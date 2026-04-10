@@ -1,9 +1,11 @@
 import { create } from "zustand"
+import type { TranscriptionBackend } from "@/types"
 
 interface SettingsState {
   deepgramApiKey: string | null
   openaiApiKey: string | null
   claudeApiKey: string | null
+  transcriptionBackend: TranscriptionBackend
   activeTranslationId: number
   audioDeviceId: string | null
   gain: number
@@ -15,6 +17,7 @@ interface SettingsState {
   setDeepgramApiKey: (key: string | null) => void
   setOpenaiApiKey: (key: string | null) => void
   setClaudeApiKey: (key: string | null) => void
+  setTranscriptionBackend: (backend: TranscriptionBackend) => void
   setActiveTranslationId: (id: number) => void
   setAudioDeviceId: (id: string | null) => void
   setGain: (gain: number) => void
@@ -28,6 +31,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   deepgramApiKey: null,
   openaiApiKey: null,
   claudeApiKey: null,
+  transcriptionBackend: "auto",
   activeTranslationId: 1,
   audioDeviceId: null,
   gain: 1.0,
@@ -39,6 +43,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setDeepgramApiKey: (deepgramApiKey) => set({ deepgramApiKey }),
   setOpenaiApiKey: (openaiApiKey) => set({ openaiApiKey }),
   setClaudeApiKey: (claudeApiKey) => set({ claudeApiKey }),
+  setTranscriptionBackend: (transcriptionBackend) => set({ transcriptionBackend }),
   setActiveTranslationId: (activeTranslationId) => set({ activeTranslationId }),
   setAudioDeviceId: (audioDeviceId) => set({ audioDeviceId }),
   setGain: (gain) => set({ gain }),

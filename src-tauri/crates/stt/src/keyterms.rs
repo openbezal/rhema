@@ -76,11 +76,10 @@ pub fn bible_keyterms() -> Vec<String> {
 
     // Common abbreviations
     let abbreviations = [
-        "Gen", "Exod", "Lev", "Num", "Deut", "Josh", "Judg", "Sam", "Kgs", "Chr", "Neh",
-        "Esth", "Ps", "Prov", "Eccl", "Isa", "Jer", "Lam", "Ezek", "Dan", "Hos", "Obad",
-        "Mic", "Nah", "Hab", "Zeph", "Hag", "Zech", "Mal", "Matt", "Mk", "Lk", "Jn", "Rom",
-        "Cor", "Gal", "Eph", "Phil", "Col", "Thess", "Tim", "Tit", "Phlm", "Heb", "Jas",
-        "Pet", "Rev",
+        "Gen", "Exod", "Lev", "Num", "Deut", "Josh", "Judg", "Sam", "Kgs", "Chr", "Neh", "Esth",
+        "Ps", "Prov", "Eccl", "Isa", "Jer", "Lam", "Ezek", "Dan", "Hos", "Obad", "Mic", "Nah",
+        "Hab", "Zeph", "Hag", "Zech", "Mal", "Matt", "Mk", "Lk", "Jn", "Rom", "Cor", "Gal", "Eph",
+        "Phil", "Col", "Thess", "Tim", "Tit", "Phlm", "Heb", "Jas", "Pet", "Rev",
     ];
     terms.extend(abbreviations.iter().map(|s| s.to_string()));
 

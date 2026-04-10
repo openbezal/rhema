@@ -6,7 +6,7 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 
 ## Features
 
-- **Real-time speech-to-text** via Deepgram (WebSocket streaming + REST fallback)
+- **Real-time speech-to-text** via whisper.cpp (local default) with optional Deepgram fallback
 - **Multi-strategy verse detection**
   - Direct reference parsing (Aho-Corasick automaton + fuzzy matching)
   - Semantic search (Qwen3-0.6B ONNX embeddings + HNSW vector index)
@@ -31,14 +31,14 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 | **AI/ML** | ONNX Runtime (Qwen3-0.6B embeddings), Aho-Corasick, Fuse.js |
 | **Database** | SQLite via rusqlite (bundled) with FTS5 |
 | **Broadcast** | NDI 6 SDK via dynamic loading (libloading FFI) |
-| **STT** | Deepgram WebSocket + REST (tokio-tungstenite) |
+| **STT** | whisper.cpp via `whisper-rs` (local default) + Deepgram fallback |
 
 ### Rust Crates
 
 | Crate | Purpose |
 |---|---|
 | `rhema-audio` | Audio device enumeration, capture, VAD (cpal) |
-| `rhema-stt` | Deepgram STT streaming + REST fallback |
+| `rhema-stt` | whisper.cpp local transcription + Deepgram fallback |
 | `rhema-bible` | SQLite Bible DB, FTS5 search, cross-references |
 | `rhema-detection` | Verse detection pipeline: direct, semantic, quotation, ensemble merger, sentence buffer, sermon context, reading mode |
 | `rhema-broadcast` | NDI video frame output via FFI |
@@ -51,7 +51,7 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 - [Rust](https://rustup.rs/) toolchain (stable, 1.77.2+)
 - [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (platform-specific system dependencies)
 - [Python 3](https://www.python.org/) (for downloading copyrighted translations and embedding model export)
-- [Deepgram API key](https://deepgram.com/) (for speech-to-text)
+- [Deepgram API key](https://deepgram.com/) (optional, for cloud fallback only)
 
 ## Getting Started
 
@@ -86,20 +86,39 @@ Reads all JSON files from `data/sources/`, creates `data/rhema.db` with FTS5 sea
 bun run build:bible
 ```
 
-### Step 3: Set up environment
+### Step 3: Download the local Whisper.cpp model
 
-Create a `.env` file in the project root:
+This app uses whisper.cpp locally by default. Download the balanced English model into `models/whisper/`:
+
+```bash
+bun run download:whisper-model
+```
+
+The default is `ggml-small.en.bin`, which is the recommended starting point for local transcription.
+If you want a faster smoke test first, download the tiny model instead:
+
+```bash
+WHISPER_MODEL=tiny.en bun run download:whisper-model
+```
+
+To force the app to use it, set `WHISPER_MODEL=tiny.en` before launching Rhema.
+
+On macOS, the build enables Metal/Core ML support in whisper-rs automatically.
+
+### Step 4 (optional): Set up Deepgram fallback
+
+Create a `.env` file in the project root only if you want cloud fallback or to force Deepgram mode:
 
 ```
 DEEPGRAM_API_KEY=your_key_here
 ```
 
-### Step 4 (optional): Download & export ONNX model
+### Step 5 (optional): Download & export ONNX model
 
 Required for semantic search (both precomputing embeddings and runtime detection). Uses `optimum-cli` to export Qwen3-Embedding-0.6B from HuggingFace to ONNX format and quantize to INT8 for ARM64.
 
 ```bash
-pip install optimum-onnx
+pip install optimum-onnx onnxruntime
 bun run download:model
 ```
 
@@ -114,7 +133,7 @@ To re-quantize separately:
 bun run quantize:model
 ```
 
-### Step 5 (optional): Precompute verse embeddings for semantic search
+### Step 6 (optional): Precompute verse embeddings for semantic search
 
 First, export KJV verses from the database to JSON:
 
@@ -126,7 +145,7 @@ Then compute embeddings. There are three methods — Option A is recommended:
 
 **Option A — Python + ONNX Runtime (recommended):**
 
-Uses the **exact same ONNX model** the Tauri app loads at runtime, guaranteeing embeddings are in the same vector space. Auto-selects INT8 quantized model if available, falls back to FP32. Requires the ONNX model from Step 4.
+Uses the **exact same ONNX model** the Tauri app loads at runtime, guaranteeing embeddings are in the same vector space. Auto-selects INT8 quantized model if available, falls back to FP32. Requires the ONNX model from Step 5.
 
 ```bash
 pip install onnxruntime tokenizers numpy
@@ -144,7 +163,7 @@ bun run precompute:embeddings-py
 
 **Option C — Rust ONNX binary (CPU only):**
 
-Same ONNX model as Option A, compiled as a Rust binary. Requires the ONNX model from Step 4.
+Same ONNX model as Option A, compiled as a Rust binary. Requires the ONNX model from Step 5.
 
 ```bash
 bun run precompute:embeddings
@@ -152,7 +171,7 @@ bun run precompute:embeddings
 
 All three produce binary files in `embeddings/`: `kjv-qwen3-0.6b.bin` (embeddings) and `kjv-qwen3-0.6b-ids.bin` (verse IDs).
 
-### Step 6 (optional): Download NDI SDK for broadcast output
+### Step 7 (optional): Download NDI SDK for broadcast output
 
 ```bash
 bun run download:ndi-sdk
@@ -190,7 +209,7 @@ rhema/
 ├── src-tauri/                    # Rust backend (Tauri v2)
 │   ├── crates/
 │   │   ├── audio/                # Audio capture & metering (cpal)
-│   │   ├── stt/                  # Deepgram STT (WebSocket + REST)
+│   │   ├── stt/                  # Local whisper.cpp STT + Deepgram fallback
 │   │   ├── bible/                # SQLite Bible DB, search, cross-references
 │   │   ├── detection/            # Verse detection pipeline
 │   │   │   ├── direct/           # Aho-Corasick + fuzzy reference parsing
@@ -207,9 +226,11 @@ rhema/
 │   ├── precompute-embeddings.py  # Embeddings via sentence-transformers (GPU)
 │   ├── precompute-embeddings-onnx.py  # Embeddings via ONNX Runtime (recommended)
 │   ├── download-model.ts         # Export & quantize Qwen3 ONNX model
+│   ├── download-whisper-model.ts # Download whisper.cpp ggml model into models/whisper/
 │   ├── download-ndi-sdk.ts       # Download NDI SDK libraries
 │   └── schema.sql                # Database schema
 ├── models/                       # ML models (gitignored)
+│   └── whisper/                  # whisper.cpp ggml model downloads
 ├── embeddings/                   # Precomputed vectors (gitignored)
 ├── sdk/ndi/                      # NDI SDK files (downloaded)
 └── build/                        # Vite build output
@@ -228,6 +249,7 @@ rhema/
 | `typecheck` | TypeScript type checking |
 | `preview` | Preview production build |
 | `download:bible-data` | Download public domain Bible translations + cross-references |
+| `download:whisper-model` | Download the local whisper.cpp ggml model into `models/whisper/` |
 | `build:bible` | Build SQLite Bible database from JSON sources |
 | `download:model` | Export Qwen3-Embedding-0.6B to ONNX + quantize to INT8 |
 | `export:verses` | Export KJV verses to JSON for embedding precomputation |
@@ -243,4 +265,4 @@ Create a `.env` file in the project root:
 
 | Variable | Required | Description |
 |---|---|---|
-| `DEEPGRAM_API_KEY` | Yes | API key for Deepgram speech-to-text |
+| `DEEPGRAM_API_KEY` | No | Optional Deepgram speech-to-text fallback or cloud-only mode |

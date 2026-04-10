@@ -10,6 +10,8 @@ use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
 
+use rhema_audio::AudioFrame;
+
 use crate::error::SttError;
 use crate::keyterms::bible_keyterms;
 use crate::types::{SttConfig, TranscriptEvent, Word};
@@ -93,7 +95,7 @@ impl DeepgramClient {
     /// Connect to Deepgram and stream audio from `audio_rx`, emitting transcript events to `event_tx`.
     pub async fn connect(
         &self,
-        audio_rx: Receiver<Vec<i16>>,
+        audio_rx: Receiver<AudioFrame>,
         event_tx: mpsc::Sender<TranscriptEvent>,
     ) -> Result<(), SttError> {
         if self.config.api_key.is_empty() {
@@ -151,7 +153,7 @@ impl DeepgramClient {
     /// Attempt a single WebSocket connection and run send/receive loops.
     async fn try_connect(
         &self,
-        audio_rx: Receiver<Vec<i16>>,
+        audio_rx: Receiver<AudioFrame>,
         event_tx: mpsc::Sender<TranscriptEvent>,
         cancelled: Arc<AtomicBool>,
     ) -> Result<(), SttError> {
@@ -219,8 +221,8 @@ impl DeepgramClient {
                     }
 
                     match audio_rx.recv_timeout(Duration::from_millis(50)) {
-                        Ok(samples) => {
-                            for sample in &samples {
+                        Ok(frame) => {
+                            for sample in &frame.samples {
                                 batch_buf.extend_from_slice(&sample.to_le_bytes());
                             }
                             if batch_buf.len() >= batch_byte_threshold {

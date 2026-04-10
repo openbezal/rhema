@@ -15,6 +15,8 @@ export interface TranscriptSegment {
   timestamp: number
 }
 
+export type TranscriptionBackend = "auto" | "local" | "deepgram"
+
 export type TranscriptEventPayload =
   | {
       type: "partial"

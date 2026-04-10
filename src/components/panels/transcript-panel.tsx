@@ -24,6 +24,7 @@ export function TranscriptPanel() {
   const connectionStatus = useTranscriptStore((s) => s.connectionStatus)
   const audioLevel = useAudioStore((s) => s.level)
   const deepgramApiKey = useSettingsStore((s) => s.deepgramApiKey)
+  const transcriptionBackend = useSettingsStore((s) => s.transcriptionBackend)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Listen for Tauri events
@@ -145,6 +146,7 @@ export function TranscriptPanel() {
         apiKey: deepgramApiKey ?? "",
         deviceId: settings.audioDeviceId,
         gain: settings.gain,
+        backend: transcriptionBackend,
       })
       useTranscriptStore.getState().setTranscribing(true)
     } catch (e) {

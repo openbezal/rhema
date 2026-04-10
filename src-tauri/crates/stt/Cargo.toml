@@ -14,7 +14,14 @@ reqwest = { version = "0.12", features = ["json"], optional = true }
 url = "2"
 futures-util = "0.3"
 crossbeam-channel = "0.5"
+rhema-audio = { path = "../audio" }
 
 [features]
 default = ["rest-fallback"]
 rest-fallback = ["reqwest"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal", "coreml"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = "0.16"

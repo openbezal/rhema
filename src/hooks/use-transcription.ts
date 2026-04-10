@@ -1,6 +1,6 @@
 import { useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
-import { useTranscriptStore } from "@/stores"
+import { useTranscriptStore, useSettingsStore } from "@/stores"
 import { useTauriEvent } from "./use-tauri-event"
 import type { TranscriptSegment } from "@/types"
 
@@ -12,6 +12,10 @@ interface TranscriptPartialPayload {
 
 export function useTranscription() {
   const store = useTranscriptStore()
+  const transcriptionBackend = useSettingsStore((s) => s.transcriptionBackend)
+  const deepgramApiKey = useSettingsStore((s) => s.deepgramApiKey)
+  const audioDeviceId = useSettingsStore((s) => s.audioDeviceId)
+  const gain = useSettingsStore((s) => s.gain)
 
   // Listen for transcript events from Rust
   useTauriEvent<TranscriptPartialPayload>("transcript_partial", (payload) => {
@@ -31,9 +35,14 @@ export function useTranscription() {
   })
 
   const startTranscription = useCallback(async () => {
-    await invoke("start_transcription")
+    await invoke("start_transcription", {
+      apiKey: deepgramApiKey ?? "",
+      deviceId: audioDeviceId,
+      gain,
+      backend: transcriptionBackend,
+    })
     store.setTranscribing(true)
-  }, [store])
+  }, [audioDeviceId, deepgramApiKey, gain, store, transcriptionBackend])
 
   const stopTranscription = useCallback(async () => {
     await invoke("stop_transcription")

@@ -4,8 +4,8 @@
  * IMPORTANT: The onnx-community export has KV cache inputs (text-generation format).
  * We need to export it ourselves using optimum-cli with --task feature-extraction.
  *
- * This script runs the optimum-cli export, which requires Python with optimum-onnx installed:
- *   pip install optimum-onnx
+ * This script runs the optimum-cli export, which requires Python with optimum-onnx and onnxruntime installed:
+ *   pip install optimum-onnx onnxruntime
  *
  * Run: bun run data/download-model.ts
  */
@@ -41,7 +41,7 @@ async function main() {
   const exitCode = await proc.exited
   if (exitCode !== 0) {
     console.error("\n❌ Export failed. Make sure optimum-onnx is installed:")
-    console.error("   pip install optimum-onnx")
+    console.error("   pip install optimum-onnx onnxruntime")
     process.exit(1)
   }
 

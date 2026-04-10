@@ -13,6 +13,7 @@
     "tauri": "tauri",
     "test": "vitest",
     "download:bible-data": "bun run data/download-sources.ts",
+    "download:whisper-model": "bun run data/download-whisper-model.ts",
     "build:bible": "bun run data/build-bible-db.ts",
     "download:model": "bun run data/download-model.ts",
     "export:verses": "bun run data/compute-embeddings.ts",

@@ -45,7 +45,7 @@ import type { DeviceInfo } from "@/types/audio"
 /*  Nav definition                                                            */
 /* -------------------------------------------------------------------------- */
 
-type NavSection = "audio" | "bible" | "display" | "api-keys"
+type NavSection = "audio" | "bible" | "display" | "transcription"
 
 const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
   {
@@ -64,8 +64,8 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
     icon: <TvIcon strokeWidth={2} />,
   },
   {
-    name: "API Keys",
-    id: "api-keys",
+    name: "Transcription",
+    id: "transcription",
     icon: <KeyIcon strokeWidth={2} />,
   },
 ]
@@ -256,13 +256,50 @@ function DisplayModeSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Section: API Keys                                                         */
+/*  Section: Transcription                                                    */
 /* -------------------------------------------------------------------------- */
 
-function ApiKeysSection() {
-  const { deepgramApiKey, setDeepgramApiKey } = useSettingsStore()
+interface LocalModelStatus {
+  model_name: string
+  model_path: string | null
+  exists: boolean
+  size_bytes: number | null
+  note: string
+}
+
+interface TranscriptionStatus {
+  backend: "auto" | "local" | "deepgram"
+  recommended_backend: "auto" | "local" | "deepgram"
+  local_model: LocalModelStatus
+  deepgram_key_configured: boolean
+}
+
+function TranscriptionSection() {
+  const {
+    deepgramApiKey,
+    setDeepgramApiKey,
+    transcriptionBackend,
+    setTranscriptionBackend,
+  } = useSettingsStore()
   const [keyValue, setKeyValue] = useState(deepgramApiKey ?? "")
   const [saved, setSaved] = useState(false)
+  const [status, setStatus] = useState<TranscriptionStatus | null>(null)
+  const [loadingStatus, setLoadingStatus] = useState(true)
+
+  useEffect(() => {
+    async function loadStatus() {
+      try {
+        const result = await invoke<TranscriptionStatus>("get_transcription_status")
+        setStatus(result)
+      } catch (e) {
+        console.error("Failed to load transcription status:", e)
+      } finally {
+        setLoadingStatus(false)
+      }
+    }
+
+    loadStatus()
+  }, [])
 
   const handleSave = () => {
     setDeepgramApiKey(keyValue || null)
@@ -270,12 +307,98 @@ function ApiKeysSection() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const modelReady = status?.local_model.exists ?? false
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Deepgram API Key
+            Local Whisper.cpp Model
+          </label>
+          {modelReady ? (
+            <Badge variant="outline" className="text-[0.5rem]">
+              Ready
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[0.5rem]">
+              Missing
+            </Badge>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3 text-[0.625rem] leading-relaxed text-muted-foreground">
+          {loadingStatus ? (
+            "Checking local model..."
+          ) : status?.local_model.exists ? (
+            <>
+              <div className="text-foreground">
+                {status.local_model.model_name}
+              </div>
+              <div className="mt-1 break-all">
+                {status.local_model.model_path}
+              </div>
+            </>
+          ) : (
+            <div>{status?.local_model.note ?? "Local model not found."}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Transcription Source
+        </label>
+
+        <RadioGroup
+          value={transcriptionBackend}
+          onValueChange={(v) => setTranscriptionBackend(v as "auto" | "local" | "deepgram")}
+          className="gap-3"
+        >
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary/20">
+            <RadioGroupItem value="auto" className="mt-0.5" />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-foreground">Auto</span>
+                <Badge variant="outline" className="text-[0.5rem]">
+                  Recommended
+                </Badge>
+              </div>
+              <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
+                Prefer local Whisper.cpp whenever the model is available, and
+                fall back to Deepgram only if a key is configured and the local
+                setup is missing.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary/20">
+            <RadioGroupItem value="local" className="mt-0.5" />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-foreground">Local only</span>
+              <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
+                Always use the on-device Whisper.cpp model and never fall back
+                to cloud transcription.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary/20">
+            <RadioGroupItem value="deepgram" className="mt-0.5" />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-foreground">Deepgram only</span>
+              <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
+                Use the cloud backend explicitly. This requires a configured API
+                key.
+              </p>
+            </div>
+          </label>
+        </RadioGroup>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Deepgram Fallback Key
           </label>
           {deepgramApiKey && (
             <Badge variant="outline" className="text-[0.5rem]">
@@ -303,8 +426,8 @@ function ApiKeysSection() {
           </Button>
         </div>
         <p className="text-[0.625rem] text-muted-foreground">
-          Required for live transcription. Get a key at{" "}
-          <span className="text-primary">deepgram.com</span>
+          Optional fallback when local Whisper.cpp is unavailable, or required
+          if you select Deepgram only.
         </p>
       </div>
     </div>
@@ -318,7 +441,7 @@ function ApiKeysSection() {
 const sectionTitles: Record<NavSection, string> = {
   audio: "Audio",
   display: "Display Mode",
-  "api-keys": "API Keys",
+  transcription: "Transcription",
 }
 
 /* -------------------------------------------------------------------------- */
@@ -425,7 +548,7 @@ const sectionComponents: Record<NavSection, React.FC> = {
   audio: AudioSection,
   bible: BibleSection,
   display: DisplayModeSection,
-  "api-keys": ApiKeysSection,
+  transcription: TranscriptionSection,
 }
 
 /* -------------------------------------------------------------------------- */
@@ -448,7 +571,7 @@ export function SettingsDialog() {
       <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[800px] lg:max-w-[900px]">
         <DialogTitle className="sr-only">Settings</DialogTitle>
         <DialogDescription className="sr-only">
-          Configure audio, display mode, and API keys.
+          Configure audio, display mode, Bible translation, and transcription.
         </DialogDescription>
         <SidebarProvider className="items-start">
           <Sidebar collapsible="none" className="hidden md:flex">
