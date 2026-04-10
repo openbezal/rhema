@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useMemo, useRef, useState, type ChangeEvent } from "react"
 import { useBroadcastStore } from "@/stores"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Input } from "@/components/ui/input"
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { parseImportedThemes, serializeThemes } from "@/lib/theme-transfer"
 import {
   PlusIcon,
   HeartIcon,
@@ -104,6 +105,7 @@ export function ThemeLibrary() {
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
+  const importInputRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
 
@@ -128,8 +130,53 @@ export function ThemeLibrary() {
     }
   }
 
+  const handleImportClick = () => {
+    importInputRef.current?.click()
+  }
+
+  const handleImportThemes = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    try {
+      const importedThemes = parseImportedThemes(await file.text())
+      const importedCount = useBroadcastStore.getState().importThemes(importedThemes)
+      window.alert(
+        importedCount === 1
+          ? "Imported 1 theme."
+          : `Imported ${importedCount} themes.`,
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Theme import failed."
+      window.alert(message)
+    }
+  }
+
+  const handleExportAll = () => {
+    const contents = serializeThemes(themes)
+    const blob = new Blob([contents], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    const stamp = new Date().toISOString().slice(0, 10)
+
+    anchor.href = url
+    anchor.download = `rhema-themes-${stamp}.json`
+    anchor.click()
+
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex h-full flex-col border-r border-border bg-card">
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={handleImportThemes}
+      />
+
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-3">
         <span className="text-lg font-semibold text-foreground">Themes</span>
@@ -167,11 +214,19 @@ export function ThemeLibrary() {
 
       {/* Import / Export */}
       <div className="flex gap-1.5 px-3 pb-3">
-        <Button variant="outline" className="flex-1 border-border bg-transparent">
+        <Button
+          variant="outline"
+          className="flex-1 border-border bg-transparent"
+          onClick={handleImportClick}
+        >
           <UploadIcon className="size-2.5" />
           Import
         </Button>
-        <Button variant="outline" className="flex-1 border-border bg-transparent">
+        <Button
+          variant="outline"
+          className="flex-1 border-border bg-transparent"
+          onClick={handleExportAll}
+        >
           <DownloadIcon className="size-2.5" />
           Export All
         </Button>

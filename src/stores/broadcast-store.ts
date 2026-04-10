@@ -2,6 +2,8 @@ import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import { resolveRenderableTheme } from "@/lib/renderable-theme"
+import { sanitizeImportedThemes } from "@/lib/theme-transfer"
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -21,6 +23,7 @@ interface BroadcastState {
   // Theme management
   loadThemes: () => void
   saveTheme: (theme: BroadcastTheme) => void
+  importThemes: (themes: BroadcastTheme[]) => number
   deleteTheme: (id: string) => void
   duplicateTheme: (id: string) => void
   setActiveTheme: (id: string) => void
@@ -70,6 +73,14 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
   return result
 }
 
+function shouldSyncDraftForOutput(
+  outputId: "main" | "alt",
+  state: Pick<BroadcastState, "activeThemeId" | "altActiveThemeId" | "editingThemeId" | "draftTheme">,
+) {
+  const themeId = outputId === "alt" ? state.altActiveThemeId : state.activeThemeId
+  return Boolean(state.draftTheme && state.editingThemeId === themeId)
+}
+
 export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   themes: [...BUILTIN_THEMES],
   activeThemeId: BUILTIN_THEMES[0].id,
@@ -84,12 +95,23 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   loadThemes: () => {
     set({ themes: [...BUILTIN_THEMES] })
   },
-  saveTheme: (theme) =>
+  saveTheme: (theme) => {
     set((s) => ({
       themes: s.themes.some((t) => t.id === theme.id)
         ? s.themes.map((t) => (t.id === theme.id ? theme : t))
         : [...s.themes, theme],
-    })),
+    }))
+    get().syncBroadcastOutput()
+  },
+  importThemes: (themes) => {
+    const importedThemes = sanitizeImportedThemes(themes, get().themes)
+    if (importedThemes.length === 0) return 0
+
+    set((state) => ({
+      themes: [...state.themes, ...importedThemes],
+    }))
+    return importedThemes.length
+  },
   deleteTheme: (id) =>
     set((s) => ({ themes: s.themes.filter((t) => t.id !== id || t.builtin) })),
   duplicateTheme: (id) => {
@@ -111,7 +133,12 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     const s = get()
     const themeId = outputId === "alt" ? s.altActiveThemeId : s.activeThemeId
     const label = outputId === "alt" ? "broadcast-alt" : "broadcast"
-    const theme = s.themes.find((t) => t.id === themeId) ?? s.themes[0]
+    const theme = resolveRenderableTheme({
+      themes: s.themes,
+      themeId,
+      draftTheme: shouldSyncDraftForOutput(outputId as "main" | "alt", s) ? s.draftTheme : null,
+      editingThemeId: s.editingThemeId,
+    })
     if (!theme) return
 
     void emitTo(label, "broadcast:verse-update", {
@@ -139,8 +166,14 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
 
   // Designer
   setDesignerOpen: (isDesignerOpen) => {
+    const wasEditingActiveTheme =
+      get().editingThemeId === get().activeThemeId ||
+      get().editingThemeId === get().altActiveThemeId
     if (!isDesignerOpen) {
       set({ isDesignerOpen, editingThemeId: null, draftTheme: null, selectedElement: null })
+      if (wasEditingActiveTheme) {
+        get().syncBroadcastOutput()
+      }
     } else {
       set({ isDesignerOpen })
     }
@@ -153,17 +186,39 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       draftTheme: { ...theme, updatedAt: Date.now() },
       selectedElement: null,
     })
+    if (themeId === get().activeThemeId) {
+      get().syncBroadcastOutputFor("main")
+    }
+    if (themeId === get().altActiveThemeId) {
+      get().syncBroadcastOutputFor("alt")
+    }
   },
-  updateDraft: (updates) =>
+  updateDraft: (updates) => {
     set((s) => ({
       draftTheme: s.draftTheme ? { ...s.draftTheme, ...updates, updatedAt: Date.now() } : null,
-    })),
-  updateDraftNested: (path, value) =>
+    }))
+    const state = get()
+    if (state.editingThemeId === state.activeThemeId) {
+      state.syncBroadcastOutputFor("main")
+    }
+    if (state.editingThemeId === state.altActiveThemeId) {
+      state.syncBroadcastOutputFor("alt")
+    }
+  },
+  updateDraftNested: (path, value) => {
     set((s) => ({
       draftTheme: s.draftTheme
         ? (setNestedValue(s.draftTheme as unknown as Record<string, unknown>, path, value) as unknown as BroadcastTheme)
         : null,
-    })),
+    }))
+    const state = get()
+    if (state.editingThemeId === state.activeThemeId) {
+      state.syncBroadcastOutputFor("main")
+    }
+    if (state.editingThemeId === state.altActiveThemeId) {
+      state.syncBroadcastOutputFor("alt")
+    }
+  },
   saveDraft: () => {
     const { draftTheme } = get()
     if (!draftTheme) return
@@ -183,6 +238,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
         editingThemeId: customTheme.id,
         draftTheme: customTheme,
       }))
+      get().syncBroadcastOutput()
     } else {
       get().saveTheme(draftTheme)
     }

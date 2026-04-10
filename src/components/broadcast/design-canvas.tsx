@@ -27,6 +27,12 @@ export function DesignCanvas() {
   const latestThemeRef = useRef<BroadcastTheme | null>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const imageRequestsRef = useRef<Map<string, Promise<HTMLImageElement>>>(new Map())
+  const dragStateRef = useRef<{
+    startX: number
+    startY: number
+    offsetX: number
+    offsetY: number
+  } | null>(null)
   const objectsRef = useRef<{
     workspace: fabric.Rect | null
     referenceRegion: fabric.Rect | null
@@ -129,6 +135,7 @@ export function DesignCanvas() {
       lockMovementY: true,
       evented: true,
       objectCaching: false,
+      hoverCursor: "move",
     })
     canvas.add(refRegion)
     objectsRef.current.referenceRegion = refRegion
@@ -150,6 +157,7 @@ export function DesignCanvas() {
       lockMovementY: true,
       evented: true,
       objectCaching: false,
+      hoverCursor: "move",
     })
     canvas.add(verseRegion)
     objectsRef.current.verseRegion = verseRegion
@@ -175,6 +183,57 @@ export function DesignCanvas() {
       useBroadcastStore.getState().setSelectedElement(null)
     })
 
+    canvas.on("mouse:down", (event) => {
+      const target = event.target
+      const scenePoint = event.scenePoint
+      const theme = latestThemeRef.current
+      if (!scenePoint || !theme) return
+
+      if (target === objectsRef.current.referenceRegion) {
+        useBroadcastStore.getState().setSelectedElement("reference")
+      } else if (target === objectsRef.current.verseRegion) {
+        useBroadcastStore.getState().setSelectedElement("verse")
+      } else {
+        dragStateRef.current = null
+        return
+      }
+
+      dragStateRef.current = {
+        startX: scenePoint.x,
+        startY: scenePoint.y,
+        offsetX: theme.layout.offsetX,
+        offsetY: theme.layout.offsetY,
+      }
+    })
+
+    canvas.on("mouse:move", (event) => {
+      const dragState = dragStateRef.current
+      const theme = latestThemeRef.current
+      const scenePoint = event.scenePoint
+      if (!dragState || !theme || !scenePoint) return
+
+      const nextOffsetX = Math.round(dragState.offsetX + (scenePoint.x - dragState.startX))
+      const nextOffsetY = Math.round(dragState.offsetY + (scenePoint.y - dragState.startY))
+      if (
+        nextOffsetX === theme.layout.offsetX &&
+        nextOffsetY === theme.layout.offsetY
+      ) {
+        return
+      }
+
+      useBroadcastStore.getState().updateDraft({
+        layout: {
+          ...theme.layout,
+          offsetX: nextOffsetX,
+          offsetY: nextOffsetY,
+        },
+      })
+    })
+
+    canvas.on("mouse:up", () => {
+      dragStateRef.current = null
+    })
+
     fabricRef.current = canvas
 
     // Auto-zoom after a tick (canvas needs to be in DOM)
@@ -187,6 +246,7 @@ export function DesignCanvas() {
     observer.observe(containerRef.current)
 
     return () => {
+      dragStateRef.current = null
       observer.disconnect()
       void canvas.dispose()
       fabricRef.current = null
