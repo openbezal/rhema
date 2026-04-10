@@ -283,10 +283,12 @@ function drawBackground(
 
       ctx.save()
 
+      const brightnessMultiplier = Math.max(0, bg.image.brightness) / 100
+
       if (bg.image.blur > 0) {
-        ctx.filter = `blur(${bg.image.blur}px) brightness(${bg.image.brightness})`
-      } else if (bg.image.brightness !== 1) {
-        ctx.filter = `brightness(${bg.image.brightness})`
+        ctx.filter = `blur(${bg.image.blur}px) brightness(${brightnessMultiplier})`
+      } else if (brightnessMultiplier !== 1) {
+        ctx.filter = `brightness(${brightnessMultiplier})`
       }
 
       let drawX = 0

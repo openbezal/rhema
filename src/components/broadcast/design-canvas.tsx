@@ -532,6 +532,10 @@ function ensureImage(
       onReady?.()
       return img
     })
+    .catch((error) => {
+      console.warn("[theme-designer] failed to load background image", { url, error })
+      throw error
+    })
     .finally(() => {
       pending.delete(url)
     })
