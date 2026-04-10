@@ -52,6 +52,8 @@ rhema-detection = { path = "crates/detection", features = ["onnx", "vector-searc
 crossbeam-channel = "0.5"
 dotenvy = "0.15"
 base64 = "0.22"
+tauri-plugin-dialog = "2.7.0"
+tauri-plugin-fs = "2.5.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

@@ -1,3 +1,4 @@
+import { pickThemeBackgroundImage } from "@/lib/theme-designer-files"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
@@ -197,17 +198,11 @@ function ImageSection() {
           size="sm"
           className="w-full"
           onClick={() => {
-            const input = document.createElement("input")
-            input.type = "file"
-            input.accept = "image/*"
-            input.onchange = (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0]
-              if (file) {
-                const url = URL.createObjectURL(file)
-                update("background.image.url", url)
-              }
-            }
-            input.click()
+            void (async () => {
+              const imageUrl = await pickThemeBackgroundImage()
+              if (!imageUrl) return
+              update("background.image.url", imageUrl)
+            })()
           }}
         >
           Change Image
