@@ -1,5 +1,8 @@
-import { useId, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { MoonIcon, SunIcon } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/components/theme-provider"
+import { cn } from "@/lib/utils"
 
 type DocumentWithTransition = Document & {
   startViewTransition?: (callback: () => void) => {
@@ -7,80 +10,71 @@ type DocumentWithTransition = Document & {
   }
 }
 
-/**
- * Two-phase toggle:
- * 1. Checkbox flips immediately → SVG stroke-draw animation plays on the live DOM
- * 2. After a delay (letting the stroke finish), the View Transition fires to
- *    dissolve the page into the new theme
- *
- * This avoids the view-transition snapshot hiding the live CSS animation.
- */
-export function ThemeModeToggle() {
+export function ThemeModeToggle({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   const { resolvedTheme, setTheme } = useTheme()
-  const id = useId()
-  const pendingRef = useRef(false)
+  const [checked, setChecked] = useState(false)
 
-  // Local checked state decoupled from theme so the checkbox
-  // can flip before the actual theme changes
-  const [localChecked, setLocalChecked] = useState(resolvedTheme === "dark")
+  useEffect(() => setChecked(resolvedTheme === "dark"), [resolvedTheme])
 
-  const isDark = resolvedTheme === "dark"
+  const handleCheckedChange = useCallback(
+    (isChecked: boolean) => {
+      setChecked(isChecked)
+      const nextTheme = isChecked ? "dark" : "light"
+      const transitionDocument = document as DocumentWithTransition
 
-  const handleChange = () => {
-    if (pendingRef.current) return
-    pendingRef.current = true
-
-    const nextTheme = isDark ? "light" : "dark"
-    const transitionDocument = document as DocumentWithTransition
-
-    // Phase 1: flip the checkbox immediately so the SVG animates
-    setLocalChecked(!localChecked)
-
-    // Phase 2: after the stroke animation has mostly played (500ms of 800ms),
-    // fire the view transition to change the actual theme
-    const delay = transitionDocument.startViewTransition ? 350 : 0
-
-    setTimeout(() => {
       if (!transitionDocument.startViewTransition) {
         setTheme(nextTheme)
-        pendingRef.current = false
         return
       }
 
-      const transition = transitionDocument.startViewTransition(() => {
+      transitionDocument.startViewTransition(() => {
         setTheme(nextTheme)
       })
-      transition.finished.then(() => {
-        pendingRef.current = false
-      })
-    }, delay)
-  }
+    },
+    [setTheme],
+  )
 
   return (
-    <div className="theme-svg-switch-wrap">
-      <input
-        id={id}
-        className="theme-svg-switch-check"
-        type="checkbox"
-        checked={localChecked}
-        onChange={handleChange}
-        aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+    <div
+      className={cn(
+        "relative flex items-center justify-center h-7 w-14",
+        className,
+      )}
+      {...props}
+    >
+      <Switch
+        checked={checked}
+        onCheckedChange={handleCheckedChange}
+        className={cn(
+          "absolute inset-0 h-full w-full rounded-full bg-input/50 transition-colors",
+          "[&>span]:h-[22px] [&>span]:w-[22px] [&>span]:rounded-full [&>span]:bg-background [&>span]:shadow [&>span]:z-10",
+          "data-[state=unchecked]:[&>span]:translate-x-0.5",
+          "data-[state=checked]:[&>span]:translate-x-[30px]",
+        )}
       />
-      <label
-        className="theme-svg-switch"
-        htmlFor={id}
-        title={`Switch to ${isDark ? "light" : "dark"} mode`}
-      >
-        <span className="sr-only">Toggle theme</span>
-        <svg viewBox="0 0 212.4992 84.4688" overflow="visible">
-          <path
-            pathLength={360}
-            fill="none"
-            stroke="currentColor"
-            d="M 42.2496 0 A 42.24 42.24 90 0 0 0 42.2496 A 42.24 42.24 90 0 0 42.2496 84.4688 A 42.24 42.24 90 0 0 84.4992 42.2496 A 42.24 42.24 90 0 0 42.2496 0 A 42.24 42.24 90 0 0 0 42.2496 A 42.24 42.24 90 0 0 42.2496 84.4688 L 170.2496 84.4688 A 42.24 42.24 90 0 0 212.4992 42.2496 A 42.24 42.24 90 0 0 170.2496 0 A 42.24 42.24 90 0 0 128 42.2496 A 42.24 42.24 90 0 0 170.2496 84.4688 A 42.24 42.24 90 0 0 212.4992 42.2496 A 42.24 42.24 90 0 0 170.2496 0 L 42.2496 0"
-          />
-        </svg>
-      </label>
+
+      <span className="pointer-events-none absolute left-1.5 inset-y-0 z-0 flex items-center justify-center">
+        <SunIcon
+          size={12}
+          className={cn(
+            "transition-all duration-200 ease-out",
+            checked ? "text-muted-foreground/70" : "text-foreground scale-110",
+          )}
+        />
+      </span>
+
+      <span className="pointer-events-none absolute right-1.5 inset-y-0 z-0 flex items-center justify-center">
+        <MoonIcon
+          size={12}
+          className={cn(
+            "transition-all duration-200 ease-out",
+            checked ? "text-foreground scale-110" : "text-muted-foreground/70",
+          )}
+        />
+      </span>
     </div>
   )
 }
