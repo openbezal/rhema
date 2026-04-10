@@ -109,4 +109,42 @@ describe("broadcast store sync", () => {
       }),
     )
   })
+
+  it("renames both the saved theme and the current draft", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+
+    useBroadcastStore.setState({
+      editingThemeId: theme.id,
+      draftTheme: theme,
+    })
+
+    useBroadcastStore.getState().renameTheme(theme.id, "New Theme Name")
+
+    const state = useBroadcastStore.getState()
+    expect(state.themes.find((entry) => entry.id === theme.id)?.name).toBe("New Theme Name")
+    expect(state.draftTheme?.name).toBe("New Theme Name")
+  })
+
+  it("falls back to the first remaining theme when deleting the active theme", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const [firstTheme] = useBroadcastStore.getState().themes
+    useBroadcastStore.getState().duplicateTheme(firstTheme.id)
+    const customTheme = useBroadcastStore.getState().themes.find((theme) => !theme.builtin)
+
+    expect(customTheme).toBeTruthy()
+
+    useBroadcastStore.setState({
+      activeThemeId: customTheme!.id,
+      editingThemeId: customTheme!.id,
+      draftTheme: customTheme!,
+    })
+
+    useBroadcastStore.getState().deleteTheme(customTheme!.id)
+
+    const state = useBroadcastStore.getState()
+    expect(state.activeThemeId).toBe(firstTheme.id)
+    expect(state.editingThemeId).toBeNull()
+    expect(state.draftTheme).toBeNull()
+  })
 })

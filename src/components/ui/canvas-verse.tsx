@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, memo } from "react"
 import { renderVerse } from "@/lib/verse-renderer"
+import { useThemeImageCache } from "@/lib/theme-image-cache"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +18,7 @@ export const CanvasVerse = memo(function CanvasVerse({
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+  const { imageCache, imageVersion } = useThemeImageCache(theme)
 
   // Measure container width with ResizeObserver
   useEffect(() => {
@@ -50,8 +52,8 @@ export const CanvasVerse = memo(function CanvasVerse({
 
     ctx.scale(dpr, dpr)
     const scale = displayW / theme.resolution.width
-    renderVerse(ctx, theme, verse, { scale })
-  }, [theme, verse, containerWidth])
+    renderVerse(ctx, theme, verse, { scale, imageCache })
+  }, [theme, verse, containerWidth, imageCache, imageVersion])
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>

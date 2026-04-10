@@ -23,6 +23,7 @@ interface BroadcastState {
   // Theme management
   loadThemes: () => void
   saveTheme: (theme: BroadcastTheme) => void
+  renameTheme: (id: string, name: string) => void
   importThemes: (themes: BroadcastTheme[]) => number
   deleteTheme: (id: string) => void
   duplicateTheme: (id: string) => void
@@ -103,6 +104,22 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     }))
     get().syncBroadcastOutput()
   },
+  renameTheme: (id, name) => {
+    const nextName = name.trim()
+    if (!nextName) return
+
+    set((state) => ({
+      themes: state.themes.map((theme) =>
+        theme.id === id
+          ? { ...theme, name: nextName, updatedAt: Date.now() }
+          : theme,
+      ),
+      draftTheme:
+        state.draftTheme?.id === id
+          ? { ...state.draftTheme, name: nextName, updatedAt: Date.now() }
+          : state.draftTheme,
+    }))
+  },
   importThemes: (themes) => {
     const importedThemes = sanitizeImportedThemes(themes, get().themes)
     if (importedThemes.length === 0) return 0
@@ -112,8 +129,27 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     }))
     return importedThemes.length
   },
-  deleteTheme: (id) =>
-    set((s) => ({ themes: s.themes.filter((t) => t.id !== id || t.builtin) })),
+  deleteTheme: (id) => {
+    set((state) => {
+      const themeToDelete = state.themes.find((theme) => theme.id === id)
+      if (!themeToDelete || themeToDelete.builtin) {
+        return state
+      }
+
+      const remainingThemes = state.themes.filter((theme) => theme.id !== id)
+      const fallbackThemeId = remainingThemes[0]?.id ?? BUILTIN_THEMES[0].id
+
+      return {
+        themes: remainingThemes,
+        activeThemeId: state.activeThemeId === id ? fallbackThemeId : state.activeThemeId,
+        altActiveThemeId: state.altActiveThemeId === id ? fallbackThemeId : state.altActiveThemeId,
+        editingThemeId: state.editingThemeId === id ? null : state.editingThemeId,
+        draftTheme: state.draftTheme?.id === id ? null : state.draftTheme,
+        selectedElement: state.draftTheme?.id === id ? null : state.selectedElement,
+      }
+    })
+    get().syncBroadcastOutput()
+  },
   duplicateTheme: (id) => {
     const s = get()
     const source = s.themes.find((t) => t.id === id)
