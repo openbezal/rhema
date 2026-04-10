@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react"
 import { useBroadcastStore } from "@/stores"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Input } from "@/components/ui/input"
@@ -47,14 +47,47 @@ function ThemeCard({
   isEditing: boolean
   onDelete: () => void
   onMakeActive: () => void
-  onRename: () => void
+  onRename: (name: string) => void
   onSelect: () => void
 }) {
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [pendingName, setPendingName] = useState(theme.name)
+
+  useEffect(() => {
+    setPendingName(theme.name)
+  }, [theme.name])
+
+  const commitRename = () => {
+    const nextName = pendingName.trim()
+    if (!nextName) {
+      setPendingName(theme.name)
+      setIsRenaming(false)
+      return
+    }
+
+    onRename(nextName)
+    setIsRenaming(false)
+  }
+
+  const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      commitRename()
+      return
+    }
+
+    if (event.key === "Escape") {
+      setPendingName(theme.name)
+      setIsRenaming(false)
+    }
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={() => {
+        if (!isRenaming) onSelect()
+      }}
       className={cn(
         "group relative flex w-full flex-col gap-1.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted/50",
         isEditing && "ring-2 ring-primary"
@@ -82,9 +115,21 @@ function ThemeCard({
       {/* Info */}
       <div className="flex items-center gap-1.5 px-0.5">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium text-foreground">
-            {theme.name}
-          </p>
+          {isRenaming ? (
+            <Input
+              autoFocus
+              value={pendingName}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setPendingName(event.target.value)}
+              onBlur={commitRename}
+              onKeyDown={handleRenameKeyDown}
+              className="h-7"
+            />
+          ) : (
+            <p className="truncate text-xs font-medium text-foreground">
+              {theme.name}
+            </p>
+          )}
           {isActive && (
             <p className="text-[0.5rem] text-muted-foreground">Default</p>
           )}
@@ -106,7 +151,7 @@ function ThemeCard({
           className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation()
-            onRename()
+            setIsRenaming(true)
           }}
         >
           <MoreHorizontalIcon className="size-3" />
@@ -133,7 +178,7 @@ function ThemeCard({
           className="h-6 px-2 text-[0.625rem]"
           onClick={(event) => {
             event.stopPropagation()
-            onRename()
+            setIsRenaming(true)
           }}
         >
           Rename
@@ -179,16 +224,7 @@ export function ThemeLibrary() {
   const customThemes = filteredThemes.filter((t) => !t.builtin)
 
   const handleNewTheme = () => {
-    const firstTheme = themes[0]
-    if (firstTheme) {
-      useBroadcastStore.getState().duplicateTheme(firstTheme.id)
-    }
-  }
-
-  const handleRenameTheme = (theme: BroadcastTheme) => {
-    const nextName = window.prompt("Enter a new theme name.", theme.name)?.trim()
-    if (!nextName || nextName === theme.name) return
-    useBroadcastStore.getState().renameTheme(theme.id, nextName)
+    useBroadcastStore.getState().createTheme()
   }
 
   const handleDeleteTheme = async (theme: BroadcastTheme) => {
@@ -214,7 +250,7 @@ export function ThemeLibrary() {
         isEditing={theme.id === editingThemeId}
         onDelete={() => void handleDeleteTheme(theme)}
         onMakeActive={() => useBroadcastStore.getState().setActiveTheme(theme.id)}
-        onRename={() => handleRenameTheme(theme)}
+        onRename={(name) => useBroadcastStore.getState().renameTheme(theme.id, name)}
         onSelect={() =>
           useBroadcastStore.getState().startEditing(theme.id)
         }

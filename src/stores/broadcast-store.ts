@@ -22,6 +22,7 @@ interface BroadcastState {
 
   // Theme management
   loadThemes: () => void
+  createTheme: () => void
   saveTheme: (theme: BroadcastTheme) => void
   renameTheme: (id: string, name: string) => void
   importThemes: (themes: BroadcastTheme[]) => number
@@ -82,6 +83,20 @@ function shouldSyncDraftForOutput(
   return Boolean(state.draftTheme && state.editingThemeId === themeId)
 }
 
+function uniqueThemeName(themes: BroadcastTheme[], baseName: string) {
+  const existingNames = new Set(themes.map((theme) => theme.name))
+  if (!existingNames.has(baseName)) {
+    return baseName
+  }
+
+  let suffix = 2
+  while (existingNames.has(`${baseName} ${suffix}`)) {
+    suffix += 1
+  }
+
+  return `${baseName} ${suffix}`
+}
+
 export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   themes: [...BUILTIN_THEMES],
   activeThemeId: BUILTIN_THEMES[0].id,
@@ -95,6 +110,29 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
 
   loadThemes: () => {
     set({ themes: [...BUILTIN_THEMES] })
+  },
+  createTheme: () => {
+    const state = get()
+    const sourceThemeId = state.editingThemeId ?? state.activeThemeId
+    const sourceTheme = state.themes.find((theme) => theme.id === sourceThemeId) ?? state.themes[0]
+    if (!sourceTheme) return
+
+    const newTheme: BroadcastTheme = {
+      ...sourceTheme,
+      id: crypto.randomUUID(),
+      name: uniqueThemeName(state.themes, "Untitled"),
+      builtin: false,
+      pinned: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+
+    set((currentState) => ({
+      themes: [...currentState.themes, newTheme],
+      editingThemeId: newTheme.id,
+      draftTheme: newTheme,
+      selectedElement: null,
+    }))
   },
   saveTheme: (theme) => {
     set((s) => ({

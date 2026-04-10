@@ -345,13 +345,18 @@ function TextBoxSection() {
     <div className="flex flex-col gap-3 border-t pt-3">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold">Text Box</h4>
-        <input
-          type="checkbox"
-          checked={textBox.enabled}
-          onChange={(e) => update("textBox.enabled", e.target.checked)}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-      </div>
+          <input
+            type="checkbox"
+            checked={textBox.enabled}
+            onChange={(e) => {
+              update("textBox.enabled", e.target.checked)
+              if (e.target.checked && textBox.opacity === 0) {
+                update("textBox.opacity", 0.5)
+              }
+            }}
+            className="h-4 w-4 rounded border-input accent-primary"
+          />
+        </div>
 
       {textBox.enabled && (
         <div className="flex flex-col gap-3">

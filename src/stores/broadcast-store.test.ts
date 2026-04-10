@@ -126,6 +126,20 @@ describe("broadcast store sync", () => {
     expect(state.draftTheme?.name).toBe("New Theme Name")
   })
 
+  it("creates a new untitled custom theme and starts editing it", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+
+    useBroadcastStore.getState().createTheme()
+
+    const state = useBroadcastStore.getState()
+    const createdTheme = state.themes.find((theme) => theme.id === state.editingThemeId)
+
+    expect(createdTheme).toBeTruthy()
+    expect(createdTheme?.builtin).toBe(false)
+    expect(createdTheme?.name).toBe("Untitled")
+    expect(state.draftTheme?.id).toBe(createdTheme?.id)
+  })
+
   it("falls back to the first remaining theme when deleting the active theme", async () => {
     const { useBroadcastStore } = await import("./broadcast-store")
     const [firstTheme] = useBroadcastStore.getState().themes

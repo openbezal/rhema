@@ -595,6 +595,44 @@ function rectForAlignedText(
   }
 }
 
+function clampToBounds(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function unionRects(rects: VerseLayoutRect[]) {
+  if (rects.length === 0) return null
+
+  const minX = Math.min(...rects.map((rect) => rect.x))
+  const minY = Math.min(...rects.map((rect) => rect.y))
+  const maxX = Math.max(...rects.map((rect) => rect.x + rect.width))
+  const maxY = Math.max(...rects.map((rect) => rect.y + rect.height))
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}
+
+function paddedRect(
+  rect: VerseLayoutRect,
+  padding: number,
+  bounds: { width: number; height: number },
+): VerseLayoutRect {
+  const x = clampToBounds(rect.x - padding, 0, bounds.width)
+  const y = clampToBounds(rect.y - padding, 0, bounds.height)
+  const maxX = clampToBounds(rect.x + rect.width + padding, 0, bounds.width)
+  const maxY = clampToBounds(rect.y + rect.height + padding, 0, bounds.height)
+
+  return {
+    x,
+    y,
+    width: Math.max(0, maxX - x),
+    height: Math.max(0, maxY - y),
+  }
+}
+
 export function computeVerseLayoutMetrics(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
@@ -775,15 +813,24 @@ function renderVerseImpl(
 
   // Draw text box if enabled
   if (scaledTheme.textBox.enabled) {
+    const textContentRect = unionRects(
+      [metrics.referenceRect, metrics.verseRect].filter(
+        (rect): rect is VerseLayoutRect => rect !== null,
+      ),
+    )
+    const textBoxRect = textContentRect
+      ? paddedRect(textContentRect, scaledTheme.textBox.padding, scaledTheme.resolution)
+      : metrics.textAreaRect
+
     ctx.save()
     ctx.globalAlpha = (options?.opacity ?? 1) * scaledTheme.textBox.opacity
     ctx.fillStyle = scaledTheme.textBox.color
     roundRect(
       ctx,
-      metrics.textAreaRect.x,
-      metrics.textAreaRect.y,
-      metrics.textAreaRect.width,
-      metrics.textAreaRect.height,
+      textBoxRect.x,
+      textBoxRect.y,
+      textBoxRect.width,
+      textBoxRect.height,
       scaledTheme.textBox.borderRadius,
     )
     ctx.fill()
