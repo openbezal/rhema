@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { ThemeDesigner } from "@/components/broadcast/theme-designer"
 import { BroadcastSettings } from "@/components/broadcast/broadcast-settings"
+import { ThemeModeToggle } from "@/components/controls/theme-mode-toggle"
 import { useAudioStore, useTranscriptStore, useBroadcastStore } from "@/stores"
 
 export function TransportBar() {
@@ -40,6 +41,7 @@ export function TransportBar() {
           <LevelMeter level={audioLevel.rms} bars={4} />
         </div>
         <LiveIndicator active={isTranscribing} />
+        <ThemeModeToggle />
         <Button
           variant="ghost"
           size="icon-sm"
