@@ -43,6 +43,7 @@ async function main() {
       "optimum[exporters,onnxruntime]",
       "onnx",
       "onnxruntime",
+      "accelerate",
     ],
     {
       stdout: "inherit",
