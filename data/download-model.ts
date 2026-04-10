@@ -16,23 +16,12 @@
 import { join } from "node:path"
 
 const MODELS_DIR = join(import.meta.dir, "..", "models", "qwen3-embedding-0.6b")
-const MODELS_DIR_INT8 = join(
-  import.meta.dir,
-  "..",
-  "models",
-  "qwen3-embedding-0.6b-int8"
-)
+const MODELS_DIR_INT8 = join(import.meta.dir, "..", "models", "qwen3-embedding-0.6b-int8")
 
 async function main() {
-  console.log(
-    "\n🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)...\n"
-  )
-  console.log(
-    "  This downloads the model from HuggingFace and converts it to ONNX format."
-  )
-  console.log(
-    "  The export uses --task feature-extraction to avoid KV cache inputs."
-  )
+  console.log("\n🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)...\n")
+  console.log("  This downloads the model from HuggingFace and converts it to ONNX format.")
+  console.log("  The export uses --task feature-extraction to avoid KV cache inputs.")
   console.log("  This may take a few minutes on first run.\n")
 
   const proc = Bun.spawn(
