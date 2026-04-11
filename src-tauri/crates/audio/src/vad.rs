@@ -82,6 +82,17 @@ impl Vad {
         self.state
     }
 
+    /// Reset the VAD state (e.g., when stopping transcription).
+    pub fn reset(&mut self) {
+        self.state = VadState::Silence;
+        self.voice_count = 0;
+        self.silence_count = 0;
+        self.utterance_frames = 0;
+        self.pre_buffer.clear();
+    }
+}
+
+impl Vad {
     /// Process an audio frame and return frames to forward (may be empty).
     ///
     /// During Silence: frames are buffered but not forwarded.
@@ -180,15 +191,6 @@ impl Vad {
                 }
             }
         }
-    }
-
-    /// Reset the VAD state (e.g., when stopping transcription).
-    pub fn reset(&mut self) {
-        self.state = VadState::Silence;
-        self.voice_count = 0;
-        self.silence_count = 0;
-        self.utterance_frames = 0;
-        self.pre_buffer.clear();
     }
 }
 
