@@ -33,12 +33,27 @@ impl std::fmt::Debug for DeepgramClient {
 }
 
 impl DeepgramClient {
+    /// Create a new DeepgramClient with the provided configuration.
     pub fn new(config: SttConfig) -> Self {
         Self {
             config,
             cancelled: Arc::new(AtomicBool::new(false)),
         }
     }
+
+    /// Cancel the current connection and signal shutdown.
+    pub fn stop(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+
+    /// Check if the client has been cancelled.
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::SeqCst)
+    }
+}
+
+/// URL and Request Utilities for Deepgram WebSocket connection.
+impl DeepgramClient {
 
     /// Build the Deepgram WebSocket URL with query parameters and keyword boosting.
     fn build_url(&self) -> Result<Url, SttError> {
@@ -88,15 +103,19 @@ impl DeepgramClient {
             for term in &all_keyterms {
                 q.append_pair("keyterm", term);
             }
-            log::info!(
+            log::info ! (
                 "Deepgram keyterm boosting: {} keyterms added",
                 all_keyterms.len()
             );
         }
 
-        log::info!("Deepgram WebSocket connection initialized ({} host)", url.host_str().unwrap_or("unknown"));
+        log::info ! ("Deepgram WebSocket connection initialized ({} host)", url.host_str().unwrap_or("unknown"));
         Ok(url)
     }
+}
+
+/// Main entry point for Deepgram STT streaming.
+impl DeepgramClient {
 
     /// Connect to Deepgram and stream audio from `audio_rx`, emitting transcript events to `event_tx`.
     pub async fn connect(
@@ -113,7 +132,7 @@ impl DeepgramClient {
 
         loop {
             if cancelled.load(Ordering::SeqCst) {
-                log::info!("DeepgramClient: cancelled, stopping connection loop");
+                log::info ! ("DeepgramClient: cancelled, stopping connection loop");
                 break;
             }
 
@@ -123,7 +142,7 @@ impl DeepgramClient {
             {
                 Ok(()) => {
                     // Clean shutdown
-                    log::info!("DeepgramClient: connection closed normally");
+                    log::info ! ("DeepgramClient: connection closed normally");
                     break;
                 }
                 Err(e) => {
@@ -155,7 +174,10 @@ impl DeepgramClient {
 
         Ok(())
     }
+}
 
+/// Internal WebSocket Orchestration for Deepgram.
+impl DeepgramClient {
     /// Attempt a single WebSocket connection and run send/receive loops.
     async fn try_connect(
         &self,
@@ -181,7 +203,7 @@ impl DeepgramClient {
             .await
             .map_err(|e| SttError::ConnectionFailed(e.to_string()))?;
 
-        log::info!("DeepgramClient: connected to Deepgram");
+        log::info ! ("DeepgramClient: connected to Deepgram");
         let _ = event_tx.send(TranscriptEvent::Connected).await;
 
         let (mut write, mut read) = ws_stream.split();
@@ -313,7 +335,7 @@ impl DeepgramClient {
                         }
                     }
                     Ok(Message::Close(_)) => {
-                        log::info!("DeepgramClient receiver: server closed connection");
+                        log::info ! ("DeepgramClient receiver: server closed connection");
                         break;
                     }
                     Ok(_) => {
@@ -342,11 +364,6 @@ impl DeepgramClient {
         }
 
         Ok(())
-    }
-
-    /// Cancel the current connection and signal shutdown.
-    pub fn stop(&self) {
-        self.cancelled.store(true, Ordering::SeqCst);
     }
 }
 

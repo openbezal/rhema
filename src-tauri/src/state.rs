@@ -4,6 +4,7 @@ use std::sync::Arc;
 use rhema_bible::BibleDb;
 use rhema_detection::{DetectionPipeline, QuotationMatcher, SermonContext};
 
+/// Global application state container.
 pub struct AppState {
     pub bible_db: Option<BibleDb>,
     pub http_client: reqwest::Client,
@@ -18,6 +19,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Create a new AppState instance with the provided HTTP client.
     pub fn new(http_client: reqwest::Client) -> Self {
         log::info ! ("[AppState] Initializing institutional core state engine");
         Self {

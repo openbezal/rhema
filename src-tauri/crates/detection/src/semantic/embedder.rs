@@ -37,17 +37,17 @@ impl TextEmbedder for StubEmbedder {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_stub_embedder_dimension() {
         let embedder = StubEmbedder::new(1024);
         assert_eq!(embedder.dimension(), 1024);
     }
 
-    #[test]
+    # [ test ]
     fn test_stub_embedder_returns_zeros() {
         let embedder = StubEmbedder::new(128);
         let result = embedder.embed("hello world").unwrap();

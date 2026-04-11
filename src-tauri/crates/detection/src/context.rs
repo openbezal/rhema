@@ -147,7 +147,7 @@ impl Default for SermonContext {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
@@ -161,14 +161,14 @@ mod tests {
         }
     }
 
-    #[test]
+    # [ test ]
     fn test_new_context_not_valid() {
         let ctx = SermonContext::new();
         assert!(!ctx.is_valid());
         assert_eq!(ctx.confidence_boost(1, 1), 0.0);
     }
 
-    #[test]
+    # [ test ]
     fn test_update_makes_valid() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct");
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(ctx.current_chapter(), Some(8));
     }
 
-    #[test]
+    # [ test ]
     fn test_same_book_boost() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct"); // Romans 8:28
@@ -185,7 +185,7 @@ mod tests {
         assert!((ctx.confidence_boost(45, 3) - SAME_BOOK_BOOST).abs() < f64::EPSILON);
     }
 
-    #[test]
+    # [ test ]
     fn test_same_chapter_boost() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct"); // Romans 8:28
@@ -193,7 +193,7 @@ mod tests {
         assert!((ctx.confidence_boost(45, 8) - SAME_CHAPTER_BOOST).abs() < f64::EPSILON);
     }
 
-    #[test]
+    # [ test ]
     fn test_different_book_no_boost() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct"); // Romans
@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(ctx.confidence_boost(43, 3), 0.0);
     }
 
-    #[test]
+    # [ test ]
     fn test_session_history() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct");
@@ -209,7 +209,7 @@ mod tests {
         assert_eq!(ctx.history().len(), 2);
     }
 
-    #[test]
+    # [ test ]
     fn test_clear_session() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct");
@@ -218,7 +218,7 @@ mod tests {
         assert!(ctx.history().is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_last_in_book() {
         let mut ctx = SermonContext::new();
         ctx.update(&make_ref(45, 8, 28), 0.95, "direct");  // Romans

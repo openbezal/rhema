@@ -84,7 +84,7 @@ impl Vad {
 
     /// Reset the VAD state (e.g., when stopping transcription).
     pub fn reset(&mut self) {
-        log::info!("[VAD] System reset: clearing audio buffers and resetting state machine");
+        log::info ! ("[VAD] System reset: clearing audio buffers and resetting state machine");
         self.state = VadState::Silence;
         self.voice_count = 0;
         self.silence_count = 0;

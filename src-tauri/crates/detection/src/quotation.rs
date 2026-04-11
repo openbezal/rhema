@@ -52,8 +52,9 @@ pub struct QuotationMatcher {
     verse_count: usize,
 }
 
+/// Indexing and Lifecycle operations for Quotation Matcher.
 impl QuotationMatcher {
-    /// Create an empty matcher.
+    /// Create a new, empty QuotationMatcher.
     pub fn new() -> Self {
         Self {
             verses: Vec::new(),
@@ -72,7 +73,7 @@ impl QuotationMatcher {
             let word_count = words.len();
 
             if word_count < 3 {
-                continue; // Skip very short verses
+                continue;
             }
 
             let idx = indexed.len();
@@ -92,7 +93,7 @@ impl QuotationMatcher {
         }
 
         let verse_count = indexed.len();
-        log::info!(
+        log::info ! (
             "[QUOTATION] Index built: {} verses, {} unique words",
             verse_count,
             word_index.len()
@@ -105,15 +106,15 @@ impl QuotationMatcher {
         }
     }
 
-    /// Check if the index is ready (has verses loaded).
+    /// Check if the quotation index has been populated.
     pub fn is_ready(&self) -> bool {
         self.verse_count > 0
     }
+}
 
-    /// Match a transcript against the verse index.
-    ///
-    /// Splits the transcript into sliding windows of 6+ words and
-    /// finds verses with high word overlap.
+/// Core Search and Matching Pipeline for Quotations.
+impl QuotationMatcher {
+    /// Match a transcript against the verse index and return ranked detections.
     pub fn match_transcript(&self, text: &str) -> Vec<Detection> {
         if !self.is_ready() || text.is_empty() {
             return vec![];
@@ -124,7 +125,6 @@ impl QuotationMatcher {
             return vec![];
         }
 
-        // Sliding windows of different sizes
         let mut candidates: HashMap<usize, f64> = HashMap::new();
 
         for window_size in [words.len(), words.len().min(15), words.len().min(10)] {
@@ -136,7 +136,6 @@ impl QuotationMatcher {
                 let window = &words[start..start + window_size];
                 let window_set: HashSet<&String> = window.iter().collect();
 
-                // Find candidate verses using the inverted index
                 let mut verse_hits: HashMap<usize, usize> = HashMap::new();
                 for word in &window_set {
                     if let Some(verse_indices) = self.word_index.get(*word) {
@@ -146,7 +145,6 @@ impl QuotationMatcher {
                     }
                 }
 
-                // Score candidates by word overlap
                 for (idx, hit_count) in verse_hits {
                     let verse = &self.verses[idx];
                     let overlap = hit_count as f64 / verse.word_count as f64;
@@ -160,7 +158,6 @@ impl QuotationMatcher {
             }
         }
 
-        // Sort by overlap and take top results
         let mut results: Vec<(usize, f64)> = candidates.into_iter().collect();
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(MAX_RESULTS);
@@ -174,7 +171,6 @@ impl QuotationMatcher {
             .into_iter()
             .map(|(idx, overlap)| {
                 let verse = &self.verses[idx];
-                // Scale overlap to confidence range 0.75-0.95
                 let confidence = 0.75 + (overlap - MIN_WORD_OVERLAP) * 0.40;
                 let confidence = confidence.min(0.95);
 
@@ -234,7 +230,7 @@ fn text_to_word_list(text: &str) -> Vec<String> {
         .collect()
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
@@ -255,14 +251,14 @@ mod tests {
         ]
     }
 
-    #[test]
+    # [ test ]
     fn test_build_index() {
         let matcher = QuotationMatcher::build(sample_verses());
         assert!(matcher.is_ready());
         assert_eq!(matcher.verse_count, 3);
     }
 
-    #[test]
+    # [ test ]
     fn test_match_john_316() {
         let matcher = QuotationMatcher::build(sample_verses());
         let results = matcher.match_transcript(
@@ -274,7 +270,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 16);
     }
 
-    #[test]
+    # [ test ]
     fn test_match_isaiah_40_31() {
         let matcher = QuotationMatcher::build(sample_verses());
         let results = matcher.match_transcript(
@@ -285,14 +281,14 @@ mod tests {
         assert_eq!(results[0].verse_ref.chapter, 40);
     }
 
-    #[test]
+    # [ test ]
     fn test_short_text_ignored() {
         let matcher = QuotationMatcher::build(sample_verses());
         let results = matcher.match_transcript("hello world");
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_no_match() {
         let matcher = QuotationMatcher::build(sample_verses());
         let results = matcher.match_transcript(
@@ -301,7 +297,7 @@ mod tests {
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_empty_index() {
         let matcher = QuotationMatcher::new();
         assert!(!matcher.is_ready());

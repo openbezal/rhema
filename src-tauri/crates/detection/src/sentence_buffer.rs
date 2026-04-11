@@ -95,18 +95,18 @@ impl Default for SentenceBuffer {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_sentence_ending_flushes() {
         let mut buf = SentenceBuffer::new();
         assert!(buf.append("God so loved").is_none());
         assert!(buf.append("the world.").is_some());
     }
 
-    #[test]
+    # [ test ]
     fn test_accumulates_fragments() {
         let mut buf = SentenceBuffer::new();
         buf.append("God so");
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(result.unwrap(), "God so loved the world.");
     }
 
-    #[test]
+    # [ test ]
     fn test_force_flush() {
         let mut buf = SentenceBuffer::new();
         buf.append("God so loved the world");
@@ -124,21 +124,21 @@ mod tests {
         assert!(!buf.has_content());
     }
 
-    #[test]
+    # [ test ]
     fn test_empty_buffer() {
         let mut buf = SentenceBuffer::new();
         assert!(buf.force_flush().is_none());
         assert!(buf.check_timeout().is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_question_mark_flushes() {
         let mut buf = SentenceBuffer::new();
         let result = buf.append("What does John 3:16 say?");
         assert!(result.is_some());
     }
 
-    #[test]
+    # [ test ]
     fn test_exclamation_flushes() {
         let mut buf = SentenceBuffer::new();
         buf.append("Praise the Lord");

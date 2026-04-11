@@ -131,11 +131,11 @@ impl BookMatcher {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_find_john() {
         let matcher = BookMatcher::new();
         let matches = matcher.find_books("Jesus said in John 3:16");
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(matches[0].book_number, 43);
     }
 
-    #[test]
+    # [ test ]
     fn test_find_psalm() {
         let matcher = BookMatcher::new();
         let matches = matcher.find_books("David in Psalm thirty two");
@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(matches[0].book_name, "Psalms");
     }
 
-    #[test]
+    # [ test ]
     fn test_find_numbered_book() {
         let matcher = BookMatcher::new();
         let matches = matcher.find_books("Paul wrote in 1 Corinthians 13");

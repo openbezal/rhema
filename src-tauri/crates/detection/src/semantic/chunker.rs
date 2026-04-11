@@ -97,11 +97,11 @@ impl Chunker {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_simple_sentences() {
         let chunker = Chunker::new();
         let text = "God so loved the world. He gave his only son. Whoever believes shall not perish.";
@@ -119,7 +119,7 @@ mod tests {
             .any(|c| c.contains("God so loved the world") && c.contains("He gave his only son")));
     }
 
-    #[test]
+    # [ test ]
     fn test_newline_boundaries() {
         let chunker = Chunker::new();
         let text = "The first sentence is right here\nThe second sentence is right here\nThe third sentence is right here";
@@ -137,7 +137,7 @@ mod tests {
         }));
     }
 
-    #[test]
+    # [ test ]
     fn test_short_text_filtered() {
         let chunker = Chunker::new();
         let text = "Hi. Bye.";
@@ -148,7 +148,7 @@ mod tests {
         assert!(chunks.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_no_boundary_single_chunk() {
         let chunker = Chunker::new();
         let text = "for God so loved the world that he gave his only begotten son";
@@ -158,13 +158,13 @@ mod tests {
         assert_eq!(chunks[0], text);
     }
 
-    #[test]
+    # [ test ]
     fn test_empty_text() {
         let chunker = Chunker::new();
         assert!(chunker.chunk("").is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_max_window_size() {
         let chunker = Chunker::with_params(1, 2);
         let text = "One fish. Two fish. Red fish. Blue fish.";

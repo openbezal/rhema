@@ -27,12 +27,12 @@ fn main() {
     let output_ids = get_arg(&args, "--output-ids")
         .unwrap_or_else(|| "embeddings/kjv-qwen3-0.6b-ids.bin".to_string());
 
-    log::info!("=== Rhema Verse Embedding Pre-computation ===");
-    log::info!("Model: {}", model_path);
-    log::info!("Tokenizer: {}", tokenizer_path);
-    log::info!("Verses: {}", verses_path);
-    log::info!("Output embeddings: {}", output_embeddings);
-    log::info!("Output IDs: {}", output_ids);
+    log::info ! ("=== Rhema Verse Embedding Pre-computation ===");
+    log::info ! ("Model: {}", model_path);
+    log::info ! ("Tokenizer: {}", tokenizer_path);
+    log::info ! ("Verses: {}", verses_path);
+    log::info ! ("Output embeddings: {}", output_embeddings);
+    log::info ! ("Output IDs: {}", output_ids);
 
     // Create output directory
     if let Some(parent) = PathBuf::from(&output_embeddings).parent() {
@@ -40,7 +40,7 @@ fn main() {
     }
 
     // Load the ONNX model with "passage: " prefix for document embedding
-    log::info!("Loading ONNX model...");
+    log::info ! ("Loading ONNX model...");
     let mut embedder = rhema_detection::OnnxEmbedder::load(
         &PathBuf::from(&model_path),
         &PathBuf::from(&tokenizer_path),
@@ -50,13 +50,13 @@ fn main() {
     // Use "passage: " prefix for verse embedding (Qwen3 uses asymmetric prefixes)
     embedder.set_prompt_prefix("passage: ".to_string());
 
-    log::info!(
+    log::info ! (
         "Model loaded. Embedding dimension: {}",
         rhema_detection::semantic::embedder::TextEmbedder::dimension(&embedder)
     );
 
     // Read verses JSON
-    log::info!("Reading verses from {}...", verses_path);
+    log::info ! ("Reading verses from {}...", verses_path);
     let verses_json = std::fs::read_to_string(&verses_path).expect("Failed to read verses JSON");
 
     #[derive(serde::Deserialize)]
@@ -70,7 +70,7 @@ fn main() {
     let entries: Vec<VerseEntry> =
         serde_json::from_str(&verses_json).expect("Failed to parse verses JSON");
 
-    log::info!("Loaded {} verses", entries.len());
+    log::info ! ("Loaded {} verses", entries.len());
 
     // Convert to (id, text) pairs
     let verses: Vec<(i64, String)> = entries.into_iter().map(|e| (e.id, e.text)).collect();
@@ -84,7 +84,7 @@ fn main() {
     )
     .expect("Pre-computation failed");
 
-    log::info!("=== Done! ===");
+    log::info ! ("=== Done! ===");
 }
 
 fn get_arg(args: &[String], flag: &str) -> Option<String> {

@@ -86,11 +86,11 @@ impl Default for ReferenceContext {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_context_update_and_resolve() {
         let mut ctx = ReferenceContext::new();
 
@@ -116,7 +116,7 @@ mod tests {
         assert_eq!(resolved.chapter, 3);
     }
 
-    #[test]
+    # [ test ]
     fn test_no_context() {
         let ctx = ReferenceContext::new();
         let partial = VerseRef {

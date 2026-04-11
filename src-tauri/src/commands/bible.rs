@@ -119,7 +119,7 @@ pub fn set_active_translation(
         }
     }
     app_state.active_translation_id = translation_id;
-    log::info!("[BIBLE] Active translation set to ID {}", translation_id);
+    log::info ! ("[BIBLE] Active translation set to ID {}", translation_id);
     Ok(translation_id)
 }
 

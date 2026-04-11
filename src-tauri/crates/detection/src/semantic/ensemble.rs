@@ -218,11 +218,11 @@ fn extract_concepts(text: &str) -> Vec<String> {
     concepts
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_extract_concepts() {
         let concepts = extract_concepts("God's grace and love through faith in Jesus");
         assert!(concepts.contains(&"grace".to_string()));
@@ -230,13 +230,13 @@ mod tests {
         assert!(concepts.contains(&"faith".to_string()));
     }
 
-    #[test]
+    # [ test ]
     fn test_extract_concepts_empty() {
         let concepts = extract_concepts("the weather is nice today");
         assert!(concepts.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_ensemble_threshold() {
         assert!(ENSEMBLE_THRESHOLD > 0.0);
         assert!(ORIGINAL_WEIGHT + SYNONYM_WEIGHT + CONCEPT_WEIGHT <= 1.01);

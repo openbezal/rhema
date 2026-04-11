@@ -41,7 +41,7 @@ pub fn precompute_embeddings(
     output_ids_path: &Path,
 ) -> Result<(), DetectionError> {
     let total = verses.len();
-    log::info!("Pre-computing embeddings for {} verses ...", total);
+    log::info ! ("Pre-computing embeddings for {} verses ...", total);
 
     let mut emb_file = std::fs::File::create(output_embeddings_path).map_err(|e| {
         DetectionError::Internal(format!(
@@ -76,10 +76,10 @@ pub fn precompute_embeddings(
         })?;
 
         if (i + 1) % 1000 == 0 || i + 1 == total {
-            log::info!("  embedded {}/{} verses", i + 1, total);
+            log::info ! ("  embedded {}/{} verses", i + 1, total);
         }
     }
 
-    log::info!("Pre-computation complete. Files written.");
+    log::info ! ("Pre-computation complete. Files written.");
     Ok(())
 }

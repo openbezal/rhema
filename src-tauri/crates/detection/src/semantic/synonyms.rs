@@ -423,11 +423,11 @@ impl SynonymExpander {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_synonym_expansion() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("God saved the world");
@@ -446,14 +446,14 @@ mod tests {
         );
     }
 
-    #[test]
+    # [ test ]
     fn test_original_always_first() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("the Lord is my shepherd");
         assert_eq!(variants[0], "the Lord is my shepherd");
     }
 
-    #[test]
+    # [ test ]
     fn test_max_expansions() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("God saved the world");
@@ -461,7 +461,7 @@ mod tests {
         assert!(variants.len() <= MAX_EXPANSIONS + 1);
     }
 
-    #[test]
+    # [ test ]
     fn test_no_synonyms_returns_original() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("xyzzy foobar baz");
@@ -469,7 +469,7 @@ mod tests {
         assert_eq!(variants[0], "xyzzy foobar baz");
     }
 
-    #[test]
+    # [ test ]
     fn test_empty_input() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("");
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(variants[0], "");
     }
 
-    #[test]
+    # [ test ]
     fn test_database_has_500_plus_entries() {
         let expander = SynonymExpander::new();
         assert!(
@@ -487,7 +487,7 @@ mod tests {
         );
     }
 
-    #[test]
+    # [ test ]
     fn test_faith_synonyms() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("have faith in God");
@@ -503,7 +503,7 @@ mod tests {
         );
     }
 
-    #[test]
+    # [ test ]
     fn test_sin_synonyms() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("the sin of man");
@@ -519,7 +519,7 @@ mod tests {
         );
     }
 
-    #[test]
+    # [ test ]
     fn test_forgiveness_synonyms() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("please forgive me");
@@ -535,7 +535,7 @@ mod tests {
         );
     }
 
-    #[test]
+    # [ test ]
     fn test_punctuation_preserved() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("God saved the world.");
@@ -543,7 +543,7 @@ mod tests {
         assert_eq!(variants[0], "God saved the world.");
     }
 
-    #[test]
+    # [ test ]
     fn test_worship_synonyms() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("we worship the Lord");
@@ -560,14 +560,14 @@ mod tests {
         );
     }
 
-    #[test]
+    # [ test ]
     fn test_light_synonyms() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("the light of the world");
         assert!(variants.len() > 1);
     }
 
-    #[test]
+    # [ test ]
     fn test_death_synonyms() {
         let expander = SynonymExpander::new();
         let variants = expander.expand("overcome death and sorrow");

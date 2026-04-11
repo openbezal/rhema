@@ -58,12 +58,12 @@ pub fn start(
 
     let stream = build_stream(&device, &supported_config, config.gain, sender)?;
 
-    log::info!("[AUDIO] Capture started successfully");
+    log::info ! ("[AUDIO] Capture started successfully");
     Ok(AudioCapture { stream })
 }
 
 fn select_device(host: &cpal::Host, device_id: &Option<String>) -> Result<cpal::Device, AudioError> {
-    log::info!("[AUDIO] Selecting device: {:?}", device_id);
+    log::info ! ("[AUDIO] Selecting device: {:?}", device_id);
 
     match device_id {
         Some(id) if !id.is_empty() => {
@@ -74,7 +74,7 @@ fn select_device(host: &cpal::Host, device_id: &Option<String>) -> Result<cpal::
             for d in input_devices {
                 if let Ok(name) = d.name() {
                     if name == *id {
-                        log::info!("[AUDIO]   ✓ Matched: '{}'", name);
+                        log::info ! ("[AUDIO]   ✓ Matched: '{}'", name);
                         return Ok(d);
                     }
                 }
@@ -85,7 +85,7 @@ fn select_device(host: &cpal::Host, device_id: &Option<String>) -> Result<cpal::
         }
         _ => {
             let d = host.default_input_device().ok_or(AudioError::NoInputDevices)?;
-            log::info!("[AUDIO] Using default device: '{}'", d.name().unwrap_or_default());
+            log::info ! ("[AUDIO] Using default device: '{}'", d.name().unwrap_or_default());
             Ok(d)
         }
     }

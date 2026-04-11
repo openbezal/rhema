@@ -4,6 +4,7 @@ use crate::state::AppState;
 use crate::commands::detection::DetectionResult;
 
 /// Run semantic (ONNX embedding) detection. Slow, runs in background worker.
+/// Run semantic (ONNX embedding) detection on audio transcripts.
 pub fn run(app: &AppHandle, transcript: &str) {
     log::info ! ("[DET-SEMANTIC] Running on: {:?}", &transcript[..transcript.len().min(80)]);
     let managed: State<'_, Mutex<AppState>> = app.state();

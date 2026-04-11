@@ -5,6 +5,7 @@ use crate::commands::detection::DetectionResult;
 use rhema_detection::QuotationDetection;
 
 /// Run quotation matching against all loaded Bible translations.
+/// Match audio transcripts against the quotation index.
 pub fn run(app: &AppHandle, transcript: &str) {
     {
         use rhema_detection::ReadingMode;

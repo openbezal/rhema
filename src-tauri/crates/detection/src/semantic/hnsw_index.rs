@@ -90,7 +90,7 @@ impl HnswVectorIndex {
             )));
         }
 
-        log::info!(
+        log::info ! (
             "HnswVectorIndex loaded: {} vectors, dim={}",
             num_vectors,
             dim
@@ -192,7 +192,7 @@ mod tests {
         v
     }
 
-    #[test]
+    # [ test ]
     fn test_brute_force_search() {
         let dim = 4;
         let embeddings = vec![
@@ -214,7 +214,7 @@ mod tests {
         assert!((results[0].similarity - 1.0).abs() < 1e-6);
     }
 
-    #[test]
+    # [ test ]
     fn test_empty_index() {
         let index = HnswVectorIndex::from_vecs(vec![], vec![], 4).unwrap();
         assert!(index.is_empty());
@@ -222,7 +222,7 @@ mod tests {
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_dimension_mismatch() {
         let index =
             HnswVectorIndex::from_vecs(vec![vec![1.0, 0.0]], vec![1], 2).unwrap();

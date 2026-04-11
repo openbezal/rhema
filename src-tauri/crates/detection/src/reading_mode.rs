@@ -53,8 +53,9 @@ pub struct ReadingMode {
     accumulated_text: String,
 }
 
+/// Session Control and State for Reading Mode.
 impl ReadingMode {
-    /// Create an inactive reading mode instance.
+    /// Create a new, inactive ReadingMode instance.
     pub fn new() -> Self {
         Self {
             active: false,
@@ -101,7 +102,7 @@ impl ReadingMode {
             return;
         }
 
-        log::info!(
+        log::info ! (
             "[READING] Started: {} {}:{} ({} verses loaded)",
             book_name, chapter, start_verse, loaded.len()
         );
@@ -115,8 +116,10 @@ impl ReadingMode {
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
     }
+}
 
-    /// Check if reading mode is currently active.
+/// Session State Accessors for Reading Mode.
+impl ReadingMode {
     pub fn is_active(&self) -> bool {
         self.active
     }
@@ -132,7 +135,7 @@ impl ReadingMode {
             self.active = true;
             self.last_match_time = Instant::now();
             let verse = self.verses.get(self.current_index).map(|v| v.verse_number).unwrap_or(0);
-            log::info!("[READING] Resumed at: {} {}:{}", self.book_name, self.chapter, verse);
+            log::info ! ("[READING] Resumed at: {} {}:{}", self.book_name, self.chapter, verse);
         }
     }
 
@@ -159,14 +162,16 @@ impl ReadingMode {
     /// Called when the user turns the toggle OFF.
     pub fn deactivate(&mut self) {
         if self.active || !self.verses.is_empty() {
-            log::info!("[READING] Deactivated (verses cleared)");
+            log::info ! ("[READING] Deactivated (verses cleared)");
         }
         self.active = false;
         self.verses.clear();
         self.accumulated_text.clear();
     }
+}
 
-    /// Process a transcript fragment and check if the reader has advanced.
+/// Core Processing Engine for Reading Mode Transcripts.
+impl ReadingMode {
     ///
     /// Returns `Some(ReadingAdvance)` if the reader has moved to a new verse.
     /// Returns `None` if still on the current verse or no match found.
@@ -181,7 +186,7 @@ impl ReadingMode {
         // This allows "verse N" references to re-activate.
         if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS {
             if self.active {
-                log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
+                log::info ! ("[READING] Timeout — pausing (toggle still on, verses retained)");
                 self.active = false;
             }
         }
@@ -251,8 +256,10 @@ impl ReadingMode {
 
         None
     }
+}
 
-    /// Check if the transcript contains a verse navigation command:
+/// Navigation and Advancement Logic for Reading Mode.
+impl ReadingMode {
     /// - "verse three", "verse 4" → jump to that verse
     /// - "next" / "next verse" → advance by 1
     /// - "previous verse" / "go back" → go back by 1
@@ -265,7 +272,7 @@ impl ReadingMode {
             || trimmed == "next verse." {
             let next_idx = self.current_index + 1;
             if next_idx < self.verses.len() {
-                log::info!("[READING] 'Next' command detected");
+                log::info ! ("[READING] 'Next' command detected");
                 return self.advance_to(next_idx);
             }
             return None;
@@ -276,7 +283,7 @@ impl ReadingMode {
             || trimmed == "go back" || trimmed == "go back." {
             if self.current_index > 0 {
                 let prev_idx = self.current_index - 1;
-                log::info!("[READING] 'Previous' command detected");
+                log::info ! ("[READING] 'Previous' command detected");
                 return self.advance_to(prev_idx);
             }
             return None;
@@ -293,7 +300,7 @@ impl ReadingMode {
         // Find this verse number in our loaded verses (allow forward AND backward)
         for (idx, v) in self.verses.iter().enumerate() {
             if v.verse_number == verse_num {
-                log::info!("[READING] Verse number reference detected: verse {}", verse_num);
+                log::info ! ("[READING] Verse number reference detected: verse {}", verse_num);
                 return self.advance_to(idx);
             }
         }
@@ -312,7 +319,7 @@ impl ReadingMode {
         self.accumulated_text.clear();
 
         let reference = format!("{} {}:{}", self.book_name, self.chapter, verse_number);
-        log::info!("[READING] Advanced to: {}", reference);
+        log::info ! ("[READING] Advanced to: {}", reference);
 
         Some(ReadingAdvance {
             book_number: self.book_number,
@@ -419,7 +426,7 @@ fn word_overlap(
     matches as f64 / verse_word_count as f64
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
@@ -432,14 +439,14 @@ mod tests {
         ]
     }
 
-    #[test]
+    # [ test ]
     fn test_starts_inactive() {
         let rm = ReadingMode::new();
         assert!(!rm.is_active());
         assert!(rm.current_verse().is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_start_activates() {
         let mut rm = ReadingMode::new();
 
@@ -448,7 +455,7 @@ mod tests {
         assert_eq!(rm.current_verse(), Some(28));
     }
 
-    #[test]
+    # [ test ]
     fn test_advance_on_next_verse_match() {
         let mut rm = ReadingMode::new();
 
@@ -467,7 +474,7 @@ mod tests {
         assert_eq!(advance.reference, "Acts 15:29");
     }
 
-    #[test]
+    # [ test ]
     fn test_deactivate() {
         let mut rm = ReadingMode::new();
 
@@ -477,7 +484,7 @@ mod tests {
         assert!(!rm.is_active());
     }
 
-    #[test]
+    # [ test ]
     fn test_no_match_returns_none() {
         let mut rm = ReadingMode::new();
 
@@ -487,7 +494,7 @@ mod tests {
         assert!(r.is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_word_overlap_function() {
         let transcript = text_to_word_set("for it seemed good to the holy ghost");
         let verse = text_to_word_set("For it seemed good to the Holy Ghost, and to us, to lay upon you no greater burden than these necessary things;");

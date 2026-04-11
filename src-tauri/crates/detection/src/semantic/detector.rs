@@ -208,7 +208,7 @@ impl SemanticDetector {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
     use crate::semantic::index::SearchResult;
@@ -229,20 +229,20 @@ mod tests {
         }
     }
 
-    #[test]
+    # [ test ]
     fn test_stub_returns_empty() {
         let mut detector = SemanticDetector::stub();
         let results = detector.detect("for God so loved the world");
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_stub_is_not_ready() {
         let detector = SemanticDetector::stub();
         assert!(!detector.is_ready());
     }
 
-    #[test]
+    # [ test ]
     fn test_detection_with_fake_index() {
         let fake_results = vec![
             SearchResult {
@@ -278,7 +278,7 @@ mod tests {
         }
     }
 
-    #[test]
+    # [ test ]
     fn test_threshold_adjustment() {
         let fake_results = vec![SearchResult {
             verse_id: 1001,

@@ -126,30 +126,25 @@ fn tokenize(text: &str) -> Vec<Token> {
 fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
     // Look for: Number Colon Number [Dash Number]
     for i in 0..tokens.len() {
-        if let Token::Number(chapter) = &tokens[i] {
-            if i + 2 < tokens.len() {
-                if matches!(&tokens[i + 1], Token::Colon) {
-                    if let Token::Number(verse) = &tokens[i + 2] {
-                        let mut verse_end = None;
-                        if i + 4 < tokens.len() {
-                            if matches!(&tokens[i + 3], Token::Dash) {
-                                if let Token::Number(end) = &tokens[i + 4] {
-                                    verse_end = Some(*end);
-                                }
-                            }
-                        }
-                        return Some(VerseRef {
-                            book_number: book_match.book_number,
-                            book_name: book_match.book_name.clone(),
-                            chapter: *chapter,
-                            verse_start: *verse,
-                            verse_end,
-                        });
-                    }
-                }
+        let Token::Number(chapter) = tokens[i] else { continue };
+        if i + 2 >= tokens.len() { continue; }
+        if !matches!(tokens[i + 1], Token::Colon) { continue; }
+        let Token::Number(verse) = tokens[i + 2] else { continue };
+
+        let mut verse_end = None;
+        if i + 4 < tokens.len() && matches!(tokens[i + 3], Token::Dash) {
+            if let Token::Number(end) = tokens[i + 4] {
+                verse_end = Some(end);
             }
-            // Don't break here; keep looking for a colon pattern
         }
+
+        return Some(VerseRef {
+            book_number: book_match.book_number,
+            book_name: book_match.book_name.clone(),
+            chapter,
+            verse_start: verse,
+            verse_end,
+        });
     }
     None
 }
@@ -159,42 +154,37 @@ fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRe
 /// "chapter six we will be reading from verse 10 to verse 16" → 6:10-16
 fn try_chapter_verse_spoken(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
     for i in 0..tokens.len() {
-        if let Token::Word(w) = &tokens[i] {
-            if w == "chapter" {
-                // Next token(s) should be a number (digit or spoken)
-                if let Some((chapter, next_idx)) = consume_number(tokens, i + 1) {
-                    // Scan forward (up to 12 tokens) looking for "verse" keyword.
-                    // Real speech often has filler: "chapter six we will be reading from verse 10"
-                    let scan_limit = (next_idx + 12).min(tokens.len());
-                    for j in next_idx..scan_limit {
-                        if let Token::Word(vw) = &tokens[j] {
-                            if vw == "verse" || vw == "verses" {
-                                if let Some((verse, verse_next)) =
-                                    consume_number(tokens, j + 1)
-                                {
-                                    let verse_end = scan_verse_end(tokens, verse_next);
-                                    return Some(VerseRef {
-                                        book_number: book_match.book_number,
-                                        book_name: book_match.book_name.clone(),
-                                        chapter,
-                                        verse_start: verse,
-                                        verse_end,
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    // No verse keyword found, treat as chapter-only
-                    return Some(VerseRef {
-                        book_number: book_match.book_number,
-                        book_name: book_match.book_name.clone(),
-                        chapter,
-                        verse_start: 0,
-                        verse_end: None,
-                    });
-                }
-            }
+        let Token::Word(w) = &tokens[i] else { continue };
+        if w != "chapter" { continue; }
+
+        let Some((chapter, next_idx)) = consume_number(tokens, i + 1) else { continue };
+        
+        // Scan forward (up to 12 tokens) looking for "verse" keyword.
+        let scan_limit = (next_idx + 12).min(tokens.len());
+        for j in next_idx..scan_limit {
+            let Token::Word(vw) = &tokens[j] else { continue };
+            if vw != "verse" && vw != "verses" { continue; }
+
+            let Some((verse, verse_next)) = consume_number(tokens, j + 1) else { continue };
+            let verse_end = scan_verse_end(tokens, verse_next);
+            
+            return Some(VerseRef {
+                book_number: book_match.book_number,
+                book_name: book_match.book_name.clone(),
+                chapter,
+                verse_start: verse,
+                verse_end,
+            });
         }
+
+        // No verse keyword found, treat as chapter-only
+        return Some(VerseRef {
+            book_number: book_match.book_number,
+            book_name: book_match.book_name.clone(),
+            chapter,
+            verse_start: 0,
+            verse_end: None,
+        });
     }
     None
 }
@@ -238,25 +228,24 @@ fn scan_verse_end(tokens: &[Token], start: usize) -> Option<i32> {
 /// Also scans forward for "verse" with filler words: "6 and we read verse 10"
 fn try_number_verse_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
     for i in 0..tokens.len() {
-        if let Some((chapter, next_idx)) = consume_number_at(tokens, i) {
-            // Scan forward for "verse" keyword (allow filler)
-            let scan_limit = (next_idx + 10).min(tokens.len());
-            for j in next_idx..scan_limit {
-                if let Token::Word(w) = &tokens[j] {
-                    if w == "verse" || w == "verses" {
-                        if let Some((verse, verse_next)) = consume_number(tokens, j + 1) {
-                            let verse_end = scan_verse_end(tokens, verse_next);
-                            return Some(VerseRef {
-                                book_number: book_match.book_number,
-                                book_name: book_match.book_name.clone(),
-                                chapter,
-                                verse_start: verse,
-                                verse_end,
-                            });
-                        }
-                    }
-                }
-            }
+        let Some((chapter, next_idx)) = consume_number_at(tokens, i) else { continue };
+        
+        // Scan forward for "verse" keyword (allow filler)
+        let scan_limit = (next_idx + 10).min(tokens.len());
+        for j in next_idx..scan_limit {
+            let Token::Word(w) = &tokens[j] else { continue };
+            if w != "verse" && w != "verses" { continue; }
+
+            let Some((verse, verse_next)) = consume_number(tokens, j + 1) else { continue };
+            let verse_end = scan_verse_end(tokens, verse_next);
+            
+            return Some(VerseRef {
+                book_number: book_match.book_number,
+                book_name: book_match.book_name.clone(),
+                chapter,
+                verse_start: verse,
+                verse_end,
+            });
         }
     }
     None
@@ -265,76 +254,70 @@ fn try_number_verse_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<
 /// Try to parse spoken number sequences like "thirty two verse one".
 fn try_spoken_numbers(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
     // Try to consume a spoken number at position 0, then look for "verse" keyword
-    if let Some((chapter, next_idx)) = consume_number(tokens, 0) {
-        if next_idx < tokens.len() {
-            if let Token::Word(w) = &tokens[next_idx] {
-                if w == "verse" || w == "verses" {
-                    if let Some((verse, verse_next)) = consume_number(tokens, next_idx + 1) {
-                        let mut verse_end = None;
-                        if verse_next < tokens.len() {
-                            if matches!(&tokens[verse_next], Token::Dash) {
-                                if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                                    verse_end = Some(end);
-                                }
-                            }
-                            if let Token::Word(tw) = &tokens[verse_next] {
-                                if tw == "through" || tw == "to" {
-                                    if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                                        verse_end = Some(end);
-                                    }
-                                }
-                            }
-                        }
-                        return Some(VerseRef {
-                            book_number: book_match.book_number,
-                            book_name: book_match.book_name.clone(),
-                            chapter,
-                            verse_start: verse,
-                            verse_end,
-                        });
-                    }
+    let Some((chapter, next_idx)) = consume_number(tokens, 0) else { return None };
+    if next_idx >= tokens.len() { return None; }
+
+    let Token::Word(w) = &tokens[next_idx] else { return None };
+    if w != "verse" && w != "verses" { return None; }
+
+    let Some((verse, verse_next)) = consume_number(tokens, next_idx + 1) else { return None };
+    
+    let mut verse_end = None;
+    if verse_next < tokens.len() {
+        if matches!(&tokens[verse_next], Token::Dash) {
+            if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
+                verse_end = Some(end);
+            }
+        } else if let Token::Word(tw) = &tokens[verse_next] {
+            if tw == "through" || tw == "to" {
+                if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
+                    verse_end = Some(end);
                 }
             }
         }
     }
-    None
+
+    Some(VerseRef {
+        book_number: book_match.book_number,
+        book_name: book_match.book_name.clone(),
+        chapter,
+        verse_start: verse,
+        verse_end,
+    })
 }
 
 /// Try to parse two consecutive numbers "N M" as chapter and verse.
 /// Handles: "3 16", "119 105", and also spoken: "three sixteen"
 fn try_two_numbers(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    if let Some((chapter, next_idx)) = consume_number_at(tokens, 0) {
-        if chapter > 0 {
-            if let Some((verse, verse_next)) = consume_number_at(tokens, next_idx) {
-                if verse > 0 {
-                    // Check for range: "3 16-18" or "3 16 through 18"
-                    let mut verse_end = None;
-                    if verse_next < tokens.len() {
-                        if matches!(&tokens[verse_next], Token::Dash) {
-                            if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                                verse_end = Some(end);
-                            }
-                        }
-                        if let Token::Word(tw) = &tokens[verse_next] {
-                            if tw == "through" || tw == "to" {
-                                if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                                    verse_end = Some(end);
-                                }
-                            }
-                        }
-                    }
-                    return Some(VerseRef {
-                        book_number: book_match.book_number,
-                        book_name: book_match.book_name.clone(),
-                        chapter,
-                        verse_start: verse,
-                        verse_end,
-                    });
+    let (chapter, next_idx) = consume_number_at(tokens, 0)?;
+    if chapter <= 0 { return None; }
+
+    let (verse, verse_next) = consume_number_at(tokens, next_idx)?;
+    if verse <= 0 { return None; }
+
+    // Check for range: "3 16-18" or "3 16 through 18"
+    let mut verse_end = None;
+    if verse_next < tokens.len() {
+        if matches!(&tokens[verse_next], Token::Dash) {
+            if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
+                verse_end = Some(end);
+            }
+        } else if let Token::Word(tw) = &tokens[verse_next] {
+            if tw == "through" || tw == "to" {
+                if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
+                    verse_end = Some(end);
                 }
             }
         }
     }
-    None
+
+    Some(VerseRef {
+        book_number: book_match.book_number,
+        book_name: book_match.book_name.clone(),
+        chapter,
+        verse_start: verse,
+        verse_end,
+    })
 }
 
 /// Try to extract a number from a single token.
@@ -474,7 +457,7 @@ pub fn parse_spoken_number(word: &str) -> Option<i32> {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
     use crate::direct::automaton::BookMatch;
@@ -488,7 +471,7 @@ mod tests {
         }
     }
 
-    #[test]
+    # [ test ]
     fn test_colon_reference() {
         let bm = make_book_match("John", 43, 4);
         let text = "John 3:16 says something";
@@ -498,7 +481,7 @@ mod tests {
         assert!(result.verse_end.is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_colon_range() {
         let bm = make_book_match("Romans", 45, 6);
         let text = "Romans 8:28-30 is powerful";
@@ -508,7 +491,7 @@ mod tests {
         assert_eq!(result.verse_end, Some(30));
     }
 
-    #[test]
+    # [ test ]
     fn test_spoken_chapter_verse() {
         let bm = make_book_match("Psalms", 19, 5);
         let text = "Psalm thirty two verse one now says";
@@ -517,7 +500,7 @@ mod tests {
         assert_eq!(result.verse_start, 1);
     }
 
-    #[test]
+    # [ test ]
     fn test_chapter_only() {
         let bm = make_book_match("Genesis", 1, 7);
         let text = "Genesis 3 is about the fall";
@@ -526,7 +509,7 @@ mod tests {
         assert_eq!(result.verse_start, 0);
     }
 
-    #[test]
+    # [ test ]
     fn test_chapter_verse_keywords() {
         let bm = make_book_match("Isaiah", 23, 6);
         let text = "Isaiah chapter 53 verse 5";
@@ -535,7 +518,7 @@ mod tests {
         assert_eq!(result.verse_start, 5);
     }
 
-    #[test]
+    # [ test ]
     fn test_two_numbers_space_separated() {
         let bm = make_book_match("John", 43, 4);
         let text = "John 3 16 for God so loved";
@@ -544,7 +527,7 @@ mod tests {
         assert_eq!(result.verse_start, 16);
     }
 
-    #[test]
+    # [ test ]
     fn test_two_numbers_genesis() {
         let bm = make_book_match("Genesis", 1, 7);
         let text = "Genesis 1 1 in the beginning";
@@ -553,7 +536,7 @@ mod tests {
         assert_eq!(result.verse_start, 1);
     }
 
-    #[test]
+    # [ test ]
     fn test_two_numbers_large() {
         let bm = make_book_match("Psalms", 19, 5);
         let text = "Psalm 119 105 thy word is a lamp";
@@ -562,7 +545,7 @@ mod tests {
         assert_eq!(result.verse_start, 105);
     }
 
-    #[test]
+    # [ test ]
     fn test_spoken_number_parser() {
         assert_eq!(parse_spoken_number("one"), Some(1));
         assert_eq!(parse_spoken_number("twenty"), Some(20));
@@ -571,7 +554,7 @@ mod tests {
         assert_eq!(parse_spoken_number("dog"), None);
     }
 
-    #[test]
+    # [ test ]
     fn test_chapter_verse_with_filler_words() {
         let bm = make_book_match("Ephesians", 49, 10);
         let text = "Ephesians chapter six we will be reading from verse 10 to verse 16";
@@ -581,7 +564,7 @@ mod tests {
         assert_eq!(result.verse_end, Some(16));
     }
 
-    #[test]
+    # [ test ]
     fn test_chapter_verse_with_and_filler() {
         let bm = make_book_match("John", 43, 4);
         let text = "John chapter three and I want us to look at verse sixteen";
@@ -590,7 +573,7 @@ mod tests {
         assert_eq!(result.verse_start, 16);
     }
 
-    #[test]
+    # [ test ]
     fn test_chapter_verse_range_to() {
         let bm = make_book_match("Genesis", 1, 7);
         let text = "Genesis chapter one verse one to verse five";
@@ -600,7 +583,7 @@ mod tests {
         assert_eq!(result.verse_end, Some(5));
     }
 
-    #[test]
+    # [ test ]
     fn test_number_verse_with_filler() {
         let bm = make_book_match("Romans", 45, 6);
         let text = "Romans 8 and let's look at verse 28";

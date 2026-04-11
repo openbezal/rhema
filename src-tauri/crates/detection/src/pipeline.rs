@@ -116,11 +116,11 @@ impl Default for DetectionPipeline {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_pipeline_direct_only() {
         let mut pipeline = DetectionPipeline::new();
         let results = pipeline.process("Jesus said in John 3:16 that God loved the world");
@@ -130,14 +130,14 @@ mod tests {
         assert_eq!(results[0].detection.verse_ref.verse_start, 16);
     }
 
-    #[test]
+    # [ test ]
     fn test_pipeline_no_match() {
         let mut pipeline = DetectionPipeline::new();
         let results = pipeline.process("The weather is nice today");
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_pipeline_multiple_references() {
         let mut pipeline = DetectionPipeline::new();
         let results =
@@ -145,19 +145,19 @@ mod tests {
         assert_eq!(results.len(), 2);
     }
 
-    #[test]
+    # [ test ]
     fn test_pipeline_semantic_not_ready_by_default() {
         let pipeline = DetectionPipeline::new();
         assert!(!pipeline.has_semantic());
     }
 
-    #[test]
+    # [ test ]
     fn test_pipeline_cloud_not_ready_by_default() {
         let pipeline = DetectionPipeline::new();
         assert!(!pipeline.has_cloud());
     }
 
-    #[test]
+    # [ test ]
     fn test_pipeline_auto_queue_for_direct() {
         let mut pipeline = DetectionPipeline::new();
         let results = pipeline.process("John 3:16");

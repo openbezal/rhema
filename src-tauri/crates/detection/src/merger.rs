@@ -37,7 +37,9 @@ pub struct DetectionMerger {
     last_auto_display: Option<Instant>,
 }
 
+/// Core result ranking and merging logic for Bible detection.
 impl DetectionMerger {
+    /// Create a new DetectionMerger with default mainnet-tier configuration.
     pub fn new() -> Self {
         Self {
             confidence_threshold: DEFAULT_CONFIDENCE_THRESHOLD,
@@ -48,25 +50,14 @@ impl DetectionMerger {
     }
 
     /// Merge direct and semantic detections into a ranked list.
-    ///
-    /// 1. Combine all detections.
-    /// 2. Dedup: if direct and semantic found the same verse, keep direct.
-    /// 3. Sort by confidence descending.
-    /// 4. Drop anything below `confidence_threshold`.
-    /// 5. Mark `auto_queued = true` for items above `auto_queue_threshold`.
-    /// 6. Apply cooldown: if last auto-display was < cooldown_ms ago,
-    ///    don't auto-queue.
     pub fn merge(
         &mut self,
         direct: Vec<Detection>,
         semantic: Vec<Detection>,
     ) -> Vec<MergedDetection> {
-        // 1. Combine
         let mut all: Vec<Detection> = Vec::with_capacity(direct.len() + semantic.len());
         all.extend(direct);
 
-        // 2. Dedup: only add semantic detections whose verse is not already
-        //    present from the direct pass.
         for s in semantic {
             let dominated = all.iter().any(|d| {
                 matches!(d.source, DetectionSource::DirectReference)
@@ -79,17 +70,14 @@ impl DetectionMerger {
             }
         }
 
-        // 3. Sort by confidence descending
         all.sort_by(|a, b| {
             b.confidence
                 .partial_cmp(&a.confidence)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // 4. Drop below threshold
         all.retain(|d| d.confidence >= self.confidence_threshold);
 
-        // 5 & 6. Build merged list with auto-queue decisions
         let now = Instant::now();
         let cooldown_ok = match self.last_auto_display {
             Some(last) => now.duration_since(last).as_millis() as u64 >= self.cooldown_ms,
@@ -112,10 +100,7 @@ impl DetectionMerger {
         results
     }
 
-    /// Apply context boosting to a list of detections.
-    ///
-    /// Boosts confidence for detections in the same book/chapter as
-    /// the current sermon context. Call this BEFORE `merge()`.
+    /// Apply context boosting to detections matching recent session history.
     pub fn apply_context_boost(
         detections: &mut [Detection],
         context: &crate::context::SermonContext,
@@ -130,7 +115,10 @@ impl DetectionMerger {
             }
         }
     }
+}
 
+/// Configuration and Management for DetectionMerger.
+impl DetectionMerger {
     /// Update the minimum confidence threshold.
     pub fn set_confidence_threshold(&mut self, threshold: f64) {
         self.confidence_threshold = threshold;
@@ -153,7 +141,7 @@ impl Default for DetectionMerger {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
     use crate::types::{DetectionSource, VerseRef};
@@ -182,7 +170,7 @@ mod tests {
         }
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_dedup_keeps_direct() {
         let mut merger = DetectionMerger::new();
 
@@ -212,7 +200,7 @@ mod tests {
         assert!((results[0].detection.confidence - 0.96).abs() < f64::EPSILON);
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_keeps_distinct_verses() {
         let mut merger = DetectionMerger::new();
 
@@ -240,7 +228,7 @@ mod tests {
         assert_eq!(results[1].detection.verse_ref.book_name, "Romans");
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_drops_below_threshold() {
         let mut merger = DetectionMerger::new();
 
@@ -269,7 +257,7 @@ mod tests {
         assert_eq!(results[0].detection.verse_ref.book_name, "John");
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_auto_queue() {
         let mut merger = DetectionMerger::new();
 
@@ -288,7 +276,7 @@ mod tests {
         assert!(results[0].auto_queued);
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_auto_queue_below_threshold() {
         let mut merger = DetectionMerger::new();
 
@@ -307,7 +295,7 @@ mod tests {
         assert!(!results[0].auto_queued);
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_sort_order() {
         let mut merger = DetectionMerger::new();
 
@@ -346,7 +334,7 @@ mod tests {
         assert!((results[2].detection.confidence - 0.60).abs() < f64::EPSILON);
     }
 
-    #[test]
+    # [ test ]
     fn test_merger_empty_inputs() {
         let mut merger = DetectionMerger::new();
         let results = merger.merge(vec![], vec![]);

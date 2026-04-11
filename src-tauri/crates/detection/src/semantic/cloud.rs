@@ -65,11 +65,11 @@ impl Default for CloudBooster {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_default_state() {
         let booster = CloudBooster::new();
         assert!(!booster.is_enabled());
@@ -78,14 +78,14 @@ mod tests {
         assert!((booster.confidence_gate() - 0.80).abs() < f64::EPSILON);
     }
 
-    #[test]
+    # [ test ]
     fn test_enable_with_api_key() {
         let mut booster = CloudBooster::new();
         booster.set_api_key("sk-test-key".to_string());
         assert!(booster.is_enabled());
     }
 
-    #[test]
+    # [ test ]
     fn test_should_boost_when_enabled() {
         let mut booster = CloudBooster::new();
         booster.set_api_key("sk-test-key".to_string());
@@ -98,14 +98,14 @@ mod tests {
         assert!(!booster.should_boost(0.95));
     }
 
-    #[test]
+    # [ test ]
     fn test_should_not_boost_when_disabled() {
         let booster = CloudBooster::new();
         // Even low similarity should not boost when disabled
         assert!(!booster.should_boost(0.10));
     }
 
-    #[test]
+    # [ test ]
     fn test_custom_confidence_gate() {
         let mut booster = CloudBooster::new();
         booster.set_api_key("sk-test-key".to_string());

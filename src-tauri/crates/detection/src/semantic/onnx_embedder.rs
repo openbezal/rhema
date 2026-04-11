@@ -63,7 +63,7 @@ impl OnnxEmbedder {
             .unwrap_or(4);
         let intra_threads = (num_cpus / 2).max(1);
 
-        log::info!(
+        log::info ! (
             "OnnxEmbedder: configuring session with {} intra-op threads (of {} CPUs), graph optimization ALL",
             intra_threads, num_cpus
         );
@@ -79,18 +79,22 @@ impl OnnxEmbedder {
             .commit_from_file(model_path)
             .map_err(|e| DetectionError::Internal(format!("ort load model: {e}")))?;
 
-        let mut tokenizer = Tokenizer::from_file(tokenizer_path)
-            .map_err(|e| DetectionError::Internal(format!("tokenizer load: {e}")))?;
+        Ok(Self {
+            session: Mutex::new(session),
+            tokenizer,
+            dim: dim as usize,
+            prompt_prefix: String::new(),
+            has_position_ids,
+        })
+    }
+}
 
-        // Ensure the tokenizer pads and truncates to our max length.
-        let pad_id = tokenizer
-            .get_vocab(true)
-            .get("[PAD]")
-            .copied()
-            .unwrap_or(0);
-        let pad_token = tokenizer
-            .id_to_token(pad_id)
-            .unwrap_or_else(|| "[PAD]".to_string());
+/// Tokenizer and Configuration utilities.
+impl OnnxEmbedder {
+    /// Configure the tokenizer with padding and truncation parameters.
+    fn configure_tokenizer(tokenizer: &mut Tokenizer) -> Result<(), DetectionError> {
+        let pad_id = tokenizer.get_vocab(true).get("[PAD]").copied().unwrap_or(0);
+        let pad_token = tokenizer.id_to_token(pad_id).unwrap_or_else(|| "[PAD]".to_string());
 
         tokenizer.with_padding(Some(tokenizers::PaddingParams {
             strategy: tokenizers::PaddingStrategy::Fixed(Self::MAX_TOKENS),
@@ -99,25 +103,30 @@ impl OnnxEmbedder {
             ..Default::default()
         }));
 
-        tokenizer
-            .with_truncation(Some(tokenizers::TruncationParams {
-                max_length: Self::MAX_TOKENS,
-                ..Default::default()
-            }))
-            .map_err(|e| DetectionError::Internal(format!("tokenizer truncation: {e}")))?;
+        tokenizer.with_truncation(Some(tokenizers::TruncationParams {
+            max_length: Self::MAX_TOKENS,
+            ..Default::default()
+        })).map_err(|e| DetectionError::Internal(format!("tokenizer truncation: {e}")))?;
+
+        Ok(())
+    }
+}
+
+/// Configuration and Metadata for OnnxEmbedder.
+impl OnnxEmbedder {
 
         let has_position_ids = session.inputs().iter().any(|i| i.name() == "position_ids");
 
         // Log all model inputs for diagnostics
         for input in session.inputs() {
-            log::info!(
+            log::info ! (
                 "ONNX model input: name='{}', type={:?}",
                 input.name(),
                 input.dtype()
             );
         }
         for output in session.outputs() {
-            log::info!(
+            log::info ! (
                 "ONNX model output: name='{}', type={:?}",
                 output.name(),
                 output.dtype()
@@ -145,7 +154,7 @@ impl OnnxEmbedder {
             ));
         }
 
-        log::info!(
+        log::info ! (
             "OnnxEmbedder loaded: dim={}, model={:?}",
             dim,
             model_path.file_name().unwrap_or_default()
@@ -155,22 +164,22 @@ impl OnnxEmbedder {
             session: Mutex::new(session),
             tokenizer: Mutex::new(tokenizer),
             dim: dim as usize,
-            // No prefix — matches the Python precompute script which embeds
-            // documents with no prefix. Symmetric mode gives highest similarity.
             prompt_prefix: String::new(),
             has_position_ids,
         })
     }
+}
 
+/// Configuration and Metadata for OnnxEmbedder.
+impl OnnxEmbedder {
     /// Override the prompt prefix prepended to every input text.
-    ///
-    /// Some models (e.g. E5) expect `"query: "` for queries and
-    /// `"passage: "` for documents.
     pub fn set_prompt_prefix(&mut self, prefix: impl Into<String>) {
         self.prompt_prefix = prefix.into();
     }
+}
 
-    /// Embed a single text string.
+/// ONNX Inference Engine for text embeddings.
+impl OnnxEmbedder {
     ///
     /// Steps:
     /// 1. Prepend the prompt prefix.
@@ -226,17 +235,10 @@ impl OnnxEmbedder {
             ]
         };
 
-        let mut session = self
-            .session
-            .lock()
-            .map_err(|e| DetectionError::Internal(format!("session lock: {e}")))?;
-
-        let outputs = session
-            .run(inputs)
-            .map_err(|e| DetectionError::Internal(format!("ort run: {e}")))?;
-
-        // Prefer `sentence_embedding` (pre-pooled by sentence-transformers, shape [1, dim]).
-        // Fall back to `token_embeddings`/`last_hidden_state` with manual pooling.
+        let mut session = self.session.lock().map_err(|e| DetectionError::Internal(format!("session lock: {e}")))?;
+        let outputs = session.run(inputs).map_err(|e| DetectionError::Internal(format!("ort run: {e}")))?;
+        
+        // Prefer `sentence_embedding` (pre-pooled), fallback to `last_hidden_state`.
         let output_value = if outputs.contains_key("sentence_embedding") {
             &outputs["sentence_embedding"]
         } else if outputs.contains_key("last_hidden_state") {
@@ -296,7 +298,7 @@ impl OnnxEmbedder {
         }
 
         let elapsed = embed_start.elapsed();
-        log::info!(
+        log::info ! (
             "[ONNX] embed() took {:?} for {} chars",
             elapsed,
             text.len()

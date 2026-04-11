@@ -172,10 +172,10 @@ impl NdiRuntime {
             drop(existing);
         }
 
-        log::info!("NDI[{}]: starting session '{}'", session_id, request.source_name);
+        log::info ! ("NDI[{}]: starting session '{}'", session_id, request.source_name);
         let session = ActiveNdiSession::create(request)?;
         let info = session.info.clone();
-        log::info!(
+        log::info ! (
             "NDI[{}]: session active — {}x{} @ {}fps",
             session_id, info.width, info.height, info.fps
         );
@@ -358,9 +358,9 @@ impl ActiveNdiSession {
         }
         self.frame_count += 1;
         if self.frame_count == 1 {
-            log::info!("NDI: first frame sent ({}x{}, {} bytes)", width, height, self.frame_buffer.len());
+            log::info ! ("NDI: first frame sent ({}x{}, {} bytes)", width, height, self.frame_buffer.len());
         } else if self.frame_count % 300 == 0 {
-            log::info!("NDI: {} frames sent", self.frame_count);
+            log::info ! ("NDI: {} frames sent", self.frame_count);
         }
         Ok(())
     }

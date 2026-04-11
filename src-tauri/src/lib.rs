@@ -5,6 +5,7 @@ mod state;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, Runtime};
 
+/// Root entry point for the Rhema application logic.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenvy::dotenv().ok();
@@ -121,7 +122,7 @@ fn setup_semantic_engine<R: Runtime>(app: &AppHandle<R>) {
     let ids_path = base_dir.join("embeddings/kjv-qwen3-0.6b-ids.bin");
 
     if !model_path.exists() || !tokenizer_path.exists() {
-        log::info!("ONNX model not found. Semantic search disabled.");
+        log::info ! ("ONNX model not found. Semantic search disabled.");
         return;
     }
 

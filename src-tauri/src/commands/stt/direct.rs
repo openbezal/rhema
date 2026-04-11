@@ -6,6 +6,7 @@ use crate::commands::detection::DetectionResult;
 
 /// Run direct (regex/pattern) detection only. Instant, no ONNX.
 /// Returns true if high-confidence results were found (>= 0.90).
+/// Process audio data for direct reference detection.
 pub fn run(app: &AppHandle, transcript: &str) -> bool {
     let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
     let mut detector = match detector_state.lock() {
@@ -51,7 +52,7 @@ pub fn run(app: &AppHandle, transcript: &str) -> bool {
                 .map(map_no_db)
                 .collect();
             for r in &results {
-                log::info!("[DET-DIRECT] Found: {} ({:.0}%) (no DB)", r.verse_ref, r.confidence * 100.0);
+                log::info ! ("[DET-DIRECT] Found: {} ({:.0}%) (no DB)", r.verse_ref, r.confidence * 100.0);
             }
             let _ = app.emit("verse_detections", &results);
             return has_high_confidence;

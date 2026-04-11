@@ -80,6 +80,7 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
 }
 
 /// Run the detection pipeline on a piece of transcript text
+/// Invoke the core detection pipeline for Bible references in the provided text.
 #[tauri::command]
 pub fn detect_verses(
     state: State<'_, Mutex<AppState>>,
@@ -92,6 +93,7 @@ pub fn detect_verses(
 }
 
 /// Check if semantic search is available
+/// Check the current status of the detection engine (Direct, Semantic, Cloud).
 #[tauri::command]
 pub fn detection_status(
     state: State<'_, Mutex<AppState>>,
@@ -106,6 +108,7 @@ pub fn detection_status(
 }
 
 /// Toggle paraphrase detection (synonym expansion) on/off
+/// Toggle paraphrase detection (synonym expansion) on or off.
 #[tauri::command]
 pub fn toggle_paraphrase_detection(
     state: State<'_, Mutex<AppState>>,
@@ -113,7 +116,7 @@ pub fn toggle_paraphrase_detection(
 ) -> Result<bool, String> {
     let mut app_state = state.lock().map_err(|e| e.to_string())?;
     app_state.detection_pipeline.set_use_synonyms(enabled);
-    log::info!("[DET] Paraphrase detection (synonyms) set to: {enabled}");
+    log::info ! ("[DET] Paraphrase detection (synonyms) set to: {enabled}");
     Ok(enabled)
 }
 
@@ -136,6 +139,7 @@ pub struct SemanticSearchResult {
     pub similarity: f64,
 }
 
+/// Perform a semantic similarity search against the Bible index.
 #[tauri::command]
 pub fn semantic_search(
     state: State<'_, Mutex<AppState>>,
@@ -179,6 +183,7 @@ pub fn semantic_search(
 
 /// Search for verses using quotation matching (word overlap).
 /// Used by the context search tab alongside semantic search.
+/// Search for Bible verses using word-overlap quotation matching.
 #[tauri::command]
 pub fn quotation_search(
     state: State<'_, Mutex<AppState>>,
@@ -241,6 +246,7 @@ pub struct QuotationSearchResult {
 }
 
 /// Get reading mode status
+/// Get the current status and position of the reading mode tracker.
 #[tauri::command]
 pub fn reading_mode_status(
     state: State<'_, Mutex<ReadingMode>>,
@@ -259,6 +265,7 @@ pub struct ReadingModeStatus {
 }
 
 /// Stop reading mode
+/// Immediately stop and deactivate the reading mode tracker.
 #[tauri::command]
 pub fn stop_reading_mode(
     state: State<'_, Mutex<ReadingMode>>,

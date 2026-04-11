@@ -42,18 +42,18 @@ impl VectorIndex for StubIndex {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_stub_index_is_empty() {
         let index = StubIndex;
         assert!(index.is_empty());
         assert_eq!(index.len(), 0);
     }
 
-    #[test]
+    # [ test ]
     fn test_stub_index_returns_empty() {
         let index = StubIndex;
         let results = index.search(&[0.0; 128], 5).unwrap();

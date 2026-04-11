@@ -54,7 +54,7 @@ pub async fn start_transcription(
         return Err(SttError::ApiKeyMissing);
     }
 
-    log::info!("Starting transcription: api_key={}..., device_id={:?}, gain={:?}",
+    log::info ! ("Starting transcription: api_key={}..., device_id={:?}, gain={:?}",
         &resolved_api_key[..8.min(resolved_api_key.len())], device_id, gain);
 
     stt_active.store(true, Ordering::SeqCst);
@@ -96,7 +96,7 @@ pub async fn start_transcription(
                 }
             };
 
-            log::info!("Audio capture started on fanout thread");
+            log::info ! ("Audio capture started on fanout thread");
 
             let mut frame_count: u64 = 0;
 
@@ -135,7 +135,7 @@ pub async fn start_transcription(
 
             // Dropping `capture` stops the cpal stream.
             capture.stop();
-            log::info!("Audio capture stopped on fanout thread");
+            log::info ! ("Audio capture stopped on fanout thread");
         })
         .map_err(|e| {
             stt_active.store(false, Ordering::SeqCst);
@@ -233,7 +233,7 @@ pub async fn start_transcription(
             }
         }
         conn_active.store(false, Ordering::SeqCst);
-        log::info!("Deepgram connection task exited");
+        log::info ! ("Deepgram connection task exited");
     });
 
     // Task B: consume TranscriptEvents, emit to frontend, run detection
@@ -353,7 +353,7 @@ pub async fn start_transcription(
                     let _ = event_app.emit("stt_error", msg);
                 }
                 TranscriptEvent::Connected => {
-                    log::info!("[STT] Connected");
+                    log::info ! ("[STT] Connected");
                     let _ = event_app.emit("stt_connected", ());
                 }
                 TranscriptEvent::Disconnected => {
@@ -363,7 +363,7 @@ pub async fn start_transcription(
             }
         }
 
-        log::info!("Transcript event consumer task exited");
+        log::info ! ("Transcript event consumer task exited");
     });
 
     Ok(())
@@ -386,6 +386,6 @@ pub fn stop_transcription(
     app_state.stt_active.store(false, Ordering::SeqCst);
     app_state.audio_active.store(false, Ordering::SeqCst);
 
-    log::info!("Transcription stop requested");
+    log::info ! ("Transcription stop requested");
     Ok(())
 }

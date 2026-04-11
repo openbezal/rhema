@@ -304,7 +304,7 @@ impl DirectDetector {
         // First check full phrases (higher confidence)
         for (pattern, abbrev) in TRANSLATION_COMMANDS {
             if lower.contains(pattern) {
-                log::info!("[DET-DIRECT] Translation command detected: {}", abbrev);
+                log::info ! ("[DET-DIRECT] Translation command detected: {}", abbrev);
                 return Some(abbrev.to_string());
             }
         }
@@ -328,7 +328,7 @@ impl DirectDetector {
                 _ => None,
             };
             if let Some(abbrev) = matched {
-                log::info!("[DET-DIRECT] Translation abbreviation detected: {}", abbrev);
+                log::info ! ("[DET-DIRECT] Translation abbreviation detected: {}", abbrev);
                 return Some(abbrev.to_string());
             }
         }
@@ -634,11 +634,11 @@ fn extract_snippet(text: &str, start: usize, end: usize) -> String {
     text[snippet_start..snippet_end].to_string()
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_basic_reference() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Jesus said in John 3:16 that God loved the world");
@@ -648,7 +648,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 16);
     }
 
-    #[test]
+    # [ test ]
     fn test_spoken_reference() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("David in Psalm thirty two verse one now says");
@@ -658,7 +658,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 1);
     }
 
-    #[test]
+    # [ test ]
     fn test_verse_range() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Let's read Romans 8:28-30 together");
@@ -669,7 +669,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_end, Some(30));
     }
 
-    #[test]
+    # [ test ]
     fn test_numbered_book() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Paul wrote in 1 Corinthians 13:4 about love");
@@ -679,7 +679,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 4);
     }
 
-    #[test]
+    # [ test ]
     fn test_chapter_only_held_as_incomplete() {
         // Chapter-only references are held as incomplete, waiting for verse completion
         let mut detector = DirectDetector::new();
@@ -689,7 +689,7 @@ mod tests {
         assert!(detector.incomplete.is_some());
     }
 
-    #[test]
+    # [ test ]
     fn test_incomplete_ref_completed_by_verse() {
         // An incomplete reference can be completed by a subsequent "verse N" text
         let mut detector = DirectDetector::new();
@@ -707,7 +707,7 @@ mod tests {
         assert!(detector.incomplete.is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_previous_verse_command() {
         let mut detector = DirectDetector::new();
         // First detect a verse
@@ -722,7 +722,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 16);
     }
 
-    #[test]
+    # [ test ]
     fn test_previous_verse_no_history() {
         let mut detector = DirectDetector::new();
         // No previous detection — should return empty
@@ -730,14 +730,14 @@ mod tests {
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_no_reference() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("The weather is nice today");
         assert!(results.is_empty());
     }
 
-    #[test]
+    # [ test ]
     fn test_spoken_chapter_verse_keywords() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Isaiah chapter fifty three verse five");
@@ -747,7 +747,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 5);
     }
 
-    #[test]
+    # [ test ]
     fn test_multiple_references() {
         let mut detector = DirectDetector::new();
         let results =
@@ -757,7 +757,7 @@ mod tests {
         assert_eq!(results[1].verse_ref.book_name, "Romans");
     }
 
-    #[test]
+    # [ test ]
     fn test_confidence_range() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("John 3:16");
@@ -766,7 +766,7 @@ mod tests {
         assert!(results[0].confidence <= 1.0);
     }
 
-    #[test]
+    # [ test ]
     fn test_detection_source() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("John 3:16");
@@ -777,7 +777,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    # [ test ]
     fn test_clean_transcript() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Please open your bibles to Ephesians chapter 6 verse 10");
@@ -785,7 +785,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "Ephesians");
     }
 
-    #[test]
+    # [ test ]
     fn test_clean_transcript_lets_turn_to() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Let's turn to Romans 8:28 and read together");
@@ -795,7 +795,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 28);
     }
 
-    #[test]
+    # [ test ]
     fn test_clean_transcript_the_bible_says_in() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("The bible says in John 3:16 that God loved the world");
@@ -803,7 +803,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "John");
     }
 
-    #[test]
+    # [ test ]
     fn test_clean_transcript_look_at() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Now look at Genesis 1:1 for the beginning");
@@ -811,7 +811,7 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "Genesis");
     }
 
-    #[test]
+    # [ test ]
     fn test_fuzzy_fallback_filipians() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Filipians chapter 4 verse 13");

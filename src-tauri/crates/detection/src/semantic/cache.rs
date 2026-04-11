@@ -40,11 +40,11 @@ impl EmbeddingCache {
     }
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
-    #[test]
+    # [ test ]
     fn test_cache_insert_and_get() {
         let mut cache = EmbeddingCache::new(10);
         let embedding = vec![1.0, 2.0, 3.0];
@@ -60,13 +60,13 @@ mod tests {
         assert_eq!(entry.1[0].verse_id, 42);
     }
 
-    #[test]
+    # [ test ]
     fn test_cache_miss() {
         let mut cache = EmbeddingCache::new(10);
         assert!(cache.get("missing").is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_cache_eviction() {
         let mut cache = EmbeddingCache::new(2);
         cache.insert("a".to_string(), (vec![1.0], vec![]));
@@ -79,7 +79,7 @@ mod tests {
         assert!(cache.get("c").is_some());
     }
 
-    #[test]
+    # [ test ]
     fn test_cache_clear() {
         let mut cache = EmbeddingCache::new(10);
         cache.insert("x".to_string(), (vec![1.0], vec![]));
