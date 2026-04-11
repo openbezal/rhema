@@ -1,3 +1,4 @@
+import { useEffect, useCallback } from "react"
 import { SparklesIcon, ChevronLeftIcon } from "lucide-react"
 import type { TooltipRenderProps } from "react-joyride"
 
@@ -9,8 +10,34 @@ export function TutorialTooltip({
   backProps,
   primaryProps,
   skipProps,
+  controls,
   tooltipProps,
 }: TooltipRenderProps) {
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault()
+        if (isLastStep) {
+          controls.skip("button_skip")
+        } else {
+          controls.next()
+        }
+      } else if (e.key === "ArrowLeft" && index > 0) {
+        e.preventDefault()
+        controls.prev()
+      } else if (e.key === "Escape") {
+        e.preventDefault()
+        controls.skip("button_close")
+      }
+    },
+    [controls, index, isLastStep]
+  )
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [handleKeyDown])
+
   return (
     <div
       {...tooltipProps}
