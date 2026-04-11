@@ -11,7 +11,11 @@ use crate::state::AppState;
 use rhema_audio::{AudioConfig, AudioFrame};
 use rhema_stt::{DeepgramClient, SttConfig, TranscriptEvent};
 
-pub mod detection;
+pub mod direct;
+pub mod semantic;
+pub mod reading;
+pub mod quotation;
+pub mod command;
 
 /// Start the full audio-capture-to-transcription pipeline.
 ///
@@ -242,7 +246,7 @@ pub async fn start_transcription(
     let sem_app = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(text) = semantic_rx.recv().await {
-            detection::run_semantic_detection(&sem_app, &text);
+            semantic::run(&sem_app, &text);
         }
     });
 
@@ -252,7 +256,7 @@ pub async fn start_transcription(
     let quot_app = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(text) = quotation_rx.recv().await {
-            detection::run_quotation_matching(&quot_app, &text);
+            quotation::run(&quot_app, &text);
         }
     });
 
@@ -279,7 +283,7 @@ pub async fn start_transcription(
                         );
 
                         // Run direct detection on partials too
-                        detection::run_direct_detection(&event_app, &transcript);
+                        direct::run(&event_app, &transcript);
                     }
                 }
                 TranscriptEvent::Final {
@@ -300,13 +304,13 @@ pub async fn start_transcription(
                         );
 
                         // Check for translation commands: "read in NIV", "switch to ESV"
-                        detection::check_translation_command(&event_app, &transcript);
+                        command::check_translation(&event_app, &transcript);
 
                         // Direct detection: instant (regex), runs on every is_final
-                        let direct_found = detection::run_direct_detection(&event_app, &transcript);
+                        let direct_found = direct::run(&event_app, &transcript);
 
                         // Reading mode: check if transcript matches expected verse
-                        detection::check_reading_mode(&event_app, &transcript, direct_found);
+                        reading::check(&event_app, &transcript, direct_found);
 
                         // Quotation matching: run on every is_final (fast, no ONNX)
                         if !direct_found {
