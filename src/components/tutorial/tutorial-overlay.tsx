@@ -18,13 +18,14 @@ export function TutorialOverlay() {
   const { theme } = useTheme()
 
   const steps = useMemo(() => {
-    const cardColor = getComputedStyle(document.documentElement)
-      .getPropertyValue("--card")
-      .trim()
+    const cardEl = document.querySelector(".bg-card")
+    const arrowColor = cardEl
+      ? getComputedStyle(cardEl).backgroundColor
+      : undefined
 
     return TUTORIAL_STEPS.map((step) => ({
       ...step,
-      arrowColor: cardColor || undefined,
+      arrowColor,
     }))
   }, [theme])
 
