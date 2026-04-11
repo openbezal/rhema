@@ -31,9 +31,10 @@ import {
   ArrowRightIcon,
   CheckIcon,
   SearchIcon,
+  PlusIcon,
 } from "lucide-react"
 import { useBible, bibleActions } from "@/hooks/use-bible"
-import { useBibleStore } from "@/stores"
+import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
@@ -543,7 +544,7 @@ export function SearchPanel() {
                   id={`verse-${verse.id}`}
                   onClick={() => handleVerseClick(verse)}
                   className={cn(
-                    "group flex cursor-pointer gap-3 rounded-lg p-3 transition-colors",
+                    "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
                     verse.id === effectiveSelectedVerseId
                       ? "border border-lime-500/50 bg-lime-500/10"
                       : "hover:bg-muted/50"
@@ -558,6 +559,29 @@ export function SearchPanel() {
                   {verse.id === effectiveSelectedVerseId && (
                     <CheckIcon className="size-4 shrink-0 text-ai-direct" />
                   )}
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className={cn(
+                      "shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                      verse.id === effectiveSelectedVerseId
+                        ? "hover:bg-lime-500/20 hover:text-lime-500"
+                        : "bg-primary/40! text-primary-foreground hover:bg-primary!"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      useQueueStore.getState().addItem({
+                        id: crypto.randomUUID(),
+                        verse,
+                        reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+                        confidence: 1,
+                        source: "manual",
+                        added_at: Date.now(),
+                      })
+                    }}
+                  >
+                    <PlusIcon className="size-3" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -594,7 +618,7 @@ export function SearchPanel() {
                     text: result.verse_text,
                   })
                 }}
-                className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50"
+                className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
               >
                 <div className="flex shrink-0 flex-row items-start gap-2">
                   <span className="text-xs font-semibold ">
@@ -609,6 +633,33 @@ export function SearchPanel() {
                 <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
                   <HighlightedText text={result.verse_text} query={contextQuery} />
                 </p>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground hover:bg-primary/80"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    useQueueStore.getState().addItem({
+                      id: crypto.randomUUID(),
+                      verse: {
+                        id: 0,
+                        translation_id: activeTranslationId,
+                        book_number: result.book_number,
+                        book_name: result.book_name,
+                        book_abbreviation: "",
+                        chapter: result.chapter,
+                        verse: result.verse,
+                        text: result.verse_text,
+                      },
+                      reference: `${result.book_name} ${result.chapter}:${result.verse}`,
+                      confidence: result.similarity,
+                      source: "manual",
+                      added_at: Date.now(),
+                    })
+                  }}
+                >
+                  <PlusIcon className="size-3" />
+                </Button>
               </div>
             ))}
           </div>
