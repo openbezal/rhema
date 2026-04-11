@@ -17,17 +17,25 @@ export function TutorialOverlay() {
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)
   const { theme } = useTheme()
 
-  const steps = useMemo(() => {
-    const cardEl = document.querySelector(".bg-card")
-    const arrowColor = cardEl
-      ? getComputedStyle(cardEl).backgroundColor
-      : undefined
+  const [arrowColor, setArrowColor] = useState<string | undefined>()
 
-    return TUTORIAL_STEPS.map((step) => ({
-      ...step,
-      arrowColor,
-    }))
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      const cardEl = document.querySelector(".bg-card")
+      if (cardEl) {
+        setArrowColor(getComputedStyle(cardEl).backgroundColor)
+      }
+    })
   }, [theme])
+
+  const steps = useMemo(
+    () =>
+      TUTORIAL_STEPS.map((step) => ({
+        ...step,
+        arrowColor,
+      })),
+    [arrowColor]
+  )
 
   useEffect(() => {
     hydrateOnboardingState().then(() => {
