@@ -38,8 +38,11 @@ import {
   CheckIcon,
   BookOpenIcon,
   RadioIcon,
+  HelpCircleIcon,
+  GraduationCapIcon,
 } from "lucide-react"
 import { useSettingsStore } from "@/stores"
+import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
 
@@ -47,7 +50,7 @@ import type { DeviceInfo } from "@/types/audio"
 /*  Nav definition                                                            */
 /* -------------------------------------------------------------------------- */
 
-type NavSection = "audio" | "bible" | "display" | "api-keys" | "remote"
+type NavSection = "audio" | "bible" | "display" | "api-keys" | "remote" | "help"
 
 const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
   {
@@ -74,6 +77,11 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
     name: "API Keys",
     id: "api-keys",
     icon: <KeyIcon strokeWidth={2} />,
+  },
+  {
+    name: "Help",
+    id: "help",
+    icon: <HelpCircleIcon strokeWidth={2} />,
   },
 ]
 
@@ -328,6 +336,7 @@ const sectionTitles: Record<NavSection, string> = {
   display: "Display Mode",
   remote: "Remote Control",
   "api-keys": "API Keys",
+  help: "Help",
 }
 
 /* -------------------------------------------------------------------------- */
@@ -681,6 +690,44 @@ function RemoteControlSection() {
   )
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Section: Help                                                             */
+/* -------------------------------------------------------------------------- */
+
+function HelpSection() {
+  const closeSettings = useSettingsDialogStore((s) => s.closeSettings)
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-4 rounded-lg border border-border p-4">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15">
+          <GraduationCapIcon className="size-4 text-primary" />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium">Interactive Tutorial</p>
+          <p className="text-sm text-muted-foreground">
+            Take a guided tour of Rhema&apos;s dashboard to learn about each
+            feature and how to use them.
+          </p>
+          <Button
+            size="sm"
+            className="mt-2"
+            onClick={() => {
+              closeSettings()
+              setTimeout(() => {
+                useTutorialStore.getState().startTutorial()
+              }, 300)
+            }}
+          >
+            <GraduationCapIcon className="mr-1.5 size-3.5" />
+            Restart Tutorial
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatusDot({ running }: { running: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
@@ -702,6 +749,7 @@ const sectionComponents: Record<NavSection, React.FC> = {
   display: DisplayModeSection,
   remote: RemoteControlSection,
   "api-keys": ApiKeysSection,
+  help: HelpSection,
 }
 
 /*  Main dialog                                                               */
