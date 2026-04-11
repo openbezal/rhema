@@ -21,6 +21,7 @@ impl Default for SynonymExpander {
 
 impl SynonymExpander {
     /// Build a new expander pre-loaded with the biblical synonym database.
+    #[expect(clippy::too_many_lines, reason = "synonym table is a large data definition")]
     pub fn new() -> Self {
         let mut synonyms: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -386,7 +387,7 @@ impl SynonymExpander {
                         continue;
                     }
                     let mut new_words: Vec<String> =
-                        words.iter().map(|w| w.to_string()).collect();
+                        words.iter().map(std::string::ToString::to_string).collect();
                     // Preserve leading/trailing punctuation from the original word
                     let prefix: String = word
                         .chars()
@@ -400,7 +401,7 @@ impl SynonymExpander {
                         .chars()
                         .rev()
                         .collect();
-                    new_words[idx] = format!("{}{}{}", prefix, syn, suffix);
+                    new_words[idx] = format!("{prefix}{syn}{suffix}");
                     let variant = new_words.join(" ");
                     if !results.contains(&variant) {
                         results.push(variant);

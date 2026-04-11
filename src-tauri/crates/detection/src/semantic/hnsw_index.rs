@@ -61,7 +61,7 @@ impl HnswVectorIndex {
         let embeddings: Vec<f32> = bytemuck::cast_slice(&emb_bytes).to_vec();
         let num_vectors = embeddings.len() / dim;
 
-        if embeddings.len() % dim != 0 {
+        if !embeddings.len().is_multiple_of(dim) {
             return Err(DetectionError::Internal(format!(
                 "embeddings length {} is not a multiple of dim {}",
                 embeddings.len(),
@@ -91,9 +91,7 @@ impl HnswVectorIndex {
         }
 
         log::info!(
-            "HnswVectorIndex loaded: {} vectors, dim={}",
-            num_vectors,
-            dim
+            "HnswVectorIndex loaded: {num_vectors} vectors, dim={dim}",
         );
 
         Ok(Self {
@@ -158,7 +156,7 @@ impl VectorIndex for HnswVectorIndex {
                 .map(|(a, b)| a * b)
                 .sum();
 
-            scores.push((i, dot as f64));
+            scores.push((i, f64::from(dot)));
         }
 
         // Partial sort: we only need the top-k, but for 31K entries a full

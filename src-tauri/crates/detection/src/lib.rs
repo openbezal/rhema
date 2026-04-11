@@ -36,7 +36,7 @@ pub use semantic::cloud::CloudBooster;
 pub use merger::{DetectionMerger, MergedDetection};
 pub use pipeline::DetectionPipeline;
 pub use sentence_buffer::SentenceBuffer;
-pub use reading_mode::{ReadingMode, ReadingAdvance};
+pub use reading_mode::{ReadingMode, ReadingAdvance, ChapterChange};
 pub use context::SermonContext;
 pub use quotation::QuotationMatcher;
 

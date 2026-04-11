@@ -54,7 +54,7 @@ impl DetectionMerger {
     /// 3. Sort by confidence descending.
     /// 4. Drop anything below `confidence_threshold`.
     /// 5. Mark `auto_queued = true` for items above `auto_queue_threshold`.
-    /// 6. Apply cooldown: if last auto-display was < cooldown_ms ago,
+    /// 6. Apply cooldown: if last auto-display was < `cooldown_ms` ago,
     ///    don't auto-queue.
     pub fn merge(
         &mut self,
@@ -92,6 +92,7 @@ impl DetectionMerger {
         // 5 & 6. Build merged list with auto-queue decisions
         let now = Instant::now();
         let cooldown_ok = match self.last_auto_display {
+            #[expect(clippy::cast_possible_truncation, reason = "cooldown millis won't exceed u64")]
             Some(last) => now.duration_since(last).as_millis() as u64 >= self.cooldown_ms,
             None => true,
         };
@@ -177,7 +178,7 @@ mod tests {
             verse_id: None,
             confidence,
             source,
-            transcript_snippet: format!("{} {}:{}", book_name, chapter, verse_start),
+            transcript_snippet: format!("{book_name} {chapter}:{verse_start}"),
             detected_at: 0,
         }
     }

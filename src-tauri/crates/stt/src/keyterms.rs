@@ -1,5 +1,6 @@
 /// Returns Bible book names, common abbreviations, spoken forms, and theological terms
 /// for use as Deepgram keyword boosting.
+#[allow(clippy::too_many_lines)]
 pub fn bible_keyterms() -> Vec<String> {
     let mut terms: Vec<String> = Vec::new();
 
@@ -72,7 +73,7 @@ pub fn bible_keyterms() -> Vec<String> {
         "Jude",
         "Revelation",
     ];
-    terms.extend(books.iter().map(|s| s.to_string()));
+    terms.extend(books.iter().map(ToString::to_string));
 
     // Common abbreviations
     let abbreviations = [
@@ -82,7 +83,7 @@ pub fn bible_keyterms() -> Vec<String> {
         "Cor", "Gal", "Eph", "Phil", "Col", "Thess", "Tim", "Tit", "Phlm", "Heb", "Jas",
         "Pet", "Rev",
     ];
-    terms.extend(abbreviations.iter().map(|s| s.to_string()));
+    terms.extend(abbreviations.iter().map(ToString::to_string));
 
     // Spoken forms
     let spoken = [
@@ -105,7 +106,7 @@ pub fn bible_keyterms() -> Vec<String> {
         "Third John",
         "Song of Songs",
     ];
-    terms.extend(spoken.iter().map(|s| s.to_string()));
+    terms.extend(spoken.iter().map(ToString::to_string));
 
     // Theological terms
     let theological = [
@@ -141,7 +142,7 @@ pub fn bible_keyterms() -> Vec<String> {
         "Melchizedek",
         "Nebuchadnezzar",
     ];
-    terms.extend(theological.iter().map(|s| s.to_string()));
+    terms.extend(theological.iter().map(ToString::to_string));
 
     terms
 }

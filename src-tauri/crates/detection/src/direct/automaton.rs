@@ -14,8 +14,14 @@ pub struct BookMatch {
 /// Aho-Corasick-based matcher for Bible book names, abbreviations, and aliases.
 pub struct BookMatcher {
     automaton: AhoCorasick,
-    /// Maps each pattern index to its (book_number, canonical_name).
+    /// Maps each pattern index to its (`book_number`, `canonical_name`).
     pattern_map: Vec<(i32, String)>,
+}
+
+impl Default for BookMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BookMatcher {
@@ -76,9 +82,8 @@ impl BookMatcher {
         loop {
             self.automaton
                 .find_overlapping(&text_lower, &mut state);
-            let mat = match state.get_match() {
-                Some(m) => m,
-                None => break,
+            let Some(mat) = state.get_match() else {
+                break;
             };
 
             let idx = mat.pattern().as_usize();

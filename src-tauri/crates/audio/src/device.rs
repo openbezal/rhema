@@ -33,8 +33,7 @@ pub fn enumerate_devices() -> Result<Vec<DeviceInfo>, AudioError> {
 
         let is_default = default_device_name
             .as_ref()
-            .map(|dn| dn == &name)
-            .unwrap_or(false);
+            .is_some_and(|dn| dn == &name);
 
         devices.push(DeviceInfo {
             id: name.clone(),

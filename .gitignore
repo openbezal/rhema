@@ -31,6 +31,9 @@ data/cross-refs/cross_references.txt
 data/cross-refs/cross-references.zip
 data/verses-for-embedding.json
 
+# Python virtual environment
+.venv/
+
 # ML models and embeddings (downloaded, not committed)
 models/*
 .env
@@ -38,9 +41,14 @@ models/*
 .superpowers/
 embeddings/*
 
+.claude/CLAUDE.md
+
 rhema-technical-plan-v3.4.md
 detailed-plan.md
 
 docs/superpowers
 data/bg_temp
 GHS-1-260.md
+
+# GSD planning artifacts
+.planning/

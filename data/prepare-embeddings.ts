@@ -54,11 +54,16 @@ function shouldSkip(label: string, ...artifacts: string[]): boolean {
   return allExist
 }
 
-async function run(cmd: string[], cwd?: string): Promise<void> {
+async function run(
+  cmd: string[],
+  cwd?: string,
+  extraEnv?: Record<string, string>
+): Promise<void> {
   const proc = Bun.spawn(cmd, {
     stdout: "inherit",
     stderr: "inherit",
     cwd: cwd ?? PROJECT_ROOT,
+    env: { ...process.env, ...extraEnv },
   })
   const exitCode = await proc.exited
   if (exitCode !== 0) {
@@ -98,10 +103,11 @@ async function main() {
     const venvPython = getVenvBin(
       process.platform === "win32" ? "python" : "python3"
     )
-    await run([
-      venvPython,
-      join(DATA_DIR, "download-biblegateway.py"),
-    ])
+    await run(
+      [venvPython, join(DATA_DIR, "download-biblegateway.py")],
+      undefined,
+      { PYTHONUTF8: "1" }
+    )
   }
 
   // ── Phase 4: Build Bible database ──────────────────────────────
@@ -176,10 +182,11 @@ async function main() {
       process.platform === "win32" ? "python" : "python3"
     )
     // Use sentence-transformers + MPS GPU (much faster than ONNX CPU)
-    await run([
-      venvPython,
-      join(DATA_DIR, "precompute-embeddings.py"),
-    ])
+    await run(
+      [venvPython, join(DATA_DIR, "precompute-embeddings.py")],
+      undefined,
+      { PYTHONUTF8: "1" }
+    )
   }
 
   // ── Done ───────────────────────────────────────────────────────

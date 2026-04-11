@@ -13,15 +13,18 @@ pub fn compute_level(samples: &[i16]) -> AudioLevel {
     let mut peak_abs: i16 = 0;
 
     for &s in samples {
-        sum_sq += (s as f64) * (s as f64);
+        sum_sq += f64::from(s) * f64::from(s);
         let abs = s.saturating_abs();
         if abs > peak_abs {
             peak_abs = abs;
         }
     }
 
-    let rms = ((sum_sq / samples.len() as f64).sqrt() as f32) / I16_MAX;
-    let peak = peak_abs as f32 / I16_MAX;
+    #[expect(clippy::cast_precision_loss, reason = "sample count fits comfortably in f64 mantissa")]
+    let count = samples.len() as f64;
+    #[expect(clippy::cast_possible_truncation, reason = "RMS is a small normalized value that fits in f32")]
+    let rms = ((sum_sq / count).sqrt() as f32) / I16_MAX;
+    let peak = f32::from(peak_abs) / I16_MAX;
 
     AudioLevel {
         rms: rms.clamp(0.0, 1.0),

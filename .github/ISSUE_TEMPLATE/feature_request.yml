@@ -1,0 +1,61 @@
+name: "\U0001F680 Feature request"
+description: Propose a new feature or enhancement for Rhema
+labels: [enhancement, pending triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe your idea in detail so we can evaluate it.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      description: Which part of Rhema does this feature relate to?
+      options:
+        - Frontend UI
+        - Broadcast / NDI output
+        - Theme Designer
+        - Bible search / data
+        - Audio / speech-to-text
+        - Verse detection
+        - Remote control (OSC)
+        - Remote control (HTTP API)
+        - Queue management
+        - Settings / preferences
+        - New integration
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear and concise description of the feature. What problem does it solve? If you intend to submit a PR for this, tell us here.
+      placeholder: As a broadcast operator, I want [goal] so that [benefit].
+    validations:
+      required: true
+  - type: textarea
+    id: suggested-solution
+    attributes:
+      label: Suggested solution
+      description: How do you think this could be implemented or how should it work?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other solutions or workarounds have you considered?
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Any other context, screenshots, mockups, or references. If this relates to external hardware or software (stream decks, lighting consoles, TouchOSC, ProPresenter, etc.), mention the specific product.
+  - type: checkboxes
+    id: checkboxes
+    attributes:
+      label: Validations
+      description: Before submitting the issue, please make sure you do the following
+      options:
+        - label: Check that there isn't [already an issue](https://github.com/openbezal/rhema/issues) requesting the same feature to avoid creating a duplicate.
+          required: true

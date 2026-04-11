@@ -125,7 +125,7 @@ def load_cached_book(book_file):
     if not book_file.exists() or book_file.stat().st_size < 10:
         return None
     try:
-        with open(book_file) as f:
+        with open(book_file, encoding='utf-8') as f:
             data = json.load(f)
         if "Info" in data:
             del data["Info"]
@@ -174,7 +174,7 @@ def download_translation(abbrev):
 
                 download_book(book, book_file, abbrev)
 
-                with open(book_file) as f:
+                with open(book_file, encoding='utf-8') as f:
                     data = json.load(f)
                     if "Info" in data:
                         del data["Info"]
@@ -204,7 +204,7 @@ def download_translation(abbrev):
     # Convert to scrollmapper format and write
     scrollmapper = convert_to_scrollmapper(combined, abbrev)
 
-    with open(output_file, "w") as f:
+    with open(output_file, "w", encoding='utf-8') as f:
         json.dump(scrollmapper, f, indent=2)
 
     size_mb = output_file.stat().st_size / 1024 / 1024

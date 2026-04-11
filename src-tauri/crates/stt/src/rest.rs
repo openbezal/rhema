@@ -89,7 +89,7 @@ impl DeepgramRestClient {
 
                         let confidence = first
                             .get("confidence")
-                            .and_then(|c| c.as_f64())
+                            .and_then(serde_json::Value::as_f64)
                             .unwrap_or(0.0);
 
                         let words = first
@@ -106,7 +106,7 @@ impl DeepgramRestClient {
                                             punctuated_word: w
                                                 .get("punctuated_word")
                                                 .and_then(|p| p.as_str())
-                                                .map(|s| s.to_string()),
+                                                .map(ToString::to_string),
                                         })
                                     })
                                     .collect::<Vec<Word>>()

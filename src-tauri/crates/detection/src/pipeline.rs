@@ -53,7 +53,7 @@ impl DetectionPipeline {
     /// 3. TODO: Cloud boost for low-confidence semantic results
     ///    (will be wired when reqwest is added).
     /// 4. Merge and rank all results.
-    /// Run the full pipeline (direct + semantic + merge). Used by `detect_verses` command.
+    ///    Run the full pipeline (direct + semantic + merge). Used by `detect_verses` command.
     pub fn process(&mut self, text: &str) -> Vec<MergedDetection> {
         let direct_results = self.direct.detect(text);
 
@@ -68,14 +68,14 @@ impl DetectionPipeline {
     }
 
     /// Run only direct (regex/pattern) detection. Instant, no ONNX inference.
-    /// Used during live transcription on every is_final fragment.
+    /// Used during live transcription on every `is_final` fragment.
     pub fn process_direct(&mut self, text: &str) -> Vec<MergedDetection> {
         let direct_results = self.direct.detect(text);
         self.merger.merge(direct_results, vec![])
     }
 
     /// Run only semantic (ONNX embedding) detection. Slow, 50-400ms.
-    /// Used on speech_final only, in a background task.
+    /// Used on `speech_final` only, in a background task.
     pub fn process_semantic(&mut self, text: &str) -> Vec<MergedDetection> {
         if text.split_whitespace().count() < 5 {
             return vec![];

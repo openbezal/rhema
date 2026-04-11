@@ -33,7 +33,7 @@ struct IndexedVerse {
     chapter: i32,
     verse: i32,
     /// Lowercase word set (used by tests).
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "retained for test assertions and future scoring")]
     words: HashSet<String>,
     word_count: usize,
 }
@@ -93,8 +93,7 @@ impl QuotationMatcher {
 
         let verse_count = indexed.len();
         log::info!(
-            "[QUOTATION] Index built: {} verses, {} unique words",
-            verse_count,
+            "[QUOTATION] Index built: {verse_count} verses, {} unique words",
             word_index.len()
         );
 
@@ -149,6 +148,7 @@ impl QuotationMatcher {
                 // Score candidates by word overlap
                 for (idx, hit_count) in verse_hits {
                     let verse = &self.verses[idx];
+                    #[expect(clippy::cast_precision_loss, reason = "word counts are small enough for f64 precision")]
                     let overlap = hit_count as f64 / verse.word_count as f64;
                     if overlap >= MIN_WORD_OVERLAP {
                         let existing = candidates.entry(idx).or_insert(0.0);
@@ -165,6 +165,7 @@ impl QuotationMatcher {
         results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(MAX_RESULTS);
 
+        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()

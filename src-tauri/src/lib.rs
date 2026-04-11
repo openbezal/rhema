@@ -4,6 +4,7 @@ mod state;
 
 use std::sync::Mutex;
 
+#[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load .env file — try src-tauri/.env first, then project root ../.env
@@ -22,6 +23,8 @@ pub fn run() {
         .manage(Mutex::new(rhema_detection::DirectDetector::new()))
         .manage(Mutex::new(rhema_detection::DetectionMerger::new()))
         .manage(Mutex::new(rhema_detection::ReadingMode::new()))
+        .manage(Mutex::new(commands::remote::OscRuntime::new()))
+        .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
             commands::bible::list_translations,
             commands::bible::list_books,
@@ -50,6 +53,13 @@ pub fn run() {
             commands::broadcast::stop_ndi,
             commands::broadcast::get_ndi_status,
             commands::broadcast::push_ndi_frame,
+            commands::remote::start_osc,
+            commands::remote::stop_osc,
+            commands::remote::get_osc_status,
+            commands::remote::start_http,
+            commands::remote::stop_http,
+            commands::remote::get_http_status,
+            commands::remote::update_remote_status,
         ])
         .setup(|app| {
             use tauri::Manager;
@@ -88,9 +98,9 @@ pub fn run() {
                 state.bible_db = Some(bible_db);
                 state.quotation_matcher = quotation_matcher;
                 drop(state);
-                log::info!("Bible database loaded from {:?}", db_path);
+                log::info!("Bible database loaded from {}", db_path.display());
             } else {
-                log::warn!("Bible database not found at {:?}", db_path);
+                log::warn!("Bible database not found at {}", db_path.display());
             }
 
             // Try to load ONNX embedding model and pre-computed verse index

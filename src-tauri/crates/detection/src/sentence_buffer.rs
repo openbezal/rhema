@@ -67,7 +67,7 @@ impl SentenceBuffer {
         None
     }
 
-    /// Force-flush the buffer (e.g., on speech_final signal).
+    /// Force-flush the buffer (e.g., on `speech_final` signal).
     /// Returns the buffered text, or None if empty.
     pub fn force_flush(&mut self) -> Option<String> {
         if self.buffer.is_empty() {

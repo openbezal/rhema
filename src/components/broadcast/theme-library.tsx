@@ -129,7 +129,7 @@ export function ThemeLibrary() {
   }
 
   return (
-    <div className="flex h-full flex-col border-r border-border bg-card">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-border bg-card">
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-3">
         <span className="text-lg font-semibold text-foreground">Themes</span>
@@ -156,7 +156,7 @@ export function ThemeLibrary() {
       <Tabs
         value={filter}
         onValueChange={(value) => setFilter(value as FilterTab)}
-        className="px-3 pb-4"
+        className="shrink-0 px-3 pb-4"
       >
         <TabsList className="h-7 w-full">
           <TabsTrigger value="all" className="capitalize">all</TabsTrigger>

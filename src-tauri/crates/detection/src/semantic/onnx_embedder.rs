@@ -1,4 +1,4 @@
-//! Real ONNX Runtime embedder using `ort` and HuggingFace `tokenizers`.
+//! Real ONNX Runtime embedder using `ort` and `HuggingFace` `tokenizers`.
 //!
 //! This module is only compiled when the `onnx` feature is enabled.
 
@@ -22,7 +22,7 @@ use super::embedder::TextEmbedder;
 /// ONNX-based text embedder.
 ///
 /// Loads a transformer model exported to ONNX format and a corresponding
-/// HuggingFace tokenizer.  Inference produces a fixed-dimension dense
+/// `HuggingFace` tokenizer.  Inference produces a fixed-dimension dense
 /// vector via mean pooling over the last hidden state.
 ///
 /// The inner `Session` requires `&mut self` for `run`, and `Tokenizer` is
@@ -49,23 +49,22 @@ impl OnnxEmbedder {
     /// Maximum number of tokens the model will accept.
     /// Bible verses are short (~20 tokens avg). 128 is plenty and 4x faster
     /// than 512 because the model doesn't process unnecessary padding tokens.
-    /// MUST match the Python precompute script (data/precompute-embeddings-onnx.py MAX_LENGTH).
+    /// MUST match the Python precompute script (data/precompute-embeddings-onnx.py `MAX_LENGTH`).
     const MAX_TOKENS: usize = 128;
 
     /// Load an ONNX model and its tokenizer from disk.
     ///
     /// `model_path` should point to a `.onnx` file and `tokenizer_path`
-    /// to a `tokenizer.json` file (HuggingFace format).
+    /// to a `tokenizer.json` file (`HuggingFace` format).
     pub fn load(model_path: &Path, tokenizer_path: &Path) -> Result<Self, DetectionError> {
         // Determine thread counts: use half of available CPUs for intra-op
         let num_cpus = std::thread::available_parallelism()
-            .map(|n| n.get())
+            .map(std::num::NonZero::get)
             .unwrap_or(4);
         let intra_threads = (num_cpus / 2).max(1);
 
         log::info!(
-            "OnnxEmbedder: configuring session with {} intra-op threads (of {} CPUs), graph optimization ALL",
-            intra_threads, num_cpus
+            "OnnxEmbedder: configuring session with {intra_threads} intra-op threads (of {num_cpus} CPUs), graph optimization ALL",
         );
 
         let session = Session::builder()
@@ -154,6 +153,7 @@ impl OnnxEmbedder {
         Ok(Self {
             session: Mutex::new(session),
             tokenizer: Mutex::new(tokenizer),
+            #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "dim validated to be positive and small")]
             dim: dim as usize,
             // No prefix — matches the Python precompute script which embeds
             // documents with no prefix. Symmetric mode gives highest similarity.
@@ -197,17 +197,19 @@ impl OnnxEmbedder {
         let seq_len = ids.len();
 
         // Build owned tensors with shape [1, seq_len].
+        #[expect(clippy::cast_possible_wrap, reason = "seq_len is at most MAX_TOKENS (128), fits i64")]
         let shape = vec![1i64, seq_len as i64];
 
-        let input_ids_data: Vec<i64> = ids.iter().map(|&v| v as i64).collect();
+        let input_ids_data: Vec<i64> = ids.iter().map(|&v| i64::from(v)).collect();
         let input_ids_tensor = Tensor::from_array((shape.clone(), input_ids_data))
             .map_err(|e| DetectionError::Internal(format!("input_ids tensor: {e}")))?;
 
-        let attention_mask_data: Vec<i64> = mask.iter().map(|&v| v as i64).collect();
+        let attention_mask_data: Vec<i64> = mask.iter().map(|&v| i64::from(v)).collect();
         let attention_mask_tensor = Tensor::from_array((shape.clone(), attention_mask_data))
             .map_err(|e| DetectionError::Internal(format!("attention_mask tensor: {e}")))?;
 
         // Qwen3 needs position_ids. For models that don't have this input, it's ignored.
+        #[expect(clippy::cast_possible_wrap, reason = "seq_len is at most MAX_TOKENS (128), fits i64")]
         let position_ids_data: Vec<i64> = (0..seq_len as i64).collect();
         let position_ids_tensor = Tensor::from_array((shape, position_ids_data))
             .map_err(|e| DetectionError::Internal(format!("position_ids tensor: {e}")))?;
@@ -249,8 +251,9 @@ impl OnnxEmbedder {
             .try_extract_tensor::<f32>()
             .map_err(|e| DetectionError::Internal(format!("extract tensor: {e}")))?;
 
-        let out_dims: &[i64] = &*out_shape;
+        let out_dims: &[i64] = out_shape;
 
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "ONNX tensor dimensions are small positive values")]
         let pooled = if out_dims.len() == 2 {
             // sentence_embedding: shape [1, dim] — already pooled by sentence-transformers
             let dim = out_dims[1] as usize;
@@ -264,8 +267,8 @@ impl OnnxEmbedder {
             let dim = out_dims[2] as usize;
             let mut pooled = vec![0.0f32; dim];
             let mut mask_sum = 0.0f32;
-            for tok in 0..seq_len {
-                if mask[tok] > 0 {
+            for (tok, &mask_val) in mask.iter().enumerate().take(seq_len) {
+                if mask_val > 0 {
                     let offset = tok * dim;
                     for d in 0..dim {
                         pooled[d] += data[offset + d];
@@ -274,15 +277,14 @@ impl OnnxEmbedder {
                 }
             }
             if mask_sum > 0.0 {
-                for d in 0..dim {
-                    pooled[d] /= mask_sum;
+                for item in &mut pooled {
+                    *item /= mask_sum;
                 }
             }
             pooled
         } else {
             return Err(DetectionError::Internal(format!(
-                "unexpected tensor rank: {:?}",
-                out_dims
+                "unexpected tensor rank: {out_dims:?}",
             )));
         };
 
@@ -290,7 +292,7 @@ impl OnnxEmbedder {
         let mut result = pooled;
         let norm: f32 = result.iter().map(|v| v * v).sum::<f32>().sqrt();
         if norm > 0.0 {
-            for v in result.iter_mut() {
+            for v in &mut result {
                 *v /= norm;
             }
         }

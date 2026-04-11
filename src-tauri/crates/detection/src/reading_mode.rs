@@ -3,6 +3,8 @@ use std::time::Instant;
 
 use serde::Serialize;
 
+use crate::direct::parser::parse_spoken_number;
+
 /// Timeout: pause reading mode after 3 minutes of no verse matches.
 /// Logos AI maintains context for ~3 minutes. Verses stay loaded for re-activation.
 const READING_MODE_TIMEOUT_MS: u128 = 180_000;
@@ -30,6 +32,15 @@ pub struct ReadingAdvance {
     pub verse_text: String,
     pub reference: String,
     pub confidence: f64,
+}
+
+/// Signal that reading mode wants to change to a different chapter.
+/// The caller must load the new chapter from the database and call `start()`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChapterChange {
+    pub book_number: i32,
+    pub book_name: String,
+    pub new_chapter: i32,
 }
 
 /// Tracks the current reading position and matches transcripts against
@@ -80,10 +91,9 @@ impl ReadingMode {
         start_verse: i32,
         verses: Vec<(i32, String)>,
     ) {
-        // Filter to only verses >= start_verse
+        // Load ALL chapter verses so "verse N" can navigate backward too.
         let loaded: Vec<LoadedVerse> = verses
             .into_iter()
-            .filter(|(v, _)| *v >= start_verse)
             .map(|(v, text)| {
                 let words = text_to_word_set(&text);
                 let word_count = words.len();
@@ -97,20 +107,26 @@ impl ReadingMode {
             .collect();
 
         if loaded.is_empty() {
-            log::warn!("[READING] No verses loaded for {} {}:{}", book_name, chapter, start_verse);
+            log::warn!("[READING] No verses loaded for {book_name} {chapter}:{start_verse}");
             return;
         }
 
+        // Position cursor at start_verse; fall back to first verse.
+        let start_index = loaded
+            .iter()
+            .position(|v| v.verse_number == start_verse)
+            .unwrap_or(0);
+
         log::info!(
-            "[READING] Started: {} {}:{} ({} verses loaded)",
-            book_name, chapter, start_verse, loaded.len()
+            "[READING] Started: {book_name} {chapter}:{start_verse} ({} verses loaded)",
+            loaded.len()
         );
 
         self.active = true;
         self.book_number = book_number;
         self.book_name = book_name.to_string();
         self.chapter = chapter;
-        self.current_index = 0;
+        self.current_index = start_index;
         self.verses = loaded;
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
@@ -131,8 +147,8 @@ impl ReadingMode {
         if !self.verses.is_empty() {
             self.active = true;
             self.last_match_time = Instant::now();
-            let verse = self.verses.get(self.current_index).map(|v| v.verse_number).unwrap_or(0);
-            log::info!("[READING] Resumed at: {} {}:{}", self.book_name, self.chapter, verse);
+            let verse = self.verses.get(self.current_index).map_or(0, |v| v.verse_number);
+            log::info!("[READING] Resumed at: {} {}:{verse}", self.book_name, self.chapter);
         }
     }
 
@@ -144,6 +160,11 @@ impl ReadingMode {
     /// Get the chapter being tracked.
     pub fn current_chapter(&self) -> i32 {
         self.chapter
+    }
+
+    /// Get the book name being tracked.
+    pub fn current_book_name(&self) -> &str {
+        &self.book_name
     }
 
     /// Get the current verse number being tracked.
@@ -166,6 +187,59 @@ impl ReadingMode {
         self.accumulated_text.clear();
     }
 
+    /// Check if the transcript contains a chapter navigation command.
+    ///
+    /// Recognises "chapter N", "next chapter", and "previous chapter" anywhere
+    /// in the text. Returns `Some(ChapterChange)` when a different chapter is
+    /// requested, `None` otherwise.
+    pub fn check_chapter_command(&self, text: &str) -> Option<ChapterChange> {
+        if self.verses.is_empty() {
+            return None;
+        }
+
+        let lower = text.to_lowercase();
+        let trimmed = lower.trim();
+
+        // "next chapter"
+        if trimmed == "next chapter" || trimmed == "next chapter." {
+            let new_chapter = self.chapter + 1;
+            log::info!("[READING] 'Next chapter' command detected → chapter {new_chapter}");
+            return Some(ChapterChange {
+                book_number: self.book_number,
+                book_name: self.book_name.clone(),
+                new_chapter,
+            });
+        }
+
+        // "previous chapter"
+        if trimmed == "previous chapter" || trimmed == "previous chapter." {
+            if self.chapter > 1 {
+                let new_chapter = self.chapter - 1;
+                log::info!("[READING] 'Previous chapter' command detected → chapter {new_chapter}");
+                return Some(ChapterChange {
+                    book_number: self.book_number,
+                    book_name: self.book_name.clone(),
+                    new_chapter,
+                });
+            }
+            return None;
+        }
+
+        // "chapter N" anywhere in text (e.g., "let's go to chapter seven")
+        let chapter_num = extract_chapter_number(trimmed)?;
+
+        if chapter_num == self.chapter {
+            return None;
+        }
+
+        log::info!("[READING] Chapter change command detected: chapter {chapter_num}");
+        Some(ChapterChange {
+            book_number: self.book_number,
+            book_name: self.book_name.clone(),
+            new_chapter: chapter_num,
+        })
+    }
+
     /// Process a transcript fragment and check if the reader has advanced.
     ///
     /// Returns `Some(ReadingAdvance)` if the reader has moved to a new verse.
@@ -179,11 +253,11 @@ impl ReadingMode {
 
         // Check timeout — but don't clear verses, just pause.
         // This allows "verse N" references to re-activate.
-        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS {
-            if self.active {
-                log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
-                self.active = false;
-            }
+        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS
+            && self.active
+        {
+            log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
+            self.active = false;
         }
 
         // Check for explicit verse number references like "verse three", "verse 4".
@@ -293,7 +367,7 @@ impl ReadingMode {
         // Find this verse number in our loaded verses (allow forward AND backward)
         for (idx, v) in self.verses.iter().enumerate() {
             if v.verse_number == verse_num {
-                log::info!("[READING] Verse number reference detected: verse {}", verse_num);
+                log::info!("[READING] Verse number reference detected: verse {verse_num}");
                 return self.advance_to(idx);
             }
         }
@@ -311,8 +385,8 @@ impl ReadingMode {
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
 
-        let reference = format!("{} {}:{}", self.book_name, self.chapter, verse_number);
-        log::info!("[READING] Advanced to: {}", reference);
+        let reference = format!("{} {}:{verse_number}", self.book_name, self.chapter);
+        log::info!("[READING] Advanced to: {reference}");
 
         Some(ReadingAdvance {
             book_number: self.book_number,
@@ -332,27 +406,25 @@ impl Default for ReadingMode {
     }
 }
 
-/// Extract a verse number from text like "verse three", "verse 4", "first two".
+/// Extract a verse number from text containing "verse N" anywhere.
+///
+/// Matches phrases like "let's go to verse five", "give me verse 4",
+/// "verse three", or bare numbers like "3.".
 fn extract_verse_number(text: &str) -> Option<i32> {
-    // Pattern: "verse N" or "verse word"
-    for prefix in &["verse ", "verses ", "first "] {
-        if let Some(rest) = text.strip_prefix(prefix) {
-            let rest = rest.trim_end_matches('.');
-            // Try digit
-            if let Ok(n) = rest.trim().parse::<i32>() {
-                if n > 0 && n <= 176 {
-                    return Some(n);
-                }
-            }
-            // Try spoken number
-            let word: String = rest.chars().take_while(|c| c.is_alphabetic()).collect();
-            if let Some(n) = spoken_to_number(&word) {
-                return Some(n);
-            }
+    // Find "verse N" or "verses N" anywhere in the text
+    for keyword in &["verse ", "verses "] {
+        if let Some(pos) = text.find(keyword) {
+            let rest = &text[pos + keyword.len()..];
+            return parse_number_token(rest);
         }
     }
 
-    // Pattern: just "N." like "3." or just a spoken number like "three."
+    // Keep "first N" as a prefix-only match
+    if let Some(rest) = text.strip_prefix("first ") {
+        return parse_number_token(rest);
+    }
+
+    // Bare number: just "3." or "3"
     let clean = text.trim_end_matches('.');
     if let Ok(n) = clean.trim().parse::<i32>() {
         if n > 0 && n <= 176 {
@@ -363,34 +435,34 @@ fn extract_verse_number(text: &str) -> Option<i32> {
     None
 }
 
-/// Convert a spoken number word to integer (1-20, tens, hundred).
-fn spoken_to_number(word: &str) -> Option<i32> {
-    match word {
-        "one" => Some(1),
-        "two" => Some(2),
-        "three" => Some(3),
-        "four" => Some(4),
-        "five" => Some(5),
-        "six" => Some(6),
-        "seven" => Some(7),
-        "eight" => Some(8),
-        "nine" => Some(9),
-        "ten" => Some(10),
-        "eleven" => Some(11),
-        "twelve" => Some(12),
-        "thirteen" => Some(13),
-        "fourteen" => Some(14),
-        "fifteen" => Some(15),
-        "sixteen" => Some(16),
-        "seventeen" => Some(17),
-        "eighteen" => Some(18),
-        "nineteen" => Some(19),
-        "twenty" => Some(20),
-        "thirty" => Some(30),
-        "forty" => Some(40),
-        "fifty" => Some(50),
-        _ => None,
+/// Parse a number (digit or spoken word) from the start of `text`.
+fn parse_number_token(text: &str) -> Option<i32> {
+    let trimmed = text.trim_end_matches(['.', ',']);
+    // Try digit
+    let token: String = trimmed.chars().take_while(|c| c.is_alphanumeric()).collect();
+    if let Ok(n) = token.parse::<i32>() {
+        if n > 0 && n <= 176 {
+            return Some(n);
+        }
     }
+    // Try spoken number
+    let word: String = trimmed.chars().take_while(|c| c.is_alphabetic()).collect();
+    if !word.is_empty() {
+        if let Some(n) = parse_spoken_number(&word) {
+            if n > 0 && n <= 176 {
+                return Some(n);
+            }
+        }
+    }
+    None
+}
+
+/// Extract a chapter number from text containing "chapter N" anywhere.
+fn extract_chapter_number(text: &str) -> Option<i32> {
+    let pos = text.find("chapter ")?;
+    let rest = &text[pos + "chapter ".len()..];
+    // Reuse the same number parsing (max chapter is 150 in Psalms)
+    parse_number_token(rest)
 }
 
 /// Convert text to a set of lowercase words (stripped of punctuation).
@@ -416,7 +488,8 @@ fn word_overlap(
         return 0.0;
     }
     let matches = verse_words.intersection(transcript_words).count();
-    matches as f64 / verse_word_count as f64
+    #[expect(clippy::cast_precision_loss, reason = "word counts are small enough for f64 precision")]
+    { matches as f64 / verse_word_count as f64 }
 }
 
 #[cfg(test)]
@@ -494,5 +567,145 @@ mod tests {
         let count = verse.len();
         let overlap = word_overlap(&transcript, &verse, count);
         assert!(overlap > 0.3); // At least some overlap
+    }
+
+    // --- Bug fix: extract_verse_number with prefix phrases ---
+
+    #[test]
+    fn test_extract_verse_number_with_prefix() {
+        assert_eq!(extract_verse_number("let's go to verse five"), Some(5));
+        assert_eq!(extract_verse_number("give me verse nine"), Some(9));
+        assert_eq!(extract_verse_number("go to verse 4"), Some(4));
+        assert_eq!(extract_verse_number("let's go to verse twenty"), Some(20));
+    }
+
+    #[test]
+    fn test_extract_verse_number_direct() {
+        assert_eq!(extract_verse_number("verse eight"), Some(8));
+        assert_eq!(extract_verse_number("verse eight,"), Some(8));
+        assert_eq!(extract_verse_number("verse 3"), Some(3));
+        assert_eq!(extract_verse_number("verse three."), Some(3));
+    }
+
+    #[test]
+    fn test_extract_verse_number_bare() {
+        assert_eq!(extract_verse_number("3."), Some(3));
+        assert_eq!(extract_verse_number("12"), Some(12));
+    }
+
+    #[test]
+    fn test_extract_verse_number_no_match() {
+        assert_eq!(extract_verse_number("hello world"), None);
+        assert_eq!(extract_verse_number("the weather is nice"), None);
+    }
+
+    // --- Bug fix: all chapter verses loaded for backward navigation ---
+
+    #[test]
+    fn test_backward_verse_navigation() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=10)
+            .map(|i| (i, format!("Verse {i} text content here.")))
+            .collect();
+
+        rm.start(1, "Genesis", 5, 6, verses);
+        assert_eq!(rm.current_verse(), Some(6));
+
+        // Navigate backward to verse 3
+        let r = rm.check_transcript("verse three");
+        assert!(r.is_some());
+        assert_eq!(r.unwrap().verse, 3);
+    }
+
+    #[test]
+    fn test_start_positions_cursor_at_start_verse() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=31)
+            .map(|i| (i, format!("Verse {i} text.")))
+            .collect();
+
+        rm.start(44, "Acts", 15, 28, verses);
+        assert_eq!(rm.current_verse(), Some(28));
+    }
+
+    // --- Bug fix: chapter navigation ---
+
+    #[test]
+    fn test_chapter_command_detected() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 5, 1, vec![(1, "In the beginning.".to_string())]);
+
+        let result = rm.check_chapter_command("let's go to chapter seven");
+        assert_eq!(
+            result,
+            Some(ChapterChange {
+                book_number: 1,
+                book_name: "Genesis".to_string(),
+                new_chapter: 7,
+            })
+        );
+    }
+
+    #[test]
+    fn test_chapter_command_with_digit() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 5, 1, vec![(1, "Text.".to_string())]);
+
+        let result = rm.check_chapter_command("let's go to chapter 8");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().new_chapter, 8);
+    }
+
+    #[test]
+    fn test_chapter_command_same_chapter_ignored() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 5, 1, vec![(1, "Text.".to_string())]);
+
+        let result = rm.check_chapter_command("chapter five");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_chapter_command_no_verses_ignored() {
+        let rm = ReadingMode::new();
+        let result = rm.check_chapter_command("chapter seven");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_next_chapter_command() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 5, 1, vec![(1, "Text.".to_string())]);
+
+        let result = rm.check_chapter_command("next chapter");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().new_chapter, 6);
+    }
+
+    #[test]
+    fn test_previous_chapter_command() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 5, 1, vec![(1, "Text.".to_string())]);
+
+        let result = rm.check_chapter_command("previous chapter");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().new_chapter, 4);
+    }
+
+    #[test]
+    fn test_previous_chapter_at_chapter_1() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 1, 1, vec![(1, "Text.".to_string())]);
+
+        let result = rm.check_chapter_command("previous chapter");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_extract_chapter_number() {
+        assert_eq!(extract_chapter_number("chapter seven"), Some(7));
+        assert_eq!(extract_chapter_number("chapter 8"), Some(8));
+        assert_eq!(extract_chapter_number("let's go to chapter twelve"), Some(12));
+        assert_eq!(extract_chapter_number("hello world"), None);
     }
 }

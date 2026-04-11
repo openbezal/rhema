@@ -103,7 +103,7 @@ impl SemanticDetector {
                         if result.best_similarity >= self.confidence_threshold {
                             detections.push(Self::make_detection(
                                 result.verse_id,
-                                &result.best_similarity,
+                                result.best_similarity,
                                 text,
                                 now,
                             ));
@@ -116,15 +116,9 @@ impl SemanticDetector {
             }
         } else {
             // Single direct embedding: fast (~1 embed call), good for exact quotes.
-            let embedding = match self.embedder.embed(text) {
-                Ok(e) => e,
-                Err(_) => return vec![],
-            };
+            let Ok(embedding) = self.embedder.embed(text) else { return vec![] };
 
-            let results = match self.index.search(&embedding, 5) {
-                Ok(r) => r,
-                Err(_) => return vec![],
-            };
+            let Ok(results) = self.index.search(&embedding, 5) else { return vec![] };
 
             // Cache for future lookups
             self.cache
@@ -138,7 +132,7 @@ impl SemanticDetector {
                 {
                     detections.push(Self::make_detection(
                         result.verse_id,
-                        &result.similarity,
+                        result.similarity,
                         text,
                         now,
                     ));
@@ -169,10 +163,7 @@ impl SemanticDetector {
         if !self.is_ready() {
             return vec![];
         }
-        let embedding = match self.embedder.embed(query) {
-            Ok(e) => e,
-            Err(_) => return vec![],
-        };
+        let Ok(embedding) = self.embedder.embed(query) else { return vec![] };
         match self.index.search(&embedding, k) {
             Ok(results) => results.iter().map(|r| (r.verse_id, r.similarity)).collect(),
             Err(_) => vec![],
@@ -181,6 +172,7 @@ impl SemanticDetector {
 
     // ---- private helpers ----
 
+    #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
     fn timestamp_ms() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -188,7 +180,7 @@ impl SemanticDetector {
             .as_millis() as u64
     }
 
-    fn make_detection(verse_id: i64, similarity: &f64, snippet: &str, detected_at: u64) -> Detection {
+    fn make_detection(verse_id: i64, similarity: f64, snippet: &str, detected_at: u64) -> Detection {
         Detection {
             verse_ref: VerseRef {
                 book_number: 0,
@@ -198,9 +190,9 @@ impl SemanticDetector {
                 verse_end: None,
             },
             verse_id: Some(verse_id),
-            confidence: *similarity,
+            confidence: similarity,
             source: DetectionSource::SemanticLocal {
-                similarity: *similarity,
+                similarity,
             },
             transcript_snippet: snippet.to_string(),
             detected_at,
