@@ -38,15 +38,9 @@ async function main() {
   // --- Phase 2: Export model ---
   const optimumCli = getVenvBin("optimum-cli")
 
-  console.log(
-    "\n🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)...\n"
-  )
-  console.log(
-    "  This downloads the model from HuggingFace and converts it to ONNX format."
-  )
-  console.log(
-    "  The export uses --task feature-extraction to avoid KV cache inputs."
-  )
+  console.log("\n Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)...\n")
+  console.log("  This downloads the model from HuggingFace and converts it to ONNX format.")
+  console.log("  The export uses --task feature-extraction to avoid KV cache inputs.")
   console.log("  This may take a few minutes on first run.\n")
 
   const proc = Bun.spawn(
@@ -68,16 +62,16 @@ async function main() {
 
   const exitCode = await proc.exited
   if (exitCode !== 0) {
-    console.error("\n❌ Export failed.")
+    console.error("\n Export failed.")
     process.exit(1)
   }
 
-  console.log(`\n✅ Model exported to ${MODELS_DIR}\n`)
+  console.log(`\n Model exported to ${MODELS_DIR}\n`)
 
   // --- Phase 3: Quantize to INT8 for ARM64 (Apple Silicon) ---
-  console.log("\n⚡ Quantizing model to INT8 (ARM64)...\n")
-  console.log("  This reduces the model from ~2.4GB to ~571MB.")
-  console.log("  Dynamic INT8 quantization preserves >99% embedding quality.\n")
+  console.log("\n Quantizing model to INT8 (ARM64)...\n")
+  console.log("  This reduces the model size.")
+  console.log("  Dynamic INT8 quantization preserves embedding quality.\n")
 
   const quantizeProc = Bun.spawn(
     [
@@ -98,10 +92,10 @@ async function main() {
 
   const quantizeExitCode = await quantizeProc.exited
   if (quantizeExitCode !== 0) {
-    console.error("\n⚠️  Quantization failed. The FP32 model is still usable.")
+    console.error("\n⚠  Quantization failed. The FP32 model is still usable.")
     console.error("   To quantize manually: bun run quantize:model")
   } else {
-    console.log(`\n✅ INT8 model quantized to ${MODELS_DIR_INT8}\n`)
+    console.log(`\n INT8 model quantized to ${MODELS_DIR_INT8}\n`)
   }
 
   console.log("  Files created:")
@@ -111,6 +105,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("❌ Failed:", err)
+  console.error(" Failed:", err)
   process.exit(1)
 })

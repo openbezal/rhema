@@ -28,7 +28,7 @@ const OUTPUT_PATH = join(DATA_DIR, "verses-for-embedding.json")
 async function main() {
   await mkdir(join(DATA_DIR, "..", "embeddings"), { recursive: true })
 
-  console.log("\n📖 Exporting KJV verses for embedding...\n")
+  console.log("\n Exporting KJV verses for embedding...\n")
 
   const db = new Database(DB_PATH, { readonly: true })
 
@@ -67,6 +67,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("❌ Export failed:", err)
+  console.error(" Export failed:", err)
   process.exit(1)
 })

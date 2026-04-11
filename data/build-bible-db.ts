@@ -83,7 +83,7 @@ const TRANSLATIONS_META: Array<{
 ]
 
 function main() {
-  console.log("\n🔨 Building rhema.db...\n")
+  console.log("\n Building rhema.db...\n")
 
   // Remove existing DB
   try { require("node:fs").unlinkSync(DB_PATH) } catch {}
@@ -97,7 +97,7 @@ function main() {
     try {
       db.exec(stmt + ";")
     } catch (e) {
-      console.error(`  ❌ Failed on SQL: ${stmt.substring(0, 60)}...`)
+      console.error(`   Failed on SQL: ${stmt.substring(0, 60)}...`)
       throw e
     }
   }
@@ -116,7 +116,7 @@ function main() {
   // Process each translation
   for (const meta of TRANSLATIONS_META) {
     const filePath = join(SOURCES_DIR, meta.file)
-    console.log(`  📖 Processing ${meta.abbreviation}...`)
+    console.log(`   Processing ${meta.abbreviation}...`)
 
     let raw: string
     try {
@@ -161,13 +161,13 @@ function main() {
   }
 
   // Build FTS5 index
-  console.log("\n  🔍 Building FTS5 search index...")
+  console.log("\n   Building FTS5 search index...")
   db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS verses_fts USING fts5(text, content='verses', content_rowid='id', tokenize='unicode61');")
   db.exec("INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses;")
   console.log("  ✓ FTS5 index built")
 
   // Import cross-references
-  console.log("\n  🔗 Importing cross-references...")
+  console.log("\n   Importing cross-references...")
   let crossRefRaw: string
   try {
     crossRefRaw = readFileSync(CROSS_REFS_PATH, "utf-8")
@@ -218,7 +218,7 @@ function main() {
   }
 
   // Optimize
-  console.log("\n  ⚡ Optimizing database...")
+  console.log("\n   Optimizing database...")
   db.exec("PRAGMA optimize;")
   db.exec("ANALYZE;")
 
@@ -227,11 +227,11 @@ function main() {
   const transTotal = db.query("SELECT COUNT(*) as c FROM translations").get() as { c: number }
   const crossTotal = db.query("SELECT COUNT(*) as c FROM cross_references").get() as { c: number }
 
-  console.log(`\n✅ rhema.db built successfully!`)
+  console.log(`\n rhema.db built successfully!`)
   console.log(`   ${transTotal.c} translations`)
   console.log(`   ${verseTotal.c.toLocaleString()} verses`)
   console.log(`   ${crossTotal.c.toLocaleString()} cross-references`)
-  console.log(`   📁 ${DB_PATH}\n`)
+  console.log(`    ${DB_PATH}\n`)
 
   db.close()
 }

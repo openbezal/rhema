@@ -37,7 +37,7 @@ async function main() {
   await mkdir(CROSS_REFS_DIR, { recursive: true })
 
   // Download Bible translations
-  console.log("\n📖 Downloading Bible translations...\n")
+  console.log("\n Downloading Bible translations...\n")
   for (const t of TRANSLATIONS) {
     const dest = join(SOURCES_DIR, t.file)
     const file = Bun.file(dest)
@@ -49,7 +49,7 @@ async function main() {
   }
 
   // Download cross-references
-  console.log("\n🔗 Downloading cross-references...\n")
+  console.log("\n Downloading cross-references...\n")
   const crossRefFile = join(CROSS_REFS_DIR, "cross_references.txt")
   const existing = Bun.file(crossRefFile)
   if ((await existing.exists()) && existing.size > 1000) {
@@ -67,10 +67,10 @@ async function main() {
     await Bun.write(zipDest, "") // truncate
   }
 
-  console.log("\n✅ All source data downloaded!\n")
+  console.log("\n All source data downloaded!\n")
 }
 
 main().catch((err) => {
-  console.error("❌ Download failed:", err)
+  console.error(" Download failed:", err)
   process.exit(1)
 })

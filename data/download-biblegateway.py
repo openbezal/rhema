@@ -73,6 +73,34 @@ TEMP_DIR = ROOT / "bg_temp"
 
 def convert_to_scrollmapper(combined, abbrev):
     """Convert {Book: {chapter: {verse: text}}} to scrollmapper format."""
+    downloader = JSONDownloader(
+        translation=abbrev,
+        show_passage_numbers=False,
+        strip_excess_whitespace=True
+    )
+
+    # Download each book
+    combined = {}
+    total = len(BOOKS)
+    for i, book in enumerate(BOOKS):
+        print(f"\r  [{i+1:2d}/{total}] {book:<20s}", end="", flush=True)
+        book_file = temp_path / f"{book}.json"
+
+        try:
+            downloader.download_book(book, str(book_file))
+            with open(book_file) as f:
+                data = json.load(f)
+                if "Info" in data:
+                    del data["Info"]
+                combined.update(data)
+        except Exception as e:
+            print(f"\n  ⚠ Failed to download {book}: {e}")
+            continue
+
+    print(f"\r  ✓ Downloaded {len(combined)} books" + " " * 30)
+
+    # Convert to scrollmapper format
+>>>>>>> 31fdd12 (chore: Purge AI-generated artifacts for professional hygiene)
     scrollmapper = {
         "translation": f"{abbrev}",
         "books": []
@@ -138,11 +166,11 @@ def load_cached_book(book_file):
 
 def download_translation(abbrev):
     """Download all books for a translation and convert to scrollmapper JSON."""
-    print(f"\n📖 Downloading {abbrev}...")
+    print(f"\n   Downloading {abbrev}...")
 
     output_file = SOURCES_DIR / f"{abbrev}.json"
     if output_file.exists():
-        print(f"  ⏭ {abbrev}.json already exists, skipping")
+        print(f"     {abbrev}.json already exists, skipping")
         return True
 
     combined = {}
@@ -186,7 +214,7 @@ def download_translation(abbrev):
 
             except Exception as e:
                 error_msg = str(e) or type(e).__name__
-                print(f" ⚠ {error_msg}")
+                print(f"   {error_msg}")
                 if attempt < MAX_RETRIES:
                     backoff = BOOK_DELAY * (2 ** attempt)
                     print(f"         Waiting {backoff}s before retry...")
@@ -197,9 +225,9 @@ def download_translation(abbrev):
 
         time.sleep(BOOK_DELAY)
 
-    print(f"\n  ✓ Downloaded {len(combined)} books ({cached_count} from cache)")
+    print(f"\n   Downloaded {len(combined)} books ({cached_count} from cache)")
     if failed_books:
-        print(f"  ⚠ Failed books: {', '.join(failed_books)}")
+        print(f"   Failed books: {', '.join(failed_books)}")
 
     # Convert to scrollmapper format and write
     scrollmapper = convert_to_scrollmapper(combined, abbrev)
@@ -213,7 +241,7 @@ def download_translation(abbrev):
         for book in scrollmapper["books"]
         for ch in book["chapters"]
     )
-    print(f"  ✓ Saved {output_file.name} ({size_mb:.1f} MB, {verse_count} verses)")
+    print(f"   Saved {output_file.name} ({size_mb:.1f} MB, {verse_count} verses)")
     return True
 
 
@@ -227,10 +255,9 @@ def main():
         try:
             download_translation(abbrev)
         except Exception as e:
-            print(f"\n  ❌ {abbrev} failed: {e}")
-            traceback.print_exc()
+            print(f"\n   {abbrev} failed: {e}")
 
-    print(f"\n✅ Done! Check {SOURCES_DIR} for output files.\n")
+    print(f"\n Done! Check {SOURCES_DIR} for output files.\n")
 
 
 if __name__ == "__main__":
