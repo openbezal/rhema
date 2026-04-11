@@ -1,6 +1,6 @@
 use std::time::Instant;
 use crate::types::VerseRef;
-use rhema_core::{BookId, ChapterNumber, VerseNumber};
+use rhema_core::{BookId, ChapterNumber};
 
 /// How long context remains valid (3 minutes, matching Logos AI).
 const CONTEXT_TIMEOUT_SECS: u64 = 180;

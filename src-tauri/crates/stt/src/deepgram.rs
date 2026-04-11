@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::Message;
 use url::Url;
 
 use crate::error::SttError;
-use crate::keyterms::bible_keyterms;
+// Removed hardcoded keyterms import
 use crate::types::{SttConfig, TranscriptEvent, Word};
 
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
@@ -45,11 +45,6 @@ impl DeepgramClient {
     pub fn stop(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
     }
-
-    /// Check if the client has been cancelled.
-    fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::SeqCst)
-    }
 }
 
 /// URL and Request Utilities for Deepgram WebSocket connection.
@@ -79,34 +74,18 @@ impl DeepgramClient {
 
             // Deepgram Nova-3 keyword boosting: uses `keyterm` (not `keywords`).
             // Each keyterm is a separate query param. Max 100 per request.
-            let core_terms = vec![
-                "Jesus".to_string(),
-                "Christ".to_string(),
-                "God".to_string(),
-                "Lord".to_string(),
-                "Holy Spirit".to_string(),
-            ];
-            let bible_terms = bible_keyterms();
-
-            // Deduplicate: core terms first, then bible_keyterms(), capped at 100.
-            let mut seen = std::collections::HashSet::new();
-            let mut all_keyterms: Vec<String> = Vec::new();
-            for term in core_terms.into_iter().chain(bible_terms.into_iter()) {
-                if seen.insert(term.clone()) {
-                    all_keyterms.push(term);
-                }
-                if all_keyterms.len() >= 100 {
-                    break;
-                }
-            }
+            let mut all_keyterms = self.config.keyterms.clone();
+            all_keyterms.truncate(100);
 
             for term in &all_keyterms {
                 q.append_pair("keyterm", term);
             }
-            log::info ! (
-                "Deepgram keyterm boosting: {} keyterms added",
-                all_keyterms.len()
-            );
+            if !all_keyterms.is_empty() {
+                log::info ! (
+                    "Deepgram keyterm boosting: {} keyterms added",
+                    all_keyterms.len()
+                );
+            }
         }
 
         log::info ! ("Deepgram WebSocket connection initialized ({} host)", url.host_str().unwrap_or("unknown"));

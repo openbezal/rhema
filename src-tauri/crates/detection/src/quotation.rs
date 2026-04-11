@@ -33,8 +33,8 @@ struct IndexedVerse {
     book_name: Arc<str>,
     chapter: ChapterNumber,
     verse: VerseNumber,
-    /// Lowercase word set (used for scoring).
-    words: HashSet<String>,
+    /// Lowercase word set (maintained for future scoring).
+    _words: HashSet<String>,
     word_count: usize,
 }
 
@@ -83,7 +83,7 @@ impl QuotationMatcher {
                 book_name: Arc::from(v.book_name),
                 chapter: v.chapter,
                 verse: v.verse,
-                words,
+                _words: words,
                 word_count,
             });
         }

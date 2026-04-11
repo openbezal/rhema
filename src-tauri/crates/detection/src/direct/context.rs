@@ -1,6 +1,6 @@
 use crate::types::VerseRef;
 use std::time::Instant;
-use rhema_core::{BookId, ChapterNumber, VerseNumber};
+use rhema_core::{BookId, ChapterNumber};
 use std::sync::Arc;
 
 /// Tracks recent Bible reference context so partial references

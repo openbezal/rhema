@@ -1,9 +1,9 @@
-use std::sync::Arc;
+// Unused top-level import moved to tests
 use std::time::Instant;
 
 use crate::types::{Detection, DetectionSource};
 use crate::context::SermonContext;
-use rhema_core::{BookId, ChapterNumber, VerseNumber};
+// Unused imports removed
 
 /// Default confidence threshold — detections below this are dropped.
 const DEFAULT_CONFIDENCE_THRESHOLD: f64 = 0.45;
@@ -147,6 +147,7 @@ impl Default for DetectionMerger {
 # [ cfg ( test ) ]
 mod tests {
     use super::*;
+    use std::sync::Arc;
     use crate::types::{DetectionSource, VerseRef};
 
     fn make_detection(

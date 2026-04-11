@@ -144,13 +144,42 @@ pub async fn start_transcription(
             SttError::ThreadError(e.to_string())
         })?;
 
-    // ── 4. Spawn the Deepgram connection on the tokio runtime ───────────
+    // ── 4. Resolve keyterms (Dynamic Bible Context) ─────────────────────
+    let keyterms = {
+        let app_state = state.lock_safe()?;
+        let mut seen = std::collections::HashSet::new();
+        let mut terms = Vec::new();
+
+        // Core terms (Deduplicated first)
+        let core = ["Jesus", "Christ", "God", "Lord", "Holy Spirit", "chapter", "verse"];
+        for tc in core {
+            if seen.insert(tc.to_lowercase()) {
+                terms.push(tc.to_string());
+            }
+        }
+
+        if let Some(ref db) = app_state.bible_db {
+            if let Ok(books) = db.list_books(app_state.active_translation_id) {
+                for book in books {
+                    if seen.insert(book.name.to_lowercase()) {
+                        terms.push(book.name);
+                    }
+                    if !book.abbreviation.is_empty() && seen.insert(book.abbreviation.to_lowercase()) {
+                        terms.push(book.abbreviation);
+                    }
+                }
+            }
+        }
+        terms
+    };
+
     let stt_config = SttConfig {
         api_key: resolved_api_key,
         model: "nova-3".to_string(),
         sample_rate: 16_000,
         encoding: "linear16".to_string(),
         language: None,
+        keyterms,
     };
 
     let client = DeepgramClient::new(stt_config.clone());
