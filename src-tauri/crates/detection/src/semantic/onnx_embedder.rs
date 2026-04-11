@@ -25,21 +25,22 @@ use super::embedder::TextEmbedder;
 /// HuggingFace tokenizer.  Inference produces a fixed-dimension dense
 /// vector via mean pooling over the last hidden state.
 ///
-/// The inner `Session` requires `&mut self` for `run`, so we wrap it in a
-/// `Mutex` to satisfy the `&self` signature of the `TextEmbedder` trait.
+/// The inner `Session` requires `&mut self` for `run`, and `Tokenizer` is
+/// `Send` but not `Sync`, so we wrap both in separate `Mutex`es to satisfy
+/// the `&self` signature of the `TextEmbedder` trait.
 #[cfg(feature = "onnx")]
 pub struct OnnxEmbedder {
     session: Mutex<Session>,
-    tokenizer: Tokenizer,
+    tokenizer: Mutex<Tokenizer>,
     dim: usize,
     prompt_prefix: String,
     has_position_ids: bool,
 }
 
 // Safety: Tokenizer is Send but not Sync by default.  We never share
-// mutable references across threads — the tokenizer is only used behind
-// the session mutex — so the Send + Sync bound required by TextEmbedder
-// is safe.
+// mutable references across threads — both the tokenizer and the session
+// are behind their own Mutex — so the Send + Sync bound required by
+// TextEmbedder is safe.
 #[cfg(feature = "onnx")]
 unsafe impl Sync for OnnxEmbedder {}
 
@@ -152,7 +153,7 @@ impl OnnxEmbedder {
 
         Ok(Self {
             session: Mutex::new(session),
-            tokenizer,
+            tokenizer: Mutex::new(tokenizer),
             dim: dim as usize,
             // No prefix — matches the Python precompute script which embeds
             // documents with no prefix. Symmetric mode gives highest similarity.
@@ -182,10 +183,14 @@ impl OnnxEmbedder {
         let embed_start = std::time::Instant::now();
         let prefixed = format!("{}{}", self.prompt_prefix, text);
 
-        let encoding = self
+        let tokenizer = self
             .tokenizer
+            .lock()
+            .map_err(|e| DetectionError::Internal(format!("tokenizer lock: {e}")))?;
+        let encoding = tokenizer
             .encode(prefixed, true)
             .map_err(|e| DetectionError::Internal(format!("tokenize: {e}")))?;
+        drop(tokenizer);
 
         let ids = encoding.get_ids();
         let mask = encoding.get_attention_mask();

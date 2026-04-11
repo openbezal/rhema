@@ -1,16 +1,17 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[non_exhaustive]
+#[derive(Error, Debug, Clone)]
 pub enum DetectionError {
-    #[error("Failed to parse reference: {0}")]
+    #[error("failed to parse reference: {0}")]
     ParseError(String),
 
-    #[error("Invalid book name: {0}")]
+    #[error("invalid book name: {0}")]
     InvalidBook(String),
 
-    #[error("Invalid chapter or verse number: {0}")]
+    #[error("invalid chapter or verse number: {0}")]
     InvalidNumber(String),
 
-    #[error("Internal error: {0}")]
+    #[error("internal error: {0}")]
     Internal(String),
 }

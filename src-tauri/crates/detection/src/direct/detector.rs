@@ -275,7 +275,7 @@ pub struct DirectDetector {
     /// Pending incomplete reference waiting for verse completion.
     incomplete: Option<IncompleteRef>,
     /// Recently detected verses for "previous verse" navigation (most recent first).
-    pub recent_detections: VecDeque<VerseRef>,
+    recent_detections: VecDeque<VerseRef>,
 }
 
 impl DirectDetector {
@@ -286,6 +286,11 @@ impl DirectDetector {
             incomplete: None,
             recent_detections: VecDeque::with_capacity(5),
         }
+    }
+
+    /// Recent detections for context tracking.
+    pub fn recent_detections(&self) -> &VecDeque<VerseRef> {
+        &self.recent_detections
     }
 
     /// Check if the transcript contains a translation switching command.

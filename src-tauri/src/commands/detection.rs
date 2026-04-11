@@ -27,6 +27,7 @@ fn source_to_string(source: &rhema_detection::DetectionSource) -> String {
         rhema_detection::DetectionSource::QuotationMatch { .. } => "quotation".to_string(),
         rhema_detection::DetectionSource::SemanticLocal { .. } => "semantic_local".to_string(),
         rhema_detection::DetectionSource::SemanticCloud { .. } => "semantic_cloud".to_string(),
+        _ => "unknown".to_string(),
     }
 }
 
@@ -148,7 +149,7 @@ pub fn semantic_search(
         return Err("Semantic search not available — model or embeddings not loaded".into());
     }
 
-    let hits = app_state.detection_pipeline.semantic.search_query(&query, k);
+    let hits = app_state.detection_pipeline.semantic_search(&query, k);
 
     let mut results: Vec<SemanticSearchResult> = hits
         .into_iter()

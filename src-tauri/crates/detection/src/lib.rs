@@ -1,3 +1,22 @@
+//! Real-time Bible verse detection for the Rhema application.
+//!
+//! Combines multiple detection strategies — direct pattern matching,
+//! semantic vector search, and quotation matching — into a unified
+//! pipeline that identifies Bible references in sermon transcripts.
+//!
+//! # Key types
+//!
+//! - [`DetectionPipeline`] — orchestrates all detection strategies
+//! - [`DirectDetector`] — regex and Aho-Corasick pattern matching
+//! - [`SemanticDetector`] — ONNX embedding and vector similarity search
+//! - [`QuotationMatcher`] — inverted word index for verse text matching
+//! - [`Detection`], [`VerseRef`] — detection results
+//!
+//! # Feature flags
+//!
+//! - `onnx` — enables ONNX Runtime for local embedding inference
+//! - `vector-search` — enables HNSW vector index for similarity search
+
 pub mod types;
 pub mod error;
 pub mod direct;

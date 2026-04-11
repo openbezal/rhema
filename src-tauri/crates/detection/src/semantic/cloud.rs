@@ -3,6 +3,7 @@
 /// Used as a fallback when local semantic confidence is below a threshold.
 /// When enabled, the pipeline will re-embed low-confidence chunks via the
 /// OpenAI API and perform a second search pass against the same vector index.
+#[derive(Debug)]
 pub struct CloudBooster {
     api_key: Option<String>,
     model: String,

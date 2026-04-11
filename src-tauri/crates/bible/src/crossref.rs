@@ -3,6 +3,10 @@ use crate::error::BibleError;
 use crate::models::CrossReference;
 
 impl BibleDb {
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (i.e., a thread panicked
+    /// while holding the database lock).
     pub fn get_cross_references(
         &self,
         book_number: i32,
@@ -24,10 +28,6 @@ impl BibleDb {
                 votes: row.get(2)?,
             })
         })?;
-        let mut refs = Vec::new();
-        for row in rows {
-            refs.push(row?);
-        }
-        Ok(refs)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 }

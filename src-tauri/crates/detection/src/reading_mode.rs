@@ -21,7 +21,7 @@ struct LoadedVerse {
 }
 
 /// Result when reading mode advances to a new verse.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReadingAdvance {
     pub book_number: i32,
     pub book_name: String,

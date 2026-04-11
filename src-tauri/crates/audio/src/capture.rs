@@ -13,6 +13,12 @@ pub struct AudioCapture {
     stream: Stream,
 }
 
+impl std::fmt::Debug for AudioCapture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AudioCapture").finish_non_exhaustive()
+    }
+}
+
 impl AudioCapture {
     /// Stop the audio capture, consuming the struct.
     pub fn stop(self) {

@@ -1,3 +1,8 @@
+//! External API integrations for the Rhema application.
+//!
+//! Implements: OSC server, HTTP API (Axum).
+//! Planned: OpenAI embeddings client.
+
 pub mod coerce;
 pub mod command;
 pub mod dispatch;

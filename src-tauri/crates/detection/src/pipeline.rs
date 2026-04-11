@@ -10,10 +10,10 @@ use crate::semantic::detector::SemanticDetector;
 /// and reuse it across transcript segments so that the merger's cooldown
 /// state is preserved.
 pub struct DetectionPipeline {
-    pub direct: DirectDetector,
-    pub semantic: SemanticDetector,
-    pub cloud: CloudBooster,
-    pub merger: DetectionMerger,
+    direct: DirectDetector,
+    semantic: SemanticDetector,
+    cloud: CloudBooster,
+    merger: DetectionMerger,
 }
 
 impl DetectionPipeline {
@@ -24,6 +24,26 @@ impl DetectionPipeline {
             cloud: CloudBooster::new(),
             merger: DetectionMerger::new(),
         }
+    }
+
+    /// Replace the semantic detector (e.g., after loading an ONNX model).
+    pub fn set_semantic(&mut self, detector: SemanticDetector) {
+        self.semantic = detector;
+    }
+
+    /// Replace the cloud booster configuration.
+    pub fn set_cloud(&mut self, booster: CloudBooster) {
+        self.cloud = booster;
+    }
+
+    /// Access the direct detector for configuration.
+    pub fn direct_mut(&mut self) -> &mut DirectDetector {
+        &mut self.direct
+    }
+
+    /// Access the merger for threshold configuration.
+    pub fn merger_mut(&mut self) -> &mut DetectionMerger {
+        &mut self.merger
     }
 
     /// Process a transcript segment and return merged detections.
@@ -82,6 +102,11 @@ impl DetectionPipeline {
     /// Returns whether synonym expansion is currently enabled.
     pub fn use_synonyms(&self) -> bool {
         self.semantic.use_synonyms()
+    }
+
+    /// Run a standalone semantic search query (for the search UI).
+    pub fn semantic_search(&mut self, query: &str, k: usize) -> Vec<(i64, f64)> {
+        self.semantic.search_query(query, k)
     }
 }
 

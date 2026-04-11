@@ -3,6 +3,10 @@ use crate::error::BibleError;
 use crate::models::{Book, Verse};
 
 impl BibleDb {
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (i.e., a thread panicked
+    /// while holding the database lock).
     pub fn search_verses(
         &self,
         query: &str,
@@ -32,11 +36,7 @@ impl BibleDb {
                 })
             },
         )?;
-        let mut verses = Vec::new();
-        for row in rows {
-            verses.push(row?);
-        }
-        Ok(verses)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
     pub fn search_books(&self, query: &str) -> Result<Vec<Book>, BibleError> {
@@ -58,10 +58,6 @@ impl BibleDb {
                 testament: row.get(5)?,
             })
         })?;
-        let mut books = Vec::new();
-        for row in rows {
-            books.push(row?);
-        }
-        Ok(books)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 }

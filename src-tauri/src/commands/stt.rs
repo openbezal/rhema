@@ -523,7 +523,7 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) {
                 Ok(d) => d,
                 Err(_) => return,
             };
-            detector.recent_detections.front().cloned()
+            detector.recent_detections().front().cloned()
         };
 
         if let Some(recent) = verse_info {
@@ -531,7 +531,7 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) {
             let detection_confidence = {
                 let detector_state: State<'_, Mutex<rhema_detection::DirectDetector>> = app.state();
                 detector_state.lock().ok()
-                    .and_then(|d| d.recent_detections.front().map(|_| 0.95)) // Direct detections are always high confidence
+                    .and_then(|d| d.recent_detections().front().map(|_| 0.95)) // Direct detections are always high confidence
                     .unwrap_or(0.0)
             };
 

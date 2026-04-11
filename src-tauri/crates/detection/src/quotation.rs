@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use rhema_bible::QuotationVerse;
+
 use crate::types::{Detection, DetectionSource, VerseRef};
 
 /// Minimum number of words in a transcript window for quotation matching.
@@ -61,16 +63,12 @@ impl QuotationMatcher {
     }
 
     /// Build the index from verse data.
-    ///
-    /// `verses` should be `(verse_id, book_number, book_name, chapter, verse, text)` tuples.
-    pub fn build(
-        verses: Vec<(i64, i32, String, i32, i32, String)>,
-    ) -> Self {
+    pub fn build(verses: Vec<QuotationVerse>) -> Self {
         let mut indexed = Vec::with_capacity(verses.len());
         let mut word_index: HashMap<String, Vec<usize>> = HashMap::new();
 
-        for (verse_id, book_number, book_name, chapter, verse, text) in verses {
-            let words = text_to_words(&text);
+        for v in verses {
+            let words = text_to_words(&v.text);
             let word_count = words.len();
 
             if word_count < 3 {
@@ -83,11 +81,11 @@ impl QuotationMatcher {
             }
 
             indexed.push(IndexedVerse {
-                verse_id,
-                book_number,
-                book_name,
-                chapter,
-                verse,
+                verse_id: v.id,
+                book_number: v.book_number,
+                book_name: v.book_name,
+                chapter: v.chapter,
+                verse: v.verse,
                 words,
                 word_count,
             });
@@ -240,14 +238,20 @@ fn text_to_word_list(text: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    fn sample_verses() -> Vec<(i64, i32, String, i32, i32, String)> {
+    fn sample_verses() -> Vec<QuotationVerse> {
         vec![
-            (1001, 43, "John".to_string(), 3, 16,
-             "For God so loved the world that he gave his only begotten Son that whosoever believeth in him should not perish but have everlasting life".to_string()),
-            (1002, 45, "Romans".to_string(), 8, 28,
-             "And we know that all things work together for good to them that love God to them who are the called according to his purpose".to_string()),
-            (1003, 23, "Isaiah".to_string(), 40, 31,
-             "But they that wait upon the Lord shall renew their strength they shall mount up with wings as eagles they shall run and not be weary and they shall walk and not faint".to_string()),
+            QuotationVerse {
+                id: 1001, book_number: 43, book_name: "John".to_string(), chapter: 3, verse: 16,
+                text: "For God so loved the world that he gave his only begotten Son that whosoever believeth in him should not perish but have everlasting life".to_string(),
+            },
+            QuotationVerse {
+                id: 1002, book_number: 45, book_name: "Romans".to_string(), chapter: 8, verse: 28,
+                text: "And we know that all things work together for good to them that love God to them who are the called according to his purpose".to_string(),
+            },
+            QuotationVerse {
+                id: 1003, book_number: 23, book_name: "Isaiah".to_string(), chapter: 40, verse: 31,
+                text: "But they that wait upon the Lord shall renew their strength they shall mount up with wings as eagles they shall run and not be weary and they shall walk and not faint".to_string(),
+            },
         ]
     }
 
