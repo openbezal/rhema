@@ -1,15 +1,21 @@
 import type { Step } from "react-joyride"
 
+const STEP_DEFAULTS = {
+  disableBeacon: true,
+  skipBeacon: true,
+} as const satisfies Partial<Step>
+
 export const TUTORIAL_STEPS: Step[] = [
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="transcript-panel"]',
     title: "Live Transcript",
     content:
       'Click "Start transcript" to begin listening. Rhema converts speech to text in real time and highlights detected Bible verses.',
     placement: "right",
-    disableBeacon: true,
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="detections-panel"]',
     title: "AI Detections",
     content:
@@ -17,6 +23,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "left",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="search-panel"]',
     title: "Book Search",
     content:
@@ -24,6 +31,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "top",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="search-panel"]',
     title: "Context Search",
     content:
@@ -31,6 +39,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "top",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="queue-panel"]',
     title: "Verse Queue",
     content:
@@ -38,6 +47,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "left",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="preview-panel"]',
     title: "Programme Preview",
     content:
@@ -45,6 +55,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "bottom",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-slot="live-output-panel"]',
     title: "Live Display",
     content:
@@ -52,6 +63,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "bottom",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-tour="broadcast"]',
     title: "Broadcast",
     content:
@@ -59,6 +71,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "bottom",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-tour="theme"]',
     title: "Themes",
     content:
@@ -66,6 +79,7 @@ export const TUTORIAL_STEPS: Step[] = [
     placement: "bottom",
   },
   {
+    ...STEP_DEFAULTS,
     target: '[data-tour="settings"]',
     title: "Settings",
     content:
