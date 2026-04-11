@@ -84,16 +84,21 @@ export function ThemeDesigner() {
             style={{
               display: "grid",
               gridTemplateColumns: "260px 1fr 320px",
+              gridTemplateRows: "1fr",
             }}
           >
             {/* Left: Theme Library */}
-            <ThemeLibrary />
+            <div className="min-h-0 overflow-hidden">
+              <ThemeLibrary />
+            </div>
 
             {/* Center: Design Canvas */}
             <DesignCanvas />
 
             {/* Right: Properties Panel */}
-            <PropertiesPanel />
+            <div className="min-h-0 overflow-hidden">
+              <PropertiesPanel />
+            </div>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

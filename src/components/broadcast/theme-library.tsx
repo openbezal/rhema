@@ -4,7 +4,6 @@ import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   PlusIcon,
@@ -178,7 +177,7 @@ export function ThemeLibrary() {
       </div>
 
       {/* Theme list */}
-      <ScrollArea className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-1 px-2 pb-4">
           {/* Built-in section */}
           {builtinThemes.length > 0 && (
@@ -226,7 +225,7 @@ export function ThemeLibrary() {
             </p>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
