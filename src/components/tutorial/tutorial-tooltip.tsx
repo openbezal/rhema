@@ -46,7 +46,7 @@ export function TutorialTooltip({
   return (
     <div
       {...tooltipProps}
-      className="z-[70] w-[340px] overflow-hidden rounded-xl border border-border/60 bg-card shadow-2xl shadow-black/20"
+      className="z-[70] w-[340px] overflow-hidden rounded-xl bg-card shadow-2xl shadow-black/25"
     >
       <div className="flex items-center gap-2.5 border-b border-border/40 px-4 pb-3 pt-4">
         <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15">
