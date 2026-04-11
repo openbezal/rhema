@@ -37,7 +37,7 @@ pub fn run(app: &AppHandle, transcript: &str) {
         .collect();
 
     for r in &results {
-        log::info!(
+        log::info ! (
             "[DET-QUOTATION] Found: {} ({:.0}%) auto_q={}",
             r.verse_ref,
             r.confidence * 100.0,

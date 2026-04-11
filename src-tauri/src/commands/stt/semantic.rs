@@ -5,7 +5,7 @@ use crate::commands::detection::DetectionResult;
 
 /// Run semantic (ONNX embedding) detection. Slow, runs in background worker.
 pub fn run(app: &AppHandle, transcript: &str) {
-    log::info!("[DET-SEMANTIC] Running on: {:?}", &transcript[..transcript.len().min(80)]);
+    log::info ! ("[DET-SEMANTIC] Running on: {:?}", &transcript[..transcript.len().min(80)]);
     let managed: State<'_, Mutex<AppState>> = app.state();
     let mut app_state = match managed.lock() {
         Ok(s) => s,
@@ -16,7 +16,7 @@ pub fn run(app: &AppHandle, transcript: &str) {
     };
     let mut detections = app_state.detection_pipeline.process_semantic(transcript);
     if detections.is_empty() {
-        log::info!("[DET-SEMANTIC] No detections");
+        log::info ! ("[DET-SEMANTIC] No detections");
         return;
     }
 
@@ -43,7 +43,7 @@ pub fn run(app: &AppHandle, transcript: &str) {
         .map(|m| crate::commands::detection::to_result(&app_state, m))
         .collect();
     for r in &results {
-        log::info!(
+        log::info ! (
             "[DET-SEMANTIC] Found: {} ({:.0}% {}) auto_q={}",
             r.verse_ref, r.confidence * 100.0, r.source, r.auto_queued
         );

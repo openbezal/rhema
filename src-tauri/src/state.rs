@@ -19,6 +19,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(http_client: reqwest::Client) -> Self {
+        log::info ! ("[AppState] Initializing institutional core state engine");
         Self {
             bible_db: None,
             http_client,

@@ -30,7 +30,7 @@ pub fn check_translation(app: &AppHandle, transcript: &str) {
             if let Ok(translations) = db.list_translations() {
                 if let Some(t) = translations.iter().find(|t| t.abbreviation == abbrev) {
                     app_state.active_translation_id = t.id;
-                    log::info!("[STT] Voice command: switched to {} (id={})", abbrev, t.id);
+                    log::info ! ("[STT] Voice command: switched to {} (id={})", abbrev, t.id);
                     drop(app_state);
 
                     let _ = app.emit("translation_command", TranslationSwitch {

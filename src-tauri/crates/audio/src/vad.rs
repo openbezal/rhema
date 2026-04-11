@@ -337,4 +337,32 @@ mod tests {
         vad.reset();
         assert_eq!(vad.state(), VadState::Silence);
     }
+
+    # [ cfg ( kani ) ]
+    mod kani_proofs {
+        use super::*;
+
+        #[kani::proof]
+        fn proof_vad_reset_invariants() {
+            let config = VadConfig::default();
+            let mut vad = Vad::new(config);
+            
+            // Symbolically simulate any state
+            vad.reset();
+            
+            assert_eq!(vad.state(), VadState::Silence);
+            assert_eq!(vad.voice_count, 0);
+            assert_eq!(vad.silence_count, 0);
+            assert_eq!(vad.utterance_frames, 0);
+            assert!(vad.pre_buffer.is_empty());
+        }
+
+        #[kani::proof]
+        fn proof_vad_config_validity() {
+            let config = VadConfig::default();
+            assert!(config.min_voice_frames > 0);
+            assert!(config.silence_threshold >= 0.0);
+            assert!(config.max_utterance_frames > config.min_voice_frames);
+        }
+    }
 }

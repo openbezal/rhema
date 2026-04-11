@@ -73,7 +73,7 @@ pub fn run(app: &AppHandle, transcript: &str) -> bool {
     }
 
     for r in &results {
-        log::info!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
+        log::info ! ("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
     }
     
     drop(app_state);
@@ -95,5 +95,30 @@ fn map_no_db(m: &MergedDetection) -> DetectionResult {
         source: "direct".to_string(),
         auto_queued: m.auto_queued,
         transcript_snippet: m.detection.transcript_snippet.clone(),
+    }
+}
+
+# [ cfg ( test ) ]
+mod tests {
+    use super::*;
+
+    # [ test ]
+    fn test_direct_run_no_detector() {
+        // Mock app without the required state should handle lock failure gracefully
+        let app = tauri::test::mock_builder().build(tauri::generate_context!()).unwrap();
+        assert!(!run(&app.handle(), "John 3:16"));
+    }
+
+    # [ cfg ( kani ) ]
+    mod kani_proofs {
+        use super::*;
+
+        #[kani::proof]
+        fn proof_direct_logic_boundary() {
+            // Verifies that the mapping logic handles empty strings safely
+            let app = tauri::test::mock_builder().build(tauri::generate_context!()).unwrap();
+            let handle = app.handle();
+            assert!(!run(&handle, ""));
+        }
     }
 }

@@ -48,7 +48,7 @@ pub fn check(app: &AppHandle, transcript: &str, direct_found: bool) {
         let verses: Vec<(i32, String)> = chapter_verses.into_iter().map(|v| (v.verse, v.text)).collect();
         let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
         if let Ok(mut rm) = rm_managed.lock() {
-            log::info!("[READING] Starting mode for {} {}:{}", recent.book_name, recent.chapter, recent.verse_start);
+            log::info ! ("[READING] Starting mode for {} {}:{}", recent.book_name, recent.chapter, recent.verse_start);
             rm.start(recent.book_number, &recent.book_name, recent.chapter, recent.verse_start, verses);
         }
     }
@@ -143,5 +143,45 @@ mod tests {
 
         // Case 5: Different book, low confidence (should be suppressed)
         assert!(!should_start_reading_mode(&rm, &diff_book, 0.85));
+    }
+
+    # [ cfg ( kani ) ]
+    mod kani_proofs {
+        use super::*;
+
+        #[kani::proof]
+        fn proof_reading_mode_start_logic() {
+            let rm = ReadingMode::default();
+            let recent = DetectionVerseRef {
+                book_number: 1,
+                book_name: "Gen".to_string(),
+                chapter: 1,
+                verse_start: 1,
+                verse_end: 1,
+                transcript_snippet: String::new(),
+                confidence: 1.0,
+                verse_id: None,
+                source: rhema_detection::DetectionSource::DirectReference,
+            };
+            
+            // Should always start if inactive
+            assert!(should_start_reading_mode(&rm, &recent, 0.95));
+        }
+
+        #[kani::proof]
+        fn proof_reading_mode_suppression() {
+            let mut rm = ReadingMode::default();
+            rm.start(1, "Gen", 1, 1, vec![(1, "Text".into())]);
+            
+            let recent = DetectionVerseRef {
+                book_number: 1,
+                chapter: 1,
+                confidence: 1.0,
+                ..DetectionVerseRef::default()
+            };
+            
+            // Should NOT restart if already tracking same chapter
+            assert!(!should_start_reading_mode(&rm, &recent, 1.0));
+        }
     }
 }

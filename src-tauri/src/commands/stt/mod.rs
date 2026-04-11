@@ -8,14 +8,14 @@ use crate::events::{
     EVENT_TRANSCRIPT_PARTIAL,
 };
 use crate::state::AppState;
-use rhema_audio::{AudioConfig, AudioFrame};
-use rhema_stt::{DeepgramClient, SttConfig, TranscriptEvent};
-
+pub mod errors;
 pub mod direct;
 pub mod semantic;
 pub mod reading;
 pub mod quotation;
 pub mod command;
+
+use errors::SttError;
 
 /// Start the full audio-capture-to-transcription pipeline.
 ///
@@ -32,12 +32,13 @@ pub async fn start_transcription(
     api_key: String,
     device_id: Option<String>,
     gain: Option<f32>,
-) -> Result<(), String> {
+) -> Result<(), SttError> {
+    log::info ! ("[STT] Start request received");
     // ── 1. Guard: already running? ──────────────────────────────────────
     let (stt_active, audio_active) = {
-        let app_state = state.lock().map_err(|e| e.to_string())?;
+        let app_state = state.lock().map_err(|e| SttError::StateLockError(e.to_string()))?;
         if app_state.stt_active.load(Ordering::Relaxed) {
-            return Err("Transcription is already running".into());
+            return Err(SttError::AlreadyRunning);
         }
         (app_state.stt_active.clone(), app_state.audio_active.clone())
     };
@@ -50,7 +51,7 @@ pub async fn start_transcription(
     };
 
     if resolved_api_key.is_empty() {
-        return Err("No Deepgram API key provided. Set it in Settings or via DEEPGRAM_API_KEY env var.".into());
+        return Err(SttError::ApiKeyMissing);
     }
 
     log::info!("Starting transcription: api_key={}..., device_id={:?}, gain={:?}",
@@ -139,7 +140,7 @@ pub async fn start_transcription(
         .map_err(|e| {
             stt_active.store(false, Ordering::SeqCst);
             audio_active.store(false, Ordering::SeqCst);
-            format!("Failed to spawn audio fanout thread: {e}")
+            SttError::ThreadError(e.to_string())
         })?;
 
     // ── 4. Spawn the Deepgram connection on the tokio runtime ───────────
@@ -157,7 +158,7 @@ pub async fn start_transcription(
 
     let conn_active = stt_active.clone();
     let http_client = {
-        let app_state = state.lock().map_err(|e| e.to_string())?;
+        let app_state = state.lock().map_err(|e| SttError::StateLockError(e.to_string()))?;
         app_state.http_client.clone()
     };
 
@@ -373,11 +374,12 @@ pub async fn start_transcription(
 #[tauri::command]
 pub fn stop_transcription(
     state: State<'_, Mutex<AppState>>,
-) -> Result<(), String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+) -> Result<(), SttError> {
+    log::info ! ("[STT] Stop request received");
+    let app_state = state.lock().map_err(|e| SttError::StateLockError(e.to_string()))?;
 
     if !app_state.stt_active.load(Ordering::Relaxed) {
-        return Err("Transcription is not running".into());
+        return Ok(()); // Idempotent stop is better than error for reliability
     }
 
     // Setting these flags causes the background threads/tasks to exit.
