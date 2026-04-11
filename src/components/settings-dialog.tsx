@@ -699,19 +699,28 @@ function HelpSection() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-4 rounded-lg border border-border p-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15">
-          <GraduationCapIcon className="size-4 text-primary" />
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-sm font-medium">Interactive Tutorial</p>
-          <p className="text-sm text-muted-foreground">
-            Take a guided tour of Rhema&apos;s dashboard to learn about each
-            feature and how to use them.
-          </p>
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground">
+          Resources to help you get the most out of Rhema.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <GraduationCapIcon className="size-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Interactive Tutorial</p>
+              <p className="text-xs text-muted-foreground">
+                Step-by-step walkthrough of every feature
+              </p>
+            </div>
+          </div>
           <Button
+            variant="outline"
             size="sm"
-            className="mt-2"
             onClick={() => {
               closeSettings()
               setTimeout(() => {
@@ -720,8 +729,22 @@ function HelpSection() {
             }}
           >
             <GraduationCapIcon className="mr-1.5 size-3.5" />
-            Restart Tutorial
+            Restart
           </Button>
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <KeyIcon className="size-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Keyboard Shortcuts</p>
+              <p className="text-xs text-muted-foreground">
+                Arrow keys navigate the tutorial, Esc to dismiss
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
