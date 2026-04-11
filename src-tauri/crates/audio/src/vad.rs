@@ -108,85 +108,10 @@ impl Vad {
             && level.rms >= self.config.frame_threshold;
 
         match self.state {
-            VadState::Silence => {
-                if is_voiced {
-                    self.voice_count += 1;
-                    if self.voice_count >= self.config.min_voice_frames {
-                        // Transition to Speech
-                        self.state = VadState::Speech;
-                        log::debug!("[VAD] State transition: Silence -> Speech (voiced frames: {})", self.voice_count);
-                        self.silence_count = 0;
-                        self.utterance_frames = 0;
-
-                        // Flush pre-buffer + current frame
-                        let mut frames: Vec<AudioFrame> = self.pre_buffer.drain(..).collect();
-                        frames.push(frame.clone());
-                        self.utterance_frames += frames.len();
-
-                        return VadResult {
-                            frames,
-                            transition: Some(VadTransition::SpeechStarted),
-                        };
-                    }
-                } else {
-                    self.voice_count = 0;
-                }
-
-                // Buffer frame for pre-speech capture
-                if self.pre_buffer.len() >= self.config.pre_buffer_frames {
-                    self.pre_buffer.remove(0);
-                }
-                self.pre_buffer.push(frame.clone());
-
-                VadResult {
-                    frames: vec![],
-                    transition: None,
-                }
-            }
-
-            VadState::Speech => {
-                self.utterance_frames += 1;
-
-                // Force-flush on max utterance length
-                if self.utterance_frames >= self.config.max_utterance_frames {
-                    self.state = VadState::Silence;
-                    self.voice_count = 0;
-                    self.silence_count = 0;
-                    self.pre_buffer.clear();
-                    return VadResult {
-                        frames: vec![frame.clone()],
-                        transition: Some(VadTransition::SpeechEnded),
-                    };
-                }
-
-                if !is_voiced {
-                    self.silence_count += 1;
-                    if self.silence_count >= self.config.silence_frame_count {
-                        // Transition to Silence (skip Trailing for simplicity)
-                        self.state = VadState::Silence;
-                        log::debug!("[VAD] State transition: Speech -> Silence (silence frames: {})", self.silence_count);
-                        self.voice_count = 0;
-                        self.silence_count = 0;
-                        self.pre_buffer.clear();
-                        return VadResult {
-                            frames: vec![], // Don't forward trailing silence
-                            transition: Some(VadTransition::SpeechEnded),
-                        };
-                    }
-                } else {
-                    self.silence_count = 0;
-                }
-
-                // Forward the frame
-                VadResult {
-                    frames: vec![frame.clone()],
-                    transition: None,
-                }
-            }
-
+            VadState::Silence => self.process_silence(frame, is_voiced),
+            VadState::Speech => self.process_speech(frame, is_voiced),
             VadState::Trailing => {
                 // Simplified: we go directly from Speech to Silence
-                // This state is reserved for future use
                 self.state = VadState::Silence;
                 VadResult {
                     frames: vec![],
@@ -194,6 +119,87 @@ impl Vad {
                 }
             }
         }
+    }
+
+    fn process_silence(&mut self, frame: &AudioFrame, is_voiced: bool) -> VadResult {
+        if !is_voiced {
+            self.voice_count = 0;
+            // Buffer frame for pre-speech capture
+            if self.pre_buffer.len() >= self.config.pre_buffer_frames {
+                self.pre_buffer.remove(0);
+            }
+            self.pre_buffer.push(frame.clone());
+
+            return VadResult { frames: vec![], transition: None };
+        }
+
+        self.voice_count += 1;
+        if self.voice_count < self.config.min_voice_frames {
+            // Buffer frame for pre-speech capture even if voiced (but not enough to start)
+            if self.pre_buffer.len() >= self.config.pre_buffer_frames {
+                self.pre_buffer.remove(0);
+            }
+            self.pre_buffer.push(frame.clone());
+            return VadResult { frames: vec![], transition: None };
+        }
+
+        // Transition to Speech
+        self.state = VadState::Speech;
+        log::debug!("[VAD] State transition: Silence -> Speech (voiced frames: {})", self.voice_count);
+        self.silence_count = 0;
+        self.utterance_frames = 0;
+
+        // Flush pre-buffer + current frame
+        let mut frames: Vec<AudioFrame> = self.pre_buffer.drain(..).collect();
+        frames.push(frame.clone());
+        self.utterance_frames += frames.len();
+
+        VadResult {
+            frames,
+            transition: Some(VadTransition::SpeechStarted),
+        }
+    }
+
+    fn process_speech(&mut self, frame: &AudioFrame, is_voiced: bool) -> VadResult {
+        self.utterance_frames += 1;
+
+        // Force-flush on max utterance length
+        if self.utterance_frames >= self.config.max_utterance_frames {
+            self.state = VadState::Silence;
+            log::debug!("[VAD] State transition: Speech -> Silence (force flush at max duration)");
+            self.voice_count = 0;
+            self.silence_count = 0;
+            self.pre_buffer.clear();
+            return VadResult {
+                frames: vec![frame.clone()],
+                transition: Some(VadTransition::SpeechEnded),
+            };
+        }
+
+        if !is_voiced {
+            self.silence_count += 1;
+            if self.silence_count >= self.config.silence_frame_count {
+                // Transition to Silence
+                self.state = VadState::Silence;
+                log::debug!("[VAD] State transition: Speech -> Silence (silence frames: {})", self.silence_count);
+                self.voice_count = 0;
+                self.silence_count = 0;
+                self.pre_buffer.clear();
+                return VadResult {
+                    frames: vec![], // Don't forward trailing silence
+                    transition: Some(VadTransition::SpeechEnded),
+                };
+            }
+        } else {
+            self.silence_count = 0;
+        }
+
+        // Forward the frame
+        VadResult {
+            frames: vec![frame.clone()],
+            transition: None,
+        }
+    }
     }
 }
 

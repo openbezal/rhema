@@ -45,6 +45,7 @@ pub fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
     let mut app_state = match app_managed.try_lock() {
         Ok(s) => s,
         Err(_) => {
+            // AppState locked by semantic worker — emit results without verse text
             let results: Vec<crate::commands::detection::DetectionResult> = merged
                 .iter()
                 .map(|m| {
@@ -70,11 +71,13 @@ pub fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
             return has_high_confidence;
         }
     };
+
     let results: Vec<crate::commands::detection::DetectionResult> = merged
         .iter()
         .map(|m| crate::commands::detection::to_result(&app_state, m))
         .collect();
 
+    // Update sermon context
     for m in &merged {
         app_state.sermon_context.update(
             &m.detection.verse_ref,
@@ -86,6 +89,7 @@ pub fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
     for r in &results {
         log::info!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
     }
+    
     drop(app_state);
     let _ = app.emit("verse_detections", &results);
     has_high_confidence
@@ -144,90 +148,73 @@ pub fn run_semantic_detection(app: &AppHandle, transcript: &str) {
 pub fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) {
     use rhema_detection::ReadingMode;
 
-    if direct_found {
-        let verse_info = {
-            let detector_state: State<'_, Mutex<rhema_detection::DirectDetector>> = app.state();
-            let detector = match detector_state.lock() {
-                Ok(d) => d,
-                Err(_) => return,
-            };
-            detector.recent_detections.front().cloned()
+    if !direct_found {
+        check_reading_mode_advancement(app, transcript);
+        return;
+    }
+
+    let verse_info = {
+        let detector_state: State<'_, Mutex<rhema_detection::DirectDetector>> = app.state();
+        let detector = match detector_state.lock() {
+            Ok(d) => d,
+            Err(_) => return,
         };
+        detector.recent_detections.front().cloned()
+    };
 
-        if let Some(recent) = verse_info {
-            let detection_confidence = 0.95; // Direct detections are high confidence
+    let Some(recent) = verse_info else {
+        check_reading_mode_advancement(app, transcript);
+        return;
+    };
 
-            let should_start = {
-                let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-                match rm_managed.lock() {
-                    Ok(rm) => {
-                        if !rm.is_active() && !rm.has_verses() {
-                            true
-                        } else if !rm.is_active() && rm.has_verses() {
-                            true
-                        } else if rm.current_book() == recent.book_number
-                            && rm.current_chapter() == recent.chapter {
-                            false
-                        } else if rm.current_book() != recent.book_number
-                            && detection_confidence >= 0.90 {
-                            true
-                        } else if rm.current_book() == recent.book_number {
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    Err(_) => false,
-                }
-            };
+    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+    let should_start = match rm_managed.lock() {
+        Ok(rm) => should_start_reading_mode(&rm, &recent, 0.95),
+        Err(_) => false,
+    };
 
-            if should_start {
-                let chapter_data = {
-                    let app_managed: State<'_, Mutex<crate::state::AppState>> = app.state();
-                    let app_state = match app_managed.try_lock() {
-                        Ok(s) => s,
-                        Err(_) => return,
-                    };
-                    match &app_state.bible_db {
-                        Some(db) => db.get_chapter(app_state.active_translation_id, recent.book_number, recent.chapter).ok(),
-                        None => None,
-                    }
-                };
+    if !should_start {
+        check_reading_mode_advancement(app, transcript);
+        return;
+    }
 
-                if let Some(chapter_verses) = chapter_data {
-                    let verses: Vec<(i32, String)> = chapter_verses
-                        .into_iter()
-                        .map(|v| (v.verse, v.text))
-                        .collect();
+    let chapter_data = {
+        let app_managed: State<'_, Mutex<crate::state::AppState>> = app.state();
+        let Ok(app_state) = app_managed.try_lock() else { return };
+        
+        app_state.bible_db.as_ref().and_then(|db| {
+            db.get_chapter(app_state.active_translation_id, recent.book_number, recent.chapter).ok()
+        })
+    };
 
-                    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-                    if let Ok(mut rm) = rm_managed.lock() {
-                        rm.start(
-                            recent.book_number,
-                            &recent.book_name,
-                            recent.chapter,
-                            recent.verse_start,
-                            verses,
-                        );
-                    }
-                }
-            }
+    if let Some(chapter_verses) = chapter_data {
+        let verses: Vec<(i32, String)> = chapter_verses.into_iter().map(|v| (v.verse, v.text)).collect();
+        let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+        if let Ok(mut rm) = rm_managed.lock() {
+            log::info!("[READING] Starting mode for {} {}:{}", recent.book_name, recent.chapter, recent.verse_start);
+            rm.start(recent.book_number, &recent.book_name, recent.chapter, recent.verse_start, verses);
         }
     }
 
+    check_reading_mode_advancement(app, transcript);
+}
+
+/// Internal helper to check for reading mode progress.
+fn check_reading_mode_advancement(app: &AppHandle, transcript: &str) {
+    use rhema_detection::ReadingMode;
     let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+    
     let advance = {
         let mut rm = match rm_managed.lock() {
             Ok(rm) => rm,
             Err(_) => return,
         };
-        if !rm.is_active() {
-            return;
-        }
+        if !rm.is_active() { return; }
         rm.check_transcript(transcript)
     };
 
     if let Some(advance) = advance {
+        log::trace!("[READING] Advanced to verse {}", advance.verse);
         let _ = app.emit("reading_mode_verse", &advance);
 
         let result = crate::commands::detection::DetectionResult {
@@ -357,4 +344,61 @@ pub fn run_quotation_matching(app: &AppHandle, transcript: &str) {
 
     drop(app_state);
     let _ = app.emit("verse_detections", &results);
+}
+
+/// Pure predicate to decide if reading mode should start/restart.
+fn should_start_reading_mode(rm: &rhema_detection::ReadingMode, recent: &rhema_detection::DetectionVerseRef, confidence: f64) -> bool {
+    if !rm.is_active() {
+        return true; // Not active: go ahead
+    }
+    
+    if rm.current_book() == recent.book_number && rm.current_chapter() == recent.chapter {
+        return false; // Already tracking
+    }
+    
+    if rm.current_book() != recent.book_number && confidence >= 0.90 {
+        return true; // Explicit new book
+    }
+    
+    rm.current_book() == recent.book_number // Same book, different chapter
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rhema_detection::{ReadingMode, DetectionVerseRef};
+
+    #[test]
+    fn test_should_start_reading_mode() {
+        let mut rm = ReadingMode::default();
+        let recent = DetectionVerseRef {
+            book_number: 1, // Genesis
+            book_name: "Genesis".to_string(),
+            chapter: 1,
+            verse_start: 1,
+            verse_end: 1,
+            transcript_snippet: String::new(),
+            confidence: 0.95,
+            verse_id: None,
+            source: rhema_detection::DetectionSource::DirectReference,
+        };
+
+        // Case 1: Not active
+        assert!(should_start_reading_mode(&rm, &recent, 0.95));
+
+        // Case 2: Already active on same chapter
+        rm.start(1, "Genesis", 1, 1, vec![(1, "In the beginning".to_string())]);
+        assert!(!should_start_reading_mode(&rm, &recent, 0.95));
+
+        // Case 3: Different chapter in same book
+        let next_ch = DetectionVerseRef { chapter: 2, ..recent.clone() };
+        assert!(should_start_reading_mode(&rm, &next_ch, 0.95));
+
+        // Case 4: Different book, high confidence
+        let diff_book = DetectionVerseRef { book_number: 2, ..recent.clone() };
+        assert!(should_start_reading_mode(&rm, &diff_book, 0.95));
+
+        // Case 5: Different book, low confidence (should be suppressed)
+        assert!(!should_start_reading_mode(&rm, &diff_book, 0.85));
+    }
 }
