@@ -14,12 +14,15 @@ import type { QueueItem } from "@/types"
 
 function QueueItemRow({
   item,
+  index,
   isActive,
 }: {
   item: QueueItem
+  index: number
   isActive: boolean
 }) {
   const handlePresent = () => {
+    useQueueStore.getState().setActive(index)
     bibleActions.selectVerse(item.verse)
     const translation = useBibleStore.getState().translations
       .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
@@ -107,6 +110,7 @@ export function QueuePanel() {
             <QueueItemRow
               key={item.id}
               item={item}
+              index={idx}
               isActive={idx === activeIndex}
             />
           ))}

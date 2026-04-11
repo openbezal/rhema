@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { invoke } from "@tauri-apps/api/core"
 
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,7 @@ import {
   SettingsIcon,
   CheckIcon,
   BookOpenIcon,
+  RadioIcon,
 } from "lucide-react"
 import { useSettingsStore } from "@/stores"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
@@ -46,7 +47,7 @@ import type { DeviceInfo } from "@/types/audio"
 /*  Nav definition                                                            */
 /* -------------------------------------------------------------------------- */
 
-type NavSection = "audio" | "bible" | "display" | "api-keys"
+type NavSection = "audio" | "bible" | "display" | "api-keys" | "remote"
 
 const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
   {
@@ -63,6 +64,11 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
     name: "Display Mode",
     id: "display",
     icon: <TvIcon strokeWidth={2} />,
+  },
+  {
+    name: "Remote Control",
+    id: "remote",
+    icon: <RadioIcon strokeWidth={2} />,
   },
   {
     name: "API Keys",
@@ -318,7 +324,9 @@ function ApiKeysSection() {
 
 const sectionTitles: Record<NavSection, string> = {
   audio: "Audio",
+  bible: "Bible Translation",
   display: "Display Mode",
+  remote: "Remote Control",
   "api-keys": "API Keys",
 }
 
@@ -422,10 +430,277 @@ function BibleSection() {
   )
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Section: Remote Control                                                   */
+/* -------------------------------------------------------------------------- */
+
+interface RemoteStatus {
+  running: boolean
+  port: number | null
+}
+
+interface CommandLogEntry {
+  id: number
+  timestamp: string
+  source: "OSC" | "HTTP"
+  command: string
+}
+
+function RemoteControlSection() {
+  const [oscEnabled, setOscEnabled] = useState(false)
+  const [httpEnabled, setHttpEnabled] = useState(false)
+  const [oscPort, setOscPort] = useState("8000")
+  const [httpPort, setHttpPort] = useState("8080")
+  const [oscStatus, setOscStatus] = useState<RemoteStatus>({ running: false, port: null })
+  const [httpStatus, setHttpStatus] = useState<RemoteStatus>({ running: false, port: null })
+  const [oscError, setOscError] = useState<string | null>(null)
+  const [httpError, setHttpError] = useState<string | null>(null)
+  const [commandLog, setCommandLog] = useState<CommandLogEntry[]>([])
+  const logIdRef = useRef(0)
+
+  // Poll statuses
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const osc = await invoke<RemoteStatus>("get_osc_status")
+        setOscStatus(osc)
+        if (osc.running) setOscError(null)
+      } catch { /* ignore */ }
+      try {
+        const http = await invoke<RemoteStatus>("get_http_status")
+        setHttpStatus(http)
+        if (http.running) setHttpError(null)
+      } catch { /* ignore */ }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Listen for remote commands to populate the log
+  useEffect(() => {
+    let cancelled = false
+    const unlisteners: (() => void)[] = []
+
+    async function setup() {
+      const { listen } = await import("@tauri-apps/api/event")
+
+      const remoteEvents = [
+        "remote:next", "remote:prev", "remote:theme", "remote:opacity",
+        "remote:on_air", "remote:show", "remote:hide", "remote:confidence",
+      ]
+
+      for (const event of remoteEvents) {
+        const unlisten = await listen(event, () => {
+          if (cancelled) return
+          const entry: CommandLogEntry = {
+            id: logIdRef.current++,
+            timestamp: new Date().toLocaleTimeString(),
+            source: "OSC", // We can't distinguish source at event level; default to OSC
+            command: event.replace("remote:", ""),
+          }
+          setCommandLog((prev) => [entry, ...prev].slice(0, 50))
+        })
+        unlisteners.push(unlisten)
+      }
+    }
+
+    setup()
+    return () => {
+      cancelled = true
+      unlisteners.forEach((fn) => fn())
+    }
+  }, [])
+
+  const handleOscToggle = async () => {
+    try {
+      if (oscStatus.running) {
+        await invoke("stop_osc")
+        setOscEnabled(false)
+        setOscError(null)
+      } else {
+        const port = parseInt(oscPort) || 8000
+        const boundPort = await invoke<number>("start_osc", { port })
+        setOscEnabled(true)
+        setOscPort(String(boundPort))
+        setOscError(null)
+      }
+    } catch (e) {
+      setOscError(String(e))
+    }
+  }
+
+  const handleHttpToggle = async () => {
+    try {
+      if (httpStatus.running) {
+        await invoke("stop_http")
+        setHttpEnabled(false)
+        setHttpError(null)
+      } else {
+        const port = parseInt(httpPort) || 8080
+        const boundPort = await invoke<number>("start_http", { port })
+        setHttpEnabled(true)
+        setHttpPort(String(boundPort))
+        setHttpError(null)
+      }
+    } catch (e) {
+      setHttpError(String(e))
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* OSC */}
+      <div className="flex flex-col gap-3">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          OSC (Open Sound Control)
+        </label>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <label className="text-xs text-muted-foreground">Port</label>
+            <Input
+              type="number"
+              value={oscPort}
+              onChange={(e) => setOscPort(e.target.value)}
+              className="h-7 w-24 text-xs"
+              disabled={oscStatus.running}
+            />
+          </div>
+          <StatusDot running={oscStatus.running} />
+          <Button
+            size="sm"
+            variant={oscStatus.running ? "destructive" : "default"}
+            onClick={handleOscToggle}
+            className="text-xs"
+          >
+            {oscStatus.running ? "Stop" : "Start"}
+          </Button>
+        </div>
+        {oscError && (
+          <p className="text-[0.625rem] text-red-500">{oscError}</p>
+        )}
+        {oscStatus.running && oscStatus.port && (
+          <p className="text-[0.625rem] text-muted-foreground">
+            Listening on UDP port {oscStatus.port}
+          </p>
+        )}
+        <p className="text-[0.625rem] text-muted-foreground">
+          Receives commands from hardware controllers (Stream Deck, TouchOSC, Companion)
+          via OSC over UDP.
+        </p>
+      </div>
+
+      {/* HTTP API */}
+      <div className="flex flex-col gap-3">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          HTTP API
+        </label>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <label className="text-xs text-muted-foreground">Port</label>
+            <Input
+              type="number"
+              value={httpPort}
+              onChange={(e) => setHttpPort(e.target.value)}
+              className="h-7 w-24 text-xs"
+              disabled={httpStatus.running}
+            />
+          </div>
+          <StatusDot running={httpStatus.running} />
+          <Button
+            size="sm"
+            variant={httpStatus.running ? "destructive" : "default"}
+            onClick={handleHttpToggle}
+            className="text-xs"
+          >
+            {httpStatus.running ? "Stop" : "Start"}
+          </Button>
+        </div>
+        {httpError && (
+          <p className="text-[0.625rem] text-red-500">{httpError}</p>
+        )}
+        {httpStatus.running && httpStatus.port && (
+          <p className="text-[0.625rem] text-muted-foreground">
+            Serving on http://localhost:{httpStatus.port}/api/v1/
+          </p>
+        )}
+        <p className="text-[0.625rem] text-muted-foreground">
+          REST API for status queries and control commands. Use with custom dashboards,
+          automation scripts, or HTTP-capable controllers.
+        </p>
+      </div>
+
+      {/* Firewall guidance */}
+      <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <p className="text-[0.625rem] font-medium text-muted-foreground mb-1">Firewall Note</p>
+        <p className="text-[0.625rem] text-muted-foreground leading-relaxed">
+          Your OS may block incoming connections. On macOS, allow Rhema through
+          System Settings → Network → Firewall. On Windows, allow through
+          Windows Security → Firewall → Allow an app.
+        </p>
+      </div>
+
+      {/* Command Log */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Command Log
+          </label>
+          {commandLog.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 text-[0.5rem] px-1.5"
+              onClick={() => setCommandLog([])}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+        <div className="h-32 overflow-y-auto rounded-lg border border-border bg-background p-2">
+          {commandLog.length === 0 ? (
+            <p className="text-[0.625rem] text-muted-foreground text-center mt-8">
+              No commands received yet
+            </p>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              {commandLog.map((entry) => (
+                <div key={entry.id} className="flex items-center gap-2 text-[0.625rem]">
+                  <span className="text-muted-foreground tabular-nums shrink-0">
+                    {entry.timestamp}
+                  </span>
+                  <Badge variant="outline" className="text-[0.5rem] h-3.5 px-1">
+                    {entry.source}
+                  </Badge>
+                  <span className="text-foreground font-mono">{entry.command}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatusDot({ running }: { running: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div
+        className={`size-2 rounded-full ${
+          running ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"
+        }`}
+      />
+      <span className="text-[0.625rem] text-muted-foreground">
+        {running ? "Listening" : "Stopped"}
+      </span>
+    </div>
+  )
+}
+
 const sectionComponents: Record<NavSection, React.FC> = {
   audio: AudioSection,
   bible: BibleSection,
   display: DisplayModeSection,
+  remote: RemoteControlSection,
   "api-keys": ApiKeysSection,
 }
 

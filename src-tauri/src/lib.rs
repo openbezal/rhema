@@ -22,6 +22,8 @@ pub fn run() {
         .manage(Mutex::new(rhema_detection::DirectDetector::new()))
         .manage(Mutex::new(rhema_detection::DetectionMerger::new()))
         .manage(Mutex::new(rhema_detection::ReadingMode::new()))
+        .manage(Mutex::new(commands::remote::OscRuntime::new()))
+        .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
             commands::bible::list_translations,
             commands::bible::list_books,
@@ -50,6 +52,13 @@ pub fn run() {
             commands::broadcast::stop_ndi,
             commands::broadcast::get_ndi_status,
             commands::broadcast::push_ndi_frame,
+            commands::remote::start_osc,
+            commands::remote::stop_osc,
+            commands::remote::get_osc_status,
+            commands::remote::start_http,
+            commands::remote::stop_http,
+            commands::remote::get_http_status,
+            commands::remote::update_remote_status,
         ])
         .setup(|app| {
             use tauri::Manager;

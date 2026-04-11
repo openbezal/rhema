@@ -42,7 +42,7 @@ export function ThemeDesigner() {
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
 
         <DialogPrimitive.Content
-          className="fixed inset-0 z-50 flex flex-col bg-background text-foreground outline-none"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background text-foreground outline-none"
           aria-describedby={undefined}
         >
           <DialogPrimitive.Title className="sr-only">
