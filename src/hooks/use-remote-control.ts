@@ -2,8 +2,10 @@ import { useEffect } from "react"
 import { listen, type UnlistenFn } from "@tauri-apps/api/event"
 import { invoke } from "@tauri-apps/api/core"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { useSettingsStore } from "@/stores/settings-store"
+import { toVerseRenderData } from "@/hooks/use-broadcast"
 
 /**
  * Listens for remote control events from the Rust backend (OSC / HTTP API)
@@ -17,7 +19,7 @@ export function useRemoteControl() {
     const unlisteners: UnlistenFn[] = []
 
     async function setup() {
-      // remote:next — advance queue to next verse
+      // remote:next — advance queue to next verse and present it
       const u1 = await listen("remote:next", () => {
         if (cancelled) return
         const { items, activeIndex } = useQueueStore.getState()
@@ -25,10 +27,11 @@ export function useRemoteControl() {
         const nextIndex =
           activeIndex === null ? 0 : Math.min(activeIndex + 1, items.length - 1)
         useQueueStore.getState().setActive(nextIndex)
+        presentQueueItem(nextIndex)
       })
       unlisteners.push(u1)
 
-      // remote:prev — go to previous verse in queue
+      // remote:prev — go to previous verse in queue and present it
       const u2 = await listen("remote:prev", () => {
         if (cancelled) return
         const { items, activeIndex } = useQueueStore.getState()
@@ -36,6 +39,7 @@ export function useRemoteControl() {
         const prevIndex =
           activeIndex === null ? 0 : Math.max(activeIndex - 1, 0)
         useQueueStore.getState().setActive(prevIndex)
+        presentQueueItem(prevIndex)
       })
       unlisteners.push(u2)
 
@@ -117,6 +121,27 @@ export function useRemoteControl() {
       clearInterval(statusInterval)
     }
   }, [])
+}
+
+/**
+ * Present a queue item at the given index to the live display.
+ * Mirrors the logic from QueueItemRow's handlePresent.
+ */
+function presentQueueItem(index: number) {
+  const { items } = useQueueStore.getState()
+  const item = items[index]
+  if (!item) return
+
+  const translation =
+    useBibleStore
+      .getState()
+      .translations.find(
+        (t) => t.id === useBibleStore.getState().activeTranslationId
+      )?.abbreviation ?? "KJV"
+
+  useBroadcastStore
+    .getState()
+    .setLiveVerse(toVerseRenderData(item.verse, translation))
 }
 
 /**
