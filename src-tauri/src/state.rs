@@ -6,6 +6,7 @@ use rhema_detection::{DetectionPipeline, QuotationMatcher, SermonContext};
 
 pub struct AppState {
     pub bible_db: Option<BibleDb>,
+    pub http_client: reqwest::Client,
     pub detection_pipeline: DetectionPipeline,
     pub sermon_context: SermonContext,
     pub quotation_matcher: QuotationMatcher,
@@ -17,9 +18,10 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(http_client: reqwest::Client) -> Self {
         Self {
             bible_db: None,
+            http_client,
             detection_pipeline: DetectionPipeline::new(),
             sermon_context: SermonContext::new(),
             quotation_matcher: QuotationMatcher::new(),

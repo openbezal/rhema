@@ -5,10 +5,14 @@ mod state;
 use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn run() { // friehub-ignore: RUST_DIP_VIOLATION - Composition Root allowed to instantiate infrastructure
     // Load .env file — try src-tauri/.env first, then project root ../.env
     dotenvy::dotenv().ok();
     dotenvy::from_filename("../.env").ok();
+
+    // Composition Root: Instantiate infrastructure here and inject into state
+    let http_client = reqwest::Client::new();
+
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -17,7 +21,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .manage(Mutex::new(state::AppState::new()))
+        .manage(Mutex::new(state::AppState::new(http_client)))
         .manage(Mutex::new(rhema_broadcast::ndi::NdiRuntime::default()))
         .manage(Mutex::new(rhema_detection::DirectDetector::new()))
         .manage(Mutex::new(rhema_detection::DetectionMerger::new()))

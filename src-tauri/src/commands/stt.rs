@@ -150,6 +150,10 @@ pub async fn start_transcription(
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<TranscriptEvent>(64);
 
     let conn_active = stt_active.clone();
+    let http_client = {
+        let app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.http_client.clone()
+    };
 
     // Task A: run the Deepgram WebSocket connection.
     // On max reconnect failure, falls back to REST mode (hybrid).
@@ -169,7 +173,7 @@ pub async fn start_transcription(
                     ))
                     .await;
 
-                let rest_client = rhema_stt::DeepgramRestClient::new(rest_config);
+                let rest_client = rhema_stt::DeepgramRestClient::new(rest_config, http_client);
                 let mut audio_buffer: Vec<i16> = Vec::new();
                 let flush_interval = std::time::Duration::from_secs(5);
                 let mut last_flush = std::time::Instant::now();

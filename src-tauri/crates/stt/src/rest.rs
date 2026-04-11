@@ -12,10 +12,10 @@ pub struct DeepgramRestClient {
 }
 
 impl DeepgramRestClient {
-    pub fn new(config: SttConfig) -> Self {
+    pub fn new(config: SttConfig, client: reqwest::Client) -> Self {
         Self {
             config,
-            client: reqwest::Client::new(),
+            client,
         }
     }
 
