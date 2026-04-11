@@ -29,6 +29,7 @@ export const TUTORIAL_STEPS: Step[] = [
     content:
       "Look up any verse by book, chapter, and number. Switch translations from the dropdown.",
     placement: "bottom",
+    spotlightPadding: 2,
   },
   {
     ...STEP_DEFAULTS,
@@ -37,6 +38,7 @@ export const TUTORIAL_STEPS: Step[] = [
     content:
       "Search by phrase or topic. Rhema uses AI to find matching verses.",
     placement: "bottom",
+    spotlightPadding: 2,
   },
   {
     ...STEP_DEFAULTS,
