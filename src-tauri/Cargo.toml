@@ -19,13 +19,21 @@ thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Allow common patterns that pedantic warns about
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
 [package]
 name = "app"
 version = "0.1.0"
 description = "Rhema - Real-Time AI Bible Verse Detection"
 authors = ["Faithful"]
-license = ""
-repository = ""
+license = "MIT"
+repository = "https://github.com/openbezal/rhema"
 edition = "2021"
 rust-version = "1.77.2"
 
@@ -52,6 +60,9 @@ rhema-detection = { path = "crates/detection", features = ["onnx", "vector-searc
 crossbeam-channel = "0.5"
 dotenvy = "0.15"
 base64 = "0.22"
+
+[lints]
+workspace = true
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

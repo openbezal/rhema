@@ -1,9 +1,14 @@
 use crate::db::BibleDb;
 use crate::error::BibleError;
-use crate::models::{Book, Translation, Verse};
+use crate::models::{Book, QuotationVerse, SearchVerse, Translation, Verse};
 
 impl BibleDb {
     /// Look up a verse by its database primary key (verses.id).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (i.e., a thread panicked
+    /// while holding the database lock). This applies to all `BibleDb` methods.
     pub fn get_verse_by_id(&self, id: i64) -> Result<Option<Verse>, BibleError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -90,11 +95,7 @@ impl BibleDb {
                 })
             },
         )?;
-        let mut verses = Vec::new();
-        for row in rows {
-            verses.push(row?);
-        }
-        Ok(verses)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
     pub fn get_verse_range(
@@ -128,37 +129,27 @@ impl BibleDb {
                 })
             },
         )?;
-        let mut verses = Vec::new();
-        for row in rows {
-            verses.push(row?);
-        }
-        Ok(verses)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
     /// Load all verses for quotation matching index.
-    /// Returns (id, book_number, book_name, chapter, verse, text) tuples.
-    /// Filters to a specific language if provided.
-    /// Load all verses for quotation matching index.
-    /// Returns (id, book_number, book_name, chapter, verse, text) tuples.
     /// Filters to a specific language if provided.
     pub fn load_all_verses_for_quotation(
         &self,
         language: Option<&str>,
-    ) -> Result<Vec<(i64, i32, String, i32, i32, String)>, BibleError> {
+    ) -> Result<Vec<QuotationVerse>, BibleError> {
         let conn = self.conn.lock().unwrap();
 
         let mapper = |row: &rusqlite::Row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i32>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, i32>(3)?,
-                row.get::<_, i32>(4)?,
-                row.get::<_, String>(5)?,
-            ))
+            Ok(QuotationVerse {
+                id: row.get(0)?,
+                book_number: row.get(1)?,
+                book_name: row.get(2)?,
+                chapter: row.get(3)?,
+                verse: row.get(4)?,
+                text: row.get(5)?,
+            })
         };
-
-        let mut results = Vec::new();
 
         if let Some(lang) = language {
             let mut stmt = conn.prepare(
@@ -168,28 +159,21 @@ impl BibleDb {
                  WHERE t.language = ?1"
             )?;
             let rows = stmt.query_map([lang], mapper)?;
-            for row in rows {
-                results.push(row?);
-            }
+            Ok(rows.collect::<Result<Vec<_>, _>>()?)
         } else {
             let mut stmt = conn.prepare(
                 "SELECT id, book_number, book_name, chapter, verse, text FROM verses"
             )?;
             let rows = stmt.query_map([], mapper)?;
-            for row in rows {
-                results.push(row?);
-            }
+            Ok(rows.collect::<Result<Vec<_>, _>>()?)
         }
-
-        Ok(results)
     }
 
     /// Load all verses for one translation for client-side context search indexing.
-    /// Returns compact tuples: (book_number, book_name, chapter, verse, text).
     pub fn load_translation_verses_for_search(
         &self,
         translation_id: i64,
-    ) -> Result<Vec<(i32, String, i32, i32, String)>, BibleError> {
+    ) -> Result<Vec<SearchVerse>, BibleError> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "SELECT book_number, book_name, chapter, verse, text \
@@ -198,20 +182,15 @@ impl BibleDb {
              ORDER BY book_number, chapter, verse",
         )?;
         let rows = stmt.query_map([translation_id], |row: &rusqlite::Row| {
-            Ok((
-                row.get::<_, i32>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, i32>(2)?,
-                row.get::<_, i32>(3)?,
-                row.get::<_, String>(4)?,
-            ))
+            Ok(SearchVerse {
+                book_number: row.get(0)?,
+                book_name: row.get(1)?,
+                chapter: row.get(2)?,
+                verse: row.get(3)?,
+                text: row.get(4)?,
+            })
         })?;
-
-        let mut results = Vec::new();
-        for row in rows {
-            results.push(row?);
-        }
-        Ok(results)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
     pub fn list_translations(&self) -> Result<Vec<Translation>, BibleError> {
@@ -230,11 +209,7 @@ impl BibleDb {
                 is_downloaded: row.get(5)?,
             })
         })?;
-        let mut translations = Vec::new();
-        for row in rows {
-            translations.push(row?);
-        }
-        Ok(translations)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
     pub fn list_books(&self, translation_id: i64) -> Result<Vec<Book>, BibleError> {
@@ -255,10 +230,6 @@ impl BibleDb {
                 testament: row.get(5)?,
             })
         })?;
-        let mut books = Vec::new();
-        for row in rows {
-            books.push(row?);
-        }
-        Ok(books)
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 }

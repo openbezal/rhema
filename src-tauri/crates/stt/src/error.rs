@@ -1,8 +1,9 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[non_exhaustive]
+#[derive(Error, Debug, Clone)]
 pub enum SttError {
-    #[error("Connection failed: {0}")]
+    #[error("connection failed: {0}")]
     ConnectionFailed(String),
 
     #[error("WebSocket error: {0}")]
@@ -11,9 +12,9 @@ pub enum SttError {
     #[error("API key is missing")]
     ApiKeyMissing,
 
-    #[error("Send error: {0}")]
+    #[error("send error: {0}")]
     SendError(String),
 
-    #[error("Parse error: {0}")]
+    #[error("parse error: {0}")]
     ParseError(String),
 }

@@ -12,7 +12,10 @@ Output: data/sources/<ABBREV>.json for each translation
 
 import json
 import os
+import socket
 import sys
+import time
+import traceback
 from pathlib import Path
 
 from meaningless import JSONDownloader
@@ -22,6 +25,21 @@ import meaningless.utilities.common as common
 def custom_get_capped_integer(number, min_value=1, max_value=200):
     return min(max(int(number), int(min_value)), int(max_value))
 common.get_capped_integer = custom_get_capped_integer
+
+# Monkey-patch get_page to add a 15s socket timeout so requests never hang
+_original_get_page = common.get_page
+def _get_page_with_timeout(url, retry_count=3, retry_delay=2):
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(15)
+    try:
+        return _original_get_page(url, retry_count, retry_delay)
+    finally:
+        socket.setdefaulttimeout(old_timeout)
+common.get_page = _get_page_with_timeout
+
+# Delay between book downloads to avoid BibleGateway rate-limiting
+BOOK_DELAY = 2  # seconds
+MAX_RETRIES = 3  # retries per book
 
 TRANSLATIONS = ["NIV", "ESV", "NASB", "NKJV", "NLT", "AMP"]
 
@@ -53,61 +71,22 @@ SOURCES_DIR = ROOT / "sources"
 TEMP_DIR = ROOT / "bg_temp"
 
 
-def download_translation(abbrev):
-    """Download all books for a translation and convert to scrollmapper JSON."""
-    print(f"\n📖 Downloading {abbrev}...")
-
-    output_file = SOURCES_DIR / f"{abbrev}.json"
-    if output_file.exists():
-        print(f"  ⏭ {abbrev}.json already exists, skipping")
-        return True
-
-    temp_path = TEMP_DIR / abbrev
-    temp_path.mkdir(parents=True, exist_ok=True)
-
-    downloader = JSONDownloader(
-        translation=abbrev,
-        show_passage_numbers=False,
-        strip_excess_whitespace=True
-    )
-
-    # Download each book
-    combined = {}
-    total = len(BOOKS)
-    for i, book in enumerate(BOOKS):
-        print(f"\r  [{i+1:2d}/{total}] {book:<20s}", end="", flush=True)
-        book_file = temp_path / f"{book}.json"
-
-        try:
-            downloader.download_book(book, str(book_file))
-            with open(book_file) as f:
-                data = json.load(f)
-                if "Info" in data:
-                    del data["Info"]
-                combined.update(data)
-        except Exception as e:
-            print(f"\n  ⚠ Failed to download {book}: {e}")
-            continue
-
-    print(f"\r  ✓ Downloaded {len(combined)} books" + " " * 30)
-
-    # Convert to scrollmapper format
+def convert_to_scrollmapper(combined, abbrev):
+    """Convert {Book: {chapter: {verse: text}}} to scrollmapper format."""
     scrollmapper = {
         "translation": f"{abbrev}",
         "books": []
     }
 
     for book_name in BOOKS:
-        # BibleGateway might use slightly different names
         bg_name = book_name
         display_name = BOOK_NAME_MAP.get(book_name, book_name)
 
         if bg_name not in combined:
-            # Try alternate names
             if book_name in BOOK_NAME_MAP:
                 bg_name = BOOK_NAME_MAP[book_name]
             if bg_name not in combined:
-                print(f"  ⚠ Book '{book_name}' not found in download")
+                print(f"  ⚠ Book '{book_name}' not found")
                 continue
 
         chapters_data = combined[bg_name]
@@ -118,7 +97,6 @@ def download_translation(abbrev):
             verses = []
             for v_num_str in sorted(verses_data.keys(), key=int):
                 text = verses_data[v_num_str].strip()
-                # Clean up extra whitespace
                 text = " ".join(text.split())
                 verses.append({"verse": int(v_num_str), "text": text})
             chapters.append({"chapter": int(ch_num_str), "verses": verses})
@@ -128,7 +106,104 @@ def download_translation(abbrev):
             "chapters": chapters
         })
 
-    # Write output
+    return scrollmapper
+
+
+def download_book(book_name, book_file, abbrev):
+    """Download a single book, creating a fresh downloader each time."""
+    downloader = JSONDownloader(
+        translation=abbrev,
+        show_passage_numbers=False,
+        strip_excess_whitespace=True,
+        enable_multiprocessing=False,
+    )
+    downloader.download_book(book_name, str(book_file))
+
+
+def load_cached_book(book_file):
+    """Load a previously downloaded book from bg_temp if valid."""
+    if not book_file.exists() or book_file.stat().st_size < 10:
+        return None
+    try:
+        with open(book_file) as f:
+            data = json.load(f)
+        if "Info" in data:
+            del data["Info"]
+        if len(data) > 0:
+            return data
+    except (json.JSONDecodeError, OSError):
+        pass
+    return None
+
+
+def download_translation(abbrev):
+    """Download all books for a translation and convert to scrollmapper JSON."""
+    print(f"\n📖 Downloading {abbrev}...")
+
+    output_file = SOURCES_DIR / f"{abbrev}.json"
+    if output_file.exists():
+        print(f"  ⏭ {abbrev}.json already exists, skipping")
+        return True
+
+    combined = {}
+    temp_path = TEMP_DIR / abbrev
+    temp_path.mkdir(parents=True, exist_ok=True)
+
+    total = len(BOOKS)
+    cached_count = 0
+    failed_books = []
+
+    for i, book in enumerate(BOOKS):
+        book_file = temp_path / f"{book}.json"
+
+        # Resume: use cached file from bg_temp if available
+        cached = load_cached_book(book_file)
+        if cached is not None:
+            print(f"  [{i+1:2d}/{total}] {book:<20s} (cached)")
+            combined.update(cached)
+            cached_count += 1
+            continue
+
+        # Download with retries — fresh downloader per book
+        success = False
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                print(f"  [{i+1:2d}/{total}] {book:<20s}", end="", flush=True)
+                if attempt > 1:
+                    print(f" (retry {attempt}/{MAX_RETRIES})", end="", flush=True)
+
+                download_book(book, book_file, abbrev)
+
+                with open(book_file) as f:
+                    data = json.load(f)
+                    if "Info" in data:
+                        del data["Info"]
+                    combined.update(data)
+
+                print()
+                success = True
+                break
+
+            except Exception as e:
+                error_msg = str(e) or type(e).__name__
+                print(f" ⚠ {error_msg}")
+                if attempt < MAX_RETRIES:
+                    backoff = BOOK_DELAY * (2 ** attempt)
+                    print(f"         Waiting {backoff}s before retry...")
+                    time.sleep(backoff)
+
+        if not success:
+            failed_books.append(book)
+
+        time.sleep(BOOK_DELAY)
+
+    print(f"\n  ✓ Downloaded {len(combined)} books ({cached_count} from cache)")
+    if failed_books:
+        print(f"  ⚠ Failed books: {', '.join(failed_books)}")
+
+    # Convert to scrollmapper format and write
+    scrollmapper = convert_to_scrollmapper(combined, abbrev)
+
     with open(output_file, "w") as f:
         json.dump(scrollmapper, f, indent=2)
 
@@ -144,7 +219,6 @@ def download_translation(abbrev):
 
 def main():
     SOURCES_DIR.mkdir(parents=True, exist_ok=True)
-    TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"=== Downloading {len(TRANSLATIONS)} translations from BibleGateway ===")
     print(f"Translations: {', '.join(TRANSLATIONS)}")
@@ -154,6 +228,7 @@ def main():
             download_translation(abbrev)
         except Exception as e:
             print(f"\n  ❌ {abbrev} failed: {e}")
+            traceback.print_exc()
 
     print(f"\n✅ Done! Check {SOURCES_DIR} for output files.\n")
 

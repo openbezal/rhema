@@ -20,7 +20,8 @@
     "precompute:embeddings-onnx": "python3 data/precompute-embeddings-onnx.py",
     "precompute:embeddings-py": "python3 data/precompute-embeddings.py",
     "precompute:embeddings": "cd src-tauri && cargo run -p rhema-detection --features precompute-bin --release --bin precompute -- --model ../models/qwen3-embedding-0.6b/model.onnx --tokenizer ../models/qwen3-embedding-0.6b/tokenizer.json --verses ../data/verses-for-embedding.json --output-embeddings ../embeddings/kjv-qwen3-0.6b.bin --output-ids ../embeddings/kjv-qwen3-0.6b-ids.bin",
-    "download:ndi-sdk": "bun run data/download-ndi-sdk.ts"
+    "download:ndi-sdk": "bun run data/download-ndi-sdk.ts",
+    "setup:all": "bun run data/prepare-embeddings.ts"
   },
   "dependencies": {
     "@dnd-kit/react": "^0.3.2",

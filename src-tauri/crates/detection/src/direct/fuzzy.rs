@@ -41,12 +41,15 @@ fn levenshtein(a: &str, b: &str) -> usize {
 }
 
 /// Determine the maximum allowed edit distance for a book name.
-/// Names longer than 8 characters allow distance 3; otherwise distance 2.
+/// Short names (≤4 chars like "Mark", "Ruth", "Joel") only allow 1 edit
+/// to prevent false positives like "Mara" → "Mark".
 fn max_distance_for(name: &str) -> usize {
-    if name.len() > 8 {
-        3
-    } else {
+    if name.len() <= 4 {
+        1  // "Mark", "Ruth", "Joel" — only 1 edit allowed
+    } else if name.len() <= 8 {
         2
+    } else {
+        3  // "Philippians", "Deuteronomy" — allow 3 for very long names
     }
 }
 

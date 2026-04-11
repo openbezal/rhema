@@ -34,6 +34,7 @@ data/verses-for-embedding.json
 # ML models and embeddings (downloaded, not committed)
 models/*
 .env
+.venv/
 .superpowers/
 embeddings/*
 

@@ -12,7 +12,7 @@ pub const SAME_BOOK_BOOST: f64 = 0.05;
 pub const SAME_CHAPTER_BOOST: f64 = 0.10;
 
 /// A timestamped detection entry in the session history.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SessionEntry {
     pub timestamp_ms: u64,
     pub verse_ref: VerseRef,

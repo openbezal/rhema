@@ -55,6 +55,87 @@ const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
     ("amplified version", "AMP"),
 ];
 
+/// Maximum chapter count per book (book_number 1-66).
+/// Used to reject impossible references like "Mark 30:1" (Mark has 16 chapters).
+const MAX_CHAPTERS: [i32; 67] = [
+    0,  // index 0 unused
+    50, // 1  Genesis
+    40, // 2  Exodus
+    27, // 3  Leviticus
+    36, // 4  Numbers
+    34, // 5  Deuteronomy
+    24, // 6  Joshua
+    21, // 7  Judges
+    4,  // 8  Ruth
+    31, // 9  1 Samuel
+    24, // 10 2 Samuel
+    22, // 11 1 Kings
+    25, // 12 2 Kings
+    29, // 13 1 Chronicles
+    36, // 14 2 Chronicles
+    10, // 15 Ezra
+    13, // 16 Nehemiah
+    10, // 17 Esther
+    42, // 18 Job
+    150,// 19 Psalms
+    31, // 20 Proverbs
+    12, // 21 Ecclesiastes
+    8,  // 22 Song of Solomon
+    66, // 23 Isaiah
+    52, // 24 Jeremiah
+    5,  // 25 Lamentations
+    48, // 26 Ezekiel
+    12, // 27 Daniel
+    14, // 28 Hosea
+    3,  // 29 Joel
+    9,  // 30 Amos
+    1,  // 31 Obadiah
+    4,  // 32 Jonah
+    7,  // 33 Micah
+    3,  // 34 Nahum
+    3,  // 35 Habakkuk
+    3,  // 36 Zephaniah
+    2,  // 37 Haggai
+    14, // 38 Zechariah
+    4,  // 39 Malachi
+    28, // 40 Matthew
+    16, // 41 Mark
+    24, // 42 Luke
+    21, // 43 John
+    28, // 44 Acts
+    16, // 45 Romans
+    16, // 46 1 Corinthians
+    13, // 47 2 Corinthians
+    6,  // 48 Galatians
+    6,  // 49 Ephesians
+    4,  // 50 Philippians
+    4,  // 51 Colossians
+    5,  // 52 1 Thessalonians
+    3,  // 53 2 Thessalonians
+    6,  // 54 1 Timothy
+    4,  // 55 2 Timothy
+    3,  // 56 Titus
+    1,  // 57 Philemon
+    13, // 58 Hebrews
+    5,  // 59 James
+    5,  // 60 1 Peter
+    3,  // 61 2 Peter
+    5,  // 62 1 John
+    1,  // 63 2 John
+    1,  // 64 3 John
+    1,  // 65 Jude
+    22, // 66 Revelation
+];
+
+/// Check if a book/chapter combination is valid.
+fn is_valid_reference(book_number: i32, chapter: i32) -> bool {
+    if book_number < 1 || book_number > 66 {
+        return false;
+    }
+    let max_ch = MAX_CHAPTERS[book_number as usize];
+    chapter >= 1 && chapter <= max_ch
+}
+
 /// Confidence assigned to chapter-only references (no verse specified).
 /// Lower than full references (0.90+) since the user likely wants a specific verse.
 /// Matches Logos AI's CHAPTER_ONLY_CONFIDENCE default of 0.75.
@@ -194,7 +275,7 @@ pub struct DirectDetector {
     /// Pending incomplete reference waiting for verse completion.
     incomplete: Option<IncompleteRef>,
     /// Recently detected verses for "previous verse" navigation (most recent first).
-    pub recent_detections: VecDeque<VerseRef>,
+    recent_detections: VecDeque<VerseRef>,
 }
 
 impl DirectDetector {
@@ -205,6 +286,11 @@ impl DirectDetector {
             incomplete: None,
             recent_detections: VecDeque::with_capacity(5),
         }
+    }
+
+    /// Recent detections for context tracking.
+    pub fn recent_detections(&self) -> &VecDeque<VerseRef> {
+        &self.recent_detections
     }
 
     /// Check if the transcript contains a translation switching command.
@@ -330,8 +416,12 @@ impl DirectDetector {
 
                 // Skip if we couldn't resolve to a meaningful reference
                 if resolved.book_number == 0 || resolved.chapter == 0 {
-                    // Still update context even for partial matches
                     self.context.update(&verse_ref);
+                    continue;
+                }
+
+                // Skip impossible references (e.g., "Mark 30:1" — Mark has 16 chapters)
+                if resolved.chapter > 0 && !is_valid_reference(resolved.book_number, resolved.chapter) {
                     continue;
                 }
 

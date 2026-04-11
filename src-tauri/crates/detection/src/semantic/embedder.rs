@@ -16,6 +16,7 @@ pub trait TextEmbedder: Send + Sync {
 ///
 /// Used when no real model is loaded so the application can still
 /// compile and run without ONNX model files.
+#[derive(Debug)]
 pub struct StubEmbedder {
     dim: usize,
 }

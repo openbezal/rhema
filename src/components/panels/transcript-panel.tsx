@@ -1,7 +1,8 @@
-import { useRef, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { Button } from "@/components/ui/button"
+import { ApiKeyPrompt } from "@/components/ui/api-key-prompt"
 import { MicIcon, MicOffIcon } from "lucide-react"
 import { invoke } from "@tauri-apps/api/core"
 import {
@@ -25,6 +26,7 @@ export function TranscriptPanel() {
   const audioLevel = useAudioStore((s) => s.level)
   const deepgramApiKey = useSettingsStore((s) => s.deepgramApiKey)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [showKeyPrompt, setShowKeyPrompt] = useState(false)
 
   // Listen for Tauri events
   useTauriEvent<{ rms: number; peak: number }>("audio_level", (payload) => {
@@ -148,9 +150,15 @@ export function TranscriptPanel() {
       })
       useTranscriptStore.getState().setTranscribing(true)
     } catch (e) {
-      console.error("Failed to start transcription:", e)
+      const errorMsg = String(e)
+      console.error("Failed to start transcription:", errorMsg)
       useTranscriptStore.getState().setConnectionStatus("error")
-      alert(String(e))
+
+      if (errorMsg.includes("No Deepgram API key")) {
+        setShowKeyPrompt(true)
+      } else {
+        alert(errorMsg)
+      }
     }
   }
 
@@ -254,6 +262,13 @@ export function TranscriptPanel() {
           </Button>
         )}
       </div>
+
+      <ApiKeyPrompt
+        open={showKeyPrompt}
+        onOpenChange={setShowKeyPrompt}
+        service="Deepgram"
+        description="Live transcription needs a Deepgram API key. Add it in settings so the app can start listening."
+      />
     </div>
   )
 }

@@ -3,6 +3,9 @@ name = "rhema-detection"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
@@ -10,6 +13,7 @@ log.workspace = true
 thiserror.workspace = true
 aho-corasick = "1"
 lru = "0.12"
+rhema-bible = { path = "../bible" }
 
 # Optional heavy dependencies for real embedding / vector search
 ort = { version = "2.0.0-rc.12", optional = true }

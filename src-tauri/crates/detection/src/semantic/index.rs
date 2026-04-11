@@ -1,7 +1,7 @@
 use crate::error::DetectionError;
 
 /// A single search result from the vector index.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SearchResult {
     /// The database row-id (or ordinal) that identifies the verse.
     pub verse_id: i64,
@@ -29,6 +29,7 @@ pub trait VectorIndex: Send + Sync {
 /// Stub index that always returns empty results.
 ///
 /// Used when no pre-computed vector index is available.
+#[derive(Debug)]
 pub struct StubIndex;
 
 impl VectorIndex for StubIndex {

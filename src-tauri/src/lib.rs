@@ -128,11 +128,12 @@ pub fn run() {
                             match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
                                 Ok(index) => {
                                     log::info!("Verse embeddings loaded ({} vectors)", index.len());
-                                    state.detection_pipeline.semantic =
+                                    state.detection_pipeline.set_semantic(
                                         rhema_detection::SemanticDetector::new(
                                             Box::new(embedder),
                                             Box::new(index),
-                                        );
+                                        ),
+                                    );
                                 }
                                 Err(e) => {
                                     log::warn!("Failed to load verse embeddings: {e}");

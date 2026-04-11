@@ -1,16 +1,17 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[non_exhaustive]
+#[derive(Error, Debug, Clone)]
 pub enum AudioError {
-    #[error("Device not found: {0}")]
+    #[error("device not found: {0}")]
     DeviceNotFound(String),
 
-    #[error("No input devices available")]
+    #[error("no input devices available")]
     NoInputDevices,
 
-    #[error("Stream error: {0}")]
+    #[error("stream error: {0}")]
     StreamError(String),
 
-    #[error("Channel error: {0}")]
+    #[error("channel error: {0}")]
     ChannelError(String),
 }

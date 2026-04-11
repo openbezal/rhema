@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A reference to a specific Bible verse or verse range.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct VerseRef {
     pub book_number: i32,
     pub book_name: String,
@@ -11,7 +11,8 @@ pub struct VerseRef {
 }
 
 /// Indicates how a detection was made.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[non_exhaustive]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum DetectionSource {
     DirectReference,
     Contextual,
@@ -21,7 +22,7 @@ pub enum DetectionSource {
 }
 
 /// A single detected Bible reference in transcript text.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Detection {
     pub verse_ref: VerseRef,
     /// Database primary key from semantic search (verses.id).

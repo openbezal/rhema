@@ -12,7 +12,7 @@ const DEFAULT_AUTO_QUEUE_THRESHOLD: f64 = 0.80;
 const DEFAULT_COOLDOWN_MS: u64 = 2500;
 
 /// A detection after merging, with an auto-queue flag.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MergedDetection {
     pub detection: Detection,
     pub auto_queued: bool,

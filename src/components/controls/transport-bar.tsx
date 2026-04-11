@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { LiveIndicator } from "@/components/ui/live-indicator"
-import { SessionTimer } from "@/components/ui/session-timer"
 import { Badge } from "@/components/ui/badge"
 import { MicIcon, PaletteIcon, CastIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -29,9 +28,6 @@ export function TransportBar() {
           Free
         </Badge>
       </div>
-
-      {/* Center: Session Timer */}
-      <SessionTimer seconds={0} />
 
       {/* Right: Audio + Status + Settings */}
       <div className="flex items-center gap-3">

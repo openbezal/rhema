@@ -146,15 +146,13 @@ pub fn get_translation_verses_for_search(
     db.load_translation_verses_for_search(translation_id)
         .map(|rows| {
             rows.into_iter()
-                .map(
-                    |(book_number, book_name, chapter, verse, text)| VerseSearchRow {
-                        book_number,
-                        book_name,
-                        chapter,
-                        verse,
-                        text,
-                    },
-                )
+                .map(|v| VerseSearchRow {
+                    book_number: v.book_number,
+                    book_name: v.book_name,
+                    chapter: v.chapter,
+                    verse: v.verse,
+                    text: v.text,
+                })
                 .collect()
         })
         .map_err(|e| e.to_string())

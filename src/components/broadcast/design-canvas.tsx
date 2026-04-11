@@ -25,6 +25,7 @@ export function DesignCanvas() {
   const canvasElRef = useRef<HTMLCanvasElement>(null)
   const fabricRef = useRef<fabric.Canvas | null>(null)
   const latestThemeRef = useRef<BroadcastTheme | null>(null)
+  const rafIdRef = useRef<number | null>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const imageRequestsRef = useRef<Map<string, Promise<HTMLImageElement>>>(new Map())
   const objectsRef = useRef<{
@@ -188,37 +189,46 @@ export function DesignCanvas() {
 
     return () => {
       observer.disconnect()
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
       void canvas.dispose()
       fabricRef.current = null
       objectsRef.current = { workspace: null, referenceRegion: null, verseRegion: null }
     }
   }, [editingThemeId, autoZoom])
 
-  // Sync draft theme to the existing Fabric objects
+  // Sync draft theme to the existing Fabric objects (throttled to 1 per frame)
   useEffect(() => {
     const canvas = fabricRef.current
     if (!canvas || !draftTheme) return
     latestThemeRef.current = draftTheme
 
-    void syncThemeToCanvas(
-      draftTheme,
-      objectsRef,
-      canvas,
-      imageCacheRef.current,
-      imageRequestsRef.current,
-      () => {
-        const latest = latestThemeRef.current
-        const latestCanvas = fabricRef.current
-        if (!latest || !latestCanvas) return
-        void syncThemeToCanvas(
-          latest,
-          objectsRef,
-          latestCanvas,
-          imageCacheRef.current,
-          imageRequestsRef.current
-        )
-      }
-    )
+    if (rafIdRef.current) return // already scheduled
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null
+      const latest = latestThemeRef.current
+      const latestCanvas = fabricRef.current
+      if (!latest || !latestCanvas) return
+      void syncThemeToCanvas(
+        latest,
+        objectsRef,
+        latestCanvas,
+        imageCacheRef.current,
+        imageRequestsRef.current,
+        () => {
+          const current = latestThemeRef.current
+          const currentCanvas = fabricRef.current
+          if (!current || !currentCanvas) return
+          void syncThemeToCanvas(
+            current,
+            objectsRef,
+            currentCanvas,
+            imageCacheRef.current,
+            imageRequestsRef.current
+          )
+        }
+      )
+    })
   }, [draftTheme])
 
   useEffect(() => {

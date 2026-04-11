@@ -39,6 +39,7 @@ import {
   BookOpenIcon,
 } from "lucide-react"
 import { useSettingsStore } from "@/stores"
+import { useSettingsDialogStore } from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
 
 /* -------------------------------------------------------------------------- */
@@ -428,18 +429,29 @@ const sectionComponents: Record<NavSection, React.FC> = {
   "api-keys": ApiKeysSection,
 }
 
-/* -------------------------------------------------------------------------- */
 /*  Main dialog                                                               */
 /* -------------------------------------------------------------------------- */
 
 export function SettingsDialog() {
-  const [open, setOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState<NavSection>("audio")
+  const open = useSettingsDialogStore((s) => s.isOpen)
+  const activeSection = useSettingsDialogStore((s) => s.activeSection)
+  const setActiveSection = useSettingsDialogStore((s) => s.setActiveSection)
+  const openSettingsFn = useSettingsDialogStore((s) => s.openSettings)
+  const closeSettings = useSettingsDialogStore((s) => s.closeSettings)
 
   const ActiveContent = sectionComponents[activeSection]
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          openSettingsFn()
+        } else {
+          closeSettings()
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon-sm">
           <SettingsIcon className="size-3.5" />

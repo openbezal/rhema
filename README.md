@@ -61,32 +61,25 @@ cd rhema
 bun install
 ```
 
-### Step 1: Download Bible source data
+### Quick Setup (recommended)
 
-Download public domain translations (KJV + Spanish, French, Portuguese) and cross-references:
-
-```bash
-bun run download:bible-data
-```
-
-For copyrighted translations (NIV, ESV, NASB, NKJV, NLT, AMP), use the BibleGateway downloader. This requires a Python virtual environment with the `meaningless` library:
+One command sets up everything — Python virtual environment, Bible data, copyrighted translations, database, ONNX model, and precomputed embeddings:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install meaningless
-python3 data/download-biblegateway.py
+bun run setup:all
 ```
 
-### Step 2: Build the Bible database
+This runs 7 phases in sequence, skipping any that are already complete:
 
-Reads all JSON files from `data/sources/`, creates `data/rhema.db` with FTS5 search index and cross-references. Gracefully skips any missing translations.
+1. Python environment setup (`.venv` + all pip dependencies)
+2. Download open-source Bible data (KJV, Spanish, French, Portuguese + cross-references)
+3. Download copyrighted translations from BibleGateway (NIV, ESV, NASB, NKJV, NLT, AMP)
+4. Build SQLite Bible database (`data/rhema.db` with FTS5 + cross-references)
+5. Download & export ONNX model (Qwen3-Embedding-0.6B) + INT8 quantization
+6. Export KJV verses to JSON for embedding
+7. Precompute verse embeddings (auto-selects GPU if available, falls back to ONNX CPU)
 
-```bash
-bun run build:bible
-```
-
-### Step 3: Set up environment
+### Environment
 
 Create a `.env` file in the project root:
 
@@ -94,71 +87,26 @@ Create a `.env` file in the project root:
 DEEPGRAM_API_KEY=your_key_here
 ```
 
-### Step 4 (optional): Download & export ONNX model
+### NDI SDK (optional)
 
-Required for semantic search (both precomputing embeddings and runtime detection). Uses `optimum-cli` to export Qwen3-Embedding-0.6B from HuggingFace to ONNX format and quantize to INT8 for ARM64.
-
-```bash
-pip install optimum-onnx
-bun run download:model
-```
-
-This creates:
-- `models/qwen3-embedding-0.6b/model.onnx` (FP32)
-- `models/qwen3-embedding-0.6b-int8/model_quantized.onnx` (INT8, ARM64-optimized)
-- `models/qwen3-embedding-0.6b/tokenizer.json`
-
-To re-quantize separately:
-
-```bash
-bun run quantize:model
-```
-
-### Step 5 (optional): Precompute verse embeddings for semantic search
-
-First, export KJV verses from the database to JSON:
-
-```bash
-bun run export:verses
-```
-
-Then compute embeddings. There are three methods — Option A is recommended:
-
-**Option A — Python + ONNX Runtime (recommended):**
-
-Uses the **exact same ONNX model** the Tauri app loads at runtime, guaranteeing embeddings are in the same vector space. Auto-selects INT8 quantized model if available, falls back to FP32. Requires the ONNX model from Step 4.
-
-```bash
-pip install onnxruntime tokenizers numpy
-bun run precompute:embeddings-onnx
-```
-
-**Option B — Python + sentence-transformers (GPU-accelerated):**
-
-Uses Apple Silicon MPS or CUDA if available. Auto-downloads the model from HuggingFace. Note: uses a different model loading path than the Tauri app, which may produce subtly different embeddings.
-
-```bash
-pip install sentence-transformers torch
-bun run precompute:embeddings-py
-```
-
-**Option C — Rust ONNX binary (CPU only):**
-
-Same ONNX model as Option A, compiled as a Rust binary. Requires the ONNX model from Step 4.
-
-```bash
-bun run precompute:embeddings
-```
-
-All three produce binary files in `embeddings/`: `kjv-qwen3-0.6b.bin` (embeddings) and `kjv-qwen3-0.6b-ids.bin` (verse IDs).
-
-### Step 6 (optional): Download NDI SDK for broadcast output
+For broadcast output via NDI:
 
 ```bash
 bun run download:ndi-sdk
 ```
 
-Downloads NDI 6 SDK headers and platform libraries (macOS, Windows, Linux) to `sdk/ndi/`.
+### Running individual setup steps
+
+Each phase can also be run independently:
+
+```bash
+bun run download:bible-data          # Public domain translations + cross-refs
+python3 data/download-biblegateway.py  # Copyrighted translations (needs .venv)
+bun run build:bible                  # Build SQLite database
+bun run download:model               # Download & export ONNX model
+bun run export:verses                # Export verses to JSON
+python3 data/precompute-embeddings.py  # Precompute embeddings (GPU or ONNX fallback)
+```
 
 ### Run in development
 
@@ -200,12 +148,13 @@ rhema/
 │   │   └── notes/                # (placeholder)
 │   └── tauri.conf.json
 ├── data/                         # Bible data pipeline
+│   ├── prepare-embeddings.ts     # Unified setup orchestrator (bun run setup:all)
+│   ├── lib/python-env.ts         # Shared Python venv management utilities
 │   ├── download-sources.ts       # Download public domain translations + cross-refs
 │   ├── download-biblegateway.py  # Download copyrighted translations (NIV, ESV, etc.)
 │   ├── build-bible-db.ts         # Build SQLite DB from JSON sources
 │   ├── compute-embeddings.ts     # Export verses to JSON for embedding
-│   ├── precompute-embeddings.py  # Embeddings via sentence-transformers (GPU)
-│   ├── precompute-embeddings-onnx.py  # Embeddings via ONNX Runtime (recommended)
+│   ├── precompute-embeddings.py  # Precompute embeddings (GPU auto-detect, ONNX fallback)
 │   ├── download-model.ts         # Export & quantize Qwen3 ONNX model
 │   ├── download-ndi-sdk.ts       # Download NDI SDK libraries
 │   └── schema.sql                # Database schema
@@ -219,6 +168,7 @@ rhema/
 
 | Script | Description |
 |---|---|
+| `setup:all` | **Full setup** — runs all data/model/embedding phases (idempotent) |
 | `dev` | Start Vite dev server (port 3000) |
 | `build` | TypeScript check + Vite production build |
 | `tauri` | Run Tauri CLI commands |
@@ -232,8 +182,8 @@ rhema/
 | `download:model` | Export Qwen3-Embedding-0.6B to ONNX + quantize to INT8 |
 | `export:verses` | Export KJV verses to JSON for embedding precomputation |
 | `precompute:embeddings` | Precompute embeddings via Rust ONNX binary |
-| `precompute:embeddings-onnx` | Precompute embeddings via Python ONNX Runtime (recommended) |
-| `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers (GPU) |
+| `precompute:embeddings-onnx` | Precompute embeddings via Python ONNX Runtime |
+| `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers |
 | `quantize:model` | Quantize ONNX model to INT8 for ARM64 |
 | `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
 
