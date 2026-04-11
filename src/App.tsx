@@ -1,6 +1,7 @@
 import { Dashboard } from "@/components/layout/dashboard"
 import { useRemoteControl } from "@/hooks/use-remote-control"
 import { TutorialOverlay } from "@/components/tutorial/tutorial-overlay"
+import { Toaster } from "sonner"
 
 export function App() {
   useRemoteControl()
@@ -8,6 +9,7 @@ export function App() {
     <>
       <Dashboard />
       <TutorialOverlay />
+      <Toaster position="bottom-center" />
     </>
   )
 }

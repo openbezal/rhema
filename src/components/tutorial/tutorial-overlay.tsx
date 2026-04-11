@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Joyride, STATUS, type EventData } from "react-joyride"
+import { toast } from "sonner"
 import { useSettingsStore } from "@/stores/settings-store"
 import {
   useTutorialStore,
@@ -46,6 +47,12 @@ export function TutorialOverlay() {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
       useTutorialStore.getState().stopTutorial()
       persistOnboardingComplete()
+
+      if (data.status === STATUS.SKIPPED) {
+        toast.info("Tutorial skipped", {
+          description: "Restart anytime in Settings.",
+        })
+      }
     }
   }, [])
 
