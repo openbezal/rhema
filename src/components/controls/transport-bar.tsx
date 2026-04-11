@@ -54,6 +54,7 @@ export function TransportBar() {
           variant="ghost"
           size="icon-sm"
           title="Broadcast Settings"
+          data-tour="broadcast"
           onClick={() => setBroadcastOpen(true)}
         >
           <CastIcon className="size-3.5" />
@@ -63,6 +64,7 @@ export function TransportBar() {
           variant="ghost"
           size="icon-sm"
           title="Theme Designer"
+          data-tour="theme"
           onClick={() => useBroadcastStore.getState().setDesignerOpen(true)}
         >
           <PaletteIcon className="size-3.5" />

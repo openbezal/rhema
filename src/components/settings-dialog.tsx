@@ -728,7 +728,7 @@ export function SettingsDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm">
+        <Button variant="ghost" size="icon-sm" data-tour="settings">
           <SettingsIcon className="size-3.5" />
         </Button>
       </DialogTrigger>
