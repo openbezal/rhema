@@ -11,7 +11,7 @@ import { existsSync } from "node:fs"
 
 export const PROJECT_ROOT = join(import.meta.dir, "..", "..")
 export const VENV_DIR = join(PROJECT_ROOT, ".venv")
-export const MIN_PYTHON_VERSION: [number, number, number] = [3, 9, 0]
+export const MIN_PYTHON_VERSION: [number, number, number] = [3, 10, 0]
 
 export function getVenvBin(name: string): string {
   if (process.platform === "win32") {
@@ -21,7 +21,7 @@ export function getVenvBin(name: string): string {
 }
 
 export async function findPython(): Promise<string> {
-  for (const candidate of ["python3", "python"]) {
+  for (const candidate of ["python3.11", "python3.10", "python3", "python"]) {
     try {
       const proc = Bun.spawn([candidate, "--version"], {
         stdout: "pipe",
