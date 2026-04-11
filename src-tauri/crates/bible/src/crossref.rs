@@ -1,6 +1,6 @@
-use crate::db::BibleDb;
-use crate::error::BibleError;
+use crate::{BibleDb, BibleError};
 use crate::models::CrossReference;
+use rhema_core::{MutexExt, BookId, ChapterNumber, VerseNumber};
 
 impl BibleDb {
     /// # Panics
@@ -9,11 +9,11 @@ impl BibleDb {
     /// while holding the database lock).
     pub fn get_cross_references(
         &self,
-        book_number: i32,
-        chapter: i32,
-        verse: i32,
+        book_number: BookId,
+        chapter: ChapterNumber,
+        verse: VerseNumber,
     ) -> Result<Vec<CrossReference>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let from_ref = format!("{}:{}:{}", book_number, chapter, verse);
         let mut stmt = conn.prepare(
             "SELECT from_ref, to_ref, votes \

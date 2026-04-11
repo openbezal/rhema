@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
+use rhema_core::MutexExt;
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -36,7 +37,7 @@ pub async fn start_transcription(
     log::info ! ("[STT] Start request received");
     // ── 1. Guard: already running? ──────────────────────────────────────
     let (stt_active, audio_active) = {
-        let app_state = state.lock().map_err(|e| SttError::StateLockError(e.to_string()))?;
+        let app_state = state.lock_safe()?;
         if app_state.stt_active.load(Ordering::Relaxed) {
             return Err(SttError::AlreadyRunning);
         }
@@ -158,7 +159,7 @@ pub async fn start_transcription(
 
     let conn_active = stt_active.clone();
     let http_client = {
-        let app_state = state.lock().map_err(|e| SttError::StateLockError(e.to_string()))?;
+        let app_state = state.lock_safe()?;
         app_state.http_client.clone()
     };
 
@@ -376,7 +377,7 @@ pub fn stop_transcription(
     state: State<'_, Mutex<AppState>>,
 ) -> Result<(), SttError> {
     log::info ! ("[STT] Stop request received");
-    let app_state = state.lock().map_err(|e| SttError::StateLockError(e.to_string()))?;
+    let app_state = state.lock_safe()?;
 
     if !app_state.stt_active.load(Ordering::Relaxed) {
         return Ok(()); // Idempotent stop is better than error for reliability

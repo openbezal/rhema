@@ -1,15 +1,11 @@
 [package]
-name = "rhema-bible"
+name = "rhema-core"
 version = "0.1.0"
 edition = "2021"
 
-[lints]
-workspace = true
-
 [dependencies]
-rhema-core = { workspace = true }
-serde.workspace = true
-serde_json.workspace = true
 log.workspace = true
 thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 rusqlite = { version = "0.34", features = ["bundled"] }

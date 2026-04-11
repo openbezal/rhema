@@ -11,4 +11,7 @@ pub enum BibleError {
 
     #[error("invalid reference: {0}")]
     InvalidReference(String),
+
+    #[error("synchronization error: {0}")]
+    Synchronization(#[from] rhema_core::CoreError),
 }

@@ -14,4 +14,15 @@ pub enum DetectionError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("Synchronization error: {0}")]
+    Synchronization(#[from] rhema_core::CoreError),
+
+    #[cfg(feature = "onnx")]
+    #[error("ONNX Runtime error: {0}")]
+    Onnx(#[from] ort::Error),
+
+    #[cfg(feature = "onnx")]
+    #[error("Tokenizer error: {0}")]
+    Tokenizer(String),
 }

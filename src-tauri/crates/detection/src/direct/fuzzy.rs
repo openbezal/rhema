@@ -1,10 +1,12 @@
 use super::books::BOOKS;
+use rhema_core::BookId;
+use std::sync::Arc;
 
 /// A fuzzy match of a Bible book name found in text.
 #[derive(Debug, Clone)]
 pub struct FuzzyMatch {
-    pub book_name: String,
-    pub book_number: i32,
+    pub book_name: Arc<str>,
+    pub book_number: BookId,
     pub start: usize,
     pub end: usize,
     pub distance: usize,
@@ -117,7 +119,7 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
                     });
                     if !dominated {
                         matches.push(FuzzyMatch {
-                            book_name: book.name.to_string(),
+                            book_name: Arc::from(book.name),
                             book_number: book.number,
                             start: span_start,
                             end: span_end,
@@ -143,22 +145,22 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
     result
 }
 
-# [ cfg ( test ) ]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    # [ test ]
+    #[test]
     fn test_levenshtein_identical() {
         assert_eq!(levenshtein("hello", "hello"), 0);
     }
 
-    # [ test ]
+    #[test]
     fn test_levenshtein_empty() {
         assert_eq!(levenshtein("", "abc"), 3);
         assert_eq!(levenshtein("abc", ""), 3);
     }
 
-    # [ test ]
+    #[test]
     fn test_levenshtein_substitution() {
         // filipians vs philippians: f→ph (1 sub), i→i ok, l→l ok, i→i ok, p→p ok, i→i ok, a→a ok, n→n ok, s→s ok
         // Actually: "filipians" (9 chars) vs "philippians" (11 chars)
@@ -166,32 +168,32 @@ mod tests {
         assert!(d <= 3, "distance was {d}");
     }
 
-    # [ test ]
+    #[test]
     fn test_fuzzy_filipians() {
         let matches = fuzzy_find_books("in Filipians chapter 4");
         assert!(!matches.is_empty());
-        assert_eq!(matches[0].book_name, "Philippians");
+        assert_eq!(matches[0].book_name.as_ref(), "Philippians");
     }
 
-    # [ test ]
+    #[test]
     fn test_fuzzy_revelations() {
         // Common misspelling: "Revelations" (extra 's' but that's just 1 edit from "Revelation")
         let matches = fuzzy_find_books("Revelations 21:1");
         assert!(!matches.is_empty());
-        assert_eq!(matches[0].book_name, "Revelation");
+        assert_eq!(matches[0].book_name.as_ref(), "Revelation");
     }
 
-    # [ test ]
+    #[test]
     fn test_fuzzy_no_false_positive() {
         // A totally unrelated word should not match any book
         let matches = fuzzy_find_books("programming is fun");
         assert!(matches.is_empty());
     }
 
-    # [ test ]
+    #[test]
     fn test_fuzzy_hebrews_misspelled() {
         let matches = fuzzy_find_books("in Hebrws chapter 11");
         assert!(!matches.is_empty());
-        assert_eq!(matches[0].book_name, "Hebrews");
+        assert_eq!(matches[0].book_name.as_ref(), "Hebrews");
     }
 }

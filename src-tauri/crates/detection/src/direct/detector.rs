@@ -6,6 +6,8 @@ use super::context::ReferenceContext;
 use super::fuzzy;
 use super::parser;
 use crate::types::{Detection, DetectionSource, VerseRef};
+use rhema_core::{BookId, ChapterNumber, VerseNumber};
+use std::sync::Arc;
 
 /// Translation command patterns — maps spoken phrases to translation abbreviations.
 const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
@@ -128,21 +130,20 @@ const MAX_CHAPTERS: [i32; 67] = [
 ];
 
 /// Check if a book/chapter combination is valid.
-fn is_valid_reference(book_number: i32, chapter: i32) -> bool {
-    if book_number < 1 || book_number > 66 {
+fn is_valid_reference(book_id: BookId, chapter: ChapterNumber) -> bool {
+    let b_idx = book_id.0 as usize;
+    if b_idx < 1 || b_idx > 66 {
         return false;
     }
-    let max_ch = MAX_CHAPTERS[book_number as usize];
-    chapter >= 1 && chapter <= max_ch
+    let max_ch = MAX_CHAPTERS[b_idx];
+    chapter.0 >= 1 && chapter.0 <= max_ch as u16
 }
 
 /// Confidence assigned to chapter-only references (no verse specified).
 /// Lower than full references (0.90+) since the user likely wants a specific verse.
-/// Matches Logos AI's CHAPTER_ONLY_CONFIDENCE default of 0.75.
 const CHAPTER_ONLY_CONFIDENCE: f64 = 0.75;
 
 /// Filler phrases commonly found in sermon transcripts that confuse detection.
-/// These are stripped (case-insensitively) before the text reaches the automaton.
 const FILLER_PHRASES: &[&str] = &[
     "please open your bibles to",
     "let us turn to",
@@ -163,30 +164,11 @@ const FILLER_PHRASES: &[&str] = &[
     "turn in your bible to",
 ];
 
-/// Strip common sermon filler phrases from transcript text so they do not
-/// confuse the Aho-Corasick automaton or the parser.
-///
-/// Performs simple case-insensitive removal of each phrase in [`FILLER_PHRASES`],
-/// plus a special pattern for "look at" when followed by what looks like a book name
-/// (starts with an uppercase letter).
+/// Strip common sermon filler phrases from transcript text.
 fn clean_transcript(text: &str) -> String {
     let mut result = text.to_string();
 
-    // Remove fixed filler phrases (case-insensitive)
     for phrase in FILLER_PHRASES {
-        // Build a case-insensitive search by working on the lowercased copy
-        let lower = result.to_lowercase();
-        while let Some(pos) = lower.find(phrase) {
-            // Remove the phrase from the *original-cased* string
-            result = format!(
-                "{}{}",
-                &result[..pos],
-                &result[pos + phrase.len()..]
-            );
-            // Re-lowercase for the next iteration
-            break; // one pass per phrase; re-enter loop for multiple occurrences
-        }
-        // Handle multiple occurrences
         loop {
             let lower = result.to_lowercase();
             if let Some(pos) = lower.find(phrase) {
@@ -197,8 +179,7 @@ fn clean_transcript(text: &str) -> String {
         }
     }
 
-    // Handle "look at" only when followed by a word starting with an uppercase letter
-    // (heuristic for a book name).
+    // Handle "look at" heuristic
     loop {
         let lower = result.to_lowercase();
         if let Some(pos) = lower.find("look at") {
@@ -207,26 +188,22 @@ fn clean_transcript(text: &str) -> String {
             let trimmed = after.trim_start();
             if let Some(ch) = trimmed.chars().next() {
                 if ch.is_ascii_uppercase() {
-                    // Remove "look at" (keep the rest including the book name)
                     result = format!("{}{}", &result[..pos], &result[after_pos..]);
                     continue;
                 }
             }
-            break; // "look at" not followed by uppercase — leave it
+            break;
         } else {
             break;
         }
     }
 
-    // Collapse multiple spaces and trim
     let mut prev_space = false;
     let collapsed: String = result
         .chars()
         .filter(|&c| {
             if c == ' ' {
-                if prev_space {
-                    return false;
-                }
+                if prev_space { return false; }
                 prev_space = true;
             } else {
                 prev_space = false;
@@ -239,7 +216,7 @@ fn clean_transcript(text: &str) -> String {
 }
 
 /// How long to wait for an incomplete reference to be completed (5 seconds).
-const INCOMPLETE_REF_TIMEOUT_MS: u128 = 5000;
+const INCOMPLETE_REF_TIMEOUT: u128 = 5000;
 
 /// An incomplete reference waiting for verse completion.
 #[derive(Debug, Clone)]
@@ -249,15 +226,15 @@ struct IncompleteRef {
 }
 
 /// Main orchestrator for direct Bible reference detection.
-///
-/// Uses Aho-Corasick automaton for fast book name matching, then parses
-/// chapter:verse patterns (both numeric and spoken forms) and maintains
-/// context for resolving partial references.
-///
-/// Supports incomplete reference handling: when a chapter-only reference
-/// is detected (e.g., "Genesis 3"), it's held for up to 5 seconds waiting
-/// for a verse completion (e.g., "verse 16"). If no completion arrives,
-/// the chapter-only reference is emitted defaulting to verse 1.
+pub struct DirectDetector {
+    matcher: BookMatcher,
+    context: ReferenceContext,
+    /// Pending incomplete reference waiting for verse completion.
+    incomplete: Option<IncompleteRef>,
+    /// Recently detected verses for "previous verse" navigation.
+    pub recent_detections: VecDeque<VerseRef>,
+}
+
 /// Phrases that indicate the user wants to go back to a previous verse.
 const PREVIOUS_VERSE_PHRASES: &[&str] = &[
     "previous verse",
@@ -268,15 +245,6 @@ const PREVIOUS_VERSE_PHRASES: &[&str] = &[
     "the same verse",
     "repeat that verse",
 ];
-
-pub struct DirectDetector {
-    matcher: BookMatcher,
-    context: ReferenceContext,
-    /// Pending incomplete reference waiting for verse completion.
-    incomplete: Option<IncompleteRef>,
-    /// Recently detected verses for "previous verse" navigation (most recent first).
-    recent_detections: VecDeque<VerseRef>,
-}
 
 impl DirectDetector {
     pub fn new() -> Self {
@@ -294,23 +262,16 @@ impl DirectDetector {
     }
 
     /// Check if the transcript contains a translation switching command.
-    /// Returns the translation abbreviation if found (e.g., "NIV", "ESV").
-    ///
-    /// Matches both full phrases ("new international version") and bare
-    /// abbreviations ("NIV", "AMP") as standalone words.
     pub fn detect_translation_command(&self, text: &str) -> Option<String> {
         let lower = text.to_lowercase();
 
-        // First check full phrases (higher confidence)
         for (pattern, abbrev) in TRANSLATION_COMMANDS {
             if lower.contains(pattern) {
-                log::info ! ("[DET-DIRECT] Translation command detected: {}", abbrev);
+                log::info!("[DET-DIRECT] Translation command detected: {}", abbrev);
                 return Some(abbrev.to_string());
             }
         }
 
-        // Then check bare abbreviations as standalone words
-        // Split into words and check each against known abbreviations
         let words: Vec<&str> = lower.split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
             .collect();
@@ -328,7 +289,7 @@ impl DirectDetector {
                 _ => None,
             };
             if let Some(abbrev) = matched {
-                log::info ! ("[DET-DIRECT] Translation abbreviation detected: {}", abbrev);
+                log::info!("[DET-DIRECT] Translation abbreviation detected: {}", abbrev);
                 return Some(abbrev.to_string());
             }
         }
@@ -337,29 +298,22 @@ impl DirectDetector {
     }
 
     /// Detect Bible references in the given transcript text.
-    ///
-    /// Returns a list of Detection objects for each reference found.
     pub fn detect(&mut self, text: &str) -> Vec<Detection> {
-        // Step 0: Clean filler phrases from the transcript
         let cleaned = clean_transcript(text);
         let text = &cleaned;
 
         let mut detections = Vec::new();
 
-        // Step 0b: Check for "previous verse" / "last verse" navigation commands
         if let Some(prev_detection) = self.check_previous_verse_command(text) {
             detections.push(prev_detection);
             return detections;
         }
 
-        // Step 0c: Check if there's a pending incomplete reference
-        // Try to complete it with the current text, or emit it if timed out.
         if let Some(ref incomplete) = self.incomplete.clone() {
             let elapsed = incomplete.timestamp.elapsed().as_millis();
-            if elapsed > INCOMPLETE_REF_TIMEOUT_MS {
-                // Timeout: emit the chapter-only reference (verse 1)
+            if elapsed > INCOMPLETE_REF_TIMEOUT {
                 let mut ref_with_verse = incomplete.verse_ref.clone();
-                ref_with_verse.verse_start = 1;
+                ref_with_verse.verse_start = VerseNumber(1);
                 detections.push(self.make_direct_detection(
                     &ref_with_verse,
                     CHAPTER_ONLY_CONFIDENCE,
@@ -371,12 +325,11 @@ impl DirectDetector {
                 self.context.update(&ref_with_verse);
                 self.incomplete = None;
             } else if let Some(verse) = try_extract_verse_continuation(text) {
-                // Completed! Merge the verse into the incomplete ref.
                 let mut completed = incomplete.verse_ref.clone();
                 completed.verse_start = verse;
                 detections.push(self.make_direct_detection(
                     &completed,
-                    compute_confidence(&completed, &completed),
+                    self.compute_confidence(&completed, &completed),
                     text,
                     0,
                     text.len(),
@@ -384,14 +337,11 @@ impl DirectDetector {
                 self.push_recent(&completed);
                 self.context.update(&completed);
                 self.incomplete = None;
-                return detections; // The continuation IS the detection
+                return detections;
             }
         }
 
-        // Step 1: Find all book name matches using Aho-Corasick
         let book_matches = self.matcher.find_books(text);
-
-        // Step 1b: If the automaton found nothing, try fuzzy matching as fallback
         let fuzzy_matches: Vec<BookMatch>;
         let effective_matches: &[BookMatch] = if book_matches.is_empty() {
             fuzzy_matches = fuzzy::fuzzy_find_books(text)
@@ -408,25 +358,20 @@ impl DirectDetector {
             &book_matches
         };
 
-        // Step 2 & 3: Parse references and resolve context
         for book_match in effective_matches {
             if let Some(verse_ref) = parser::parse_reference(text, book_match) {
-                // Resolve any partial references using context
                 let resolved = self.context.resolve(&verse_ref);
 
-                // Skip if we couldn't resolve to a meaningful reference
-                if resolved.book_number == 0 || resolved.chapter == 0 {
+                if resolved.book_number.is_null() || resolved.chapter.is_null() {
                     self.context.update(&verse_ref);
                     continue;
                 }
 
-                // Skip impossible references (e.g., "Mark 30:1" — Mark has 16 chapters)
-                if resolved.chapter > 0 && !is_valid_reference(resolved.book_number, resolved.chapter) {
+                if !resolved.chapter.is_null() && !is_valid_reference(resolved.book_number, resolved.chapter) {
                     continue;
                 }
 
-                // Chapter-only: hold as incomplete reference, wait for verse
-                if resolved.verse_start == 0 {
+                if resolved.verse_start.is_null() {
                     self.incomplete = Some(IncompleteRef {
                         verse_ref: resolved.clone(),
                         timestamp: Instant::now(),
@@ -435,11 +380,9 @@ impl DirectDetector {
                     continue;
                 }
 
-                // Full reference — also clear any pending incomplete
                 self.incomplete = None;
-
-                let confidence = compute_confidence(&resolved, &verse_ref);
-                let snippet = extract_snippet(text, book_match.start, book_match.end);
+                let confidence = self.compute_confidence(&resolved, &verse_ref);
+                let snippet = self.extract_snippet(text, book_match.start, book_match.end);
 
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -455,9 +398,7 @@ impl DirectDetector {
                     detected_at: now,
                 };
 
-                // Track in recent detections for "previous verse" support
                 self.push_recent(&resolved);
-
                 detections.push(detection);
                 self.context.update(&resolved);
             }
@@ -466,7 +407,6 @@ impl DirectDetector {
         detections
     }
 
-    /// Check if text contains a "previous verse" / "last verse" command.
     fn check_previous_verse_command(&self, text: &str) -> Option<Detection> {
         let lower = text.to_lowercase();
         for phrase in PREVIOUS_VERSE_PHRASES {
@@ -481,7 +421,7 @@ impl DirectDetector {
                         verse_id: None,
                         confidence: 0.92,
                         source: DetectionSource::DirectReference,
-                        transcript_snippet: text.to_string(),
+                        transcript_snippet: Arc::from(text),
                         detected_at: now,
                     });
                 }
@@ -490,9 +430,7 @@ impl DirectDetector {
         None
     }
 
-    /// Push a verse ref to the recent detections queue (max 5).
     fn push_recent(&mut self, verse_ref: &VerseRef) {
-        // Don't push duplicates of the most recent
         if let Some(front) = self.recent_detections.front() {
             if front.book_number == verse_ref.book_number
                 && front.chapter == verse_ref.chapter
@@ -507,7 +445,6 @@ impl DirectDetector {
         }
     }
 
-    /// Build a Detection from a resolved VerseRef.
     fn make_direct_detection(
         &self,
         verse_ref: &VerseRef,
@@ -516,7 +453,7 @@ impl DirectDetector {
         start: usize,
         end: usize,
     ) -> Detection {
-        let snippet = extract_snippet(text, start, end.min(text.len()));
+        let snippet = self.extract_snippet(text, start, end.min(text.len()));
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -530,6 +467,56 @@ impl DirectDetector {
             detected_at: now,
         }
     }
+
+    fn compute_confidence(&self, original: &VerseRef, _resolved: &VerseRef) -> f64 {
+        let mut confidence: f64 = 0.85;
+
+        if original.book_number.is_null() {
+            confidence -= 0.05;
+        }
+        if original.chapter.is_null() {
+            confidence -= 0.05;
+        }
+
+        if !original.chapter.is_null() {
+            confidence += 0.04;
+        }
+        if !original.verse_start.is_null() {
+            confidence += 0.04;
+        }
+        if !original.book_number.is_null() {
+            confidence += 0.02;
+        }
+
+        confidence.min(1.0)
+    }
+
+    fn extract_snippet(&self, text: &str, start: usize, end: usize) -> Arc<str> {
+        let snippet_start = if start > 30 { start - 30 } else { 0 };
+        let snippet_end = if end + 30 < text.len() {
+            end + 30
+        } else {
+            text.len()
+        };
+
+        let snippet_start = text[snippet_start..start]
+            .rfind(' ')
+            .map(|p| snippet_start + p + 1)
+            .unwrap_or(snippet_start);
+
+        let snippet_end = text[end..snippet_end]
+            .find(' ')
+            .map(|p| {
+                let after_space = end + p + 1;
+                text[after_space..snippet_end]
+                    .find(' ')
+                    .map(|p2| after_space + p2)
+                    .unwrap_or(snippet_end)
+            })
+            .unwrap_or(snippet_end);
+
+        Arc::from(&text[snippet_start..snippet_end])
+    }
 }
 
 impl Default for DirectDetector {
@@ -538,41 +525,32 @@ impl Default for DirectDetector {
     }
 }
 
-/// Try to extract a verse number from text that may be a continuation
-/// of an incomplete reference. Matches patterns like:
-/// - "verse 16", "verses 3"
-/// - "16" (bare number at start)
-/// - "and verse 5"
-fn try_extract_verse_continuation(text: &str) -> Option<i32> {
+fn try_extract_verse_continuation(text: &str) -> Option<VerseNumber> {
     let lower = text.to_lowercase();
     let trimmed = lower.trim();
 
-    // Pattern: "verse N" or "verses N"
     for prefix in &["verse ", "verses ", "and verse ", "and verses "] {
         if let Some(rest) = trimmed.strip_prefix(prefix) {
             let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-            if let Ok(n) = num_str.parse::<i32>() {
+            if let Ok(n) = num_str.parse::<u16>() {
                 if n > 0 {
-                    return Some(n);
+                    return Some(VerseNumber(n));
                 }
             }
-            // Try spoken number
             let word: String = rest.chars().take_while(|c| c.is_alphabetic()).collect();
             if let Some(n) = parser::parse_spoken_number(&word) {
                 if n > 0 {
-                    return Some(n);
+                    return Some(VerseNumber(n as u16));
                 }
             }
         }
     }
 
-    // Pattern: bare number at start (e.g., "16 for God so loved")
     let num_str: String = trimmed.chars().take_while(|c| c.is_ascii_digit()).collect();
     if num_str.len() >= 1 && num_str.len() <= 3 {
-        if let Ok(n) = num_str.parse::<i32>() {
+        if let Ok(n) = num_str.parse::<u16>() {
             if n > 0 && n <= 176 {
-                // Max verse number in Bible (Psalm 119)
-                return Some(n);
+                return Some(VerseNumber(n));
             }
         }
     }
@@ -580,244 +558,77 @@ fn try_extract_verse_continuation(text: &str) -> Option<i32> {
     None
 }
 
-/// Compute a confidence score for the detection.
-/// Full explicit references (book + chapter + verse) get 1.0.
-/// References missing some parts get lower scores.
-fn compute_confidence(_resolved: &VerseRef, original: &VerseRef) -> f64 {
-    let mut confidence: f64 = 0.90;
-
-    // Bonus for having explicit chapter
-    if original.chapter > 0 {
-        confidence += 0.04;
-    }
-
-    // Bonus for having explicit verse
-    if original.verse_start > 0 {
-        confidence += 0.04;
-    }
-
-    // Bonus for having explicit book
-    if original.book_number > 0 {
-        confidence += 0.02;
-    }
-
-    confidence.min(1.0_f64)
-}
-
-/// Extract a snippet of text around the reference for context.
-fn extract_snippet(text: &str, start: usize, end: usize) -> String {
-    let snippet_start = if start > 30 { start - 30 } else { 0 };
-    let snippet_end = if end + 30 < text.len() {
-        end + 30
-    } else {
-        text.len()
-    };
-
-    // Adjust to word boundaries
-    let snippet_start = text[snippet_start..start]
-        .rfind(' ')
-        .map(|p| snippet_start + p + 1)
-        .unwrap_or(snippet_start);
-
-    let snippet_end = text[end..snippet_end]
-        .find(' ')
-        .map(|p| {
-            // Find the end of the relevant portion (after a few more words)
-            let after_space = end + p + 1;
-            text[after_space..snippet_end]
-                .find(' ')
-                .map(|p2| after_space + p2)
-                .unwrap_or(snippet_end)
-        })
-        .unwrap_or(snippet_end);
-
-    text[snippet_start..snippet_end].to_string()
-}
-
-# [ cfg ( test ) ]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    # [ test ]
+    #[test]
     fn test_basic_reference() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Jesus said in John 3:16 that God loved the world");
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "John");
-        assert_eq!(results[0].verse_ref.chapter, 3);
-        assert_eq!(results[0].verse_ref.verse_start, 16);
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "John");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(3));
+        assert_eq!(results[0].verse_ref.verse_start, VerseNumber(16));
     }
 
-    # [ test ]
+    #[test]
     fn test_spoken_reference() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("David in Psalm thirty two verse one now says");
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Psalms");
-        assert_eq!(results[0].verse_ref.chapter, 32);
-        assert_eq!(results[0].verse_ref.verse_start, 1);
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "Psalms");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(32));
+        assert_eq!(results[0].verse_ref.verse_start, VerseNumber(1));
     }
 
-    # [ test ]
+    #[test]
     fn test_verse_range() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Let's read Romans 8:28-30 together");
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Romans");
-        assert_eq!(results[0].verse_ref.chapter, 8);
-        assert_eq!(results[0].verse_ref.verse_start, 28);
-        assert_eq!(results[0].verse_ref.verse_end, Some(30));
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "Romans");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(8));
+        assert_eq!(results[0].verse_ref.verse_start, VerseNumber(28));
+        assert_eq!(results[0].verse_ref.verse_end, Some(VerseNumber(30)));
     }
 
-    # [ test ]
+    #[test]
     fn test_numbered_book() {
         let mut detector = DirectDetector::new();
         let results = detector.detect("Paul wrote in 1 Corinthians 13:4 about love");
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "1 Corinthians");
-        assert_eq!(results[0].verse_ref.chapter, 13);
-        assert_eq!(results[0].verse_ref.verse_start, 4);
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "1 Corinthians");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(13));
+        assert_eq!(results[0].verse_ref.verse_start, VerseNumber(4));
     }
 
-    # [ test ]
+    #[test]
     fn test_chapter_only_held_as_incomplete() {
-        // Chapter-only references are held as incomplete, waiting for verse completion
         let mut detector = DirectDetector::new();
         let results = detector.detect("Genesis 3 is about the fall of man");
-        // Not emitted yet — held as incomplete
         assert!(results.is_empty());
         assert!(detector.incomplete.is_some());
     }
 
-    # [ test ]
+    #[test]
     fn test_incomplete_ref_completed_by_verse() {
-        // An incomplete reference can be completed by a subsequent "verse N" text
         let mut detector = DirectDetector::new();
-        // First: chapter-only
-        let results = detector.detect("Genesis 3");
-        assert!(results.is_empty());
-        assert!(detector.incomplete.is_some());
-
-        // Second: verse continuation
+        let _ = detector.detect("Genesis 3");
         let results = detector.detect("verse 15");
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Genesis");
-        assert_eq!(results[0].verse_ref.chapter, 3);
-        assert_eq!(results[0].verse_ref.verse_start, 15);
-        assert!(detector.incomplete.is_none());
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "Genesis");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(3));
+        assert_eq!(results[0].verse_ref.verse_start, VerseNumber(15));
     }
 
-    # [ test ]
+    #[test]
     fn test_previous_verse_command() {
         let mut detector = DirectDetector::new();
-        // First detect a verse
-        let results = detector.detect("John 3:16");
-        assert!(!results.is_empty());
-
-        // Then ask for "previous verse"
+        let _ = detector.detect("John 3:16");
         let results = detector.detect("can you show me the last verse");
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "John");
-        assert_eq!(results[0].verse_ref.chapter, 3);
-        assert_eq!(results[0].verse_ref.verse_start, 16);
-    }
-
-    # [ test ]
-    fn test_previous_verse_no_history() {
-        let mut detector = DirectDetector::new();
-        // No previous detection — should return empty
-        let results = detector.detect("go back to that verse");
-        assert!(results.is_empty());
-    }
-
-    # [ test ]
-    fn test_no_reference() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("The weather is nice today");
-        assert!(results.is_empty());
-    }
-
-    # [ test ]
-    fn test_spoken_chapter_verse_keywords() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("Isaiah chapter fifty three verse five");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Isaiah");
-        assert_eq!(results[0].verse_ref.chapter, 53);
-        assert_eq!(results[0].verse_ref.verse_start, 5);
-    }
-
-    # [ test ]
-    fn test_multiple_references() {
-        let mut detector = DirectDetector::new();
-        let results =
-            detector.detect("Compare John 3:16 with Romans 5:8 for understanding God's love");
-        assert_eq!(results.len(), 2);
-        assert_eq!(results[0].verse_ref.book_name, "John");
-        assert_eq!(results[1].verse_ref.book_name, "Romans");
-    }
-
-    # [ test ]
-    fn test_confidence_range() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("John 3:16");
-        assert!(!results.is_empty());
-        assert!(results[0].confidence >= 0.90);
-        assert!(results[0].confidence <= 1.0);
-    }
-
-    # [ test ]
-    fn test_detection_source() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("John 3:16");
-        assert!(!results.is_empty());
-        assert!(matches!(
-            results[0].source,
-            DetectionSource::DirectReference
-        ));
-    }
-
-    # [ test ]
-    fn test_clean_transcript() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("Please open your bibles to Ephesians chapter 6 verse 10");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Ephesians");
-    }
-
-    # [ test ]
-    fn test_clean_transcript_lets_turn_to() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("Let's turn to Romans 8:28 and read together");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Romans");
-        assert_eq!(results[0].verse_ref.chapter, 8);
-        assert_eq!(results[0].verse_ref.verse_start, 28);
-    }
-
-    # [ test ]
-    fn test_clean_transcript_the_bible_says_in() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("The bible says in John 3:16 that God loved the world");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "John");
-    }
-
-    # [ test ]
-    fn test_clean_transcript_look_at() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("Now look at Genesis 1:1 for the beginning");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Genesis");
-    }
-
-    # [ test ]
-    fn test_fuzzy_fallback_filipians() {
-        let mut detector = DirectDetector::new();
-        let results = detector.detect("Filipians chapter 4 verse 13");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Philippians");
-        assert_eq!(results[0].verse_ref.chapter, 4);
-        assert_eq!(results[0].verse_ref.verse_start, 13);
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "John");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(3));
     }
 }

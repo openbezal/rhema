@@ -1,16 +1,12 @@
 use crate::db::BibleDb;
 use crate::error::BibleError;
 use crate::models::{Book, QuotationVerse, SearchVerse, Translation, Verse};
+use rhema_core::{BookId, ChapterNumber, VerseNumber, MutexExt};
 
 impl BibleDb {
     /// Look up a verse by its database primary key (verses.id).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (i.e., a thread panicked
-    /// while holding the database lock). This applies to all `BibleDb` methods.
     pub fn get_verse_by_id(&self, id: i64) -> Result<Option<Verse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses WHERE id = ?1",
@@ -19,11 +15,11 @@ impl BibleDb {
             Ok(Verse {
                 id: row.get(0)?,
                 translation_id: row.get(1)?,
-                book_number: row.get(2)?,
+                book_number: BookId(row.get(2)?),
                 book_name: row.get(3)?,
                 book_abbreviation: row.get(4)?,
-                chapter: row.get(5)?,
-                verse: row.get(6)?,
+                chapter: ChapterNumber(row.get(5)?),
+                verse: VerseNumber(row.get(6)?),
                 text: row.get(7)?,
             })
         })?;
@@ -36,27 +32,27 @@ impl BibleDb {
     pub fn get_verse(
         &self,
         translation_id: i64,
-        book_number: i32,
-        chapter: i32,
-        verse: i32,
+        book_number: BookId,
+        chapter: ChapterNumber,
+        verse: VerseNumber,
     ) -> Result<Option<Verse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses \
              WHERE translation_id = ?1 AND book_number = ?2 AND chapter = ?3 AND verse = ?4",
         )?;
         let mut rows = stmt.query_map(
-            rusqlite::params![translation_id, book_number, chapter, verse],
+            rusqlite::params![translation_id, book_number.0 as i32, chapter.0 as i32, verse.0 as i32],
             |row: &rusqlite::Row| {
                 Ok(Verse {
                     id: row.get(0)?,
                     translation_id: row.get(1)?,
-                    book_number: row.get(2)?,
+                    book_number: BookId(row.get(2)?),
                     book_name: row.get(3)?,
                     book_abbreviation: row.get(4)?,
-                    chapter: row.get(5)?,
-                    verse: row.get(6)?,
+                    chapter: ChapterNumber(row.get(5)?),
+                    verse: VerseNumber(row.get(6)?),
                     text: row.get(7)?,
                 })
             },
@@ -70,10 +66,10 @@ impl BibleDb {
     pub fn get_chapter(
         &self,
         translation_id: i64,
-        book_number: i32,
-        chapter: i32,
+        book_number: BookId,
+        chapter: ChapterNumber,
     ) -> Result<Vec<Verse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses \
@@ -81,16 +77,16 @@ impl BibleDb {
              ORDER BY verse",
         )?;
         let rows = stmt.query_map(
-            rusqlite::params![translation_id, book_number, chapter],
+            rusqlite::params![translation_id, book_number.0 as i32, chapter.0 as i32],
             |row: &rusqlite::Row| {
                 Ok(Verse {
                     id: row.get(0)?,
                     translation_id: row.get(1)?,
-                    book_number: row.get(2)?,
+                    book_number: BookId(row.get(2)?),
                     book_name: row.get(3)?,
                     book_abbreviation: row.get(4)?,
-                    chapter: row.get(5)?,
-                    verse: row.get(6)?,
+                    chapter: ChapterNumber(row.get(5)?),
+                    verse: VerseNumber(row.get(6)?),
                     text: row.get(7)?,
                 })
             },
@@ -101,12 +97,12 @@ impl BibleDb {
     pub fn get_verse_range(
         &self,
         translation_id: i64,
-        book_number: i32,
-        chapter: i32,
-        verse_start: i32,
-        verse_end: i32,
+        book_number: BookId,
+        chapter: ChapterNumber,
+        verse_start: VerseNumber,
+        verse_end: VerseNumber,
     ) -> Result<Vec<Verse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses \
@@ -115,16 +111,16 @@ impl BibleDb {
              ORDER BY verse",
         )?;
         let rows = stmt.query_map(
-            rusqlite::params![translation_id, book_number, chapter, verse_start, verse_end],
+            rusqlite::params![translation_id, book_number.0 as i32, chapter.0 as i32, verse_start.0 as i32, verse_end.0 as i32],
             |row: &rusqlite::Row| {
                 Ok(Verse {
                     id: row.get(0)?,
                     translation_id: row.get(1)?,
-                    book_number: row.get(2)?,
+                    book_number: BookId(row.get(2)?),
                     book_name: row.get(3)?,
                     book_abbreviation: row.get(4)?,
-                    chapter: row.get(5)?,
-                    verse: row.get(6)?,
+                    chapter: ChapterNumber(row.get(5)?),
+                    verse: VerseNumber(row.get(6)?),
                     text: row.get(7)?,
                 })
             },
@@ -132,21 +128,20 @@ impl BibleDb {
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
-    /// Load all verses for quotation matching index.
-    /// Filters to a specific language if provided.
+    /// Load all verses for quotation matching index construction.
     pub fn load_all_verses_for_quotation(
         &self,
         language: Option<&str>,
     ) -> Result<Vec<QuotationVerse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
 
         let mapper = |row: &rusqlite::Row| {
             Ok(QuotationVerse {
                 id: row.get(0)?,
-                book_number: row.get(1)?,
+                book_number: BookId(row.get::<_, i32>(1)? as u8),
                 book_name: row.get(2)?,
-                chapter: row.get(3)?,
-                verse: row.get(4)?,
+                chapter: ChapterNumber(row.get::<_, i32>(3)? as u16),
+                verse: VerseNumber(row.get::<_, i32>(4)? as u16),
                 text: row.get(5)?,
             })
         };
@@ -174,7 +169,7 @@ impl BibleDb {
         &self,
         translation_id: i64,
     ) -> Result<Vec<SearchVerse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT book_number, book_name, chapter, verse, text \
              FROM verses \
@@ -183,10 +178,10 @@ impl BibleDb {
         )?;
         let rows = stmt.query_map([translation_id], |row: &rusqlite::Row| {
             Ok(SearchVerse {
-                book_number: row.get(0)?,
+                book_number: BookId(row.get::<_, i32>(0)? as u8),
                 book_name: row.get(1)?,
-                chapter: row.get(2)?,
-                verse: row.get(3)?,
+                chapter: ChapterNumber(row.get::<_, i32>(2)? as u16),
+                verse: VerseNumber(row.get::<_, i32>(3)? as u16),
                 text: row.get(4)?,
             })
         })?;
@@ -194,7 +189,7 @@ impl BibleDb {
     }
 
     pub fn list_translations(&self) -> Result<Vec<Translation>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT id, abbreviation, title, language, is_copyrighted, is_downloaded \
              FROM translations",
@@ -213,7 +208,7 @@ impl BibleDb {
     }
 
     pub fn list_books(&self, translation_id: i64) -> Result<Vec<Book>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, name, abbreviation, testament \
              FROM books \
@@ -224,7 +219,7 @@ impl BibleDb {
             Ok(Book {
                 id: row.get(0)?,
                 translation_id: row.get(1)?,
-                book_number: row.get(2)?,
+                book_number: BookId(row.get(2)?),
                 name: row.get(3)?,
                 abbreviation: row.get(4)?,
                 testament: row.get(5)?,

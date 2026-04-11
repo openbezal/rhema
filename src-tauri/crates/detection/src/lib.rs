@@ -45,3 +45,6 @@ pub use semantic::onnx_embedder::OnnxEmbedder;
 
 #[cfg(feature = "vector-search")]
 pub use semantic::hnsw_index::HnswVectorIndex;
+
+// MutexExt is now provided by rhema-core
+pub use rhema_core::MutexExt;

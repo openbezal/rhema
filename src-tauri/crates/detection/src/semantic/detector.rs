@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::cache::EmbeddingCache;
@@ -8,6 +9,7 @@ use super::ensemble::EnsembleSearcher;
 use super::index::{StubIndex, VectorIndex};
 use super::synonyms::SynonymExpander;
 use crate::types::{Detection, DetectionSource, VerseRef};
+use rhema_core::{BookId, ChapterNumber, VerseNumber};
 
 /// Default cache capacity (number of text-chunk entries).
 const DEFAULT_CACHE_CAPACITY: usize = 256;
@@ -118,12 +120,18 @@ impl SemanticDetector {
             // Single direct embedding: fast (~1 embed call), good for exact quotes.
             let embedding = match self.embedder.embed(text) {
                 Ok(e) => e,
-                Err(_) => return vec![],
+                Err(e) => {
+                    log::warn!("[SEMANTIC] Embedding failed: {}", e);
+                    return vec![];
+                }
             };
 
             let results = match self.index.search(&embedding, 5) {
                 Ok(r) => r,
-                Err(_) => return vec![],
+                Err(e) => {
+                    log::warn!("[SEMANTIC] Vector search failed: {}", e);
+                    return vec![];
+                }
             };
 
             // Cache for future lookups
@@ -175,7 +183,10 @@ impl SemanticDetector {
         };
         match self.index.search(&embedding, k) {
             Ok(results) => results.iter().map(|r| (r.verse_id, r.similarity)).collect(),
-            Err(_) => vec![],
+            Err(e) => {
+                log::warn!("[SEMANTIC] search_query failed: {}", e);
+                vec![]
+            }
         }
     }
 
@@ -191,10 +202,10 @@ impl SemanticDetector {
     fn make_detection(verse_id: i64, similarity: &f64, snippet: &str, detected_at: u64) -> Detection {
         Detection {
             verse_ref: VerseRef {
-                book_number: 0,
-                book_name: String::new(),
-                chapter: 0,
-                verse_start: 0,
+                book_number: BookId(0u8),
+                book_name: Arc::from(""),
+                chapter: ChapterNumber(0u16),
+                verse_start: VerseNumber(0u16),
                 verse_end: None,
             },
             verse_id: Some(verse_id),
@@ -202,7 +213,7 @@ impl SemanticDetector {
             source: DetectionSource::SemanticLocal {
                 similarity: *similarity,
             },
-            transcript_snippet: snippet.to_string(),
+            transcript_snippet: Arc::from(snippet),
             detected_at,
         }
     }

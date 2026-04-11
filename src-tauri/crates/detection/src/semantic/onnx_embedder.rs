@@ -20,14 +20,6 @@ use crate::error::DetectionError;
 use super::embedder::TextEmbedder;
 
 /// ONNX-based text embedder.
-///
-/// Loads a transformer model exported to ONNX format and a corresponding
-/// HuggingFace tokenizer.  Inference produces a fixed-dimension dense
-/// vector via mean pooling over the last hidden state.
-///
-/// The inner `Session` requires `&mut self` for `run`, and `Tokenizer` is
-/// `Send` but not `Sync`, so we wrap both in separate `Mutex`es to satisfy
-/// the `&self` signature of the `TextEmbedder` trait.
 #[cfg(feature = "onnx")]
 pub struct OnnxEmbedder {
     session: Mutex<Session>,
@@ -37,110 +29,45 @@ pub struct OnnxEmbedder {
     has_position_ids: bool,
 }
 
-// Safety: Tokenizer is Send but not Sync by default.  We never share
-// mutable references across threads — both the tokenizer and the session
-// are behind their own Mutex — so the Send + Sync bound required by
-// TextEmbedder is safe.
 #[cfg(feature = "onnx")]
 unsafe impl Sync for OnnxEmbedder {}
 
 #[cfg(feature = "onnx")]
 impl OnnxEmbedder {
     /// Maximum number of tokens the model will accept.
-    /// Bible verses are short (~20 tokens avg). 128 is plenty and 4x faster
-    /// than 512 because the model doesn't process unnecessary padding tokens.
-    /// MUST match the Python precompute script (data/precompute-embeddings-onnx.py MAX_LENGTH).
     const MAX_TOKENS: usize = 128;
 
     /// Load an ONNX model and its tokenizer from disk.
-    ///
-    /// `model_path` should point to a `.onnx` file and `tokenizer_path`
-    /// to a `tokenizer.json` file (HuggingFace format).
     pub fn load(model_path: &Path, tokenizer_path: &Path) -> Result<Self, DetectionError> {
-        // Determine thread counts: use half of available CPUs for intra-op
+        let mut tokenizer = Tokenizer::from_file(tokenizer_path)
+            .map_err(|e| DetectionError::Tokenizer(e.to_string()))?;
+
+        Self::configure_tokenizer(&mut tokenizer)?;
+
         let num_cpus = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(4);
         let intra_threads = (num_cpus / 2).max(1);
 
         log::info ! (
-            "OnnxEmbedder: configuring session with {} intra-op threads (of {} CPUs), graph optimization ALL",
+            "OnnxEmbedder: configuring session with {} intra-op threads (of {} CPUs)",
             intra_threads, num_cpus
         );
 
-        let session = Session::builder()
-            .map_err(|e| DetectionError::Internal(format!("ort session builder: {e}")))?
-            .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)
-            .map_err(|e| DetectionError::Internal(format!("ort optimization level: {e}")))?
-            .with_intra_threads(intra_threads)
-            .map_err(|e| DetectionError::Internal(format!("ort intra threads: {e}")))?
-            .with_inter_threads(2)
-            .map_err(|e| DetectionError::Internal(format!("ort inter threads: {e}")))?
-            .commit_from_file(model_path)
-            .map_err(|e| DetectionError::Internal(format!("ort load model: {e}")))?;
-
-        Ok(Self {
-            session: Mutex::new(session),
-            tokenizer,
-            dim: dim as usize,
-            prompt_prefix: String::new(),
-            has_position_ids,
-        })
-    }
-}
-
-/// Tokenizer and Configuration utilities.
-impl OnnxEmbedder {
-    /// Configure the tokenizer with padding and truncation parameters.
-    fn configure_tokenizer(tokenizer: &mut Tokenizer) -> Result<(), DetectionError> {
-        let pad_id = tokenizer.get_vocab(true).get("[PAD]").copied().unwrap_or(0);
-        let pad_token = tokenizer.id_to_token(pad_id).unwrap_or_else(|| "[PAD]".to_string());
-
-        tokenizer.with_padding(Some(tokenizers::PaddingParams {
-            strategy: tokenizers::PaddingStrategy::Fixed(Self::MAX_TOKENS),
-            pad_id,
-            pad_token,
-            ..Default::default()
-        }));
-
-        tokenizer.with_truncation(Some(tokenizers::TruncationParams {
-            max_length: Self::MAX_TOKENS,
-            ..Default::default()
-        })).map_err(|e| DetectionError::Internal(format!("tokenizer truncation: {e}")))?;
-
-        Ok(())
-    }
-}
-
-/// Configuration and Metadata for OnnxEmbedder.
-impl OnnxEmbedder {
+        let session = Session::builder()?
+            .with_optimization_level(ort::session::builder::GraphOptimizationLevel::Level3)?
+            .with_intra_threads(intra_threads)?
+            .with_inter_threads(2)?
+            .commit_from_file(model_path)?;
 
         let has_position_ids = session.inputs().iter().any(|i| i.name() == "position_ids");
 
-        // Log all model inputs for diagnostics
-        for input in session.inputs() {
-            log::info ! (
-                "ONNX model input: name='{}', type={:?}",
-                input.name(),
-                input.dtype()
-            );
-        }
-        for output in session.outputs() {
-            log::info ! (
-                "ONNX model output: name='{}', type={:?}",
-                output.name(),
-                output.dtype()
-            );
-        }
-
-        // Determine embedding dimension from the model's output shape.
-        // The output is typically Tensor { shape: [batch, seq_len, dim], .. }.
+        // Determine embedding dimension from output shape
         let dim = session
             .outputs()
             .first()
             .and_then(|outlet| {
                 if let ort::value::ValueType::Tensor { ref shape, .. } = *outlet.dtype() {
-                    // Shape derefs to &[i64]; grab the last dimension.
                     shape.last().copied()
                 } else {
                     None
@@ -168,60 +95,54 @@ impl OnnxEmbedder {
             has_position_ids,
         })
     }
-}
 
-/// Configuration and Metadata for OnnxEmbedder.
-impl OnnxEmbedder {
-    /// Override the prompt prefix prepended to every input text.
+    fn configure_tokenizer(tokenizer: &mut Tokenizer) -> Result<(), DetectionError> {
+        let pad_id = tokenizer.get_vocab(true).get("[PAD]").copied().unwrap_or(0);
+        let pad_token = tokenizer.id_to_token(pad_id).unwrap_or_else(|| "[PAD]".to_string());
+
+        tokenizer.with_padding(Some(tokenizers::PaddingParams {
+            strategy: tokenizers::PaddingStrategy::Fixed(Self::MAX_TOKENS),
+            pad_id,
+            pad_token,
+            ..Default::default()
+        }));
+
+        tokenizer.with_truncation(Some(tokenizers::TruncationParams {
+            max_length: Self::MAX_TOKENS,
+            ..Default::default()
+        })).map_err(|e| DetectionError::Tokenizer(e.to_string()))?;
+
+        Ok(())
+    }
+
     pub fn set_prompt_prefix(&mut self, prefix: impl Into<String>) {
         self.prompt_prefix = prefix.into();
     }
-}
 
-/// ONNX Inference Engine for text embeddings.
-impl OnnxEmbedder {
-    ///
-    /// Steps:
-    /// 1. Prepend the prompt prefix.
-    /// 2. Tokenize (pad / truncate to `MAX_TOKENS`).
-    /// 3. Build `input_ids` and `attention_mask` tensors.
-    /// 4. Run ONNX inference.
-    /// 5. Mean-pool the last hidden state over the attention mask.
-    /// 6. L2-normalise the resulting vector.
     fn embed_impl(&self, text: &str) -> Result<Vec<f32>, DetectionError> {
         let embed_start = std::time::Instant::now();
         let prefixed = format!("{}{}", self.prompt_prefix, text);
 
-        let tokenizer = self
-            .tokenizer
-            .lock()
-            .map_err(|e| DetectionError::Internal(format!("tokenizer lock: {e}")))?;
-        let encoding = tokenizer
-            .encode(prefixed, true)
-            .map_err(|e| DetectionError::Internal(format!("tokenize: {e}")))?;
+        use rhema_core::MutexExt;
+        let tokenizer = self.tokenizer.lock_safe()?;
+        let encoding = tokenizer.encode(prefixed, true)
+            .map_err(|e| DetectionError::Tokenizer(e.to_string()))?;
         drop(tokenizer);
 
         let ids = encoding.get_ids();
         let mask = encoding.get_attention_mask();
         let seq_len = ids.len();
 
-        // Build owned tensors with shape [1, seq_len].
         let shape = vec![1i64, seq_len as i64];
-
         let input_ids_data: Vec<i64> = ids.iter().map(|&v| v as i64).collect();
-        let input_ids_tensor = Tensor::from_array((shape.clone(), input_ids_data))
-            .map_err(|e| DetectionError::Internal(format!("input_ids tensor: {e}")))?;
+        let input_ids_tensor = Tensor::from_array((shape.clone(), input_ids_data))?;
 
         let attention_mask_data: Vec<i64> = mask.iter().map(|&v| v as i64).collect();
-        let attention_mask_tensor = Tensor::from_array((shape.clone(), attention_mask_data))
-            .map_err(|e| DetectionError::Internal(format!("attention_mask tensor: {e}")))?;
+        let attention_mask_tensor = Tensor::from_array((shape.clone(), attention_mask_data))?;
 
-        // Qwen3 needs position_ids. For models that don't have this input, it's ignored.
         let position_ids_data: Vec<i64> = (0..seq_len as i64).collect();
-        let position_ids_tensor = Tensor::from_array((shape, position_ids_data))
-            .map_err(|e| DetectionError::Internal(format!("position_ids tensor: {e}")))?;
+        let position_ids_tensor = Tensor::from_array((shape, position_ids_data))?;
 
-        // Qwen3 needs position_ids; BERT-style models don't
         let inputs = if self.has_position_ids {
             ort::inputs![
                 "input_ids" => input_ids_tensor,
@@ -233,12 +154,11 @@ impl OnnxEmbedder {
                 "input_ids" => input_ids_tensor,
                 "attention_mask" => attention_mask_tensor,
             ]
-        };
+        }?;
 
-        let mut session = self.session.lock().map_err(|e| DetectionError::Internal(format!("session lock: {e}")))?;
-        let outputs = session.run(inputs).map_err(|e| DetectionError::Internal(format!("ort run: {e}")))?;
+        let mut session = self.session.lock_safe()?;
+        let outputs = session.run(inputs)?;
         
-        // Prefer `sentence_embedding` (pre-pooled), fallback to `last_hidden_state`.
         let output_value = if outputs.contains_key("sentence_embedding") {
             &outputs["sentence_embedding"]
         } else if outputs.contains_key("last_hidden_state") {
@@ -247,21 +167,13 @@ impl OnnxEmbedder {
             &outputs[0usize]
         };
 
-        let (out_shape, data) = output_value
-            .try_extract_tensor::<f32>()
-            .map_err(|e| DetectionError::Internal(format!("extract tensor: {e}")))?;
-
+        let (out_shape, data) = output_value.try_extract_tensor::<f32>()?;
         let out_dims: &[i64] = &*out_shape;
 
         let pooled = if out_dims.len() == 2 {
-            // sentence_embedding: shape [1, dim] — already pooled by sentence-transformers
             let dim = out_dims[1] as usize;
             data[..dim].to_vec()
         } else if out_dims.len() == 3 {
-            // token_embeddings: shape [1, seq_len, dim] — mean pooling over attention mask
-            // MUST match the Python precompute script (data/precompute-embeddings-onnx.py)
-            // which uses mean pooling. Using last-token pooling here would put queries
-            // in a different vector space than the pre-computed verse embeddings.
             let seq_len = out_dims[1] as usize;
             let dim = out_dims[2] as usize;
             let mut pooled = vec![0.0f32; dim];
@@ -276,34 +188,20 @@ impl OnnxEmbedder {
                 }
             }
             if mask_sum > 0.0 {
-                for d in 0..dim {
-                    pooled[d] /= mask_sum;
-                }
+                for d in 0..dim { pooled[d] /= mask_sum; }
             }
             pooled
         } else {
-            return Err(DetectionError::Internal(format!(
-                "unexpected tensor rank: {:?}",
-                out_dims
-            )));
+            return Err(DetectionError::Internal(format!("unexpected tensor rank: {:?}", out_dims)));
         };
 
-        // L2 normalise (safe to re-normalize even if already normalized)
         let mut result = pooled;
         let norm: f32 = result.iter().map(|v| v * v).sum::<f32>().sqrt();
         if norm > 0.0 {
-            for v in result.iter_mut() {
-                *v /= norm;
-            }
+            for v in result.iter_mut() { *v /= norm; }
         }
 
-        let elapsed = embed_start.elapsed();
-        log::info ! (
-            "[ONNX] embed() took {:?} for {} chars",
-            elapsed,
-            text.len()
-        );
-
+        log::info ! ("[ONNX] embed() took {:?} for {} chars", embed_start.elapsed(), text.len());
         Ok(result)
     }
 }

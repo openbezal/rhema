@@ -4,6 +4,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use rhema_core::MutexExt;
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
 
 /// Map output_id ("main" | "alt") to Tauri window label.
@@ -139,7 +140,7 @@ pub fn close_broadcast_window(
     let label = window_label(&output_id);
     if let Some(window) = app.get_webview_window(label) {
         let ndi_active = runtime
-            .lock()
+            .lock_safe()
             .map_err(|e| e.to_string())?
             .is_active(&output_id);
         if ndi_active {
@@ -157,7 +158,7 @@ pub fn start_ndi(
     runtime: State<'_, Mutex<NdiRuntime>>,
     request: NdiStartRequest,
 ) -> Result<NdiSessionInfo, String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
+    let mut runtime = runtime.lock_safe().map_err(|e| e.to_string())?;
     runtime
         .start(output_id, request)
         .map_err(|e| e.to_string())
@@ -165,7 +166,7 @@ pub fn start_ndi(
 
 #[tauri::command]
 pub fn stop_ndi(output_id: String, runtime: State<'_, Mutex<NdiRuntime>>) -> Result<(), String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
+    let mut runtime = runtime.lock_safe().map_err(|e| e.to_string())?;
     runtime.stop(&output_id);
     Ok(())
 }
@@ -183,7 +184,7 @@ pub fn get_ndi_status(
     output_id: String,
     runtime: State<'_, Mutex<NdiRuntime>>,
 ) -> Result<Option<NdiStatusResponse>, String> {
-    let runtime = runtime.lock().map_err(|e| e.to_string())?;
+    let runtime = runtime.lock_safe().map_err(|e| e.to_string())?;
     match runtime.current_info(&output_id) {
         Some(info) => Ok(Some(NdiStatusResponse {
             active: true,

@@ -1,12 +1,14 @@
-use aho_corasick::{AhoCorasick, MatchKind};
+use aho_corasick::{MatchKind, AhoCorasick};
+use rhema_core::BookId;
+use std::sync::Arc;
 
 use super::books::BOOKS;
 
 /// A match of a Bible book name found in text.
 #[derive(Debug, Clone)]
 pub struct BookMatch {
-    pub book_number: i32,
-    pub book_name: String,
+    pub book_number: BookId,
+    pub book_name: Arc<str>,
     pub start: usize,
     pub end: usize,
 }
@@ -15,36 +17,37 @@ pub struct BookMatch {
 pub struct BookMatcher {
     automaton: AhoCorasick,
     /// Maps each pattern index to its (book_number, canonical_name).
-    pattern_map: Vec<(i32, String)>,
+    pattern_map: Vec<(BookId, Arc<str>)>,
 }
 
 impl BookMatcher {
     /// Build the automaton from all book names, abbreviations, and aliases.
     pub fn new() -> Self {
         let mut patterns: Vec<String> = Vec::new();
-        let mut pattern_map: Vec<(i32, String)> = Vec::new();
+        let mut pattern_map: Vec<(BookId, Arc<str>)> = Vec::new();
 
         for book in BOOKS {
-            // Add the canonical name
+            let canonical_name: Arc<str> = Arc::from(book.name);
             patterns.push(book.name.to_lowercase());
-            pattern_map.push((book.number, book.name.to_string()));
+            pattern_map.push((book.number, canonical_name.clone()));
 
             // Add the abbreviation (if different from name)
             let abbr_lower = book.abbreviation.to_lowercase();
             if abbr_lower != book.name.to_lowercase() {
                 patterns.push(abbr_lower);
-                pattern_map.push((book.number, book.name.to_string()));
+                pattern_map.push((book.number, canonical_name.clone()));
             }
 
             // Add all aliases
             for alias in book.aliases {
                 let alias_lower = alias.to_lowercase();
                 // Avoid duplicates with name and abbreviation
-                if alias_lower != book.name.to_lowercase()
+                if !alias_lower.is_empty()
+                    && alias_lower != book.name.to_lowercase()
                     && alias_lower != book.abbreviation.to_lowercase()
                 {
                     patterns.push(alias_lower);
-                    pattern_map.push((book.number, book.name.to_string()));
+                    pattern_map.push((book.number, canonical_name.clone()));
                 }
             }
         }
@@ -131,32 +134,34 @@ impl BookMatcher {
     }
 }
 
-# [ cfg ( test ) ]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    # [ test ]
+    #[test]
     fn test_find_john() {
         let matcher = BookMatcher::new();
         let matches = matcher.find_books("Jesus said in John 3:16");
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].book_name, "John");
-        assert_eq!(matches[0].book_number, 43);
+        assert_eq!(matches[0].book_name.as_ref(), "John");
+        assert_eq!(matches[0].book_number, BookId(43u8));
     }
 
-    # [ test ]
+    #[test]
     fn test_find_psalm() {
         let matcher = BookMatcher::new();
         let matches = matcher.find_books("David in Psalm thirty two");
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].book_name, "Psalms");
+        assert_eq!(matches[0].book_name.as_ref(), "Psalms");
+        assert_eq!(matches[0].book_number, BookId(19u8));
     }
 
-    # [ test ]
+    #[test]
     fn test_find_numbered_book() {
         let matcher = BookMatcher::new();
         let matches = matcher.find_books("Paul wrote in 1 Corinthians 13");
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].book_name, "1 Corinthians");
+        assert_eq!(matches[0].book_name.as_ref(), "1 Corinthians");
+        assert_eq!(matches[0].book_number, BookId(46u8));
     }
 }

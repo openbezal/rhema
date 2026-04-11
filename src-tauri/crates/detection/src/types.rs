@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
+use rhema_core::{BookId, ChapterNumber, VerseNumber};
+use std::sync::Arc;
 
 /// A reference to a specific Bible verse or verse range.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct VerseRef {
-    pub book_number: i32,
-    pub book_name: String,
-    pub chapter: i32,
-    pub verse_start: i32,
-    pub verse_end: Option<i32>,
+    pub book_number: BookId,
+    pub book_name: Arc<str>,
+    pub chapter: ChapterNumber,
+    pub verse_start: VerseNumber,
+    pub verse_end: Option<VerseNumber>,
 }
 
 /// Indicates how a detection was made.
@@ -30,6 +32,6 @@ pub struct Detection {
     pub verse_id: Option<i64>,
     pub confidence: f64,
     pub source: DetectionSource,
-    pub transcript_snippet: String,
+    pub transcript_snippet: Arc<str>,
     pub detected_at: u64,
 }

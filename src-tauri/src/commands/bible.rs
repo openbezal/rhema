@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 use serde::Serialize;
 use tauri::State;
+use rhema_core::MutexExt;
 
 use crate::state::AppState;
 use rhema_bible::{Book, CrossReference, Translation, Verse};
@@ -9,7 +10,7 @@ use rhema_bible::{Book, CrossReference, Translation, Verse};
 pub fn list_translations(
     state: State<'_, Mutex<AppState>>,
 ) -> Result<Vec<Translation>, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
         .as_ref()
@@ -22,7 +23,7 @@ pub fn list_books(
     state: State<'_, Mutex<AppState>>,
     translation_id: i64,
 ) -> Result<Vec<Book>, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
         .as_ref()
@@ -37,7 +38,7 @@ pub fn get_chapter(
     book_number: i32,
     chapter: i32,
 ) -> Result<Vec<Verse>, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
         .as_ref()
@@ -54,7 +55,7 @@ pub fn get_verse(
     chapter: i32,
     verse: i32,
 ) -> Result<Option<Verse>, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
         .as_ref()
@@ -70,7 +71,7 @@ pub fn search_verses(
     translation_id: i64,
     limit: usize,
 ) -> Result<Vec<Verse>, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
         .as_ref()
@@ -86,7 +87,7 @@ pub fn get_cross_references(
     chapter: i32,
     verse: i32,
 ) -> Result<Vec<CrossReference>, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
         .as_ref()
@@ -100,7 +101,7 @@ pub fn get_cross_references(
 pub fn get_active_translation(
     state: State<'_, Mutex<AppState>>,
 ) -> Result<i64, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     Ok(app_state.active_translation_id)
 }
 
@@ -110,7 +111,7 @@ pub fn set_active_translation(
     state: State<'_, Mutex<AppState>>,
     translation_id: i64,
 ) -> Result<i64, String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
+    let mut app_state = state.lock_safe().map_err(|e| e.to_string())?;
     // Verify the translation exists
     if let Some(ref db) = app_state.bible_db {
         let translations = db.list_translations().map_err(|e| e.to_string())?;

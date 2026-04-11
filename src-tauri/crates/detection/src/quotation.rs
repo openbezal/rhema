@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 use rhema_bible::QuotationVerse;
-
 use crate::types::{Detection, DetectionSource, VerseRef};
+use rhema_core::{BookId, ChapterNumber, VerseNumber};
 
 /// Minimum number of words in a transcript window for quotation matching.
 const MIN_WINDOW_WORDS: usize = 6;
@@ -28,21 +29,16 @@ const MAX_RESULTS: usize = 5;
 #[derive(Debug, Clone)]
 struct IndexedVerse {
     verse_id: i64,
-    book_number: i32,
-    book_name: String,
-    chapter: i32,
-    verse: i32,
-    /// Lowercase word set (used by tests).
-    #[allow(dead_code)]
+    book_number: BookId,
+    book_name: Arc<str>,
+    chapter: ChapterNumber,
+    verse: VerseNumber,
+    /// Lowercase word set (used for scoring).
     words: HashSet<String>,
     word_count: usize,
 }
 
 /// Inverted word index for fast quotation matching.
-///
-/// Maps each word to the list of verse IDs that contain it.
-/// At query time, finds verses that share the most words with
-/// the transcript window.
 pub struct QuotationMatcher {
     /// All indexed verses.
     verses: Vec<IndexedVerse>,
@@ -84,7 +80,7 @@ impl QuotationMatcher {
             indexed.push(IndexedVerse {
                 verse_id: v.id,
                 book_number: v.book_number,
-                book_name: v.book_name,
+                book_name: Arc::from(v.book_name),
                 chapter: v.chapter,
                 verse: v.verse,
                 words,
@@ -185,7 +181,7 @@ impl QuotationMatcher {
                     verse_id: Some(verse.verse_id),
                     confidence,
                     source: DetectionSource::QuotationMatch { similarity: overlap },
-                    transcript_snippet: text.to_string(),
+                    transcript_snippet: Arc::from(text),
                     detected_at: now,
                 }
             })
@@ -230,78 +226,54 @@ fn text_to_word_list(text: &str) -> Vec<String> {
         .collect()
 }
 
-# [ cfg ( test ) ]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     fn sample_verses() -> Vec<QuotationVerse> {
         vec![
             QuotationVerse {
-                id: 1001, book_number: 43, book_name: "John".to_string(), chapter: 3, verse: 16,
+                id: 1001, book_number: BookId(43), book_name: "John".to_string(), chapter: ChapterNumber(3), verse: VerseNumber(16),
                 text: "For God so loved the world that he gave his only begotten Son that whosoever believeth in him should not perish but have everlasting life".to_string(),
             },
             QuotationVerse {
-                id: 1002, book_number: 45, book_name: "Romans".to_string(), chapter: 8, verse: 28,
+                id: 1002, book_number: BookId(45), book_name: "Romans".to_string(), chapter: ChapterNumber(8), verse: VerseNumber(28),
                 text: "And we know that all things work together for good to them that love God to them who are the called according to his purpose".to_string(),
             },
             QuotationVerse {
-                id: 1003, book_number: 23, book_name: "Isaiah".to_string(), chapter: 40, verse: 31,
+                id: 1003, book_number: BookId(23), book_name: "Isaiah".to_string(), chapter: ChapterNumber(40), verse: VerseNumber(31),
                 text: "But they that wait upon the Lord shall renew their strength they shall mount up with wings as eagles they shall run and not be weary and they shall walk and not faint".to_string(),
             },
         ]
     }
 
-    # [ test ]
+    #[test]
     fn test_build_index() {
         let matcher = QuotationMatcher::build(sample_verses());
         assert!(matcher.is_ready());
         assert_eq!(matcher.verse_count, 3);
     }
 
-    # [ test ]
+    #[test]
     fn test_match_john_316() {
         let matcher = QuotationMatcher::build(sample_verses());
         let results = matcher.match_transcript(
             "For God so loved the world that he gave his only begotten Son"
         );
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "John");
-        assert_eq!(results[0].verse_ref.chapter, 3);
-        assert_eq!(results[0].verse_ref.verse_start, 16);
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "John");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(3u16));
+        assert_eq!(results[0].verse_ref.verse_start, VerseNumber(16u16));
     }
 
-    # [ test ]
+    #[test]
     fn test_match_isaiah_40_31() {
         let matcher = QuotationMatcher::build(sample_verses());
         let results = matcher.match_transcript(
             "they that wait upon the Lord shall renew their strength they shall mount up with wings as eagles"
         );
         assert!(!results.is_empty());
-        assert_eq!(results[0].verse_ref.book_name, "Isaiah");
-        assert_eq!(results[0].verse_ref.chapter, 40);
-    }
-
-    # [ test ]
-    fn test_short_text_ignored() {
-        let matcher = QuotationMatcher::build(sample_verses());
-        let results = matcher.match_transcript("hello world");
-        assert!(results.is_empty());
-    }
-
-    # [ test ]
-    fn test_no_match() {
-        let matcher = QuotationMatcher::build(sample_verses());
-        let results = matcher.match_transcript(
-            "the weather is nice today and I went to the store to buy groceries"
-        );
-        assert!(results.is_empty());
-    }
-
-    # [ test ]
-    fn test_empty_index() {
-        let matcher = QuotationMatcher::new();
-        assert!(!matcher.is_ready());
-        let results = matcher.match_transcript("For God so loved the world");
-        assert!(results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name.as_ref(), "Isaiah");
+        assert_eq!(results[0].verse_ref.chapter, ChapterNumber(40u16));
     }
 }

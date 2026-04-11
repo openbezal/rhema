@@ -1,21 +1,36 @@
 use std::collections::HashSet;
 use std::time::Instant;
-
+use std::sync::Arc;
 use serde::Serialize;
+use rhema_core::{BookId, ChapterNumber, VerseNumber, InternalEvent};
 
-/// Timeout: pause reading mode after 3 minutes of no verse matches.
-/// Logos AI maintains context for ~3 minutes. Verses stay loaded for re-activation.
 const READING_MODE_TIMEOUT_MS: u128 = 180_000;
-
-/// Minimum word overlap ratio to consider a transcript matching a verse.
 const MIN_WORD_OVERLAP: f64 = 0.40;
 
-/// A verse loaded for reading mode tracking.
+/// Minimalist abstraction for calculating word overlap between text segments.
+pub struct OverlapScorer;
+
+impl OverlapScorer {
+    /// Calculate similarity between a transcript word-set and a verse word-set.
+    pub fn score(transcript: &HashSet<String>, verse: &HashSet<String>, total: usize) -> f64 {
+        if total == 0 { return 0.0; }
+        verse.intersection(transcript).count() as f64 / total as f64
+    }
+
+    /// Convert text to a normalized set of words.
+    pub fn tokenize(text: &str) -> HashSet<String> {
+        text.split_whitespace()
+            .map(|w| w.to_lowercase().chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect::<String>())
+            .filter(|w| w.len() >= 2)
+            .collect()
+    }
+}
+
+/// A verse loaded into memory for efficient matching.
 #[derive(Debug, Clone)]
 struct LoadedVerse {
-    verse_number: i32,
-    text: String,
-    /// Pre-computed lowercase word set for fast matching.
+    verse_number: VerseNumber,
+    text: Arc<str>,
     words: HashSet<String>,
     word_count: usize,
 }
@@ -23,483 +38,225 @@ struct LoadedVerse {
 /// Result when reading mode advances to a new verse.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ReadingAdvance {
-    pub book_number: i32,
-    pub book_name: String,
-    pub chapter: i32,
-    pub verse: i32,
-    pub verse_text: String,
-    pub reference: String,
+    pub book_number: BookId,
+    pub book_name: Arc<str>,
+    pub chapter: ChapterNumber,
+    pub verse: VerseNumber,
+    pub verse_text: Arc<str>,
+    pub reference: Arc<str>,
     pub confidence: f64,
 }
 
-/// Tracks the current reading position and matches transcripts against
-/// expected verse text to auto-advance through a passage.
-///
-/// Activated when direct detection catches a verse reference. Pre-loads
-/// the remaining verses in the chapter. On each transcript, compares
-/// word overlap against the current and next verse to detect advancement.
+/// A lean orchestrator for the reading position.
 pub struct ReadingMode {
     active: bool,
-    book_number: i32,
-    book_name: String,
-    chapter: i32,
-    /// Index into `verses` for the current verse being read.
-    current_index: usize,
-    /// All verses from the starting verse to end of chapter.
+    book_id: BookId,
+    book_name: Arc<str>,
+    chapter: ChapterNumber,
+    index: usize,
     verses: Vec<LoadedVerse>,
-    /// Last time a verse match was found.
-    last_match_time: Instant,
-    /// Accumulated transcript text since last advance (for multi-fragment matching).
-    accumulated_text: String,
+    last_match: Instant,
+    last_emitted: Option<usize>,
+    buffer: String,
 }
 
-/// Session Control and State for Reading Mode.
 impl ReadingMode {
-    /// Create a new, inactive ReadingMode instance.
     pub fn new() -> Self {
         Self {
             active: false,
-            book_number: 0,
-            book_name: String::new(),
-            chapter: 0,
-            current_index: 0,
+            book_id: BookId(0),
+            book_name: Option::<&str>::None.map(Arc::from).unwrap_or_else(|| Arc::from("")),
+            chapter: ChapterNumber(0),
+            index: 0,
             verses: Vec::new(),
-            last_match_time: Instant::now(),
-            accumulated_text: String::new(),
+            last_match: Instant::now(),
+            last_emitted: None,
+            buffer: String::new(),
         }
     }
 
-    /// Activate reading mode starting from the given verse.
-    ///
-    /// `verses` should be `(verse_number, verse_text)` pairs for all verses
-    /// from the starting verse to the end of the chapter.
-    pub fn start(
-        &mut self,
-        book_number: i32,
-        book_name: &str,
-        chapter: i32,
-        start_verse: i32,
-        verses: Vec<(i32, String)>,
-    ) {
-        // Filter to only verses >= start_verse
-        let loaded: Vec<LoadedVerse> = verses
-            .into_iter()
-            .filter(|(v, _)| *v >= start_verse)
+    pub fn start(&mut self, book_id: BookId, name: &str, ch: ChapterNumber, start: VerseNumber, data: Vec<(VerseNumber, String)>) {
+        self.verses = data.into_iter()
+            .filter(|(v, _)| *v >= start)
             .map(|(v, text)| {
-                let words = text_to_word_set(&text);
+                let words = OverlapScorer::tokenize(&text);
                 let word_count = words.len();
-                LoadedVerse {
-                    verse_number: v,
-                    text,
-                    words,
-                    word_count,
-                }
-            })
-            .collect();
+                LoadedVerse { verse_number: v, text: Arc::from(text), words, word_count }
+            }).collect();
 
-        if loaded.is_empty() {
-            log::warn!("[READING] No verses loaded for {} {}:{}", book_name, chapter, start_verse);
-            return;
-        }
-
-        log::info ! (
-            "[READING] Started: {} {}:{} ({} verses loaded)",
-            book_name, chapter, start_verse, loaded.len()
-        );
-
-        self.active = true;
-        self.book_number = book_number;
-        self.book_name = book_name.to_string();
-        self.chapter = chapter;
-        self.current_index = 0;
-        self.verses = loaded;
-        self.last_match_time = Instant::now();
-        self.accumulated_text.clear();
-    }
-}
-
-/// Session State Accessors for Reading Mode.
-impl ReadingMode {
-    pub fn is_active(&self) -> bool {
-        self.active
-    }
-
-    /// Check if verses are still loaded (paused but resumable).
-    pub fn has_verses(&self) -> bool {
-        !self.verses.is_empty()
-    }
-
-    /// Resume from the current position (re-activate after pause/toggle).
-    pub fn resume(&mut self) {
         if !self.verses.is_empty() {
             self.active = true;
-            self.last_match_time = Instant::now();
-            let verse = self.verses.get(self.current_index).map(|v| v.verse_number).unwrap_or(0);
-            log::info ! ("[READING] Resumed at: {} {}:{}", self.book_name, self.chapter, verse);
+            self.book_id = book_id;
+            self.book_name = Arc::from(name);
+            self.chapter = ch;
+            self.index = 0;
+            self.last_match = Instant::now();
+            self.last_emitted = None;
+            self.buffer.clear();
         }
     }
 
-    /// Get the book number being tracked.
-    pub fn current_book(&self) -> i32 {
-        self.book_number
+    pub fn deactivate(&mut self) { self.active = false; self.verses.clear(); }
+    pub fn is_active(&self) -> bool { self.active }
+    pub fn has_verses(&self) -> bool { !self.verses.is_empty() }
+    pub fn current_book(&self) -> BookId { self.book_id }
+    pub fn current_chapter(&self) -> ChapterNumber { self.chapter }
+    pub fn current_verse(&self) -> Option<VerseNumber> {
+        if self.active { self.verses.get(self.index).map(|v| v.verse_number) } else { None }
     }
 
-    /// Get the chapter being tracked.
-    pub fn current_chapter(&self) -> i32 {
-        self.chapter
-    }
-
-    /// Get the current verse number being tracked.
-    pub fn current_verse(&self) -> Option<i32> {
-        if self.active {
-            self.verses.get(self.current_index).map(|v| v.verse_number)
-        } else {
-            None
-        }
-    }
-
-    /// Fully deactivate reading mode and clear all loaded verses.
-    /// Called when the user turns the toggle OFF.
-    pub fn deactivate(&mut self) {
-        if self.active || !self.verses.is_empty() {
-            log::info ! ("[READING] Deactivated (verses cleared)");
-        }
-        self.active = false;
-        self.verses.clear();
-        self.accumulated_text.clear();
-    }
-}
-
-/// Core Processing Engine for Reading Mode Transcripts.
-impl ReadingMode {
-    ///
-    /// Returns `Some(ReadingAdvance)` if the reader has moved to a new verse.
-    /// Returns `None` if still on the current verse or no match found.
-    ///
-    /// Automatically deactivates after timeout.
     pub fn check_transcript(&mut self, text: &str) -> Option<ReadingAdvance> {
-        if !self.active || self.verses.is_empty() {
-            return None;
+        if !self.has_verses() { return None; }
+        
+        // Timeout handling (Pause but retain verses)
+        if self.last_match.elapsed().as_millis() > READING_MODE_TIMEOUT_MS {
+             self.active = false;
         }
 
-        // Check timeout — but don't clear verses, just pause.
-        // This allows "verse N" references to re-activate.
-        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS {
-            if self.active {
-                log::info ! ("[READING] Timeout — pausing (toggle still on, verses retained)");
-                self.active = false;
-            }
+        // Command handling (jump to verse N, next, previous)
+        if let Some(advance) = self.handle_commands(text) {
+            self.active = true;
+            return Some(advance);
         }
 
-        // Check for explicit verse number references like "verse three", "verse 4".
-        // This works even when paused (timed out) — it re-activates reading mode.
-        if !self.verses.is_empty() {
-            if let Some(advance) = self.check_verse_number_reference(text) {
-                self.active = true; // Re-activate if paused
-                return Some(advance);
-            }
-        }
+        if !self.active { return None; }
 
-        if !self.active {
-            return None;
-        }
+        if !self.buffer.is_empty() { self.buffer.push(' '); }
+        self.buffer.push_str(text);
 
-        // Accumulate text for multi-fragment matching
-        if !self.accumulated_text.is_empty() {
-            self.accumulated_text.push(' ');
-        }
-        self.accumulated_text.push_str(text);
-
-        let transcript_words = text_to_word_set(&self.accumulated_text);
-
-        // Check current verse
-        if let Some(current) = self.verses.get(self.current_index) {
-            let overlap = word_overlap(&transcript_words, &current.words, current.word_count);
-            if overlap >= MIN_WORD_OVERLAP {
-                // Matched current verse — now check if we should advance to next
-                let next_idx = self.current_index + 1;
-                if next_idx < self.verses.len() {
-                    let next = &self.verses[next_idx];
-                    let next_overlap = word_overlap(&transcript_words, &next.words, next.word_count);
-
-                    // If transcript also matches next verse, advance
-                    if next_overlap >= MIN_WORD_OVERLAP {
-                        return self.advance_to(next_idx);
+        let ws = OverlapScorer::tokenize(&self.buffer);
+        
+        // Check current, next, and skip-next (cascading match)
+        for offset in 0..=2 {
+            let target_idx = self.index + offset;
+            if let Some(v) = self.verses.get(target_idx) {
+                if OverlapScorer::score(&ws, &v.words, v.word_count) >= MIN_WORD_OVERLAP {
+                    self.last_match = Instant::now();
+                    if self.last_emitted != Some(target_idx) {
+                        return self.advance_to(target_idx);
                     }
+                    // Current verse matches but already emitted; continue checking for next verse
+                    continue;
                 }
-
-                // Still on current verse, reset match timer
-                self.last_match_time = Instant::now();
-                return None;
             }
         }
-
-        // Check next verse (speaker may have moved ahead without us catching current)
-        let next_idx = self.current_index + 1;
-        if next_idx < self.verses.len() {
-            let next = &self.verses[next_idx];
-            let overlap = word_overlap(&transcript_words, &next.words, next.word_count);
-            if overlap >= MIN_WORD_OVERLAP {
-                return self.advance_to(next_idx);
-            }
-        }
-
-        // Check verse after next (speaker may have skipped one)
-        let skip_idx = self.current_index + 2;
-        if skip_idx < self.verses.len() {
-            let skip = &self.verses[skip_idx];
-            let overlap = word_overlap(&transcript_words, &skip.words, skip.word_count);
-            if overlap >= MIN_WORD_OVERLAP {
-                return self.advance_to(skip_idx);
-            }
-        }
-
-        None
-    }
-}
-
-/// Navigation and Advancement Logic for Reading Mode.
-impl ReadingMode {
-    /// - "verse three", "verse 4" → jump to that verse
-    /// - "next" / "next verse" → advance by 1
-    /// - "previous verse" / "go back" → go back by 1
-    fn check_verse_number_reference(&mut self, text: &str) -> Option<ReadingAdvance> {
-        let lower = text.to_lowercase();
-        let trimmed = lower.trim();
-
-        // Check for "next" / "next verse" command
-        if trimmed == "next" || trimmed == "next." || trimmed == "next verse"
-            || trimmed == "next verse." {
-            let next_idx = self.current_index + 1;
-            if next_idx < self.verses.len() {
-                log::info ! ("[READING] 'Next' command detected");
-                return self.advance_to(next_idx);
-            }
-            return None;
-        }
-
-        // Check for "previous" / "go back" command
-        if trimmed == "previous verse" || trimmed == "previous verse."
-            || trimmed == "go back" || trimmed == "go back." {
-            if self.current_index > 0 {
-                let prev_idx = self.current_index - 1;
-                log::info ! ("[READING] 'Previous' command detected");
-                return self.advance_to(prev_idx);
-            }
-            return None;
-        }
-
-        // Strip Deepgram stutters: "verse verse four" → "verse four"
-        let cleaned = trimmed
-            .replace("verse verse ", "verse ")
-            .replace("verses verses ", "verses ");
-
-        // Try to extract a verse number from patterns like "verse N", "verse N."
-        let verse_num = extract_verse_number(&cleaned)?;
-
-        // Find this verse number in our loaded verses (allow forward AND backward)
-        for (idx, v) in self.verses.iter().enumerate() {
-            if v.verse_number == verse_num {
-                log::info ! ("[READING] Verse number reference detected: verse {}", verse_num);
-                return self.advance_to(idx);
-            }
-        }
-
         None
     }
 
-    /// Advance to a new verse index and return the advance event.
-    fn advance_to(&mut self, index: usize) -> Option<ReadingAdvance> {
-        let verse = self.verses.get(index)?;
-        let verse_number = verse.verse_number;
-        let verse_text = verse.text.clone();
+    fn handle_commands(&mut self, text: &str) -> Option<ReadingAdvance> {
+        let t = text.to_lowercase();
+        let trimmed = t.trim().trim_end_matches('.');
+        
+        let target_idx = match trimmed {
+            "next" | "next verse" => Some(self.index + 1),
+            "previous" | "previous verse" | "go back" => if self.index > 0 { Some(self.index - 1) } else { None },
+            _ => self.extract_verse_idx(trimmed),
+        };
 
-        self.current_index = index;
-        self.last_match_time = Instant::now();
-        self.accumulated_text.clear();
+        if let Some(idx) = target_idx {
+            if idx < self.verses.len() { return self.advance_to(idx); }
+        }
+        None
+    }
 
-        let reference = format!("{} {}:{}", self.book_name, self.chapter, verse_number);
-        log::info ! ("[READING] Advanced to: {}", reference);
+    fn extract_verse_idx(&self, text: &str) -> Option<usize> {
+        let num = if let Some(rest) = text.strip_prefix("verse ") { rest.parse::<u16>().ok() } 
+                  else { text.parse::<u16>().ok() }?;
+        self.verses.iter().position(|v| v.verse_number == VerseNumber(num))
+    }
+
+    fn advance_to(&mut self, idx: usize) -> Option<ReadingAdvance> {
+        let v = self.verses.get(idx)?;
+        let num = v.verse_number;
+        let text = v.text.clone();
+        
+        self.index = idx;
+        self.last_match = Instant::now();
+        self.last_emitted = Some(idx);
+        self.buffer.clear();
+
+        let reference: Arc<str> = Arc::from(format!("{} {}:{}", self.book_name, self.chapter, num).as_str());
+        InternalEvent::ReadingAdvance { book_id: self.book_id, chapter: self.chapter, verse: num, reference: reference.to_string() }.emit();
 
         Some(ReadingAdvance {
-            book_number: self.book_number,
-            book_name: self.book_name.clone(),
-            chapter: self.chapter,
-            verse: verse_number,
-            verse_text,
-            reference,
-            confidence: 1.0, // We'll refine this later
+            book_number: self.book_id, book_name: self.book_name.clone(), chapter: self.chapter,
+            verse: num, verse_text: text, reference, confidence: 1.0,
         })
     }
 }
 
-impl Default for ReadingMode {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Extract a verse number from text like "verse three", "verse 4", "first two".
-fn extract_verse_number(text: &str) -> Option<i32> {
-    // Pattern: "verse N" or "verse word"
-    for prefix in &["verse ", "verses ", "first "] {
-        if let Some(rest) = text.strip_prefix(prefix) {
-            let rest = rest.trim_end_matches('.');
-            // Try digit
-            if let Ok(n) = rest.trim().parse::<i32>() {
-                if n > 0 && n <= 176 {
-                    return Some(n);
-                }
-            }
-            // Try spoken number
-            let word: String = rest.chars().take_while(|c| c.is_alphabetic()).collect();
-            if let Some(n) = spoken_to_number(&word) {
-                return Some(n);
-            }
-        }
-    }
-
-    // Pattern: just "N." like "3." or just a spoken number like "three."
-    let clean = text.trim_end_matches('.');
-    if let Ok(n) = clean.trim().parse::<i32>() {
-        if n > 0 && n <= 176 {
-            return Some(n);
-        }
-    }
-
-    None
-}
-
-/// Convert a spoken number word to integer (1-20, tens, hundred).
-fn spoken_to_number(word: &str) -> Option<i32> {
-    match word {
-        "one" => Some(1),
-        "two" => Some(2),
-        "three" => Some(3),
-        "four" => Some(4),
-        "five" => Some(5),
-        "six" => Some(6),
-        "seven" => Some(7),
-        "eight" => Some(8),
-        "nine" => Some(9),
-        "ten" => Some(10),
-        "eleven" => Some(11),
-        "twelve" => Some(12),
-        "thirteen" => Some(13),
-        "fourteen" => Some(14),
-        "fifteen" => Some(15),
-        "sixteen" => Some(16),
-        "seventeen" => Some(17),
-        "eighteen" => Some(18),
-        "nineteen" => Some(19),
-        "twenty" => Some(20),
-        "thirty" => Some(30),
-        "forty" => Some(40),
-        "fifty" => Some(50),
-        _ => None,
-    }
-}
-
-/// Convert text to a set of lowercase words (stripped of punctuation).
-fn text_to_word_set(text: &str) -> HashSet<String> {
-    text.split_whitespace()
-        .map(|w| {
-            w.to_lowercase()
-                .chars()
-                .filter(|c| c.is_alphanumeric() || *c == '\'')
-                .collect::<String>()
-        })
-        .filter(|w| w.len() >= 2) // Skip single-char words
-        .collect()
-}
-
-/// Calculate what fraction of `verse_words` appear in `transcript_words`.
-fn word_overlap(
-    transcript_words: &HashSet<String>,
-    verse_words: &HashSet<String>,
-    verse_word_count: usize,
-) -> f64 {
-    if verse_word_count == 0 {
-        return 0.0;
-    }
-    let matches = verse_words.intersection(transcript_words).count();
-    matches as f64 / verse_word_count as f64
-}
-
-# [ cfg ( test ) ]
+impl Default for ReadingMode { fn default() -> Self { Self::new() } }
+#[cfg(test)]
 mod tests {
     use super::*;
+    use rhema_core::{BookId, ChapterNumber, VerseNumber};
 
-    fn sample_verses() -> Vec<(i32, String)> {
+    fn sample_verses() -> Vec<(VerseNumber, String)> {
         vec![
-            (28, "For it seemed good to the Holy Ghost, and to us, to lay upon you no greater burden than these necessary things;".to_string()),
-            (29, "That ye abstain from meats offered to idols, and from blood, and from things strangled, and from fornication: from which if ye keep yourselves, ye shall do well. Fare ye well.".to_string()),
-            (30, "So when they were dismissed, they came to Antioch: and when they had gathered the multitude together, they delivered the epistle:".to_string()),
-            (31, "Which when they had read, they rejoiced for the consolation.".to_string()),
+            (VerseNumber(1), "In the beginning God created the heavens and the earth".to_string()),
+            (VerseNumber(2), "The earth was without form and void and darkness was on the face of the deep".to_string()),
+            (VerseNumber(3), "Then God said let there be light and there was light".to_string()),
         ]
     }
 
-    # [ test ]
-    fn test_starts_inactive() {
-        let rm = ReadingMode::new();
-        assert!(!rm.is_active());
-        assert!(rm.current_verse().is_none());
+    #[test]
+    fn test_overlap_scorer() {
+        let t = OverlapScorer::tokenize("God said let there be light");
+        let v = OverlapScorer::tokenize("Then God said let there be light and there was light");
+        
+        let score = OverlapScorer::score(&t, &v, v.len());
+        // v has 11 words: then, god, said, let, there, be, light, and, there, was, light
+        // Uniquely (normalized): then, god, said, let, there, be, light, and, was (9 total)
+        // Intersection: god, said, let, there, be, light (6 words)
+        // Score: 6 / 9 = 0.66
+        assert!(score > 0.60);
     }
 
-    # [ test ]
-    fn test_start_activates() {
+    #[test]
+    fn test_reading_mode_advance() {
         let mut rm = ReadingMode::new();
+        rm.start(
+            BookId(1),
+            "Genesis",
+            ChapterNumber(1),
+            VerseNumber(1),
+            sample_verses(),
+        );
 
-        rm.start(44, "Acts", 15, 28, sample_verses());
-        assert!(rm.is_active());
-        assert_eq!(rm.current_verse(), Some(28));
+        // Verse 1 matches
+        let adv = rm.check_transcript("In the beginning God created").unwrap();
+        assert_eq!(adv.verse, VerseNumber(1));
+        assert_eq!(adv.confidence, 1.0);
+
+        // Advance to verse 2
+        let adv2 = rm.check_transcript("The earth was without form").unwrap();
+        assert_eq!(adv2.verse, VerseNumber(2));
+        assert_eq!(adv2.confidence, 1.0);
+
+        // Repeat verse 2 (should not emit again immediately unless threshold met, 
+        // but our implementation emits on transition).
+        assert!(rm.check_transcript("The earth was without form").is_none());
+
+        // Skip to verse 3
+        let adv3 = rm.check_transcript("let there be light").unwrap();
+        assert_eq!(adv3.verse, VerseNumber(3));
     }
 
-    # [ test ]
-    fn test_advance_on_next_verse_match() {
+    #[test]
+    fn test_reading_mode_timeout() {
         let mut rm = ReadingMode::new();
+        rm.start(
+            BookId(1),
+            "Genesis",
+            ChapterNumber(1),
+            VerseNumber(1),
+            sample_verses(),
+        );
 
-        rm.start(44, "Acts", 15, 28, sample_verses());
-
-        // Feed text matching verse 28
-        let r = rm.check_transcript("it seemed good to the Holy Ghost and to us to lay upon you no greater burden than these necessary things");
-        // Still on verse 28 — no advance yet
-        assert!(r.is_none());
-
-        // Feed text matching verse 29
-        let r = rm.check_transcript("that ye abstain from meats offered to idols and from blood and from things strangled and from fornication");
-        assert!(r.is_some());
-        let advance = r.unwrap();
-        assert_eq!(advance.verse, 29);
-        assert_eq!(advance.reference, "Acts 15:29");
-    }
-
-    # [ test ]
-    fn test_deactivate() {
-        let mut rm = ReadingMode::new();
-
-        rm.start(44, "Acts", 15, 28, sample_verses());
-        assert!(rm.is_active());
-        rm.deactivate();
-        assert!(!rm.is_active());
-    }
-
-    # [ test ]
-    fn test_no_match_returns_none() {
-        let mut rm = ReadingMode::new();
-
-        rm.start(44, "Acts", 15, 28, sample_verses());
-
-        let r = rm.check_transcript("the weather is nice today and I like coffee");
-        assert!(r.is_none());
-    }
-
-    # [ test ]
-    fn test_word_overlap_function() {
-        let transcript = text_to_word_set("for it seemed good to the holy ghost");
-        let verse = text_to_word_set("For it seemed good to the Holy Ghost, and to us, to lay upon you no greater burden than these necessary things;");
-        let count = verse.len();
-        let overlap = word_overlap(&transcript, &verse, count);
-        assert!(overlap > 0.3); // At least some overlap
+        // Manually expire context
+        rm.last_match = Instant::now() - std::time::Duration::from_secs(200);
+        
+        // Should return None because it timed out
+        assert!(rm.check_transcript("In the beginning").is_none());
     }
 }

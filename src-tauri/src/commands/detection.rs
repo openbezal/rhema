@@ -1,5 +1,6 @@
-use std::sync::Mutex;
 use tauri::State;
+use rhema_core::{BookId, ChapterNumber, VerseNumber, MutexExt};
+use std::sync::Arc;
 
 use crate::state::AppState;
 use rhema_detection::{MergedDetection, ReadingMode};
@@ -9,15 +10,15 @@ use serde::Serialize;
 #[derive(Clone, Serialize)]
 pub struct DetectionResult {
     pub verse_ref: String,
-    pub verse_text: String,
-    pub book_name: String,
-    pub book_number: i32,
-    pub chapter: i32,
-    pub verse: i32,
+    pub verse_text: Arc<str>,
+    pub book_name: Arc<str>,
+    pub book_number: BookId,
+    pub chapter: ChapterNumber,
+    pub verse: VerseNumber,
     pub confidence: f64,
     pub source: String,
     pub auto_queued: bool,
-    pub transcript_snippet: String,
+    pub transcript_snippet: Arc<str>,
 }
 
 fn source_to_string(source: &rhema_detection::DetectionSource) -> String {
@@ -41,28 +42,28 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
             // Semantic detection: resolve via DB primary key
             if let Ok(Some(v)) = db.get_verse_by_id(id) {
                 let r = format!("{} {}:{}", v.book_name, v.chapter, v.verse);
-                (r, v.text, v.book_name, v.book_number, v.chapter, v.verse)
+                (r, Arc::from(v.text), Arc::from(v.book_name), BookId(v.book_number as u8), ChapterNumber(v.chapter as u16), VerseNumber(v.verse as u16))
             } else {
                 let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
-                (r, String::new(), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
+                (r, Arc::from(""), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
             }
         } else if let Some(ref db) = state.bible_db {
             // Direct detection: resolve via book/chapter/verse
-            if vr.book_number > 0 && vr.chapter > 0 && vr.verse_start > 0 {
-                if let Ok(Some(v)) = db.get_verse(state.active_translation_id, vr.book_number, vr.chapter, vr.verse_start) {
+            if vr.book_number.0 > 0 && vr.chapter.0 > 0 && vr.verse_start.0 > 0 {
+                if let Ok(Some(v)) = db.get_verse(state.active_translation_id, vr.book_number.0 as i32, vr.chapter.0 as i32, vr.verse_start.0 as i32) {
                     let r = format!("{} {}:{}", v.book_name, v.chapter, v.verse);
-                    (r, v.text, v.book_name, v.book_number, v.chapter, v.verse)
+                    (r, Arc::from(v.text), Arc::from(v.book_name), BookId(v.book_number as u8), ChapterNumber(v.chapter as u16), VerseNumber(v.verse as u16))
                 } else {
                     let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
-                    (r, String::new(), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
+                    (r, Arc::from(""), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
                 }
             } else {
                 let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
-                (r, String::new(), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
+                (r, Arc::from(""), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
             }
         } else {
             let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
-            (r, String::new(), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
+            (r, Arc::from(""), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
         };
 
     DetectionResult {
@@ -86,7 +87,7 @@ pub fn detect_verses(
     state: State<'_, Mutex<AppState>>,
     text: String,
 ) -> Result<Vec<DetectionResult>, String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
+    let mut app_state = state.lock_safe().map_err(|e| e.to_string())?;
     let merged = app_state.detection_pipeline.process(&text);
     let results: Vec<DetectionResult> = merged.iter().map(|m| to_result(&app_state, m)).collect();
     Ok(results)
@@ -98,7 +99,7 @@ pub fn detect_verses(
 pub fn detection_status(
     state: State<'_, Mutex<AppState>>,
 ) -> Result<DetectionStatusResult, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
     Ok(DetectionStatusResult {
         has_direct: true,
         has_semantic: app_state.detection_pipeline.has_semantic(),
@@ -114,7 +115,7 @@ pub fn toggle_paraphrase_detection(
     state: State<'_, Mutex<AppState>>,
     enabled: bool,
 ) -> Result<bool, String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
+    let mut app_state = state.lock_safe().map_err(|e| e.to_string())?;
     app_state.detection_pipeline.set_use_synonyms(enabled);
     log::info ! ("[DET] Paraphrase detection (synonyms) set to: {enabled}");
     Ok(enabled)
@@ -131,11 +132,11 @@ pub struct DetectionStatusResult {
 #[derive(Serialize)]
 pub struct SemanticSearchResult {
     pub verse_ref: String,
-    pub verse_text: String,
-    pub book_name: String,
-    pub book_number: i32,
-    pub chapter: i32,
-    pub verse: i32,
+    pub verse_text: Arc<str>,
+    pub book_name: Arc<str>,
+    pub book_number: BookId,
+    pub chapter: ChapterNumber,
+    pub verse: VerseNumber,
     pub similarity: f64,
 }
 
@@ -147,7 +148,7 @@ pub fn semantic_search(
     limit: Option<usize>,
 ) -> Result<Vec<SemanticSearchResult>, String> {
     let k = limit.unwrap_or(10);
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
+    let mut app_state = state.lock_safe().map_err(|e| e.to_string())?;
 
     if !app_state.detection_pipeline.has_semantic() {
         return Err("Semantic search not available — model or embeddings not loaded".into());
@@ -162,11 +163,11 @@ pub fn semantic_search(
                 if let Ok(Some(v)) = db.get_verse_by_id(verse_id) {
                     return Some(SemanticSearchResult {
                         verse_ref: format!("{} {}:{}", v.book_name, v.chapter, v.verse),
-                        verse_text: v.text,
-                        book_name: v.book_name,
-                        book_number: v.book_number,
-                        chapter: v.chapter,
-                        verse: v.verse,
+                        verse_text: Arc::from(v.text),
+                        book_name: Arc::from(v.book_name),
+                        book_number: BookId(v.book_number as u8),
+                        chapter: ChapterNumber(v.chapter as u16),
+                        verse: VerseNumber(v.verse as u16),
                         similarity,
                     });
                 }
@@ -191,7 +192,7 @@ pub fn quotation_search(
     limit: Option<usize>,
 ) -> Result<Vec<QuotationSearchResult>, String> {
     let k = limit.unwrap_or(10);
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let app_state = state.lock_safe().map_err(|e| e.to_string())?;
 
     if !app_state.quotation_matcher.is_ready() {
         return Ok(vec![]);
@@ -221,7 +222,7 @@ pub fn quotation_search(
 
             QuotationSearchResult {
                 verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
-                verse_text,
+                verse_text: Arc::from(verse_text),
                 book_name: vr.book_name.clone(),
                 book_number: vr.book_number,
                 chapter: vr.chapter,
@@ -237,11 +238,11 @@ pub fn quotation_search(
 #[derive(Serialize)]
 pub struct QuotationSearchResult {
     pub verse_ref: String,
-    pub verse_text: String,
-    pub book_name: String,
-    pub book_number: i32,
-    pub chapter: i32,
-    pub verse: i32,
+    pub verse_text: Arc<str>,
+    pub book_name: Arc<str>,
+    pub book_number: BookId,
+    pub chapter: ChapterNumber,
+    pub verse: VerseNumber,
     pub similarity: f64,
 }
 
@@ -251,7 +252,7 @@ pub struct QuotationSearchResult {
 pub fn reading_mode_status(
     state: State<'_, Mutex<ReadingMode>>,
 ) -> Result<ReadingModeStatus, String> {
-    let rm = state.lock().map_err(|e| e.to_string())?;
+    let rm = state.lock_safe().map_err(|e| e.to_string())?;
     Ok(ReadingModeStatus {
         active: rm.is_active(),
         current_verse: rm.current_verse(),
@@ -270,7 +271,7 @@ pub struct ReadingModeStatus {
 pub fn stop_reading_mode(
     state: State<'_, Mutex<ReadingMode>>,
 ) -> Result<(), String> {
-    let mut rm = state.lock().map_err(|e| e.to_string())?;
+    let mut rm = state.lock_safe().map_err(|e| e.to_string())?;
     rm.deactivate();
     Ok(())
 }

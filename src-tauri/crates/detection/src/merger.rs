@@ -1,6 +1,9 @@
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::types::{Detection, DetectionSource};
+use crate::context::SermonContext;
+use rhema_core::{BookId, ChapterNumber, VerseNumber};
 
 /// Default confidence threshold — detections below this are dropped.
 const DEFAULT_CONFIDENCE_THRESHOLD: f64 = 0.45;
@@ -103,7 +106,7 @@ impl DetectionMerger {
     /// Apply context boosting to detections matching recent session history.
     pub fn apply_context_boost(
         detections: &mut [Detection],
-        context: &crate::context::SermonContext,
+        context: &SermonContext,
     ) {
         for detection in detections.iter_mut() {
             let boost = context.confidence_boost(
@@ -147,17 +150,18 @@ mod tests {
     use crate::types::{DetectionSource, VerseRef};
 
     fn make_detection(
-        book_number: i32,
+        book_number: BookId,
         book_name: &str,
-        chapter: i32,
-        verse_start: i32,
+        chapter: ChapterNumber,
+        verse_start: VerseNumber,
         confidence: f64,
         source: DetectionSource,
     ) -> Detection {
+        let book_name_arc: Arc<str> = Arc::from(book_name);
         Detection {
             verse_ref: VerseRef {
                 book_number,
-                book_name: book_name.to_string(),
+                book_name: book_name_arc.clone(),
                 chapter,
                 verse_start,
                 verse_end: None,
@@ -165,28 +169,28 @@ mod tests {
             verse_id: None,
             confidence,
             source,
-            transcript_snippet: format!("{} {}:{}", book_name, chapter, verse_start),
+            transcript_snippet: Arc::from(format!("{} {}:{}", book_name_arc, chapter, verse_start).as_str()),
             detected_at: 0,
         }
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_dedup_keeps_direct() {
         let mut merger = DetectionMerger::new();
 
         let direct = vec![make_detection(
-            43,
+            BookId(43u8),
             "John",
-            3,
-            16,
+            ChapterNumber(3u16),
+            VerseNumber(16u16),
             0.96,
             DetectionSource::DirectReference,
         )];
         let semantic = vec![make_detection(
-            43,
+            BookId(43u8),
             "John",
-            3,
-            16,
+            ChapterNumber(3u16),
+            VerseNumber(16u16),
             0.72,
             DetectionSource::SemanticLocal { similarity: 0.72 },
         )];
@@ -200,23 +204,23 @@ mod tests {
         assert!((results[0].detection.confidence - 0.96).abs() < f64::EPSILON);
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_keeps_distinct_verses() {
         let mut merger = DetectionMerger::new();
 
         let direct = vec![make_detection(
-            43,
+            BookId(43u8),
             "John",
-            3,
-            16,
+            ChapterNumber(3u16),
+            VerseNumber(16u16),
             0.96,
             DetectionSource::DirectReference,
         )];
         let semantic = vec![make_detection(
-            45,
+            BookId(45u8),
             "Romans",
-            8,
-            28,
+            ChapterNumber(8u16),
+            VerseNumber(28u16),
             0.65,
             DetectionSource::SemanticLocal { similarity: 0.65 },
         )];
@@ -224,103 +228,101 @@ mod tests {
         let results = merger.merge(direct, semantic);
         assert_eq!(results.len(), 2);
         // Sorted by confidence descending
-        assert_eq!(results[0].detection.verse_ref.book_name, "John");
-        assert_eq!(results[1].detection.verse_ref.book_name, "Romans");
+        assert_eq!(results[0].detection.verse_ref.book_name.as_ref(), "John");
+        assert_eq!(results[1].detection.verse_ref.book_name.as_ref(), "Romans");
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_drops_below_threshold() {
         let mut merger = DetectionMerger::new();
 
         let direct = vec![];
         let semantic = vec![
             make_detection(
-                43,
+                BookId(43u8),
                 "John",
-                3,
-                16,
+                ChapterNumber(3u16),
+                VerseNumber(16u16),
                 0.50,
                 DetectionSource::SemanticLocal { similarity: 0.50 },
             ),
             make_detection(
-                45,
+                BookId(45u8),
                 "Romans",
-                8,
-                28,
-                0.20, // below 0.35 threshold
+                ChapterNumber(8u16),
+                VerseNumber(28u16),
+                0.20, // below threshold
                 DetectionSource::SemanticLocal { similarity: 0.20 },
             ),
         ];
 
         let results = merger.merge(direct, semantic);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].detection.verse_ref.book_name, "John");
+        assert_eq!(results[0].detection.verse_ref.book_name.as_ref(), "John");
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_auto_queue() {
         let mut merger = DetectionMerger::new();
 
         let direct = vec![make_detection(
-            43,
+            BookId(43u8),
             "John",
-            3,
-            16,
+            ChapterNumber(3u16),
+            VerseNumber(16u16),
             0.96,
             DetectionSource::DirectReference,
         )];
 
         let results = merger.merge(direct, vec![]);
         assert_eq!(results.len(), 1);
-        // 0.96 >= 0.80 auto_queue_threshold and no cooldown yet
         assert!(results[0].auto_queued);
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_auto_queue_below_threshold() {
         let mut merger = DetectionMerger::new();
 
         let semantic = vec![make_detection(
-            43,
+            BookId(43u8),
             "John",
-            3,
-            16,
+            ChapterNumber(3u16),
+            VerseNumber(16u16),
             0.50,
             DetectionSource::SemanticLocal { similarity: 0.50 },
         )];
 
         let results = merger.merge(vec![], semantic);
         assert_eq!(results.len(), 1);
-        // 0.50 < 0.80 auto_queue_threshold
         assert!(!results[0].auto_queued);
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_sort_order() {
         let mut merger = DetectionMerger::new();
 
         let direct = vec![make_detection(
-            43,
+            BookId(43u8),
             "John",
-            3,
-            16,
+            ChapterNumber(3u16),
+            VerseNumber(16u16),
             0.90,
             DetectionSource::DirectReference,
         )];
         let semantic = vec![
             make_detection(
-                45,
+                BookId(45u8),
                 "Romans",
-                8,
-                28,
+                ChapterNumber(8u16),
+                VerseNumber(28u16),
                 0.95,
                 DetectionSource::SemanticLocal { similarity: 0.95 },
             ),
             make_detection(
-                1,
+                BookId(1u8),
                 "Genesis",
-                1,
-                1,
+                ChapterNumber(1u16),
+                VerseNumber(1u16),
                 0.60,
                 DetectionSource::SemanticLocal { similarity: 0.60 },
             ),
@@ -328,13 +330,12 @@ mod tests {
 
         let results = merger.merge(direct, semantic);
         assert_eq!(results.len(), 3);
-        // Highest confidence first
         assert!((results[0].detection.confidence - 0.95).abs() < f64::EPSILON);
         assert!((results[1].detection.confidence - 0.90).abs() < f64::EPSILON);
         assert!((results[2].detection.confidence - 0.60).abs() < f64::EPSILON);
     }
 
-    # [ test ]
+    #[test]
     fn test_merger_empty_inputs() {
         let mut merger = DetectionMerger::new();
         let results = merger.merge(vec![], vec![]);

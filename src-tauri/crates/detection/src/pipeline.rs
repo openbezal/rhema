@@ -2,6 +2,7 @@ use crate::direct::detector::DirectDetector;
 use crate::merger::{DetectionMerger, MergedDetection};
 use crate::semantic::cloud::CloudBooster;
 use crate::semantic::detector::SemanticDetector;
+use rhema_core::InternalEvent;
 
 /// The main detection pipeline that runs on each transcript segment.
 ///
@@ -64,14 +65,41 @@ impl DetectionPipeline {
             vec![]
         };
 
-        self.merger.merge(direct_results, semantic_results)
+        let results = self.merger.merge(direct_results, semantic_results);
+ 
+        // Observability: Emit internal events for detections
+        for res in &results {
+            InternalEvent::BibleDetection {
+                book_id: res.detection.verse_ref.book_number,
+                chapter: res.detection.verse_ref.chapter,
+                verse: res.detection.verse_ref.verse_start,
+                confidence: res.detection.confidence,
+                source: format!("{:?}", res.detection.source),
+            }
+            .emit();
+        }
+ 
+        results
     }
 
     /// Run only direct (regex/pattern) detection. Instant, no ONNX inference.
     /// Used during live transcription on every is_final fragment.
     pub fn process_direct(&mut self, text: &str) -> Vec<MergedDetection> {
         let direct_results = self.direct.detect(text);
-        self.merger.merge(direct_results, vec![])
+        let results = self.merger.merge(direct_results, vec![]);
+ 
+        for res in &results {
+            InternalEvent::BibleDetection {
+                book_id: res.detection.verse_ref.book_number,
+                chapter: res.detection.verse_ref.chapter,
+                verse: res.detection.verse_ref.verse_start,
+                confidence: res.detection.confidence,
+                source: format!("{:?}", res.detection.source),
+            }
+            .emit();
+        }
+ 
+        results
     }
 
     /// Run only semantic (ONNX embedding) detection. Slow, 50-400ms.
@@ -81,7 +109,20 @@ impl DetectionPipeline {
             return vec![];
         }
         let semantic_results = self.semantic.detect(text);
-        self.merger.merge(vec![], semantic_results)
+        let results = self.merger.merge(vec![], semantic_results);
+ 
+        for res in &results {
+            InternalEvent::BibleDetection {
+                book_id: res.detection.verse_ref.book_number,
+                chapter: res.detection.verse_ref.chapter,
+                verse: res.detection.verse_ref.verse_start,
+                confidence: res.detection.confidence,
+                source: format!("{:?}", res.detection.source),
+            }
+            .emit();
+        }
+ 
+        results
     }
 
     /// Check if semantic search is available (model loaded + index populated).
@@ -119,15 +160,16 @@ impl Default for DetectionPipeline {
 # [ cfg ( test ) ]
 mod tests {
     use super::*;
+    use rhema_core::{ChapterNumber, VerseNumber};
 
-    # [ test ]
+    #[test]
     fn test_pipeline_direct_only() {
         let mut pipeline = DetectionPipeline::new();
         let results = pipeline.process("Jesus said in John 3:16 that God loved the world");
         assert!(!results.is_empty());
-        assert_eq!(results[0].detection.verse_ref.book_name, "John");
-        assert_eq!(results[0].detection.verse_ref.chapter, 3);
-        assert_eq!(results[0].detection.verse_ref.verse_start, 16);
+        assert_eq!(results[0].detection.verse_ref.book_name.as_ref(), "John");
+        assert_eq!(results[0].detection.verse_ref.chapter, ChapterNumber(3));
+        assert_eq!(results[0].detection.verse_ref.verse_start, VerseNumber(16));
     }
 
     # [ test ]

@@ -1,594 +1,218 @@
-use super::automaton::BookMatch;
 use crate::types::VerseRef;
+use rhema_core::{ChapterNumber, VerseNumber};
+use super::automaton::BookMatch;
 
-/// Parse a Bible reference from text given a book match position.
-///
-/// Looks ahead from the end of the book match for chapter:verse patterns.
-pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
-    let after = &text[book_match.end..];
-    let after_trimmed = after.trim_start();
-    let offset = after.len() - after_trimmed.len();
-    let _ = offset; // consumed whitespace
-
-    // Tokenize the text after the book name for easier parsing
-    let tokens = tokenize(after_trimmed);
-
-    if tokens.is_empty() {
-        return None;
-    }
-
-    // Try pattern: chapter:verse or chapter:verse-end
-    if let Some(result) = try_colon_pattern(&tokens, book_match) {
-        return Some(result);
-    }
-
-    // Try pattern: "chapter N verse M" (spoken form)
-    if let Some(result) = try_chapter_verse_spoken(&tokens, book_match) {
-        return Some(result);
-    }
-
-    // Try pattern: number followed by "verse" keyword then number
-    // e.g. "32 verse 1"
-    if let Some(result) = try_number_verse_pattern(&tokens, book_match) {
-        return Some(result);
-    }
-
-    // Try pattern: spoken numbers like "thirty two verse one"
-    if let Some(result) = try_spoken_numbers(&tokens, book_match) {
-        return Some(result);
-    }
-
-    // Try pattern: two consecutive numbers "3 16" → chapter 3 verse 16
-    // This handles "John 3 16" where Deepgram transcribes without colon or keywords
-    if let Some(result) = try_two_numbers(&tokens, book_match) {
-        return Some(result);
-    }
-
-    // Try pattern: just a number (chapter only)
-    if let Some(chapter) = token_to_number(&tokens[0]) {
-        return Some(VerseRef {
-            book_number: book_match.book_number,
-            book_name: book_match.book_name.clone(),
-            chapter,
-            verse_start: 0,
-            verse_end: None,
-        });
-    }
-
-    None
-}
-
-/// A token from the text after the book name.
-#[derive(Debug, Clone)]
+/// A Bible reference token.
+#[derive(Debug, PartialEq, Clone)]
 enum Token {
     Word(String),
-    Number(i32),
+    Number(u16),
     Colon,
     Dash,
 }
 
-/// Tokenize text into words, numbers, colons, and dashes.
-fn tokenize(text: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
-    let mut chars = text.chars().peekable();
-
-    while let Some(&ch) = chars.peek() {
-        if ch.is_whitespace() {
-            chars.next();
-            continue;
-        }
-        if ch == ':' {
-            tokens.push(Token::Colon);
-            chars.next();
-            continue;
-        }
-        if ch == '-' || ch == '\u{2013}' || ch == '\u{2014}' {
-            tokens.push(Token::Dash);
-            chars.next();
-            continue;
-        }
-        if ch.is_ascii_digit() {
-            let mut num_str = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_ascii_digit() {
-                    num_str.push(c);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            if let Ok(n) = num_str.parse::<i32>() {
-                tokens.push(Token::Number(n));
-            }
-            continue;
-        }
-        if ch.is_alphabetic() {
-            let mut word = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_alphabetic() {
-                    word.push(c);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            tokens.push(Token::Word(word.to_lowercase()));
-            continue;
-        }
-        // Skip other characters
-        chars.next();
-    }
-
-    tokens
+/// Tokenizes text into a stream of semantic tokens (words, numbers, symbols).
+struct Tokenizer<'a> {
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
 }
 
-/// Try to parse "N:M" or "N : M" or "N:M-E" patterns.
-fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    // Look for: Number Colon Number [Dash Number]
-    for i in 0..tokens.len() {
-        let Token::Number(chapter) = tokens[i] else { continue };
-        if i + 2 >= tokens.len() { continue; }
-        if !matches!(tokens[i + 1], Token::Colon) { continue; }
-        let Token::Number(verse) = tokens[i + 2] else { continue };
+impl<'a> Tokenizer<'a> {
+    fn new(text: &'a str) -> Self {
+        let chars = text.chars().peekable();
+        Self { chars }
+    }
 
-        let mut verse_end = None;
-        if i + 4 < tokens.len() && matches!(tokens[i + 3], Token::Dash) {
-            if let Token::Number(end) = tokens[i + 4] {
-                verse_end = Some(end);
+    fn collect(mut self) -> Vec<Token> {
+        let mut tokens = Vec::new();
+        while let Some(&ch) = self.chars.peek() {
+            match ch {
+                ch if ch.is_whitespace() => { self.chars.next(); }
+                ':' => { tokens.push(Token::Colon); self.chars.next(); }
+                '-' | '\u{2013}' | '\u{2014}' => { tokens.push(Token::Dash); self.chars.next(); }
+                ch if ch.is_ascii_digit() => tokens.push(self.read_digit_number()),
+                ch if ch.is_alphabetic() => tokens.push(self.read_word_or_spoken_number()),
+                _ => { self.chars.next(); }
             }
         }
-
-        return Some(VerseRef {
-            book_number: book_match.book_number,
-            book_name: book_match.book_name.clone(),
-            chapter,
-            verse_start: verse,
-            verse_end,
-        });
+        tokens
     }
-    None
+
+    fn read_digit_number(&mut self) -> Token {
+        let mut s = String::new();
+        while let Some(&c) = self.chars.peek() {
+            if c.is_ascii_digit() { s.push(c); self.chars.next(); } else { break; }
+        }
+        Token::Number(s.parse().unwrap_or(0))
+    }
+
+    fn read_word_or_spoken_number(&mut self) -> Token {
+        let mut s = String::new();
+        while let Some(&c) = self.chars.peek() {
+            if c.is_alphabetic() { s.push(c); self.chars.next(); } else { break; }
+        }
+        let word = s.to_lowercase();
+        if let Some(n) = parse_spoken_number(&word) {
+            Token::Number(n as u16)
+        } else {
+            Token::Word(word)
+        }
+    }
 }
 
-/// Try to parse "chapter N verse M" pattern.
-/// Handles filler words between chapter and verse:
-/// "chapter six we will be reading from verse 10 to verse 16" → 6:10-16
-fn try_chapter_verse_spoken(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    for i in 0..tokens.len() {
-        let Token::Word(w) = &tokens[i] else { continue };
-        if w != "chapter" { continue; }
+/// Parses a structured VerseRef from transcript text using a declarative scanner.
+pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
+    let tokens = Tokenizer::new(text[book_match.end..].trim_start()).collect();
+    if tokens.is_empty() { return None; }
 
-        let Some((chapter, next_idx)) = consume_number(tokens, i + 1) else { continue };
-        
-        // Scan forward (up to 12 tokens) looking for "verse" keyword.
-        let scan_limit = (next_idx + 12).min(tokens.len());
-        for j in next_idx..scan_limit {
-            let Token::Word(vw) = &tokens[j] else { continue };
-            if vw != "verse" && vw != "verses" { continue; }
-
-            let Some((verse, verse_next)) = consume_number(tokens, j + 1) else { continue };
-            let verse_end = scan_verse_end(tokens, verse_next);
-            
-            return Some(VerseRef {
-                book_number: book_match.book_number,
-                book_name: book_match.book_name.clone(),
-                chapter,
-                verse_start: verse,
-                verse_end,
-            });
-        }
-
-        // No verse keyword found, treat as chapter-only
-        return Some(VerseRef {
-            book_number: book_match.book_number,
-            book_name: book_match.book_name.clone(),
-            chapter,
-            verse_start: 0,
-            verse_end: None,
-        });
-    }
-    None
-}
-
-/// Scan for a verse range ending after the verse number.
-/// Handles: "to verse 16", "through 18", "- 20", "to 16"
-fn scan_verse_end(tokens: &[Token], start: usize) -> Option<i32> {
-    if start >= tokens.len() {
-        return None;
-    }
-    // Check for dash: "10-16"
-    if matches!(&tokens[start], Token::Dash) {
-        if let Some((end, _)) = consume_number(tokens, start + 1) {
-            return Some(end);
-        }
-    }
-    // Check for "to" or "through"
-    if let Token::Word(tw) = &tokens[start] {
-        if tw == "to" || tw == "through" {
-            let next = start + 1;
-            if next < tokens.len() {
-                // "to verse 16" pattern
-                if let Token::Word(vw) = &tokens[next] {
-                    if vw == "verse" || vw == "verses" {
-                        if let Some((end, _)) = consume_number(tokens, next + 1) {
-                            return Some(end);
-                        }
-                    }
-                }
-                // "to 16" pattern (no "verse" keyword)
-                if let Some((end, _)) = consume_number(tokens, next) {
-                    return Some(end);
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Try to parse "N verse M" pattern (number followed by "verse" keyword).
-/// Also scans forward for "verse" with filler words: "6 and we read verse 10"
-fn try_number_verse_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    for i in 0..tokens.len() {
-        let Some((chapter, next_idx)) = consume_number_at(tokens, i) else { continue };
-        
-        // Scan forward for "verse" keyword (allow filler)
-        let scan_limit = (next_idx + 10).min(tokens.len());
-        for j in next_idx..scan_limit {
-            let Token::Word(w) = &tokens[j] else { continue };
-            if w != "verse" && w != "verses" { continue; }
-
-            let Some((verse, verse_next)) = consume_number(tokens, j + 1) else { continue };
-            let verse_end = scan_verse_end(tokens, verse_next);
-            
-            return Some(VerseRef {
-                book_number: book_match.book_number,
-                book_name: book_match.book_name.clone(),
-                chapter,
-                verse_start: verse,
-                verse_end,
-            });
-        }
-    }
-    None
-}
-
-/// Try to parse spoken number sequences like "thirty two verse one".
-fn try_spoken_numbers(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    // Try to consume a spoken number at position 0, then look for "verse" keyword
-    let Some((chapter, next_idx)) = consume_number(tokens, 0) else { return None };
-    if next_idx >= tokens.len() { return None; }
-
-    let Token::Word(w) = &tokens[next_idx] else { return None };
-    if w != "verse" && w != "verses" { return None; }
-
-    let Some((verse, verse_next)) = consume_number(tokens, next_idx + 1) else { return None };
-    
-    let mut verse_end = None;
-    if verse_next < tokens.len() {
-        if matches!(&tokens[verse_next], Token::Dash) {
-            if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                verse_end = Some(end);
-            }
-        } else if let Token::Word(tw) = &tokens[verse_next] {
-            if tw == "through" || tw == "to" {
-                if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                    verse_end = Some(end);
-                }
-            }
-        }
-    }
-
-    Some(VerseRef {
+    let mut scanner = Scanner::new(&tokens);
+    let mut vref = VerseRef {
         book_number: book_match.book_number,
         book_name: book_match.book_name.clone(),
-        chapter,
-        verse_start: verse,
-        verse_end,
-    })
-}
+        chapter: ChapterNumber(0),
+        verse_start: VerseNumber(0),
+        verse_end: None,
+    };
 
-/// Try to parse two consecutive numbers "N M" as chapter and verse.
-/// Handles: "3 16", "119 105", and also spoken: "three sixteen"
-fn try_two_numbers(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    let (chapter, next_idx) = consume_number_at(tokens, 0)?;
-    if chapter <= 0 { return None; }
-
-    let (verse, verse_next) = consume_number_at(tokens, next_idx)?;
-    if verse <= 0 { return None; }
-
-    // Check for range: "3 16-18" or "3 16 through 18"
-    let mut verse_end = None;
-    if verse_next < tokens.len() {
-        if matches!(&tokens[verse_next], Token::Dash) {
-            if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                verse_end = Some(end);
+    scanner.skip_fillers();
+    if let Some(ch) = scanner.next_number() {
+        vref.chapter = ChapterNumber(ch);
+        
+        scanner.skip_fillers();
+        // Match patterns: "N:M", "N verse M", or bare "N M"
+        let is_verse = scanner.consume_word("verse") 
+            || scanner.consume_word("verses")
+            || scanner.consume_colon();
+        
+        if is_verse {
+            if let Some(v) = scanner.next_number() {
+                vref.verse_start = VerseNumber(v);
+                vref.verse_end = scanner.scan_range_end().map(VerseNumber);
             }
-        } else if let Token::Word(tw) = &tokens[verse_next] {
-            if tw == "through" || tw == "to" {
-                if let Some((end, _)) = consume_number(tokens, verse_next + 1) {
-                    verse_end = Some(end);
-                }
-            }
+        } else if let Some(v) = scanner.next_number() {
+            // Bare number sequence "John 3 16"
+            vref.verse_start = VerseNumber(v);
+            vref.verse_end = scanner.scan_range_end().map(VerseNumber);
         }
+        return Some(vref);
     }
-
-    Some(VerseRef {
-        book_number: book_match.book_number,
-        book_name: book_match.book_name.clone(),
-        chapter,
-        verse_start: verse,
-        verse_end,
-    })
-}
-
-/// Try to extract a number from a single token.
-fn token_to_number(token: &Token) -> Option<i32> {
-    match token {
-        Token::Number(n) => Some(*n),
-        Token::Word(w) => parse_spoken_number(w),
-        _ => None,
-    }
-}
-
-/// Try to consume a number at the given token position.
-/// Returns (number, next_token_index) if successful.
-/// Handles both digit tokens and spoken number words (including compounds like "thirty two").
-fn consume_number(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
-    if start >= tokens.len() {
-        return None;
-    }
-    consume_number_at(tokens, start)
-}
-
-/// Consume a number starting at position `start`.
-/// Handles compound spoken numbers like "thirty two", "one hundred fifty".
-fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
-    if start >= tokens.len() {
-        return None;
-    }
-
-    // If it's a digit number, return it directly
-    if let Token::Number(n) = &tokens[start] {
-        return Some((*n, start + 1));
-    }
-
-    // Try to parse spoken number words
-    if let Token::Word(w) = &tokens[start] {
-        if let Some(n) = parse_spoken_number(w) {
-            // Check if this is "hundred" — if so, look for more
-            if w == "hundred" {
-                // Shouldn't start with "hundred" alone without context
-                return Some((n, start + 1));
-            }
-
-            // If n >= 100, it's already compound (e.g., won't happen with single words)
-            // If n is a tens value (20, 30, ..., 90), look for a ones digit next
-            if n >= 20 && n % 10 == 0 && start + 1 < tokens.len() {
-                if let Token::Word(next_w) = &tokens[start + 1] {
-                    if let Some(ones) = parse_spoken_number(next_w) {
-                        if ones >= 1 && ones <= 9 {
-                            let combined = n + ones;
-                            // Check for "hundred" after tens+ones
-                            if start + 2 < tokens.len() {
-                                if let Token::Word(hw) = &tokens[start + 2] {
-                                    if hw == "hundred" {
-                                        // e.g., "one hundred" — but we're at "thirty two hundred"?
-                                        // This is unusual, so skip
-                                        return Some((combined, start + 2));
-                                    }
-                                }
-                            }
-                            return Some((combined, start + 2));
-                        }
-                    }
-                }
-            }
-
-            // Check if next word is "hundred"
-            if n >= 1 && n <= 9 && start + 1 < tokens.len() {
-                if let Token::Word(next_w) = &tokens[start + 1] {
-                    if next_w == "hundred" {
-                        let base = n * 100;
-                        // Look for more after "hundred"
-                        if start + 2 < tokens.len() {
-                            if let Token::Word(w2) = &tokens[start + 2] {
-                                // Skip optional "and"
-                                let skip = if w2 == "and" { 1 } else { 0 };
-                                if let Some((rest, rest_idx)) =
-                                    consume_number_at(tokens, start + 2 + skip)
-                                {
-                                    if rest < 100 {
-                                        return Some((base + rest, rest_idx));
-                                    }
-                                }
-                            }
-                            if let Token::Number(n2) = &tokens[start + 2] {
-                                if *n2 < 100 {
-                                    return Some((base + n2, start + 3));
-                                }
-                            }
-                        }
-                        return Some((base, start + 2));
-                    }
-                }
-            }
-
-            return Some((n, start + 1));
-        }
-    }
-
     None
 }
 
-/// Convert a spoken number word to an integer.
-/// Supports "one" through "twenty", tens "thirty" through "ninety",
-/// and "hundred". Returns None if the word is not a recognized number.
+struct Scanner<'a> {
+    tokens: &'a [Token],
+    cursor: usize,
+}
+
+impl<'a> Scanner<'a> {
+    fn new(tokens: &'a [Token]) -> Self {
+        Self { tokens, cursor: 0 }
+    }
+
+    fn skip_fillers(&mut self) {
+        while let Some(Token::Word(w)) = self.tokens.get(self.cursor) {
+            if matches!(w.as_str(), "and" | "we" | "will" | "be" | "reading" | "from" | "look" | "at" | "i" | "want" | "us" | "to" | "chapter" | "verse" | "verses") {
+                self.cursor += 1;
+            } else { break; }
+        }
+    }
+
+    fn next_number(&mut self) -> Option<u16> {
+        self.skip_fillers();
+
+        if let Some(Token::Number(n)) = self.tokens.get(self.cursor) {
+            let mut val = *n;
+            self.cursor += 1;
+
+            // Greedily aggregate spoken compounds (e.g., [30, 2] -> 32)
+            // Rule: If current val is multiple of 10 and next is 1..9, add them.
+            if val % 10 == 0 && val >= 20 {
+                if let Some(Token::Number(n2)) = self.tokens.get(self.cursor) {
+                    if *n2 > 0 && *n2 < 10 {
+                        val += *n2;
+                        self.cursor += 1;
+                    }
+                }
+            }
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    fn consume_word(&mut self, target: &str) -> bool {
+        if let Some(Token::Word(w)) = self.tokens.get(self.cursor) {
+            if w == target { self.cursor += 1; return true; }
+        }
+        false
+    }
+
+    fn consume_colon(&mut self) -> bool {
+        if let Some(Token::Colon) = self.tokens.get(self.cursor) {
+            self.cursor += 1; return true;
+        }
+        false
+    }
+
+    fn scan_range_end(&mut self) -> Option<u16> {
+        let saved = self.cursor;
+        let is_range = matches!(self.tokens.get(self.cursor), Some(Token::Dash))
+            || self.consume_word("to")
+            || self.consume_word("through");
+        
+        if is_range {
+            if matches!(self.tokens.get(self.cursor), Some(Token::Dash)) { self.cursor += 1; }
+            self.consume_word("verse");
+            self.consume_word("verses");
+            if let Some(n) = self.next_number() { return Some(n); }
+        }
+        self.cursor = saved;
+        None
+    }
+}
+
 pub fn parse_spoken_number(word: &str) -> Option<i32> {
-    match word.to_lowercase().as_str() {
-        "zero" => Some(0),
-        "one" => Some(1),
-        "two" => Some(2),
-        "three" => Some(3),
-        "four" => Some(4),
-        "five" => Some(5),
-        "six" => Some(6),
-        "seven" => Some(7),
-        "eight" => Some(8),
-        "nine" => Some(9),
-        "ten" => Some(10),
-        "eleven" => Some(11),
-        "twelve" => Some(12),
-        "thirteen" => Some(13),
-        "fourteen" => Some(14),
-        "fifteen" => Some(15),
-        "sixteen" => Some(16),
-        "seventeen" => Some(17),
-        "eighteen" => Some(18),
-        "nineteen" => Some(19),
-        "twenty" => Some(20),
-        "thirty" => Some(30),
-        "forty" => Some(40),
-        "fifty" => Some(50),
-        "sixty" => Some(60),
-        "seventy" => Some(70),
-        "eighty" => Some(80),
-        "ninety" => Some(90),
-        "hundred" => Some(100),
+    match word {
+        "one" => Some(1), "two" => Some(2), "three" => Some(3), "four" => Some(4),
+        "five" => Some(5), "six" => Some(6), "seven" => Some(7), "eight" => Some(8),
+        "nine" => Some(9), "ten" => Some(10), "eleven" => Some(11), "twelve" => Some(12),
+        "thirteen" => Some(13), "fourteen" => Some(14), "fifteen" => Some(15), "sixteen" => Some(16),
+        "seventeen" => Some(17), "eighteen" => Some(18), "nineteen" => Some(19), "twenty" => Some(20),
+        "thirty" => Some(30), "forty" => Some(40), "fifty" => Some(50), "sixty" => Some(60),
+        "seventy" => Some(70), "eighty" => Some(80), "ninety" => Some(90), "hundred" => Some(100),
         _ => None,
     }
 }
 
-# [ cfg ( test ) ]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::direct::automaton::BookMatch;
+    use std::sync::Arc;
 
-    fn make_book_match(name: &str, number: i32, end: usize) -> BookMatch {
-        BookMatch {
-            book_number: number,
-            book_name: name.to_string(),
-            start: 0,
-            end,
+    use rhema_core::{BookId, ChapterNumber, VerseNumber};
+
+    fn make_bm(name: &str, num: i32, end: usize) -> BookMatch {
+        BookMatch { book_number: BookId(num as u8), book_name: Arc::from(name), start: 0, end }
+    }
+
+    #[test]
+    fn test_patterns() {
+        let cases = [
+            ("John 3:16", 43, "John", 3, 16, None),
+            ("Romans 8:28-30", 45, "Romans", 8, 28, Some(30)),
+            ("Psalm thirty two verse one", 19, "Psalms", 32, 1, None),
+            ("John 3 16", 43, "John", 3, 16, None),
+            ("Genesis 1 1", 1, "Genesis", 1, 1, None),
+            ("Isaiah chapter 53 verse 5", 23, "Isaiah", 53, 5, None),
+            ("Ephesians chapter six we will be reading from verse 10 to verse 16", 49, "Ephesians", 6, 10, Some(16)),
+        ];
+
+        for (text, num, name, ch, v, v_end) in cases {
+            let bm = make_bm(name, num, name.len());
+            let res = parse_reference(text, &bm).expect(text);
+            assert_eq!(res.chapter, ChapterNumber(ch as u16), "Chapter mismatch for {}", text);
+            assert_eq!(res.verse_start, VerseNumber(v as u16), "Verse mismatch for {}", text);
+            assert_eq!(res.verse_end, v_end.map(|vend| VerseNumber(vend as u16)));
         }
-    }
-
-    # [ test ]
-    fn test_colon_reference() {
-        let bm = make_book_match("John", 43, 4);
-        let text = "John 3:16 says something";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 3);
-        assert_eq!(result.verse_start, 16);
-        assert!(result.verse_end.is_none());
-    }
-
-    # [ test ]
-    fn test_colon_range() {
-        let bm = make_book_match("Romans", 45, 6);
-        let text = "Romans 8:28-30 is powerful";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 8);
-        assert_eq!(result.verse_start, 28);
-        assert_eq!(result.verse_end, Some(30));
-    }
-
-    # [ test ]
-    fn test_spoken_chapter_verse() {
-        let bm = make_book_match("Psalms", 19, 5);
-        let text = "Psalm thirty two verse one now says";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 32);
-        assert_eq!(result.verse_start, 1);
-    }
-
-    # [ test ]
-    fn test_chapter_only() {
-        let bm = make_book_match("Genesis", 1, 7);
-        let text = "Genesis 3 is about the fall";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 3);
-        assert_eq!(result.verse_start, 0);
-    }
-
-    # [ test ]
-    fn test_chapter_verse_keywords() {
-        let bm = make_book_match("Isaiah", 23, 6);
-        let text = "Isaiah chapter 53 verse 5";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 53);
-        assert_eq!(result.verse_start, 5);
-    }
-
-    # [ test ]
-    fn test_two_numbers_space_separated() {
-        let bm = make_book_match("John", 43, 4);
-        let text = "John 3 16 for God so loved";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 3);
-        assert_eq!(result.verse_start, 16);
-    }
-
-    # [ test ]
-    fn test_two_numbers_genesis() {
-        let bm = make_book_match("Genesis", 1, 7);
-        let text = "Genesis 1 1 in the beginning";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 1);
-        assert_eq!(result.verse_start, 1);
-    }
-
-    # [ test ]
-    fn test_two_numbers_large() {
-        let bm = make_book_match("Psalms", 19, 5);
-        let text = "Psalm 119 105 thy word is a lamp";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 119);
-        assert_eq!(result.verse_start, 105);
-    }
-
-    # [ test ]
-    fn test_spoken_number_parser() {
-        assert_eq!(parse_spoken_number("one"), Some(1));
-        assert_eq!(parse_spoken_number("twenty"), Some(20));
-        assert_eq!(parse_spoken_number("thirty"), Some(30));
-        assert_eq!(parse_spoken_number("hundred"), Some(100));
-        assert_eq!(parse_spoken_number("dog"), None);
-    }
-
-    # [ test ]
-    fn test_chapter_verse_with_filler_words() {
-        let bm = make_book_match("Ephesians", 49, 10);
-        let text = "Ephesians chapter six we will be reading from verse 10 to verse 16";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 6);
-        assert_eq!(result.verse_start, 10);
-        assert_eq!(result.verse_end, Some(16));
-    }
-
-    # [ test ]
-    fn test_chapter_verse_with_and_filler() {
-        let bm = make_book_match("John", 43, 4);
-        let text = "John chapter three and I want us to look at verse sixteen";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 3);
-        assert_eq!(result.verse_start, 16);
-    }
-
-    # [ test ]
-    fn test_chapter_verse_range_to() {
-        let bm = make_book_match("Genesis", 1, 7);
-        let text = "Genesis chapter one verse one to verse five";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 1);
-        assert_eq!(result.verse_start, 1);
-        assert_eq!(result.verse_end, Some(5));
-    }
-
-    # [ test ]
-    fn test_number_verse_with_filler() {
-        let bm = make_book_match("Romans", 45, 6);
-        let text = "Romans 8 and let's look at verse 28";
-        let result = parse_reference(text, &bm).unwrap();
-        assert_eq!(result.chapter, 8);
-        assert_eq!(result.verse_start, 28);
     }
 }

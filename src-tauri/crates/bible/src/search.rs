@@ -1,6 +1,6 @@
-use crate::db::BibleDb;
-use crate::error::BibleError;
+use crate::{BibleDb, BibleError};
 use crate::models::{Book, Verse};
+use rhema_core::MutexExt;
 
 impl BibleDb {
     /// # Panics
@@ -13,7 +13,7 @@ impl BibleDb {
         translation_id: i64,
         limit: usize,
     ) -> Result<Vec<Verse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let mut stmt = conn.prepare(
             "SELECT v.id, v.translation_id, v.book_number, v.book_name, v.book_abbreviation, v.chapter, v.verse, v.text \
              FROM verses_fts fts \
@@ -40,7 +40,7 @@ impl BibleDb {
     }
 
     pub fn search_books(&self, query: &str) -> Result<Vec<Book>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock_safe()?;
         let pattern = format!("{}%", query);
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, name, abbreviation, testament \

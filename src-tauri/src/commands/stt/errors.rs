@@ -19,8 +19,8 @@ pub enum SttError {
     ThreadError(String),
 }
 
-impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, crate::state::AppState>>> for SttError {
-    fn from(e: std::sync::PoisonError<std::sync::MutexGuard<'_, crate::state::AppState>>) -> Self {
+impl From<rhema_core::CoreError> for SttError {
+    fn from(e: rhema_core::CoreError) -> Self {
         Self::StateLockError(e.to_string())
     }
 }
