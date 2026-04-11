@@ -84,6 +84,7 @@ impl Vad {
 
     /// Reset the VAD state (e.g., when stopping transcription).
     pub fn reset(&mut self) {
+        log::info!("[VAD] System reset: clearing audio buffers and resetting state machine");
         self.state = VadState::Silence;
         self.voice_count = 0;
         self.silence_count = 0;
@@ -218,7 +219,7 @@ pub enum VadTransition {
     SpeechEnded,
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
 
@@ -240,13 +241,13 @@ mod tests {
         make_frame(0.05) // Well above silence_threshold of 0.005
     }
 
-    #[test]
+    # [ test ]
     fn test_starts_in_silence() {
         let vad = Vad::new(VadConfig::default());
         assert_eq!(vad.state(), VadState::Silence);
     }
 
-    #[test]
+    # [ test ]
     fn test_silence_gates_audio() {
         let mut vad = Vad::new(VadConfig::default());
         let result = vad.process(&silent_frame());
@@ -254,7 +255,7 @@ mod tests {
         assert!(result.transition.is_none());
     }
 
-    #[test]
+    # [ test ]
     fn test_speech_detection() {
         let mut config = VadConfig::default();
         config.min_voice_frames = 2; // Lower for testing
@@ -272,7 +273,7 @@ mod tests {
         assert_eq!(result.transition, Some(VadTransition::SpeechStarted));
     }
 
-    #[test]
+    # [ test ]
     fn test_speech_forwards_audio() {
         let mut config = VadConfig::default();
         config.min_voice_frames = 1;
@@ -286,7 +287,7 @@ mod tests {
         assert_eq!(result.frames.len(), 1);
     }
 
-    #[test]
+    # [ test ]
     fn test_silence_after_speech() {
         let mut config = VadConfig::default();
         config.min_voice_frames = 1;
@@ -307,7 +308,7 @@ mod tests {
         assert_eq!(result.transition, Some(VadTransition::SpeechEnded));
     }
 
-    #[test]
+    # [ test ]
     fn test_pre_buffer_flushed_on_speech() {
         let mut config = VadConfig::default();
         config.min_voice_frames = 1;
@@ -324,7 +325,7 @@ mod tests {
         assert_eq!(result.transition, Some(VadTransition::SpeechStarted));
     }
 
-    #[test]
+    # [ test ]
     fn test_reset() {
         let mut config = VadConfig::default();
         config.min_voice_frames = 1;

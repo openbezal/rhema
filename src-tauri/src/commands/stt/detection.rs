@@ -48,21 +48,7 @@ pub fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
             // AppState locked by semantic worker — emit results without verse text
             let results: Vec<crate::commands::detection::DetectionResult> = merged
                 .iter()
-                .map(|m| {
-                    let vr = &m.detection.verse_ref;
-                    crate::commands::detection::DetectionResult {
-                        verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
-                        verse_text: String::new(),
-                        book_name: vr.book_name.clone(),
-                        book_number: vr.book_number,
-                        chapter: vr.chapter,
-                        verse: vr.verse_start,
-                        confidence: m.detection.confidence,
-                        source: "direct".to_string(),
-                        auto_queued: m.auto_queued,
-                        transcript_snippet: m.detection.transcript_snippet.clone(),
-                    }
-                })
+                .map(|m| map_direct_no_db(m))
                 .collect();
             for r in &results {
                 log::info!("[DET-DIRECT] Found: {} ({:.0}%) (no DB)", r.verse_ref, r.confidence * 100.0);
@@ -301,36 +287,7 @@ pub fn run_quotation_matching(app: &AppHandle, transcript: &str) {
 
     let results: Vec<crate::commands::detection::DetectionResult> = detections
         .iter()
-        .map(|d| {
-            let vr = &d.verse_ref;
-            let verse_text = if let Some(ref db) = app_state.bible_db {
-                db.get_verse(
-                    app_state.active_translation_id,
-                    vr.book_number,
-                    vr.chapter,
-                    vr.verse_start,
-                )
-                .ok()
-                .flatten()
-                .map(|v| v.text)
-                .unwrap_or_default()
-            } else {
-                String::new()
-            };
-
-            crate::commands::detection::DetectionResult {
-                verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
-                verse_text,
-                book_name: vr.book_name.clone(),
-                book_number: vr.book_number,
-                chapter: vr.chapter,
-                verse: vr.verse_start,
-                confidence: d.confidence,
-                source: "quotation".to_string(),
-                auto_queued: d.confidence >= 0.85,
-                transcript_snippet: d.transcript_snippet.clone(),
-            }
-        })
+        .map(|d| map_quotation_match_to_result(&app_state, d))
         .collect();
 
     for r in &results {
@@ -344,6 +301,49 @@ pub fn run_quotation_matching(app: &AppHandle, transcript: &str) {
 
     drop(app_state);
     let _ = app.emit("verse_detections", &results);
+}
+
+/// Helper for direct detection without DB access.
+fn map_direct_no_db(m: &rhema_detection::MergedDetection) -> crate::commands::detection::DetectionResult {
+    let vr = &m.detection.verse_ref;
+    crate::commands::detection::DetectionResult {
+        verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
+        verse_text: String::new(),
+        book_name: vr.book_name.clone(),
+        book_number: vr.book_number,
+        chapter: vr.chapter,
+        verse: vr.verse_start,
+        confidence: m.detection.confidence,
+        source: "direct".to_string(),
+        auto_queued: m.auto_queued,
+        transcript_snippet: m.detection.transcript_snippet.clone(),
+    }
+}
+
+/// Helper for quotation mapping.
+fn map_quotation_match_to_result(app_state: &AppState, d: &rhema_detection::QuotationDetection) -> crate::commands::detection::DetectionResult {
+    let vr = &d.verse_ref;
+    let verse_text = match &app_state.bible_db {
+        Some(db) => db.get_verse(app_state.active_translation_id, vr.book_number, vr.chapter, vr.verse_start)
+            .ok()
+            .flatten()
+            .map(|v| v.text)
+            .unwrap_or_default(),
+        None => String::new(),
+    };
+
+    crate::commands::detection::DetectionResult {
+        verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
+        verse_text,
+        book_name: vr.book_name.clone(),
+        book_number: vr.book_number,
+        chapter: vr.chapter,
+        verse: vr.verse_start,
+        confidence: d.confidence,
+        source: "quotation".to_string(),
+        auto_queued: d.confidence >= 0.85,
+        transcript_snippet: d.transcript_snippet.clone(),
+    }
 }
 
 /// Pure predicate to decide if reading mode should start/restart.
@@ -363,12 +363,12 @@ fn should_start_reading_mode(rm: &rhema_detection::ReadingMode, recent: &rhema_d
     rm.current_book() == recent.book_number // Same book, different chapter
 }
 
-#[cfg(test)]
+# [ cfg ( test ) ]
 mod tests {
     use super::*;
     use rhema_detection::{ReadingMode, DetectionVerseRef};
 
-    #[test]
+    # [ test ]
     fn test_should_start_reading_mode() {
         let mut rm = ReadingMode::default();
         let recent = DetectionVerseRef {
