@@ -711,6 +711,7 @@ export function SettingsDialog() {
   const open = useSettingsDialogStore((s) => s.isOpen)
   const activeSection = useSettingsDialogStore((s) => s.activeSection)
   const setActiveSection = useSettingsDialogStore((s) => s.setActiveSection)
+  const openSettingsFn = useSettingsDialogStore((s) => s.openSettings)
   const closeSettings = useSettingsDialogStore((s) => s.closeSettings)
 
   const ActiveContent = sectionComponents[activeSection]
@@ -719,7 +720,9 @@ export function SettingsDialog() {
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
+        if (nextOpen) {
+          openSettingsFn()
+        } else {
           closeSettings()
         }
       }}
