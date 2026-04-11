@@ -12,6 +12,7 @@ use url::Url;
 
 use crate::error::SttError;
 use crate::keyterms::bible_keyterms;
+use crate::provider::SttProvider;
 use crate::types::{SttConfig, TranscriptEvent, Word};
 
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
@@ -444,4 +445,89 @@ async fn parse_and_send(
         .map_err(|e| SttError::SendError(e.to_string()))?;
 
     Ok(())
+}
+
+// ── SttProvider implementation ───────────────────────────────────────────────
+
+#[async_trait::async_trait]
+impl SttProvider for DeepgramClient {
+    async fn start(
+        &self,
+        audio_rx: Receiver<Vec<i16>>,
+        event_tx: mpsc::Sender<TranscriptEvent>,
+    ) -> Result<(), SttError> {
+        let result = self.connect(audio_rx.clone(), event_tx.clone()).await;
+
+        // On max reconnect failure, fall back to REST mode (hybrid).
+        if let Err(ref e) = result {
+            log::warn!(
+                "[STT-Deepgram] WebSocket failed after retries: {e}, switching to REST fallback"
+            );
+            let _ = event_tx
+                .send(TranscriptEvent::Error(
+                    "Connection unstable, switching to Hybrid mode".into(),
+                ))
+                .await;
+
+            let rest_client = crate::rest::DeepgramRestClient::new(self.config.clone());
+            let mut audio_buffer: Vec<i16> = Vec::new();
+            let flush_interval = std::time::Duration::from_secs(5);
+            let mut last_flush = std::time::Instant::now();
+            let cancelled = self.cancelled.clone();
+
+            loop {
+                if cancelled.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                match audio_rx.recv_timeout(Duration::from_millis(100)) {
+                    Ok(samples) => {
+                        audio_buffer.extend(samples);
+
+                        if last_flush.elapsed() >= flush_interval && !audio_buffer.is_empty() {
+                            match rest_client.transcribe(&audio_buffer).await {
+                                Ok(events) => {
+                                    for evt in events {
+                                        let _ = event_tx.send(evt).await;
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("[STT-REST] Transcription failed: {e}");
+                                }
+                            }
+                            audio_buffer.clear();
+                            last_flush = std::time::Instant::now();
+                        }
+                    }
+                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                        if last_flush.elapsed() >= flush_interval && !audio_buffer.is_empty() {
+                            match rest_client.transcribe(&audio_buffer).await {
+                                Ok(events) => {
+                                    for evt in events {
+                                        let _ = event_tx.send(evt).await;
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("[STT-REST] Transcription failed: {e}");
+                                }
+                            }
+                            audio_buffer.clear();
+                            last_flush = std::time::Instant::now();
+                        }
+                    }
+                    Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn stop(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+
+    fn name(&self) -> &'static str {
+        "deepgram"
+    }
 }

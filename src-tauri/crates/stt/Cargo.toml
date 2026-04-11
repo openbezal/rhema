@@ -13,11 +13,22 @@ log.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
-reqwest = { version = "0.12", features = ["json"], optional = true }
+reqwest = { version = "0.12", features = ["json", "stream"], optional = true }
 url = "2"
 futures-util = "0.3"
 crossbeam-channel = "0.5"
+async-trait = "0.1"
+
+# Whisper local STT (optional)
+rhema-audio = { path = "../audio", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.13", features = ["metal"], optional = true }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = { version = "0.13", optional = true }
 
 [features]
 default = ["rest-fallback"]
 rest-fallback = ["reqwest"]
+whisper = ["dep:whisper-rs", "rhema-audio"]

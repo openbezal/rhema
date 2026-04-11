@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-type SettingsSection = "audio" | "bible" | "display" | "api-keys" | "help"
+type SettingsSection = "audio" | "speech" | "bible" | "display" | "api-keys" | "help"
 
 interface SettingsDialogState {
   isOpen: boolean

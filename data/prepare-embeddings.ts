@@ -8,6 +8,7 @@
  *   Phase 5 – Download & export ONNX model + INT8 quantization
  *   Phase 6 – Export KJV verses to JSON
  *   Phase 7 – Pre-compute verse embeddings
+ *   Phase 8 – Download Whisper model for local STT
  *
  * Every phase is idempotent: if its output artifacts already exist it is
  * skipped. Pass --force to re-run everything regardless.
@@ -39,6 +40,7 @@ const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
 const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b.bin")
 const IDS_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b-ids.bin")
+const WHISPER_MODEL = join(PROJECT_ROOT, "models", "whisper", "ggml-large-v3-turbo-q8_0.bin")
 const MODEL_ONNX = join(MODELS_DIR, "model.onnx")
 const MODEL_INT8 = join(MODELS_DIR_INT8, "model_quantized.onnx")
 
@@ -79,12 +81,11 @@ async function main() {
   if (force) console.log("  (--force: re-running all phases)\n")
 
   // ── Phase 1: Python environment ────────────────────────────────
-  console.log("\n━━━ Phase 1/7: Python environment ━━━")
+  console.log("\n━━━ Phase 1/8: Python environment ━━━")
   await ensurePythonEnv([
     "optimum-onnx[onnxruntime]",
     "sentence-transformers",
     "accelerate",
-    "onnxruntime",
     "tokenizers",
     "numpy",
     "torch",
@@ -92,13 +93,13 @@ async function main() {
   ])
 
   // ── Phase 2: Open-source Bible data ────────────────────────────
-  console.log("\n━━━ Phase 2/7: Download open-source Bible data ━━━")
+  console.log("\n━━━ Phase 2/8: Download open-source Bible data ━━━")
   if (!shouldSkip("open-source Bible data", KJV_SOURCE)) {
     await run(["bun", "run", join(DATA_DIR, "download-sources.ts")])
   }
 
   // ── Phase 3: BibleGateway copyrighted translations ─────────────
-  console.log("\n━━━ Phase 3/7: Download BibleGateway translations ━━━")
+  console.log("\n━━━ Phase 3/8: Download BibleGateway translations ━━━")
   if (!shouldSkip("BibleGateway translations", NIV_SOURCE)) {
     const venvPython = getVenvBin(
       process.platform === "win32" ? "python" : "python3"
@@ -111,13 +112,13 @@ async function main() {
   }
 
   // ── Phase 4: Build Bible database ──────────────────────────────
-  console.log("\n━━━ Phase 4/7: Build Bible database ━━━")
+  console.log("\n━━━ Phase 4/8: Build Bible database ━━━")
   if (!shouldSkip("Bible database", DB_PATH)) {
     await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
   }
 
   // ── Phase 5: ONNX model download + quantize ────────────────────
-  console.log("\n━━━ Phase 5/7: ONNX model download & quantize ━━━")
+  console.log("\n━━━ Phase 5/8: ONNX model download & quantize ━━━")
   if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
     const optimumCli = getVenvBin("optimum-cli")
 
@@ -164,7 +165,7 @@ async function main() {
   }
 
   // ── Phase 6: Export verses to JSON ─────────────────────────────
-  console.log("\n━━━ Phase 6/7: Export verses to JSON ━━━")
+  console.log("\n━━━ Phase 6/8: Export verses to JSON ━━━")
   if (!shouldSkip("verses JSON", VERSES_JSON)) {
     if (!existsSync(DB_PATH)) {
       console.error(
@@ -176,7 +177,7 @@ async function main() {
   }
 
   // ── Phase 7: Pre-compute embeddings ────────────────────────────
-  console.log("\n━━━ Phase 7/7: Pre-compute verse embeddings ━━━")
+  console.log("\n━━━ Phase 7/8: Pre-compute verse embeddings ━━━")
   if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
     const venvPython = getVenvBin(
       process.platform === "win32" ? "python" : "python3"
@@ -187,6 +188,12 @@ async function main() {
       undefined,
       { PYTHONUTF8: "1" }
     )
+  }
+
+  // ── Phase 8: Whisper model ────────────────────────────────────
+  console.log("\n━━━ Phase 8/8: Download Whisper model ━━━")
+  if (!shouldSkip("Whisper model", WHISPER_MODEL)) {
+    await run(["bun", "run", join(DATA_DIR, "download-whisper-model.ts")])
   }
 
   // ── Done ───────────────────────────────────────────────────────

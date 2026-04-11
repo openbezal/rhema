@@ -21,7 +21,13 @@ export function getVenvBin(name: string): string {
 }
 
 export async function findPython(): Promise<string> {
-  for (const candidate of ["python3", "python"]) {
+  for (const candidate of [
+    "python3.12",
+    "python3.11",
+    "python3.10",
+    "python3",
+    "python",
+  ]) {
     try {
       const proc = Bun.spawn([candidate, "--version"], {
         stdout: "pipe",
