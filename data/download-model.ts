@@ -30,7 +30,8 @@ const MODELS_DIR_INT8 = join(
 async function main() {
   // --- Phase 1: Python environment setup ---
   await ensurePythonEnv([
-    "optimum-onnx[onnxruntime]",
+    "optimum[exporters,onnxruntime]==1.23.3",
+    "transformers==4.46.3",
     "sentence-transformers",
     "accelerate",
   ])
