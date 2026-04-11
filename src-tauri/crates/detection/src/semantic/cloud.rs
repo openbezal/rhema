@@ -1,8 +1,8 @@
-/// Cloud embedding client for OpenAI text-embedding-3-large.
+/// Cloud embedding client for `OpenAI` text-embedding-3-large.
 ///
 /// Used as a fallback when local semantic confidence is below a threshold.
 /// When enabled, the pipeline will re-embed low-confidence chunks via the
-/// OpenAI API and perform a second search pass against the same vector index.
+/// `OpenAI` API and perform a second search pass against the same vector index.
 #[derive(Debug)]
 pub struct CloudBooster {
     api_key: Option<String>,
@@ -21,7 +21,7 @@ impl CloudBooster {
         }
     }
 
-    /// Configure the OpenAI API key and enable cloud boost.
+    /// Configure the `OpenAI` API key and enable cloud boost.
     pub fn set_api_key(&mut self, key: String) {
         self.api_key = Some(key);
         self.enabled = true;

@@ -21,8 +21,13 @@ impl BibleDb {
              WHERE fts.text MATCH ?1 AND v.translation_id = ?2 \
              LIMIT ?3",
         )?;
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "limit is a small page-size value that fits in i64"
+        )]
+        let limit_i64 = limit as i64;
         let rows = stmt.query_map(
-            rusqlite::params![query, translation_id, limit as i64],
+            rusqlite::params![query, translation_id, limit_i64],
             |row: &rusqlite::Row| {
                 Ok(Verse {
                     id: row.get(0)?,
@@ -41,7 +46,7 @@ impl BibleDb {
 
     pub fn search_books(&self, query: &str) -> Result<Vec<Book>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let pattern = format!("{}%", query);
+        let pattern = format!("{query}%");
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, name, abbreviation, testament \
              FROM books \

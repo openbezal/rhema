@@ -69,6 +69,7 @@ pub struct OscStartResult {
 /// # Errors
 ///
 /// Returns `CommandError::DispatchFailed` if the UDP socket cannot bind.
+#[expect(clippy::needless_pass_by_value, reason = "OscConfig is consumed to move fields into the spawned thread")]
 pub fn start_osc_listener<S>(config: OscConfig, sink: Arc<S>) -> Result<OscStartResult, CommandError>
 where
     S: CommandSink + 'static,

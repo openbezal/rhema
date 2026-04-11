@@ -146,7 +146,9 @@ impl Vad {
                     };
                 }
 
-                if !is_voiced {
+                if is_voiced {
+                    self.silence_count = 0;
+                } else {
                     self.silence_count += 1;
                     if self.silence_count >= self.config.silence_frame_count {
                         // Transition to Silence (skip Trailing for simplicity)
@@ -159,8 +161,6 @@ impl Vad {
                             transition: Some(VadTransition::SpeechEnded),
                         };
                     }
-                } else {
-                    self.silence_count = 0;
                 }
 
                 // Forward the frame

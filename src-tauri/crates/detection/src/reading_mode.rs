@@ -97,13 +97,13 @@ impl ReadingMode {
             .collect();
 
         if loaded.is_empty() {
-            log::warn!("[READING] No verses loaded for {} {}:{}", book_name, chapter, start_verse);
+            log::warn!("[READING] No verses loaded for {book_name} {chapter}:{start_verse}");
             return;
         }
 
         log::info!(
-            "[READING] Started: {} {}:{} ({} verses loaded)",
-            book_name, chapter, start_verse, loaded.len()
+            "[READING] Started: {book_name} {chapter}:{start_verse} ({} verses loaded)",
+            loaded.len()
         );
 
         self.active = true;
@@ -131,8 +131,8 @@ impl ReadingMode {
         if !self.verses.is_empty() {
             self.active = true;
             self.last_match_time = Instant::now();
-            let verse = self.verses.get(self.current_index).map(|v| v.verse_number).unwrap_or(0);
-            log::info!("[READING] Resumed at: {} {}:{}", self.book_name, self.chapter, verse);
+            let verse = self.verses.get(self.current_index).map_or(0, |v| v.verse_number);
+            log::info!("[READING] Resumed at: {} {}:{verse}", self.book_name, self.chapter);
         }
     }
 
@@ -179,11 +179,11 @@ impl ReadingMode {
 
         // Check timeout — but don't clear verses, just pause.
         // This allows "verse N" references to re-activate.
-        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS {
-            if self.active {
-                log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
-                self.active = false;
-            }
+        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS
+            && self.active
+        {
+            log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
+            self.active = false;
         }
 
         // Check for explicit verse number references like "verse three", "verse 4".
@@ -293,7 +293,7 @@ impl ReadingMode {
         // Find this verse number in our loaded verses (allow forward AND backward)
         for (idx, v) in self.verses.iter().enumerate() {
             if v.verse_number == verse_num {
-                log::info!("[READING] Verse number reference detected: verse {}", verse_num);
+                log::info!("[READING] Verse number reference detected: verse {verse_num}");
                 return self.advance_to(idx);
             }
         }
@@ -311,8 +311,8 @@ impl ReadingMode {
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
 
-        let reference = format!("{} {}:{}", self.book_name, self.chapter, verse_number);
-        log::info!("[READING] Advanced to: {}", reference);
+        let reference = format!("{} {}:{verse_number}", self.book_name, self.chapter);
+        log::info!("[READING] Advanced to: {reference}");
 
         Some(ReadingAdvance {
             book_number: self.book_number,
@@ -416,7 +416,8 @@ fn word_overlap(
         return 0.0;
     }
     let matches = verse_words.intersection(transcript_words).count();
-    matches as f64 / verse_word_count as f64
+    #[expect(clippy::cast_precision_loss, reason = "word counts are small enough for f64 precision")]
+    { matches as f64 / verse_word_count as f64 }
 }
 
 #[cfg(test)]

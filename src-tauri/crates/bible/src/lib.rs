@@ -6,7 +6,7 @@
 //!
 //! # Key types
 //!
-//! - [`BibleDb`] — connection wrapper for the SQLite database
+//! - [`BibleDb`] — connection wrapper for the `SQLite` database
 //! - [`Verse`], [`Book`], [`Translation`] — data models
 //! - [`BibleError`] — error type for all database operations
 

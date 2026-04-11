@@ -16,8 +16,8 @@ pub trait CommandSink: Send + Sync {
 
 /// Routes `RemoteCommand` variants to the correct sink method.
 ///
-/// Frontend-bound (emit_event): Next, Prev, Theme, Opacity, OnAir
-/// Backend-bound (invoke_backend): Show, Hide, Confidence
+/// Frontend-bound (`emit_event`): Next, Prev, Theme, Opacity, `OnAir`
+/// Backend-bound (`invoke_backend`): Show, Hide, Confidence
 pub struct CommandDispatcher;
 
 impl CommandDispatcher {

@@ -127,25 +127,25 @@ fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRe
     // Look for: Number Colon Number [Dash Number]
     for i in 0..tokens.len() {
         if let Token::Number(chapter) = &tokens[i] {
-            if i + 2 < tokens.len() {
-                if matches!(&tokens[i + 1], Token::Colon) {
-                    if let Token::Number(verse) = &tokens[i + 2] {
-                        let mut verse_end = None;
-                        if i + 4 < tokens.len() {
-                            if matches!(&tokens[i + 3], Token::Dash) {
-                                if let Token::Number(end) = &tokens[i + 4] {
-                                    verse_end = Some(*end);
-                                }
-                            }
+            if i + 2 < tokens.len()
+                && matches!(&tokens[i + 1], Token::Colon)
+            {
+                if let Token::Number(verse) = &tokens[i + 2] {
+                    let mut verse_end = None;
+                    if i + 4 < tokens.len()
+                        && matches!(&tokens[i + 3], Token::Dash)
+                    {
+                        if let Token::Number(end) = &tokens[i + 4] {
+                            verse_end = Some(*end);
                         }
-                        return Some(VerseRef {
-                            book_number: book_match.book_number,
-                            book_name: book_match.book_name.clone(),
-                            chapter: *chapter,
-                            verse_start: *verse,
-                            verse_end,
-                        });
                     }
+                    return Some(VerseRef {
+                        book_number: book_match.book_number,
+                        book_name: book_match.book_name.clone(),
+                        chapter: *chapter,
+                        verse_start: *verse,
+                        verse_end,
+                    });
                 }
             }
             // Don't break here; keep looking for a colon pattern
@@ -347,7 +347,7 @@ fn token_to_number(token: &Token) -> Option<i32> {
 }
 
 /// Try to consume a number at the given token position.
-/// Returns (number, next_token_index) if successful.
+/// Returns (number, `next_token_index`) if successful.
 /// Handles both digit tokens and spoken number words (including compounds like "thirty two").
 fn consume_number(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
     if start >= tokens.len() {
@@ -382,7 +382,7 @@ fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
             if n >= 20 && n % 10 == 0 && start + 1 < tokens.len() {
                 if let Token::Word(next_w) = &tokens[start + 1] {
                     if let Some(ones) = parse_spoken_number(next_w) {
-                        if ones >= 1 && ones <= 9 {
+                        if (1..=9).contains(&ones) {
                             let combined = n + ones;
                             // Check for "hundred" after tens+ones
                             if start + 2 < tokens.len() {
@@ -401,7 +401,7 @@ fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
             }
 
             // Check if next word is "hundred"
-            if n >= 1 && n <= 9 && start + 1 < tokens.len() {
+            if (1..=9).contains(&n) && start + 1 < tokens.len() {
                 if let Token::Word(next_w) = &tokens[start + 1] {
                     if next_w == "hundred" {
                         let base = n * 100;
@@ -409,7 +409,7 @@ fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
                         if start + 2 < tokens.len() {
                             if let Token::Word(w2) = &tokens[start + 2] {
                                 // Skip optional "and"
-                                let skip = if w2 == "and" { 1 } else { 0 };
+                                let skip = usize::from(w2 == "and");
                                 if let Some((rest, rest_idx)) =
                                     consume_number_at(tokens, start + 2 + skip)
                                 {

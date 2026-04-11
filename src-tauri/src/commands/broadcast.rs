@@ -1,3 +1,5 @@
+#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+
 use std::sync::Mutex;
 
 use base64::Engine;
@@ -6,7 +8,7 @@ use tauri::State;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
 
-/// Map output_id ("main" | "alt") to Tauri window label.
+/// Map `output_id` ("main" | "alt") to Tauri window label.
 fn window_label(output_id: &str) -> &'static str {
     match output_id {
         "alt" => "broadcast-alt",
@@ -14,9 +16,9 @@ fn window_label(output_id: &str) -> &'static str {
     }
 }
 
-/// Map output_id to broadcast-output.html URL with query param.
+/// Map `output_id` to broadcast-output.html URL with query param.
 fn window_url(output_id: &str) -> String {
-    format!("broadcast-output.html?output={}", output_id)
+    format!("broadcast-output.html?output={output_id}")
 }
 
 #[derive(Serialize)]
@@ -83,7 +85,7 @@ pub fn open_broadcast_window(
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
     let monitor = monitors
         .get(monitor_index)
-        .ok_or_else(|| format!("Monitor index {} out of range", monitor_index))?;
+        .ok_or_else(|| format!("Monitor index {monitor_index} out of range"))?;
 
     let pos = monitor.position();
     let size = monitor.size();
@@ -118,8 +120,8 @@ pub fn open_broadcast_window(
         WebviewUrl::App(window_url(&output_id).into()),
     )
     .title(title)
-    .position(pos.x as f64, pos.y as f64)
-    .inner_size(size.width as f64, size.height as f64)
+    .position(f64::from(pos.x), f64::from(pos.y))
+    .inner_size(f64::from(size.width), f64::from(size.height))
     .decorations(true)
     .always_on_top(false)
     .skip_taskbar(false)
@@ -205,6 +207,6 @@ pub fn push_ndi_frame(
         .map_err(|e| format!("base64 decode error: {e}"))?;
     let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
     runtime
-        .send_frame_rgba(&request.output_id, request.width, request.height, rgba_data)
+        .send_frame_rgba(&request.output_id, request.width, request.height, &rgba_data)
         .map_err(|e| e.to_string())
 }

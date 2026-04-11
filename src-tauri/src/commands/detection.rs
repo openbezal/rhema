@@ -1,3 +1,5 @@
+#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+
 use std::sync::Mutex;
 use tauri::State;
 
@@ -118,6 +120,7 @@ pub fn toggle_paraphrase_detection(
 }
 
 #[derive(Serialize)]
+#[expect(clippy::struct_excessive_bools, reason = "status flags for UI consumption")]
 pub struct DetectionStatusResult {
     pub has_direct: bool,
     pub has_semantic: bool,

@@ -55,7 +55,7 @@ const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
     ("amplified version", "AMP"),
 ];
 
-/// Maximum chapter count per book (book_number 1-66).
+/// Maximum chapter count per book (`book_number` 1-66).
 /// Used to reject impossible references like "Mark 30:1" (Mark has 16 chapters).
 const MAX_CHAPTERS: [i32; 67] = [
     0,  // index 0 unused
@@ -129,16 +129,17 @@ const MAX_CHAPTERS: [i32; 67] = [
 
 /// Check if a book/chapter combination is valid.
 fn is_valid_reference(book_number: i32, chapter: i32) -> bool {
-    if book_number < 1 || book_number > 66 {
+    if !(1..=66).contains(&book_number) {
         return false;
     }
+    #[expect(clippy::cast_sign_loss, reason = "book_number validated to be 1..=66")]
     let max_ch = MAX_CHAPTERS[book_number as usize];
     chapter >= 1 && chapter <= max_ch
 }
 
 /// Confidence assigned to chapter-only references (no verse specified).
 /// Lower than full references (0.90+) since the user likely wants a specific verse.
-/// Matches Logos AI's CHAPTER_ONLY_CONFIDENCE default of 0.75.
+/// Matches Logos AI's `CHAPTER_ONLY_CONFIDENCE` default of 0.75.
 const CHAPTER_ONLY_CONFIDENCE: f64 = 0.75;
 
 /// Filler phrases commonly found in sermon transcripts that confuse detection.
@@ -174,19 +175,6 @@ fn clean_transcript(text: &str) -> String {
 
     // Remove fixed filler phrases (case-insensitive)
     for phrase in FILLER_PHRASES {
-        // Build a case-insensitive search by working on the lowercased copy
-        let lower = result.to_lowercase();
-        while let Some(pos) = lower.find(phrase) {
-            // Remove the phrase from the *original-cased* string
-            result = format!(
-                "{}{}",
-                &result[..pos],
-                &result[pos + phrase.len()..]
-            );
-            // Re-lowercase for the next iteration
-            break; // one pass per phrase; re-enter loop for multiple occurrences
-        }
-        // Handle multiple occurrences
         loop {
             let lower = result.to_lowercase();
             if let Some(pos) = lower.find(phrase) {
@@ -213,9 +201,8 @@ fn clean_transcript(text: &str) -> String {
                 }
             }
             break; // "look at" not followed by uppercase — leave it
-        } else {
-            break;
         }
+        break;
     }
 
     // Collapse multiple spaces and trim
@@ -304,7 +291,7 @@ impl DirectDetector {
         // First check full phrases (higher confidence)
         for (pattern, abbrev) in TRANSLATION_COMMANDS {
             if lower.contains(pattern) {
-                log::info!("[DET-DIRECT] Translation command detected: {}", abbrev);
+                log::info!("[DET-DIRECT] Translation command detected: {abbrev}");
                 return Some(abbrev.to_string());
             }
         }
@@ -323,12 +310,11 @@ impl DirectDetector {
                 "nkjv" => Some("NKJV"),
                 "nlt" => Some("NLT"),
                 "kjv" => Some("KJV"),
-                "amp" => Some("AMP"),
-                "amplified" => Some("AMP"),
+                "amp" | "amplified" => Some("AMP"),
                 _ => None,
             };
             if let Some(abbrev) = matched {
-                log::info!("[DET-DIRECT] Translation abbreviation detected: {}", abbrev);
+                log::info!("[DET-DIRECT] Translation abbreviation detected: {abbrev}");
                 return Some(abbrev.to_string());
             }
         }
@@ -441,6 +427,7 @@ impl DirectDetector {
                 let confidence = compute_confidence(&resolved, &verse_ref);
                 let snippet = extract_snippet(text, book_match.start, book_match.end);
 
+                #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap_or_default()
@@ -472,6 +459,7 @@ impl DirectDetector {
         for phrase in PREVIOUS_VERSE_PHRASES {
             if lower.contains(phrase) {
                 if let Some(prev_ref) = self.recent_detections.front() {
+                    #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap_or_default()
@@ -507,7 +495,8 @@ impl DirectDetector {
         }
     }
 
-    /// Build a Detection from a resolved VerseRef.
+    /// Build a Detection from a resolved `VerseRef`.
+    #[expect(clippy::unused_self, reason = "method kept on self for future extensibility")]
     fn make_direct_detection(
         &self,
         verse_ref: &VerseRef,
@@ -517,6 +506,7 @@ impl DirectDetector {
         end: usize,
     ) -> Detection {
         let snippet = extract_snippet(text, start, end.min(text.len()));
+        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -550,7 +540,7 @@ fn try_extract_verse_continuation(text: &str) -> Option<i32> {
     // Pattern: "verse N" or "verses N"
     for prefix in &["verse ", "verses ", "and verse ", "and verses "] {
         if let Some(rest) = trimmed.strip_prefix(prefix) {
-            let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            let num_str: String = rest.chars().take_while(char::is_ascii_digit).collect();
             if let Ok(n) = num_str.parse::<i32>() {
                 if n > 0 {
                     return Some(n);
@@ -567,8 +557,8 @@ fn try_extract_verse_continuation(text: &str) -> Option<i32> {
     }
 
     // Pattern: bare number at start (e.g., "16 for God so loved")
-    let num_str: String = trimmed.chars().take_while(|c| c.is_ascii_digit()).collect();
-    if num_str.len() >= 1 && num_str.len() <= 3 {
+    let num_str: String = trimmed.chars().take_while(char::is_ascii_digit).collect();
+    if !num_str.is_empty() && num_str.len() <= 3 {
         if let Ok(n) = num_str.parse::<i32>() {
             if n > 0 && n <= 176 {
                 // Max verse number in Bible (Psalm 119)
@@ -606,7 +596,7 @@ fn compute_confidence(_resolved: &VerseRef, original: &VerseRef) -> f64 {
 
 /// Extract a snippet of text around the reference for context.
 fn extract_snippet(text: &str, start: usize, end: usize) -> String {
-    let snippet_start = if start > 30 { start - 30 } else { 0 };
+    let snippet_start = start.saturating_sub(30);
     let snippet_end = if end + 30 < text.len() {
         end + 30
     } else {
@@ -616,20 +606,17 @@ fn extract_snippet(text: &str, start: usize, end: usize) -> String {
     // Adjust to word boundaries
     let snippet_start = text[snippet_start..start]
         .rfind(' ')
-        .map(|p| snippet_start + p + 1)
-        .unwrap_or(snippet_start);
+        .map_or(snippet_start, |p| snippet_start + p + 1);
 
     let snippet_end = text[end..snippet_end]
         .find(' ')
-        .map(|p| {
+        .map_or(snippet_end, |p| {
             // Find the end of the relevant portion (after a few more words)
             let after_space = end + p + 1;
             text[after_space..snippet_end]
                 .find(' ')
-                .map(|p2| after_space + p2)
-                .unwrap_or(snippet_end)
-        })
-        .unwrap_or(snippet_end);
+                .map_or(snippet_end, |p2| after_space + p2)
+        });
 
     text[snippet_start..snippet_end].to_string()
 }

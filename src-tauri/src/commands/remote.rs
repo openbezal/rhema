@@ -22,7 +22,7 @@ impl CommandSink for TauriSink {
             .map_err(|e| CommandError::DispatchFailed(format!("Tauri emit failed: {e}")))
     }
 
-    fn invoke_backend(&self, action: &str, _args: &str) -> Result<(), CommandError> {
+    fn invoke_backend(&self, action: &str, args: &str) -> Result<(), CommandError> {
         match action {
             "show_broadcast" => {
                 log::info!("Remote control: show broadcast");
@@ -38,7 +38,7 @@ impl CommandSink for TauriSink {
             }
             "set_confidence" => {
                 self.app
-                    .emit("remote:confidence", _args.to_string())
+                    .emit("remote:confidence", args.to_string())
                     .map_err(|e| CommandError::DispatchFailed(e.to_string()))
             }
             _ => Err(CommandError::DispatchFailed(format!(
@@ -124,7 +124,7 @@ pub async fn get_osc_status(
     let runtime = state.lock().map_err(|e| e.to_string())?;
 
     Ok(OscStatus {
-        running: runtime.handle.as_ref().map_or(false, |h| h.is_active()),
+        running: runtime.handle.as_ref().is_some_and(rhema_api::OscHandle::is_active),
         port: runtime.bound_port,
     })
 }
@@ -226,7 +226,7 @@ pub async fn get_http_status(
     let runtime = state.lock().map_err(|e| e.to_string())?;
 
     Ok(HttpStatus {
-        running: runtime.handle.as_ref().map_or(false, |h| h.is_active()),
+        running: runtime.handle.as_ref().is_some_and(rhema_api::HttpHandle::is_active),
         port: runtime.bound_port,
     })
 }

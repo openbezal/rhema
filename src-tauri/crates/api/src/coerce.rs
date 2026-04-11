@@ -45,7 +45,9 @@ pub fn coerce_bool(arg: &OscType) -> Result<bool, CommandError> {
 pub fn coerce_f32_normalized(arg: &OscType) -> Result<f32, CommandError> {
     match arg {
         OscType::Float(f) => Ok(f.clamp(0.0, 1.0)),
+        #[expect(clippy::cast_possible_truncation, reason = "OSC double values are small control values that fit in f32")]
         OscType::Double(d) => Ok((*d as f32).clamp(0.0, 1.0)),
+        #[expect(clippy::cast_precision_loss, reason = "OSC int values are small control values that fit in f32")]
         OscType::Int(i) => {
             let val = if *i > 1 {
                 *i as f32 / 100.0
@@ -54,6 +56,7 @@ pub fn coerce_f32_normalized(arg: &OscType) -> Result<f32, CommandError> {
             };
             Ok(val.clamp(0.0, 1.0))
         }
+        #[expect(clippy::cast_precision_loss, reason = "OSC long values are small control values that fit in f32")]
         OscType::Long(l) => {
             let val = if *l > 1 {
                 *l as f32 / 100.0

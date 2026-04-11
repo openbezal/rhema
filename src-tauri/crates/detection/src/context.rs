@@ -64,6 +64,7 @@ impl SermonContext {
         }
         self.last_update = Some(Instant::now());
 
+        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()

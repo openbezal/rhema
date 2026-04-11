@@ -41,7 +41,7 @@ pub fn precompute_embeddings(
     output_ids_path: &Path,
 ) -> Result<(), DetectionError> {
     let total = verses.len();
-    log::info!("Pre-computing embeddings for {} verses ...", total);
+    log::info!("Pre-computing embeddings for {total} verses ...");
 
     let mut emb_file = std::fs::File::create(output_embeddings_path).map_err(|e| {
         DetectionError::Internal(format!(
@@ -61,7 +61,7 @@ pub fn precompute_embeddings(
         // Safety: f32 has no padding and a well-defined repr.
         let emb_bytes: &[u8] = unsafe {
             std::slice::from_raw_parts(
-                embedding.as_ptr() as *const u8,
+                embedding.as_ptr().cast::<u8>(),
                 embedding.len() * std::mem::size_of::<f32>(),
             )
         };

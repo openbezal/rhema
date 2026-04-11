@@ -54,7 +54,7 @@ pub enum NdiResolution {
 }
 
 impl NdiResolution {
-    pub fn dimensions(self) -> (u32, u32) {
+    pub fn dimensions(&self) -> (u32, u32) {
         match self {
             Self::R720p => (1280, 720),
             Self::R1080p => (1920, 1080),
@@ -72,7 +72,7 @@ pub enum NdiFrameRate {
 }
 
 impl NdiFrameRate {
-    pub fn fps(self) -> u32 {
+    pub fn fps(&self) -> u32 {
         match self {
             Self::Fps24 => 24,
             Self::Fps30 => 30,
@@ -130,6 +130,7 @@ pub enum NdiError {
     InvalidFrameBufferSize { width: u32, height: u32 },
 }
 
+#[derive(Default)]
 pub struct NdiRuntime {
     sessions: std::collections::HashMap<String, ActiveNdiSession>,
 }
@@ -139,14 +140,6 @@ impl std::fmt::Debug for NdiRuntime {
         f.debug_struct("NdiRuntime")
             .field("active_sessions", &self.sessions.len())
             .finish()
-    }
-}
-
-impl Default for NdiRuntime {
-    fn default() -> Self {
-        Self {
-            sessions: std::collections::HashMap::new(),
-        }
     }
 }
 
@@ -168,16 +161,16 @@ impl NdiRuntime {
     ) -> Result<NdiSessionInfo, NdiError> {
         // Stop existing session with this ID if running
         if let Some(existing) = self.sessions.remove(&session_id) {
-            log::info!("NDI[{}]: shutting down existing session before restart", session_id);
+            log::info!("NDI[{session_id}]: shutting down existing session before restart");
             drop(existing);
         }
 
-        log::info!("NDI[{}]: starting session '{}'", session_id, request.source_name);
+        log::info!("NDI[{session_id}]: starting session '{}'", request.source_name);
         let session = ActiveNdiSession::create(request)?;
         let info = session.info.clone();
         log::info!(
-            "NDI[{}]: session active — {}x{} @ {}fps",
-            session_id, info.width, info.height, info.fps
+            "NDI[{session_id}]: session active — {}x{} @ {}fps",
+            info.width, info.height, info.fps
         );
         self.sessions.insert(session_id, session);
         Ok(info)
@@ -185,14 +178,14 @@ impl NdiRuntime {
 
     pub fn stop(&mut self, session_id: &str) {
         if let Some(existing) = self.sessions.remove(session_id) {
-            log::info!("NDI[{}]: stopping session", session_id);
+            log::info!("NDI[{session_id}]: stopping session");
             drop(existing);
         }
     }
 
     pub fn stop_all(&mut self) {
         for (id, _session) in self.sessions.drain() {
-            log::info!("NDI[{}]: stopping session", id);
+            log::info!("NDI[{id}]: stopping session");
         }
     }
 
@@ -205,7 +198,7 @@ impl NdiRuntime {
         session_id: &str,
         width: u32,
         height: u32,
-        rgba_data: Vec<u8>,
+        rgba_data: &[u8],
     ) -> Result<(), NdiError> {
         let session = self
             .sessions
@@ -237,6 +230,7 @@ unsafe impl Send for NdiRuntime {}
 unsafe impl Sync for NdiRuntime {}
 
 impl ActiveNdiSession {
+    #[expect(clippy::needless_pass_by_value, reason = "request fields are destructured and moved into the session")]
     fn create(request: NdiStartRequest) -> Result<Self, NdiError> {
         let source_name = request.source_name.trim().to_string();
         if source_name.is_empty() {
@@ -271,7 +265,8 @@ impl ActiveNdiSession {
         // SAFETY: send_create_fn is a valid function pointer. The NdiSendCreate struct has valid
         // pointers (name is a CString kept alive by _sender_name field). p_groups is null which
         // NDI accepts.
-        let sender = unsafe { send_create_fn(&create as *const NdiSendCreate) };
+        let create_ptr = std::ptr::from_ref(&create);
+        let sender = unsafe { send_create_fn(create_ptr) };
         if sender.is_null() {
             // SAFETY: NDI was initialized successfully above, so ndi_destroy is safe to call
             unsafe { ndi_destroy_fn() };
@@ -306,7 +301,7 @@ impl ActiveNdiSession {
         &mut self,
         width: u32,
         height: u32,
-        rgba_data: Vec<u8>,
+        rgba_data: &[u8],
     ) -> Result<(), NdiError> {
         if width != self.info.width || height != self.info.height {
             return Err(NdiError::FrameDimensionsMismatch {
@@ -336,6 +331,14 @@ impl ActiveNdiSession {
             };
         }
 
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "NDI FFI requires i32 for dimensions/rates that are always positive and small"
+        )]
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "NDI FFI requires f32 aspect ratio; u32 dimensions fit in f32 without loss"
+        )]
         let frame = NdiVideoFrameV2 {
             xres: width as i32,
             yres: height as i32,
@@ -353,13 +356,15 @@ impl ActiveNdiSession {
 
         // SAFETY: sender is a valid NDI send instance. frame points to self.frame_buffer which
         // is correctly sized and will outlive this call.
+        let sender = self.sender;
+        let frame_ptr = std::ptr::from_ref(&frame);
         unsafe {
-            (self.send_video)(self.sender, &frame);
+            (self.send_video)(sender, frame_ptr);
         }
         self.frame_count += 1;
         if self.frame_count == 1 {
-            log::info!("NDI: first frame sent ({}x{}, {} bytes)", width, height, self.frame_buffer.len());
-        } else if self.frame_count % 300 == 0 {
+            log::info!("NDI: first frame sent ({width}x{height}, {} bytes)", self.frame_buffer.len());
+        } else if self.frame_count.is_multiple_of(300) {
             log::info!("NDI: {} frames sent", self.frame_count);
         }
         Ok(())
@@ -371,8 +376,9 @@ impl Drop for ActiveNdiSession {
         // SAFETY: sender was created by NDIlib_send_create and is non-null (validated in create()).
         // send_destroy and ndi_destroy are valid function pointers loaded from the NDI library.
         // The library (_library field) is kept alive by this struct and will be dropped after this.
+        let sender = self.sender;
         unsafe {
-            (self.send_destroy)(self.sender);
+            (self.send_destroy)(sender);
             (self.ndi_destroy)();
         }
     }

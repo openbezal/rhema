@@ -67,6 +67,7 @@ impl Chunker {
     }
 
     /// Split text into trimmed, non-empty sentences.
+    #[expect(clippy::unused_self, reason = "method kept on self for future extensibility")]
     fn split_sentences(&self, text: &str) -> Vec<String> {
         // First replace newlines with a sentence-ending marker so they
         // act as boundaries alongside punctuation.

@@ -4,6 +4,7 @@ mod state;
 
 use std::sync::Mutex;
 
+#[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load .env file — try src-tauri/.env first, then project root ../.env
@@ -97,9 +98,9 @@ pub fn run() {
                 state.bible_db = Some(bible_db);
                 state.quotation_matcher = quotation_matcher;
                 drop(state);
-                log::info!("Bible database loaded from {:?}", db_path);
+                log::info!("Bible database loaded from {}", db_path.display());
             } else {
-                log::warn!("Bible database not found at {:?}", db_path);
+                log::warn!("Bible database not found at {}", db_path.display());
             }
 
             // Try to load ONNX embedding model and pre-computed verse index

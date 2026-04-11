@@ -3,6 +3,7 @@ use std::time::Instant;
 
 /// Tracks recent Bible reference context so partial references
 /// (e.g., "verse 17" without a book/chapter) can be resolved.
+#[expect(clippy::struct_field_names, reason = "last_ prefix conveys temporal context clearly")]
 pub struct ReferenceContext {
     last_book: Option<i32>,
     last_book_name: Option<String>,
@@ -31,10 +32,10 @@ impl ReferenceContext {
         }
     }
 
-    /// Resolve a partial VerseRef by filling in missing book/chapter from context.
+    /// Resolve a partial `VerseRef` by filling in missing book/chapter from context.
     ///
-    /// If the verse_ref has book_number == 0, attempt to fill from context.
-    /// If the verse_ref has chapter == 0, attempt to fill from context.
+    /// If the `verse_ref` has `book_number` == 0, attempt to fill from context.
+    /// If the `verse_ref` has chapter == 0, attempt to fill from context.
     pub fn resolve(&self, partial: &VerseRef) -> VerseRef {
         let mut resolved = partial.clone();
 
@@ -49,7 +50,7 @@ impl ReferenceContext {
             }
             if let Some(ref name) = self.last_book_name {
                 if resolved.book_name.is_empty() {
-                    resolved.book_name = name.clone();
+                    resolved.book_name.clone_from(name);
                 }
             }
         }
