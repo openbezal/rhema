@@ -37,45 +37,7 @@ pub fn start(
 ) -> Result<AudioCapture, AudioError> {
     let host = cpal::default_host();
 
-    // Select the device
-    log::info!("[AUDIO] Requested device_id: {:?}", config.device_id);
-
-    let device = match &config.device_id {
-        Some(id) if !id.is_empty() => {
-            let mut found = None;
-            let input_devices = host
-                .input_devices()
-                .map_err(|e| AudioError::StreamError(format!("Failed to enumerate devices: {e}")))?;
-            for d in input_devices {
-                if let Ok(name) = d.name() {
-                    log::info!("[AUDIO]   Available device: '{}'", name);
-                    if name == *id {
-                        log::info!("[AUDIO]   ✓ MATCH: '{}'", name);
-                        found = Some(d);
-                        break;
-                    }
-                }
-            }
-            match found {
-                Some(d) => {
-                    log::info!("[AUDIO] Using requested device: '{}'", id);
-                    d
-                }
-                None => {
-                    log::warn!("[AUDIO] Device '{}' not found! Falling back to default.", id);
-                    host.default_input_device()
-                        .ok_or(AudioError::NoInputDevices)?
-                }
-            }
-        }
-        _ => {
-            let d = host
-                .default_input_device()
-                .ok_or(AudioError::NoInputDevices)?;
-            log::info!("[AUDIO] Using default device: '{}'", d.name().unwrap_or_default());
-            d
-        }
-    };
+    let device = select_device(&host, &config.device_id)?;
 
     let supported_config = device
         .default_input_config()
@@ -94,87 +56,95 @@ pub fn start(
         log::error!("Audio stream error: {err}");
     };
 
-    let stream = match sample_format {
+    let stream = build_stream(&device, &supported_config, config.gain, sender)?;
+
+    log::info!("[AUDIO] Capture started successfully");
+    Ok(AudioCapture { stream })
+}
+
+fn select_device(host: &cpal::Host, device_id: &Option<String>) -> Result<cpal::Device, AudioError> {
+    log::info!("[AUDIO] Selecting device: {:?}", device_id);
+
+    match device_id {
+        Some(id) if !id.is_empty() => {
+            let input_devices = host
+                .input_devices()
+                .map_err(|e| AudioError::StreamError(format!("Failed to enumerate devices: {e}")))?;
+            
+            for d in input_devices {
+                if let Ok(name) = d.name() {
+                    if name == *id {
+                        log::info!("[AUDIO]   ✓ Matched: '{}'", name);
+                        return Ok(d);
+                    }
+                }
+            }
+            
+            log::warn!("[AUDIO] Device '{}' not found! Falling back to default.", id);
+            host.default_input_device().ok_or(AudioError::NoInputDevices)
+        }
+        _ => {
+            let d = host.default_input_device().ok_or(AudioError::NoInputDevices)?;
+            log::info!("[AUDIO] Using default device: '{}'", d.name().unwrap_or_default());
+            Ok(d)
+        }
+    }
+}
+
+fn build_stream(
+    device: &cpal::Device,
+    supported_config: &cpal::SupportedStreamConfig,
+    gain: f32,
+    sender: Sender<AudioFrame>,
+) -> Result<cpal::Stream, AudioError> {
+    let source_sample_rate = supported_config.sample_rate().0;
+    let source_channels = supported_config.channels() as usize;
+    let sample_format = supported_config.sample_format();
+    let stream_config: StreamConfig = supported_config.clone().into();
+    
+    let target_sample_rate: u32 = 16_000;
+    let err_fn = |err: cpal::StreamError| {
+        log::error!("Audio stream error: {err}");
+    };
+
+    match sample_format {
         SampleFormat::I16 => {
-            let sender = sender.clone();
             device.build_input_stream(
                 &stream_config,
-                move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                    process_and_send(
-                        data,
-                        source_channels,
-                        source_sample_rate,
-                        target_sample_rate,
-                        gain,
-                        &sender,
-                    );
+                move |data: &[i16], _| {
+                    process_and_send(data, source_channels, source_sample_rate, target_sample_rate, gain, &sender);
                 },
                 err_fn,
                 None,
             )
         }
         SampleFormat::F32 => {
-            let sender = sender.clone();
             device.build_input_stream(
                 &stream_config,
-                move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                    // Convert f32 -> i16
-                    let i16_data: Vec<i16> = data
-                        .iter()
-                        .map(|&s| {
-                            let clamped = s.clamp(-1.0, 1.0);
-                            (clamped * i16::MAX as f32) as i16
-                        })
-                        .collect();
-                    process_and_send(
-                        &i16_data,
-                        source_channels,
-                        source_sample_rate,
-                        target_sample_rate,
-                        gain,
-                        &sender,
-                    );
+                move |data: &[f32], _| {
+                    let i16_data: Vec<i16> = data.iter().map(|&s| (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16).collect();
+                    process_and_send(&i16_data, source_channels, source_sample_rate, target_sample_rate, gain, &sender);
                 },
                 err_fn,
                 None,
             )
         }
         SampleFormat::U16 => {
-            let sender = sender.clone();
             device.build_input_stream(
                 &stream_config,
-                move |data: &[u16], _: &cpal::InputCallbackInfo| {
-                    // Convert u16 -> i16 (u16 midpoint is 32768)
-                    let i16_data: Vec<i16> = data
-                        .iter()
-                        .map(|&s| (s as i32 - 32768) as i16)
-                        .collect();
-                    process_and_send(
-                        &i16_data,
-                        source_channels,
-                        source_sample_rate,
-                        target_sample_rate,
-                        gain,
-                        &sender,
-                    );
+                move |data: &[u16], _| {
+                    let i16_data: Vec<i16> = data.iter().map(|&s| (s as i32 - 32768) as i16).collect();
+                    process_and_send(&i16_data, source_channels, source_sample_rate, target_sample_rate, gain, &sender);
                 },
                 err_fn,
                 None,
             )
         }
-        _ => {
-            return Err(AudioError::StreamError(format!(
-                "Unsupported sample format: {sample_format:?}"
-            )));
-        }
+        _ => Err(cpal::BuildStreamError::BackendSpecific { 
+            err: cpal::BackendSpecificError { description: format!("Unsupported sample format: {:?}", sample_format) } 
+        }),
     }
-    .map_err(|e| AudioError::StreamError(format!("Failed to build input stream: {e}")))?;
-
-    stream
-        .play()
-        .map_err(|e| AudioError::StreamError(format!("Failed to start stream: {e}")))?;
-
-    Ok(AudioCapture { stream })
+    .map_err(|e| AudioError::StreamError(format!("Failed to build input stream: {e}")))
 }
 
 /// Downmix to mono, apply gain, resample to target rate, and send as AudioFrame.

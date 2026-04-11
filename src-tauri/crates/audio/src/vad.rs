@@ -103,6 +103,7 @@ impl Vad {
     /// Also returns a state transition event if the state changed.
     pub fn process(&mut self, frame: &AudioFrame) -> VadResult {
         let level = meter::compute_level(&frame.samples);
+        log::trace!("[VAD] Frame processed - RMS: {:.6}, Peak: {:.6}", level.rms, level.peak);
         let is_voiced = level.rms >= self.config.silence_threshold
             && level.rms >= self.config.frame_threshold;
 
@@ -113,6 +114,7 @@ impl Vad {
                     if self.voice_count >= self.config.min_voice_frames {
                         // Transition to Speech
                         self.state = VadState::Speech;
+                        log::debug!("[VAD] State transition: Silence -> Speech (voiced frames: {})", self.voice_count);
                         self.silence_count = 0;
                         self.utterance_frames = 0;
 
@@ -162,6 +164,7 @@ impl Vad {
                     if self.silence_count >= self.config.silence_frame_count {
                         // Transition to Silence (skip Trailing for simplicity)
                         self.state = VadState::Silence;
+                        log::debug!("[VAD] State transition: Speech -> Silence (silence frames: {})", self.silence_count);
                         self.voice_count = 0;
                         self.silence_count = 0;
                         self.pre_buffer.clear();
