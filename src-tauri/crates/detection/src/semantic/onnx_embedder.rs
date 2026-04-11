@@ -146,9 +146,9 @@ impl OnnxEmbedder {
         }
 
         log::info!(
-            "OnnxEmbedder loaded: dim={}, model={}",
+            "OnnxEmbedder loaded: dim={}, model={:?}",
             dim,
-            model_path.display()
+            model_path.file_name().unwrap_or_default()
         );
 
         Ok(Self {

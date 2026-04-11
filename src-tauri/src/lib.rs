@@ -88,7 +88,7 @@ pub fn run() {
                 state.bible_db = Some(bible_db);
                 state.quotation_matcher = quotation_matcher;
                 drop(state);
-                log::info!("Bible database loaded from {:?}", db_path);
+                log::info!("Bible database loaded successfully ({:?})", db_path.file_name().unwrap_or_default());
             } else {
                 log::warn!("Bible database not found at {:?}", db_path);
             }

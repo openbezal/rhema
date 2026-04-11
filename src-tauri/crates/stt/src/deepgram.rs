@@ -94,7 +94,7 @@ impl DeepgramClient {
             );
         }
 
-        log::info!("Deepgram WebSocket URL: {}", url.as_str());
+        log::info!("Deepgram WebSocket connection initialized ({} host)", url.host_str().unwrap_or("unknown"));
         Ok(url)
     }
 
