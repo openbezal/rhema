@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { cn } from "@/lib/utils"
+import { resolveRenderableTheme } from "@/lib/renderable-theme"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { deriveLiveVerse } from "@/hooks/use-broadcast"
 
@@ -9,13 +10,20 @@ export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const draftTheme = useBroadcastStore((s) => s.draftTheme)
+  const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
 
   // Read the same data source as the preview panel
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
   const translations = useBibleStore((s) => s.translations)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
 
-  const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
+  const activeTheme = resolveRenderableTheme({
+    themes,
+    themeId: activeThemeId,
+    draftTheme,
+    editingThemeId,
+  })
   const translation =
     translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
 

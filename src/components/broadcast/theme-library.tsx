@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react"
 import { useBroadcastStore } from "@/stores"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Input } from "@/components/ui/input"
@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { resolveRenderableTheme } from "@/lib/renderable-theme"
+import { serializeThemes } from "@/lib/theme-transfer"
+import {
+  pickThemeBackgroundImage,
+  saveThemeExportFile,
+  showThemeDesignerMessage,
+} from "@/lib/theme-designer-files"
 import {
   PlusIcon,
   HeartIcon,
@@ -26,20 +33,61 @@ const THUMBNAIL_VERSE: VerseRenderData = {
 
 function ThemeCard({
   theme,
+  canDelete,
   isActive,
   isEditing,
+  onDelete,
+  onMakeActive,
+  onRename,
   onSelect,
 }: {
   theme: BroadcastTheme
+  canDelete: boolean
   isActive: boolean
   isEditing: boolean
+  onDelete: () => void
+  onMakeActive: () => void
+  onRename: (name: string) => void
   onSelect: () => void
 }) {
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [pendingName, setPendingName] = useState(theme.name)
+
+  useEffect(() => {
+    setPendingName(theme.name)
+  }, [theme.name])
+
+  const commitRename = () => {
+    const nextName = pendingName.trim()
+    if (!nextName) {
+      setPendingName(theme.name)
+      setIsRenaming(false)
+      return
+    }
+
+    onRename(nextName)
+    setIsRenaming(false)
+  }
+
+  const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      commitRename()
+      return
+    }
+
+    if (event.key === "Escape") {
+      setPendingName(theme.name)
+      setIsRenaming(false)
+    }
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={() => {
+        if (!isRenaming) onSelect()
+      }}
       className={cn(
         "group relative flex w-full flex-col gap-1.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted/50",
         isEditing && "ring-2 ring-primary"
@@ -67,9 +115,21 @@ function ThemeCard({
       {/* Info */}
       <div className="flex items-center gap-1.5 px-0.5">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium text-foreground">
-            {theme.name}
-          </p>
+          {isRenaming ? (
+            <Input
+              autoFocus
+              value={pendingName}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setPendingName(event.target.value)}
+              onBlur={commitRename}
+              onKeyDown={handleRenameKeyDown}
+              className="h-7"
+            />
+          ) : (
+            <p className="truncate text-xs font-medium text-foreground">
+              {theme.name}
+            </p>
+          )}
           {isActive && (
             <p className="text-[0.5rem] text-muted-foreground">Default</p>
           )}
@@ -91,10 +151,51 @@ function ThemeCard({
           className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation()
+            setIsRenaming(true)
           }}
         >
           <MoreHorizontalIcon className="size-3" />
         </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-1 px-0.5 pb-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {!isActive && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-[0.625rem]"
+            onClick={(event) => {
+              event.stopPropagation()
+              onMakeActive()
+            }}
+          >
+            Use Live
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-[0.625rem]"
+          onClick={(event) => {
+            event.stopPropagation()
+            setIsRenaming(true)
+          }}
+        >
+          Rename
+        </Button>
+        {canDelete && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-[0.625rem]"
+            onClick={(event) => {
+              event.stopPropagation()
+              onDelete()
+            }}
+          >
+            Delete
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -104,6 +205,7 @@ export function ThemeLibrary() {
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
+  const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
 
@@ -122,10 +224,74 @@ export function ThemeLibrary() {
   const customThemes = filteredThemes.filter((t) => !t.builtin)
 
   const handleNewTheme = () => {
-    const firstTheme = themes[0]
-    if (firstTheme) {
-      useBroadcastStore.getState().duplicateTheme(firstTheme.id)
+    useBroadcastStore.getState().createTheme()
+  }
+
+  const handleDeleteTheme = async (theme: BroadcastTheme) => {
+    const confirmed = window.confirm(`Delete "${theme.name}"?`)
+    if (!confirmed) return
+    useBroadcastStore.getState().deleteTheme(theme.id)
+  }
+
+  const renderThemeCard = (theme: BroadcastTheme) => {
+    const displayTheme = resolveRenderableTheme({
+      themes,
+      themeId: theme.id,
+      draftTheme,
+      editingThemeId,
+    })
+
+    return (
+      <ThemeCard
+        key={theme.id}
+        theme={displayTheme}
+        canDelete={!theme.builtin}
+        isActive={theme.id === activeThemeId}
+        isEditing={theme.id === editingThemeId}
+        onDelete={() => void handleDeleteTheme(theme)}
+        onMakeActive={() => useBroadcastStore.getState().setActiveTheme(theme.id)}
+        onRename={(name) => useBroadcastStore.getState().renameTheme(theme.id, name)}
+        onSelect={() =>
+          useBroadcastStore.getState().startEditing(theme.id)
+        }
+      />
+    )
+  }
+
+  const handleImportClick = async () => {
+    const draftTheme = useBroadcastStore.getState().draftTheme
+    if (!draftTheme) {
+      await showThemeDesignerMessage(
+        "Select a theme first, then import a background image.",
+        "warning",
+      )
+      return
     }
+
+    const imageUrl = await pickThemeBackgroundImage()
+    if (!imageUrl) return
+
+    useBroadcastStore.getState().updateDraft({
+      background: {
+        ...draftTheme.background,
+        type: "image",
+        image: {
+          url: imageUrl,
+          fit: draftTheme.background.image?.fit ?? "cover",
+          blur: draftTheme.background.image?.blur ?? 0,
+          brightness: draftTheme.background.image?.brightness ?? 100,
+          tint: draftTheme.background.image?.tint ?? null,
+        },
+      },
+    })
+  }
+
+  const handleExportAll = async () => {
+    const contents = serializeThemes(themes)
+    const stamp = new Date().toISOString().slice(0, 10)
+    const didSave = await saveThemeExportFile(`rhema-themes-${stamp}.json`, contents)
+    if (!didSave) return
+    await showThemeDesignerMessage("Themes exported successfully.")
   }
 
   return (
@@ -167,11 +333,19 @@ export function ThemeLibrary() {
 
       {/* Import / Export */}
       <div className="flex gap-1.5 px-3 pb-3">
-        <Button variant="outline" className="flex-1 border-border bg-transparent">
+        <Button
+          variant="outline"
+          className="flex-1 border-border bg-transparent"
+          onClick={() => void handleImportClick()}
+        >
           <UploadIcon className="size-2.5" />
           Import
         </Button>
-        <Button variant="outline" className="flex-1 border-border bg-transparent">
+        <Button
+          variant="outline"
+          className="flex-1 border-border bg-transparent"
+          onClick={() => void handleExportAll()}
+        >
           <DownloadIcon className="size-2.5" />
           Export All
         </Button>
@@ -186,17 +360,7 @@ export function ThemeLibrary() {
               <p className="px-1.5 pt-2 pb-1 text-[0.625rem] font-semibold tracking-widest text-muted-foreground uppercase">
                 Built-in
               </p>
-              {builtinThemes.map((theme) => (
-                <ThemeCard
-                  key={theme.id}
-                  theme={theme}
-                  isActive={theme.id === activeThemeId}
-                  isEditing={theme.id === editingThemeId}
-                  onSelect={() =>
-                    useBroadcastStore.getState().startEditing(theme.id)
-                  }
-                />
-              ))}
+              {builtinThemes.map(renderThemeCard)}
             </>
           )}
 
@@ -206,17 +370,7 @@ export function ThemeLibrary() {
               <p className="px-1.5 pt-3 pb-1 text-[0.625rem] font-semibold tracking-widest text-muted-foreground uppercase">
                 Custom
               </p>
-              {customThemes.map((theme) => (
-                <ThemeCard
-                  key={theme.id}
-                  theme={theme}
-                  isActive={theme.id === activeThemeId}
-                  isEditing={theme.id === editingThemeId}
-                  onSelect={() =>
-                    useBroadcastStore.getState().startEditing(theme.id)
-                  }
-                />
-              ))}
+              {customThemes.map(renderThemeCard)}
             </>
           )}
 

@@ -1,3 +1,4 @@
+import { pickThemeBackgroundImage } from "@/lib/theme-designer-files"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
@@ -197,17 +198,11 @@ function ImageSection() {
           size="sm"
           className="w-full"
           onClick={() => {
-            const input = document.createElement("input")
-            input.type = "file"
-            input.accept = "image/*"
-            input.onchange = (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0]
-              if (file) {
-                const url = URL.createObjectURL(file)
-                update("background.image.url", url)
-              }
-            }
-            input.click()
+            void (async () => {
+              const imageUrl = await pickThemeBackgroundImage()
+              if (!imageUrl) return
+              update("background.image.url", imageUrl)
+            })()
           }}
         >
           Change Image
@@ -350,13 +345,18 @@ function TextBoxSection() {
     <div className="flex flex-col gap-3 border-t pt-3">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold">Text Box</h4>
-        <input
-          type="checkbox"
-          checked={textBox.enabled}
-          onChange={(e) => update("textBox.enabled", e.target.checked)}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-      </div>
+          <input
+            type="checkbox"
+            checked={textBox.enabled}
+            onChange={(e) => {
+              update("textBox.enabled", e.target.checked)
+              if (e.target.checked && textBox.opacity === 0) {
+                update("textBox.opacity", 0.5)
+              }
+            }}
+            className="h-4 w-4 rounded border-input accent-primary"
+          />
+        </div>
 
       {textBox.enabled && (
         <div className="flex flex-col gap-3">

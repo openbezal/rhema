@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const emitToMock = vi.fn()
+const { emitToMock } = vi.hoisted(() => ({
+  emitToMock: vi.fn(),
+}))
 
 vi.mock("@tauri-apps/api/event", () => ({
   emitTo: emitToMock,
@@ -27,7 +29,7 @@ describe("broadcast store sync", () => {
     emitToMock.mockClear()
     useBroadcastStore.getState().syncBroadcastOutput()
 
-    expect(emitToMock).toHaveBeenCalledTimes(1)
+    expect(emitToMock).toHaveBeenCalledTimes(2)
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:verse-update",
@@ -36,5 +38,127 @@ describe("broadcast store sync", () => {
         verse: expect.objectContaining({ reference: "John 3:16" }),
       }),
     )
+  })
+
+  it("uses the draft theme for broadcast output while editing the active theme", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+    const draftTheme = {
+      ...theme,
+      layout: {
+        ...theme.layout,
+        offsetX: 140,
+        offsetY: -60,
+      },
+    }
+
+    useBroadcastStore.setState({
+      activeThemeId: theme.id,
+      editingThemeId: theme.id,
+      draftTheme,
+      liveVerse: {
+        reference: "John 3:16",
+        segments: [{ text: "For God so loved the world", verseNumber: 16 }],
+      },
+    })
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().syncBroadcastOutput()
+
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({
+        theme: expect.objectContaining({
+          id: theme.id,
+          layout: expect.objectContaining({
+            offsetX: 140,
+            offsetY: -60,
+          }),
+        }),
+      }),
+    )
+  })
+
+  it("re-syncs broadcast output when an active theme draft changes", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+
+    useBroadcastStore.setState({
+      activeThemeId: theme.id,
+      editingThemeId: theme.id,
+      draftTheme: theme,
+      liveVerse: {
+        reference: "John 3:16",
+        segments: [{ text: "For God so loved the world", verseNumber: 16 }],
+      },
+    })
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().updateDraftNested("layout.offsetX", 220)
+
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({
+        theme: expect.objectContaining({
+          layout: expect.objectContaining({
+            offsetX: 220,
+          }),
+        }),
+      }),
+    )
+  })
+
+  it("renames both the saved theme and the current draft", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+
+    useBroadcastStore.setState({
+      editingThemeId: theme.id,
+      draftTheme: theme,
+    })
+
+    useBroadcastStore.getState().renameTheme(theme.id, "New Theme Name")
+
+    const state = useBroadcastStore.getState()
+    expect(state.themes.find((entry) => entry.id === theme.id)?.name).toBe("New Theme Name")
+    expect(state.draftTheme?.name).toBe("New Theme Name")
+  })
+
+  it("creates a new untitled custom theme and starts editing it", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+
+    useBroadcastStore.getState().createTheme()
+
+    const state = useBroadcastStore.getState()
+    const createdTheme = state.themes.find((theme) => theme.id === state.editingThemeId)
+
+    expect(createdTheme).toBeTruthy()
+    expect(createdTheme?.builtin).toBe(false)
+    expect(createdTheme?.name).toBe("Untitled")
+    expect(state.draftTheme?.id).toBe(createdTheme?.id)
+  })
+
+  it("falls back to the first remaining theme when deleting the active theme", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const [firstTheme] = useBroadcastStore.getState().themes
+    useBroadcastStore.getState().duplicateTheme(firstTheme.id)
+    const customTheme = useBroadcastStore.getState().themes.find((theme) => !theme.builtin)
+
+    expect(customTheme).toBeTruthy()
+
+    useBroadcastStore.setState({
+      activeThemeId: customTheme!.id,
+      editingThemeId: customTheme!.id,
+      draftTheme: customTheme!,
+    })
+
+    useBroadcastStore.getState().deleteTheme(customTheme!.id)
+
+    const state = useBroadcastStore.getState()
+    expect(state.activeThemeId).toBe(firstTheme.id)
+    expect(state.editingThemeId).toBeNull()
+    expect(state.draftTheme).toBeNull()
   })
 })
