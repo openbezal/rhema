@@ -27,7 +27,7 @@ export function TransportBar() {
           Veeba
         </span>
         <Badge variant="outline" className="text-[0.5625rem] uppercase">
-          Free
+          Pro
         </Badge>
       </div>
 
