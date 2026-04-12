@@ -44,8 +44,9 @@ import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
+import { ScriptureQuickNav } from "@/components/scripture-quick-nav"
 
-type SearchTab = "book" | "context"
+type SearchTab = "book" | "context" | "quick"
 
 /** Highlights words from the query that appear in the text (like Logos AI). */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -76,7 +77,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 }
 
 export function SearchPanel() {
-  const [activeTab, setActiveTab] = useState<SearchTab>("book")
+  const [activeTab, setActiveTab] = useState<SearchTab>("quick")
   const [bookOpen, setBookOpen] = useState(false)
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState(1)
@@ -366,6 +367,18 @@ export function SearchPanel() {
       <div className="flex shrink-0 items-center gap-0 border-b border-border min-h-11">
         <div className="flex items-center gap-1 px-3 py-1.5">
           <button
+            onClick={() => setActiveTab("quick")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "quick"
+                ? "border-lime-500/50 bg-lime-500/15"
+                : "border-border text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <SearchIcon className={cn("size-3.5", activeTab === "quick" ? "text-lime-400" : "text-muted-foreground")} />
+            Quick nav
+          </button>
+          <button
             data-tour="book-search"
             onClick={() => setActiveTab("book")}
             className={cn(
@@ -396,7 +409,11 @@ export function SearchPanel() {
           </button>
         </div>
 
-        {activeTab === "book" ? (
+        {activeTab === "quick" ? (
+          <div className="flex flex-1 items-center gap-2 pr-3">
+            <ScriptureQuickNav onNavigate={() => panelRef.current?.focus()} />
+          </div>
+        ) : activeTab === "book" ? (
           <div className="flex flex-1 items-center gap-2 pr-3">
             {/* Book combobox */}
             <Popover open={bookOpen} onOpenChange={setBookOpen}>
@@ -502,6 +519,39 @@ export function SearchPanel() {
           </div>
         )}
       </div>
+
+      {/* Quick nav tab */}
+      {activeTab === "quick" && (
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="space-y-3 text-xs text-muted-foreground">
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Quick Navigation</h4>
+              <p>Type to instantly navigate to any scripture.</p>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="font-medium text-foreground">Example:</span>
+                <div className="mt-1 space-y-1 font-mono text-[0.65rem]">
+                  <div>1. Type <code className="px-1 py-0.5 bg-muted rounded">J</code> → autocompletes to "John"</div>
+                  <div>2. Press <code className="px-1 py-0.5 bg-muted rounded">→</code> or <code className="px-1 py-0.5 bg-muted rounded">Tab</code> to accept</div>
+                  <div>3. Type <code className="px-1 py-0.5 bg-muted rounded">3</code> → "John 3:"</div>
+                  <div>4. Select verse from dropdown or type <code className="px-1 py-0.5 bg-muted rounded">16</code></div>
+                  <div>5. Press <code className="px-1 py-0.5 bg-muted rounded">Enter</code> to navigate</div>
+                </div>
+              </div>
+              <div className="pt-2">
+                <span className="font-medium text-foreground">More examples:</span>
+                <div className="mt-1 space-y-0.5 font-mono text-[0.65rem]">
+                  <div><code className="px-1 py-0.5 bg-muted rounded">Gen 1:1</code></div>
+                  <div><code className="px-1 py-0.5 bg-muted rounded">Psalm 23:1</code></div>
+                  <div><code className="px-1 py-0.5 bg-muted rounded">Rom 8:28</code></div>
+                  <div><code className="px-1 py-0.5 bg-muted rounded">Rev 21:4</code></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Book search tab */}
       {activeTab === "book" && (
