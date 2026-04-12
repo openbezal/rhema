@@ -27,6 +27,10 @@ must_use_candidate = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 [package]
 name = "app"
 version = "0.1.0"
