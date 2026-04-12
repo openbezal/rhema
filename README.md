@@ -6,7 +6,8 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 
 ## Features
 
-- **Real-time speech-to-text** via Deepgram (WebSocket streaming + REST fallback)
+- **Real-time speech-to-text** via local Whisper or cloud Deepgram (WebSocket streaming + REST fallback)
+  - [Whisper setup guide](Documentation/whisper.md) — Local, offline transcription (no API costs)
 - **Multi-strategy verse detection**
   - Direct reference parsing (Aho-Corasick automaton + fuzzy matching)
   - Semantic search (Qwen3-0.6B ONNX embeddings + HNSW vector index)
@@ -21,6 +22,8 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 - **Verse queue** with drag-and-drop ordering
 - **Fuzzy contextual search** (Fuse.js client-side)
 - **Audio level metering**, live indicator, and session timer
+- **Remote control** via OSC and HTTP API for hardware controllers and automation
+  - [Remote control guide](Documentation/remote-control.md) — Stream Deck, TouchOSC, REST API integration
 
 ## Tech Stack
 
@@ -51,7 +54,8 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 - [Rust](https://rustup.rs/) toolchain (stable, 1.77.2+)
 - [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (platform-specific system dependencies)
 - [Python 3](https://www.python.org/) (for downloading copyrighted translations and embedding model export)
-- [Deepgram API key](https://deepgram.com/) (for speech-to-text)
+- [CMake](https://cmake.org/) (for Whisper local transcription) — install via `brew install cmake`
+- [Deepgram API key](https://deepgram.com/) (optional, for cloud speech-to-text instead of Whisper)
 
 ## Getting Started
 
@@ -81,11 +85,23 @@ This runs 7 phases in sequence, skipping any that are already complete:
 
 ### Environment
 
+#### Speech-to-Text Options
+
+Rhema supports two speech-to-text engines:
+
+**Option 1: Whisper (Local, Free)**
+No setup required! Whisper runs locally on your machine with no API costs or internet dependency.
+- Requires CMake: `brew install cmake`
+- Model downloads automatically on first use
+
+**Option 2: Deepgram (Cloud, Paid)**
 Create a `.env` file in the project root:
 
 ```
 DEEPGRAM_API_KEY=your_key_here
 ```
+
+Get your API key at [deepgram.com](https://deepgram.com/)
 
 ### NDI SDK (optional)
 
@@ -189,8 +205,8 @@ rhema/
 
 ## Environment Variables
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (optional):
 
 | Variable | Required | Description |
 |---|---|---|
-| `DEEPGRAM_API_KEY` | Yes | API key for Deepgram speech-to-text |
+| `DEEPGRAM_API_KEY` | Optional | API key for Deepgram speech-to-text (not needed if using Whisper) |
