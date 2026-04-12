@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 // Using native overflow-y-auto instead of Radix ScrollArea for reliable scrolling in flex layouts
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { getAutocompleteSuggestion, getTabNavigationResult } from "@/lib/quick-search"
 import {
   Select,
   SelectContent,
@@ -45,7 +46,7 @@ import type { Book, Verse } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
 
-type SearchTab = "book" | "context"
+type SearchTab = "book" | "context" 
 
 /** Highlights words from the query that appear in the text (like Logos AI). */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -83,7 +84,15 @@ export function SearchPanel() {
   const [selectedVerseId, setSelectedVerseId] = useState<number | null>(null)
   const [chapterInput, setChapterInput] = useState("")
   const [contextQuery, setContextQuery] = useState("")
+
+  // EasyWorship-style autocomplete
+  const [quickInput, setQuickInput] = useState("")
+  const [quickSuggestion, setQuickSuggestion] = useState("")
+  const [showQuickVerses, setShowQuickVerses] = useState(false)
+  const [quickVersesList, setQuickVersesList] = useState<Verse[]>([])
+
   const chapterInputRef = useRef<HTMLInputElement>(null)
+  const quickInputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const {
@@ -354,6 +363,96 @@ export function SearchPanel() {
     }
   }, [])
 
+  // EasyWorship-style autocomplete logic
+  useEffect(() => {
+    const result = getAutocompleteSuggestion(quickInput, books)
+
+    // Set suggestion
+    setQuickSuggestion(result.suggestion)
+
+    // Handle navigation and verse loading based on stage
+    if (result.matchedBook && result.chapter && result.verse) {
+      // Navigate to the verse for preview
+      useBibleStore.getState().setPendingNavigation({
+        bookNumber: result.matchedBook.book_number,
+        chapter: result.chapter,
+        verse: result.verse
+      })
+
+      // Keep focus on input
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (quickInputRef.current && document.activeElement !== quickInputRef.current) {
+            quickInputRef.current.focus()
+          }
+        })
+      })
+    }
+
+    // Load verses for dropdown when at chapter stage
+    if (result.stage === "chapter" && result.matchedBook && result.chapter) {
+      invoke<Verse[]>("get_chapter", {
+        translationId: activeTranslationId,
+        bookNumber: result.matchedBook.book_number,
+        chapter: result.chapter
+      }).then(verses => {
+        setQuickVersesList(verses)
+        setShowQuickVerses(true)
+      }).catch(console.error)
+    } else if (result.stage === "verse" && result.matchedBook && result.chapter) {
+      // Show verse dropdown when colon is typed
+      invoke<Verse[]>("get_chapter", {
+        translationId: activeTranslationId,
+        bookNumber: result.matchedBook.book_number,
+        chapter: result.chapter
+      }).then(verses => {
+        setQuickVersesList(verses)
+        setShowQuickVerses(true)
+      }).catch(console.error)
+    } else {
+      setShowQuickVerses(false)
+    }
+  }, [quickInput, books, activeTranslationId])
+
+  const handleQuickKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Tab or → accepts suggestion and advances to NEXT STAGE
+    if ((e.key === "Tab" || e.key === "ArrowRight") && quickSuggestion && quickSuggestion !== quickInput) {
+      e.preventDefault()
+      const nextInput = getTabNavigationResult(quickInput, quickSuggestion)
+      setQuickInput(nextInput)
+      return
+    }
+
+    // Enter clears input (verse is already showing in panel)
+    if (e.key === "Enter") {
+      e.preventDefault()
+      setQuickInput("")
+      setQuickSuggestion("")
+      setShowQuickVerses(false)
+      return
+    }
+
+    // Escape clears
+    if (e.key === "Escape") {
+      e.preventDefault()
+      setQuickInput("")
+      setQuickSuggestion("")
+      setShowQuickVerses(false)
+      return
+    }
+  }, [quickInput, quickSuggestion])
+
+  const handleQuickVerseClick = useCallback((verse: Verse) => {
+    useBibleStore.getState().setPendingNavigation({
+      bookNumber: verse.book_number,
+      chapter: verse.chapter,
+      verse: verse.verse
+    })
+    setQuickInput("")
+    setQuickSuggestion("")
+    setShowQuickVerses(false)
+  }, [])
+
   return (
     <div
       ref={panelRef}
@@ -365,6 +464,7 @@ export function SearchPanel() {
       {/* STICKY: Tab row + search input */}
       <div className="flex shrink-0 items-center gap-0 border-b border-border min-h-11">
         <div className="flex items-center gap-1 px-3 py-1.5">
+          
           <button
             data-tour="book-search"
             onClick={() => setActiveTab("book")}
@@ -398,55 +498,57 @@ export function SearchPanel() {
 
         {activeTab === "book" ? (
           <div className="flex flex-1 items-center gap-2 pr-3">
-            {/* Book combobox */}
-            <Popover open={bookOpen} onOpenChange={setBookOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 min-w-[140px] justify-start gap-1.5 text-xs font-normal"
-                >
-                  <SearchIcon className="size-3 shrink-0 text-muted-foreground" />
-                  {selectedBook ? selectedBook.name : "Select book..."}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[240px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search books..." className="h-8 text-xs" />
-                  <CommandList>
-                    <CommandEmpty>No book found.</CommandEmpty>
-                    <CommandGroup>
-                      {books.map((book) => (
-                        <CommandItem
-                          key={book.id}
-                          value={`${book.name} ${book.abbreviation}`}
-                          onSelect={() => handleBookSelect(book)}
-                          className="text-xs"
-                        >
-                          <span className="w-5 shrink-0 text-right text-muted-foreground">
-                            {book.book_number}
-                          </span>
-                          <span className="flex-1">{book.name}</span>
-                          <Badge variant="outline" className="text-[0.5rem] opacity-50">
-                            {book.testament}
-                          </Badge>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            {/* EasyWorship-style autocomplete */}
+            <div className="relative flex-1">
+              {/* Suggestion overlay */}
+              {quickSuggestion && quickSuggestion !== quickInput && (
+                <div className="absolute inset-0 flex items-center px-3 pointer-events-none z-10">
+                  <span className="text-xs font-normal">
+                    <span className="text-foreground">{quickInput}</span>
+                    <span className="text-gray-500 dark:text-gray-400">{quickSuggestion.slice(quickInput.length)}</span>
+                  </span>
+                </div>
+              )}
 
-            {/* Chapter:Verse input */}
-            <Input
-              ref={chapterInputRef}
-              placeholder={selectedBook ? "ch:verse" : ""}
-              value={chapterInput}
-              onChange={(e) => handleChapterInput(e.target.value)}
-              disabled={!selectedBook}
-              className="h-7 w-20 text-xs"
-            />
+              {/* Actual input */}
+              <Input
+                ref={quickInputRef}
+                data-tour="quick-nav"
+                value={quickInput}
+                onChange={(e) => setQuickInput(e.target.value)}
+                onKeyDown={handleQuickKeyDown}
+                placeholder="Type: J → John 3:16"
+                className={cn(
+                  "h-7 text-xs relative bg-background",
+                  quickSuggestion && quickSuggestion !== quickInput ? "text-transparent" : ""
+                )}
+                style={quickSuggestion && quickSuggestion !== quickInput ? {
+                  caretColor: 'var(--foreground)'
+                } : undefined}
+              />
+
+              {/* Verse dropdown */}
+              {showQuickVerses && quickVersesList.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
+                  <div className="p-1">
+                    {quickVersesList.map((verse) => (
+                      <button
+                        key={verse.id}
+                        onClick={() => handleQuickVerseClick(verse)}
+                        className="flex w-full items-start gap-2 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <span className="shrink-0 font-semibold text-primary w-6 text-right">
+                          {verse.verse}
+                        </span>
+                        <span className="flex-1 text-muted-foreground line-clamp-1">
+                          {verse.text}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <Select
               value={String(activeTranslationId)}
@@ -502,6 +604,9 @@ export function SearchPanel() {
           </div>
         )}
       </div>
+
+      {/* Quick nav tab */}
+      
 
       {/* Book search tab */}
       {activeTab === "book" && (
