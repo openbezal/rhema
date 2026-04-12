@@ -27,9 +27,17 @@ describe("broadcast store sync", () => {
     emitToMock.mockClear()
     useBroadcastStore.getState().syncBroadcastOutput()
 
-    expect(emitToMock).toHaveBeenCalledTimes(1)
+    expect(emitToMock).toHaveBeenCalledTimes(2)
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({
+        theme: expect.objectContaining({ id: theme.id }),
+        verse: expect.objectContaining({ reference: "John 3:16" }),
+      }),
+    )
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast-alt",
       "broadcast:verse-update",
       expect.objectContaining({
         theme: expect.objectContaining({ id: theme.id }),

@@ -160,3 +160,8 @@
     @apply font-sans;
     }
 }
+
+/* Smooth spotlight morph between tutorial steps */
+#react-joyride-portal .react-joyride__spotlight {
+  transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease;
+}

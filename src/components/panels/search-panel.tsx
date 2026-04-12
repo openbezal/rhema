@@ -366,6 +366,7 @@ export function SearchPanel() {
       <div className="flex shrink-0 items-center gap-0 border-b border-border min-h-11">
         <div className="flex items-center gap-1 px-3 py-1.5">
           <button
+            data-tour="book-search"
             onClick={() => setActiveTab("book")}
             className={cn(
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
@@ -378,6 +379,7 @@ export function SearchPanel() {
             Book search
           </button>
           <button
+            data-tour="context-search"
             onClick={() => {
               setActiveTab("context")
               setContextQuery("")

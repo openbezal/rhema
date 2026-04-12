@@ -17,4 +17,7 @@ pub enum SttError {
 
     #[error("parse error: {0}")]
     ParseError(String),
+
+    #[error("model not found: {0}")]
+    ModelNotFound(String),
 }

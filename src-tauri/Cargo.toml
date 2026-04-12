@@ -62,6 +62,10 @@ crossbeam-channel = "0.5"
 dotenvy = "0.15"
 base64 = "0.22"
 
+[features]
+default = ["whisper"]
+whisper = ["rhema-stt/whisper"]
+
 [lints]
 workspace = true
 

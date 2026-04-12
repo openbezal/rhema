@@ -142,16 +142,19 @@ export function TranscriptPanel() {
       useTranscriptStore.getState().setConnectionStatus("connecting")
       const { useSettingsStore } = await import("@/stores")
       const settings = useSettingsStore.getState()
-      console.log("[AUDIO] Starting with deviceId:", settings.audioDeviceId, "gain:", settings.gain)
-      await invoke("start_transcription", {
-        apiKey: deepgramApiKey ?? "",
+      const params = {
+        apiKey: settings.sttProvider === "deepgram" ? (deepgramApiKey ?? "") : "",
         deviceId: settings.audioDeviceId,
         gain: settings.gain,
-      })
+        provider: settings.sttProvider,
+      }
+      console.log("[AUDIO] Starting transcription:", params)
+      await invoke("start_transcription", params)
+      console.log("[AUDIO] Transcription started successfully")
       useTranscriptStore.getState().setTranscribing(true)
     } catch (e) {
       const errorMsg = String(e)
-      console.error("Failed to start transcription:", errorMsg)
+      console.error("[AUDIO] Failed to start transcription:", errorMsg)
       useTranscriptStore.getState().setConnectionStatus("error")
 
       if (errorMsg.includes("No Deepgram API key")) {
