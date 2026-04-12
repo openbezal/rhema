@@ -24,7 +24,7 @@ export function TransportBar() {
       {/* Left: Logo + Plan Badge */}
       <div className="flex items-center gap-2.5">
         <span className="text-sm font-semibold tracking-tight text-foreground">
-          Rhema
+          Veeba
         </span>
         <Badge variant="outline" className="text-[0.5625rem] uppercase">
           Free

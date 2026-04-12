@@ -30,7 +30,7 @@ missing_panics_doc = "allow"
 [package]
 name = "app"
 version = "0.1.0"
-description = "Rhema - Real-Time AI Bible Verse Detection"
+description = "Veeba - Real-Time AI Bible Verse Detection"
 authors = ["Faithful"]
 license = "MIT"
 repository = "https://github.com/openbezal/rhema"

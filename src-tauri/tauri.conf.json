@@ -1,18 +1,18 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "rhema",
+  "productName": "veeba",
   "version": "0.1.0",
   "identifier": "com.openbezal.rhema",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "bun dev",
-    "beforeBuildCommand": "bun build"
+    "beforeBuildCommand": "bun run build"
   },
   "app": {
     "windows": [
       {
-        "title": "Rhema",
+        "title": "Veeba",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
