@@ -6,7 +6,7 @@ use serde::Serialize;
 use crate::direct::parser::parse_spoken_number;
 
 /// Timeout: pause reading mode after 3 minutes of no verse matches.
-/// Logos AI maintains context for ~3 minutes. Verses stay loaded for re-activation.
+/// Context is maintained for ~3 minutes. Verses stay loaded for re-activation.
 const READING_MODE_TIMEOUT_MS: u128 = 180_000;
 
 /// Minimum word overlap ratio to consider a transcript matching a verse.

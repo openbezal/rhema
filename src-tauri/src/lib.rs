@@ -39,7 +39,6 @@ pub fn run() {
             commands::detection::detection_status,
             commands::detection::semantic_search,
             commands::detection::toggle_paraphrase_detection,
-            commands::detection::quotation_search,
             commands::detection::reading_mode_status,
             commands::detection::stop_reading_mode,
             commands::audio::get_audio_devices,
@@ -80,23 +79,9 @@ pub fn run() {
                 let bible_db = rhema_bible::BibleDb::open(&db_path)
                     .expect("Failed to open Bible database");
 
-                // Build quotation matching index from all English verses
-                log::info!("Building quotation matching index...");
-                let quotation_matcher = match bible_db.load_all_verses_for_quotation(Some("en")) {
-                    Ok(verses) => {
-                        log::info!("Loaded {} English verses for quotation index", verses.len());
-                        rhema_detection::QuotationMatcher::build(verses)
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to load verses for quotation index: {e}");
-                        rhema_detection::QuotationMatcher::new()
-                    }
-                };
-
                 let managed_state = app.state::<Mutex<state::AppState>>();
                 let mut state = managed_state.lock().unwrap();
                 state.bible_db = Some(bible_db);
-                state.quotation_matcher = quotation_matcher;
                 drop(state);
                 log::info!("Bible database loaded from {}", db_path.display());
             } else {

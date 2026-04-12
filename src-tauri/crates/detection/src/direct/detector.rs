@@ -139,7 +139,6 @@ fn is_valid_reference(book_number: i32, chapter: i32) -> bool {
 
 /// Confidence assigned to chapter-only references (no verse specified).
 /// Lower than full references (0.90+) since the user likely wants a specific verse.
-/// Matches Logos AI's `CHAPTER_ONLY_CONFIDENCE` default of 0.75.
 const CHAPTER_ONLY_CONFIDENCE: f64 = 0.75;
 
 /// Filler phrases commonly found in sermon transcripts that confuse detection.

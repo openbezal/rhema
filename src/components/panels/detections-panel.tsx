@@ -10,10 +10,7 @@ import type { DetectionResult } from "@/types"
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   direct: { bg: "bg-green-500/15", text: "text-green-600", label: "Direct" },
-  contextual: { bg: "bg-blue-500/15", text: "text-blue-600", label: "Context" },
-  quotation: { bg: "bg-pink-500/15", text: "text-pink-600", label: "Quote" },
-  semantic_local: { bg: "bg-indigo-500/15", text: "text-indigo-300", label: "Semantic" },
-  semantic_cloud: { bg: "bg-purple-500/15", text: "text-purple-300", label: "Cloud" },
+  semantic: { bg: "bg-indigo-500/15", text: "text-indigo-300", label: "Semantic" },
 }
 
 function SourceBadge({ source }: { source: string }) {
@@ -30,7 +27,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
     // Select this verse for preview
     bibleActions.selectVerse({
       id: 0,
-      translation_id: 1,
+      translation_id: useBibleStore.getState().activeTranslationId,
       book_number: detection.book_number,
       book_name: detection.book_name,
       book_abbreviation: "",
@@ -51,7 +48,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
     useBroadcastStore.getState().setLiveVerse(
       toVerseRenderData({
-        id: 0, translation_id: 1,
+        id: 0, translation_id: useBibleStore.getState().activeTranslationId,
         book_number: detection.book_number, book_name: detection.book_name,
         book_abbreviation: "", chapter: detection.chapter,
         verse: detection.verse, text: detection.verse_text,
@@ -89,7 +86,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
               id: crypto.randomUUID(),
               verse: {
                 id: 0,
-                translation_id: 1,
+                translation_id: useBibleStore.getState().activeTranslationId,
                 book_number: detection.book_number,
                 book_name: detection.book_name,
                 book_abbreviation: "",

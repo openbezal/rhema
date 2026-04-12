@@ -3,7 +3,6 @@ pub mod index;
 pub mod chunker;
 pub mod cache;
 pub mod detector;
-pub mod cloud;
 pub mod synonyms;
 pub mod ensemble;
 

@@ -12,7 +12,7 @@ async function detectVerses(text: string) {
 }
 
 async function getDetectionStatus() {
-  return invoke<{ has_direct: boolean; has_semantic: boolean; has_cloud: boolean }>(
+  return invoke<{ has_direct: boolean; has_semantic: boolean }>(
     "detection_status"
   )
 }

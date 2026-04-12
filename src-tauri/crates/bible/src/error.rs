@@ -11,4 +11,7 @@ pub enum BibleError {
 
     #[error("invalid reference: {0}")]
     InvalidReference(String),
+
+    #[error("internal error: {0}")]
+    Internal(String),
 }

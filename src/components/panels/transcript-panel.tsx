@@ -80,9 +80,9 @@ export function TranscriptPanel() {
     useDetectionStore.getState().addDetections(detections)
 
     // Auto-navigate book search + select verse for preview/live
-    // Handle direct, contextual (reading mode), and high-confidence quotation matches
+    // Auto-navigate on direct detection hits
     const directHit = detections.find(
-      (d) => d.source === "direct" || d.source === "contextual" || (d.source === "quotation" && d.auto_queued)
+      (d) => d.source === "direct"
     )
     if (directHit && directHit.book_number > 0) {
       // Select verse immediately so preview/live panels update
