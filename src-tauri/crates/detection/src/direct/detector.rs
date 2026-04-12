@@ -14,45 +14,216 @@ const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
     ("read in niv", "NIV"),
     ("switch to niv", "NIV"),
     ("in the niv", "NIV"),
+    ("can i have it in niv", "NIV"),
+    ("can i have that in niv", "NIV"),
+    ("show me niv", "NIV"),
     ("new international version", "NIV"),
+    ("in new international", "NIV"),
     // ESV
     ("give me esv", "ESV"),
     ("read in esv", "ESV"),
     ("switch to esv", "ESV"),
     ("in the esv", "ESV"),
+    ("can i have it in esv", "ESV"),
+    ("can i have that in esv", "ESV"),
+    ("show me esv", "ESV"),
     ("english standard version", "ESV"),
+    ("in english standard", "ESV"),
     // NASB
     ("give me nasb", "NASB"),
     ("read in nasb", "NASB"),
     ("switch to nasb", "NASB"),
     ("in the nasb", "NASB"),
+    ("can i have it in nasb", "NASB"),
+    ("can i have that in nasb", "NASB"),
+    ("show me nasb", "NASB"),
     ("new american standard", "NASB"),
+    ("in new american", "NASB"),
     // NKJV
     ("give me nkjv", "NKJV"),
     ("read in nkjv", "NKJV"),
     ("switch to nkjv", "NKJV"),
     ("in the nkjv", "NKJV"),
+    ("can i have it in nkjv", "NKJV"),
+    ("can i have that in nkjv", "NKJV"),
+    ("show me nkjv", "NKJV"),
     ("new king james", "NKJV"),
+    ("in new king james", "NKJV"),
     // NLT
     ("give me nlt", "NLT"),
     ("read in nlt", "NLT"),
     ("switch to nlt", "NLT"),
     ("in the nlt", "NLT"),
+    ("can i have it in nlt", "NLT"),
+    ("can i have that in nlt", "NLT"),
+    ("show me nlt", "NLT"),
     ("new living translation", "NLT"),
+    ("in new living", "NLT"),
     // KJV
     ("give me kjv", "KJV"),
     ("read in kjv", "KJV"),
     ("switch to kjv", "KJV"),
     ("in the kjv", "KJV"),
+    ("can i have it in kjv", "KJV"),
+    ("can i have that in kjv", "KJV"),
+    ("show me kjv", "KJV"),
     ("king james version", "KJV"),
     ("king james", "KJV"),
+    ("in king james", "KJV"),
     // AMP
     ("give me amp", "AMP"),
     ("give me amplified", "AMP"),
     ("read in amplified", "AMP"),
     ("switch to amplified", "AMP"),
+    ("in the amplified", "AMP"),
+    ("can i have it in amplified", "AMP"),
+    ("can i have that in amplified", "AMP"),
+    ("can i have it in amp", "AMP"),
+    ("can i have that in amp", "AMP"),
+    ("show me amplified", "AMP"),
+    ("show me amp", "AMP"),
     ("amplified bible", "AMP"),
     ("amplified version", "AMP"),
+    ("amplified translation", "AMP"),
+    ("in amplified version", "AMP"),
+    ("in amplified translation", "AMP"),
+    // SpaRV (Spanish - Reina-Valera 1909)
+    ("give me reina valera", "SpaRV"),
+    ("read in reina valera", "SpaRV"),
+    ("switch to reina valera", "SpaRV"),
+    ("in reina valera", "SpaRV"),
+    ("can i have it in reina valera", "SpaRV"),
+    ("can i have that in reina valera", "SpaRV"),
+    ("show me reina valera", "SpaRV"),
+    ("give me spanish", "SpaRV"),
+    ("read in spanish", "SpaRV"),
+    ("switch to spanish", "SpaRV"),
+    ("in spanish", "SpaRV"),
+    ("can i have it in spanish", "SpaRV"),
+    ("can i have that in spanish", "SpaRV"),
+    ("spanish version", "SpaRV"),
+    ("spanish translation", "SpaRV"),
+    // FreJND (French - J.N. Darby)
+    ("give me french", "FreJND"),
+    ("read in french", "FreJND"),
+    ("switch to french", "FreJND"),
+    ("in french", "FreJND"),
+    ("can i have it in french", "FreJND"),
+    ("can i have that in french", "FreJND"),
+    ("show me french", "FreJND"),
+    ("french version", "FreJND"),
+    ("french translation", "FreJND"),
+    ("darby french", "FreJND"),
+    // PorBLivre (Portuguese - Biblia Livre)
+    ("give me portuguese", "PorBLivre"),
+    ("read in portuguese", "PorBLivre"),
+    ("switch to portuguese", "PorBLivre"),
+    ("in portuguese", "PorBLivre"),
+    ("can i have it in portuguese", "PorBLivre"),
+    ("can i have that in portuguese", "PorBLivre"),
+    ("show me portuguese", "PorBLivre"),
+    ("portuguese version", "PorBLivre"),
+    ("portuguese translation", "PorBLivre"),
+    ("biblia livre", "PorBLivre"),
+    // MSG (The Message)
+    ("give me message", "MSG"),
+    ("give me the message", "MSG"),
+    ("read in message", "MSG"),
+    ("read in the message", "MSG"),
+    ("switch to message", "MSG"),
+    ("switch to the message", "MSG"),
+    ("in the message", "MSG"),
+    ("can i have it in message", "MSG"),
+    ("can i have that in message", "MSG"),
+    ("can i have it in the message", "MSG"),
+    ("can i have that in the message", "MSG"),
+    ("show me message", "MSG"),
+    ("show me the message", "MSG"),
+    ("message version", "MSG"),
+    ("message translation", "MSG"),
+    ("message bible", "MSG"),
+    // CSB (Christian Standard Bible)
+    ("give me csb", "CSB"),
+    ("read in csb", "CSB"),
+    ("switch to csb", "CSB"),
+    ("in the csb", "CSB"),
+    ("can i have it in csb", "CSB"),
+    ("can i have that in csb", "CSB"),
+    ("show me csb", "CSB"),
+    ("christian standard", "CSB"),
+    ("christian standard bible", "CSB"),
+    ("in christian standard", "CSB"),
+    // HCSB (Holman Christian Standard Bible)
+    ("give me hcsb", "HCSB"),
+    ("read in hcsb", "HCSB"),
+    ("switch to hcsb", "HCSB"),
+    ("in the hcsb", "HCSB"),
+    ("can i have it in hcsb", "HCSB"),
+    ("can i have that in hcsb", "HCSB"),
+    ("show me hcsb", "HCSB"),
+    ("holman christian", "HCSB"),
+    ("holman christian standard", "HCSB"),
+    ("in holman christian", "HCSB"),
+    // RSV (Revised Standard Version)
+    ("give me rsv", "RSV"),
+    ("read in rsv", "RSV"),
+    ("switch to rsv", "RSV"),
+    ("in the rsv", "RSV"),
+    ("can i have it in rsv", "RSV"),
+    ("can i have that in rsv", "RSV"),
+    ("show me rsv", "RSV"),
+    ("revised standard", "RSV"),
+    ("revised standard version", "RSV"),
+    ("in revised standard", "RSV"),
+    // NRSV (New Revised Standard Version)
+    ("give me nrsv", "NRSV"),
+    ("read in nrsv", "NRSV"),
+    ("switch to nrsv", "NRSV"),
+    ("in the nrsv", "NRSV"),
+    ("can i have it in nrsv", "NRSV"),
+    ("can i have that in nrsv", "NRSV"),
+    ("show me nrsv", "NRSV"),
+    ("new revised standard", "NRSV"),
+    ("new revised standard version", "NRSV"),
+    ("in new revised standard", "NRSV"),
+    // NET (New English Translation)
+    ("give me net", "NET"),
+    ("read in net", "NET"),
+    ("switch to net", "NET"),
+    ("in the net", "NET"),
+    ("can i have it in net", "NET"),
+    ("can i have that in net", "NET"),
+    ("show me net", "NET"),
+    ("new english translation", "NET"),
+    ("in new english", "NET"),
+    // CEV (Contemporary English Version)
+    ("give me cev", "CEV"),
+    ("read in cev", "CEV"),
+    ("switch to cev", "CEV"),
+    ("in the cev", "CEV"),
+    ("can i have it in cev", "CEV"),
+    ("can i have that in cev", "CEV"),
+    ("show me cev", "CEV"),
+    ("contemporary english", "CEV"),
+    ("contemporary english version", "CEV"),
+    ("in contemporary english", "CEV"),
+    // GNT/GNB (Good News Translation / Good News Bible)
+    ("give me gnt", "GNT"),
+    ("give me gnb", "GNT"),
+    ("read in gnt", "GNT"),
+    ("read in gnb", "GNT"),
+    ("switch to gnt", "GNT"),
+    ("switch to gnb", "GNT"),
+    ("in the gnt", "GNT"),
+    ("in the gnb", "GNT"),
+    ("can i have it in gnt", "GNT"),
+    ("can i have that in gnt", "GNT"),
+    ("show me gnt", "GNT"),
+    ("show me gnb", "GNT"),
+    ("good news", "GNT"),
+    ("good news translation", "GNT"),
+    ("good news bible", "GNT"),
+    ("in good news", "GNT"),
 ];
 
 /// Maximum chapter count per book (`book_number` 1-66).
@@ -311,6 +482,17 @@ impl DirectDetector {
                 "nlt" => Some("NLT"),
                 "kjv" => Some("KJV"),
                 "amp" | "amplified" => Some("AMP"),
+                "sparv" | "spanish" => Some("SpaRV"),
+                "frejnd" | "french" => Some("FreJND"),
+                "porblivre" | "portuguese" => Some("PorBLivre"),
+                "msg" | "message" => Some("MSG"),
+                "csb" => Some("CSB"),
+                "hcsb" => Some("HCSB"),
+                "rsv" => Some("RSV"),
+                "nrsv" => Some("NRSV"),
+                "net" => Some("NET"),
+                "cev" => Some("CEV"),
+                "gnt" | "gnb" => Some("GNT"),
                 _ => None,
             };
             if let Some(abbrev) = matched {
@@ -806,5 +988,189 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "Philippians");
         assert_eq!(results[0].verse_ref.chapter, 4);
         assert_eq!(results[0].verse_ref.verse_start, 13);
+    }
+
+    // ========== Translation Command Detection Tests ==========
+
+    #[test]
+    fn test_translation_command_basic_niv() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("give me niv"), Some("NIV".to_string()));
+        assert_eq!(detector.detect_translation_command("read in niv"), Some("NIV".to_string()));
+        assert_eq!(detector.detect_translation_command("switch to niv"), Some("NIV".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_natural_language() {
+        let detector = DirectDetector::new();
+        assert_eq!(
+            detector.detect_translation_command("can i have it in amplified"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("can i have that in amplified version"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("can i have it in esv"),
+            Some("ESV".to_string())
+        );
+    }
+
+    #[test]
+    fn test_translation_command_full_names() {
+        let detector = DirectDetector::new();
+        assert_eq!(
+            detector.detect_translation_command("new international version"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("king james version"),
+            Some("KJV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("english standard version"),
+            Some("ESV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("amplified bible"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("new living translation"),
+            Some("NLT".to_string())
+        );
+    }
+
+    #[test]
+    fn test_translation_command_bare_abbreviations() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("niv"), Some("NIV".to_string()));
+        assert_eq!(detector.detect_translation_command("esv"), Some("ESV".to_string()));
+        assert_eq!(detector.detect_translation_command("kjv"), Some("KJV".to_string()));
+        assert_eq!(detector.detect_translation_command("amp"), Some("AMP".to_string()));
+        assert_eq!(detector.detect_translation_command("nasb"), Some("NASB".to_string()));
+        assert_eq!(detector.detect_translation_command("nkjv"), Some("NKJV".to_string()));
+        assert_eq!(detector.detect_translation_command("nlt"), Some("NLT".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_in_sentence() {
+        let detector = DirectDetector::new();
+        assert_eq!(
+            detector.detect_translation_command("show me genesis 3:16 in the amplified"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("read john 3:16 in niv"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("i want to read that in the message"),
+            Some("MSG".to_string())
+        );
+    }
+
+    #[test]
+    fn test_translation_command_message_bible() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("give me the message"), Some("MSG".to_string()));
+        assert_eq!(detector.detect_translation_command("read in the message"), Some("MSG".to_string()));
+        assert_eq!(detector.detect_translation_command("switch to message"), Some("MSG".to_string()));
+        assert_eq!(detector.detect_translation_command("message version"), Some("MSG".to_string()));
+        assert_eq!(detector.detect_translation_command("message bible"), Some("MSG".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_csb_hcsb() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("give me csb"), Some("CSB".to_string()));
+        assert_eq!(detector.detect_translation_command("christian standard bible"), Some("CSB".to_string()));
+        assert_eq!(detector.detect_translation_command("give me hcsb"), Some("HCSB".to_string()));
+        assert_eq!(detector.detect_translation_command("holman christian standard"), Some("HCSB".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_revised_standard() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("give me rsv"), Some("RSV".to_string()));
+        assert_eq!(detector.detect_translation_command("revised standard version"), Some("RSV".to_string()));
+        assert_eq!(detector.detect_translation_command("give me nrsv"), Some("NRSV".to_string()));
+        assert_eq!(detector.detect_translation_command("new revised standard"), Some("NRSV".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_good_news() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("give me gnt"), Some("GNT".to_string()));
+        assert_eq!(detector.detect_translation_command("give me gnb"), Some("GNT".to_string()));
+        assert_eq!(detector.detect_translation_command("good news translation"), Some("GNT".to_string()));
+        assert_eq!(detector.detect_translation_command("good news bible"), Some("GNT".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_net_cev() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("give me net"), Some("NET".to_string()));
+        assert_eq!(detector.detect_translation_command("new english translation"), Some("NET".to_string()));
+        assert_eq!(detector.detect_translation_command("give me cev"), Some("CEV".to_string()));
+        assert_eq!(detector.detect_translation_command("contemporary english version"), Some("CEV".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_non_english() {
+        let detector = DirectDetector::new();
+        // Spanish
+        assert_eq!(detector.detect_translation_command("give me spanish"), Some("SpaRV".to_string()));
+        assert_eq!(detector.detect_translation_command("read in reina valera"), Some("SpaRV".to_string()));
+        assert_eq!(detector.detect_translation_command("in spanish"), Some("SpaRV".to_string()));
+
+        // French
+        assert_eq!(detector.detect_translation_command("give me french"), Some("FreJND".to_string()));
+        assert_eq!(detector.detect_translation_command("read in french"), Some("FreJND".to_string()));
+        assert_eq!(detector.detect_translation_command("darby french"), Some("FreJND".to_string()));
+
+        // Portuguese
+        assert_eq!(detector.detect_translation_command("give me portuguese"), Some("PorBLivre".to_string()));
+        assert_eq!(detector.detect_translation_command("biblia livre"), Some("PorBLivre".to_string()));
+        assert_eq!(detector.detect_translation_command("in portuguese"), Some("PorBLivre".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_case_insensitive() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("GIVE ME NIV"), Some("NIV".to_string()));
+        assert_eq!(detector.detect_translation_command("Give Me Amplified"), Some("AMP".to_string()));
+        assert_eq!(detector.detect_translation_command("CAN I HAVE IT IN ESV"), Some("ESV".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_show_me_variations() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("show me niv"), Some("NIV".to_string()));
+        assert_eq!(detector.detect_translation_command("show me amplified"), Some("AMP".to_string()));
+        assert_eq!(detector.detect_translation_command("show me the message"), Some("MSG".to_string()));
+    }
+
+    #[test]
+    fn test_translation_command_no_match() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.detect_translation_command("genesis 3 verse 16"), None);
+        assert_eq!(detector.detect_translation_command("the weather is nice"), None);
+        assert_eq!(detector.detect_translation_command("tell me about the bible"), None);
+    }
+
+    #[test]
+    fn test_translation_command_partial_match() {
+        let detector = DirectDetector::new();
+        // Should match even with extra words
+        assert_eq!(
+            detector.detect_translation_command("i would like to read that in amplified version please"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("could you show me that verse in the niv translation"),
+            Some("NIV".to_string())
+        );
     }
 }
