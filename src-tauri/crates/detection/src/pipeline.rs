@@ -156,6 +156,7 @@ impl DetectionPipeline {
                 source: DetectionSource::Semantic { similarity: confidence },
                 transcript_snippet: snippet.clone(),
                 detected_at: now,
+                is_chapter_only: false,
             });
         }
 

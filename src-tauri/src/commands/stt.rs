@@ -408,6 +408,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
                     source: "direct".to_string(),
                     auto_queued: m.auto_queued,
                     transcript_snippet: m.detection.transcript_snippet.clone(),
+                    is_chapter_only: m.detection.is_chapter_only,
                 }
             })
             .collect();
@@ -628,6 +629,7 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
                         source: "contextual".to_string(),
                         auto_queued: true,
                         transcript_snippet: String::new(),
+                        is_chapter_only: false,
                     };
                     let _ = app.emit("verse_detections", &vec![result]);
 
@@ -662,6 +664,7 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
             source: "contextual".to_string(),
             auto_queued: true,
             transcript_snippet: String::new(),
+            is_chapter_only: false,
         };
         let _ = app.emit("verse_detections", &vec![result]);
         return true;

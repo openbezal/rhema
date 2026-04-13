@@ -161,6 +161,7 @@ mod tests {
             source,
             transcript_snippet: format!("{book_name} {chapter}:{verse_start}"),
             detected_at: 0,
+            is_chapter_only: false,
         }
     }
 
