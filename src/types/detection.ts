@@ -27,3 +27,14 @@ export interface SemanticSearchResult {
   verse: number
   similarity: number
 }
+
+export interface PredictionResult {
+  verse_ref: string
+  verse_text: string
+  book_name: string
+  book_number: number
+  chapter: number
+  verse: number
+  confidence: number
+  strategy: string
+}

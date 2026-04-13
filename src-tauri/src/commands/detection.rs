@@ -1,4 +1,7 @@
-#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
 
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -62,7 +65,12 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
         }
         // Fall back to book/chapter/verse lookup (direct + FTS5 detections)
         if vr.book_number > 0 && vr.chapter > 0 && vr.verse_start > 0 {
-            if let Ok(Some(v)) = db.get_verse(state.active_translation_id, vr.book_number, vr.chapter, vr.verse_start) {
+            if let Ok(Some(v)) = db.get_verse(
+                state.active_translation_id,
+                vr.book_number,
+                vr.chapter,
+                vr.verse_start,
+            ) {
                 return Some(v);
             }
         }
@@ -76,7 +84,14 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
         }
         None => {
             let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
-            (r, String::new(), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
+            (
+                r,
+                String::new(),
+                vr.book_name.clone(),
+                vr.book_number,
+                vr.chapter,
+                vr.verse_start,
+            )
         }
     };
 
@@ -223,7 +238,11 @@ pub fn semantic_search(
     }
 
     // Ensure highest similarity is always first
-    results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(results)
 }
@@ -248,10 +267,92 @@ pub struct ReadingModeStatus {
 
 /// Stop reading mode
 #[tauri::command]
-pub fn stop_reading_mode(
-    state: State<'_, Mutex<ReadingMode>>,
-) -> Result<(), String> {
+pub fn stop_reading_mode(state: State<'_, Mutex<ReadingMode>>) -> Result<(), String> {
     let mut rm = state.lock().map_err(|e| e.to_string())?;
     rm.deactivate();
     Ok(())
+}
+
+#[derive(Serialize)]
+pub struct PredictionResult {
+    pub verse_ref: String,
+    pub verse_text: String,
+    pub book_name: String,
+    pub book_number: i32,
+    pub chapter: i32,
+    pub verse: i32,
+    pub confidence: f64,
+    pub strategy: String,
+}
+
+#[tauri::command]
+pub fn predict_next_verses(
+    state: State<'_, Mutex<AppState>>,
+    reading_mode_state: State<'_, Mutex<ReadingMode>>,
+    limit: Option<usize>,
+) -> Result<Vec<PredictionResult>, String> {
+    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let rm = reading_mode_state.lock().map_err(|e| e.to_string())?;
+
+    let predictions = if rm.is_active() {
+        app_state.verse_predictor.predict_from_reading_mode(&rm, 3)
+    } else {
+        app_state.verse_predictor.predict()
+    };
+
+    let results: Vec<PredictionResult> = predictions
+        .into_iter()
+        .map(|p| {
+            let vr = &p.verse_ref;
+            let verse_text = if let Some(ref db) = app_state.bible_db {
+                db.get_verse(
+                    app_state.active_translation_id,
+                    vr.book_number,
+                    vr.chapter,
+                    vr.verse_start,
+                )
+                .ok()
+                .flatten()
+                .map(|v| {
+                    if vr.book_name.is_empty() {
+                        v.book_name.clone()
+                    } else {
+                        vr.book_name.clone()
+                    }
+                })
+                .unwrap_or(p.verse_text)
+            } else {
+                p.verse_text
+            };
+
+            let book_name = if let Some(ref db) = app_state.bible_db {
+                db.get_verse(
+                    app_state.active_translation_id,
+                    vr.book_number,
+                    vr.chapter,
+                    vr.verse_start,
+                )
+                .ok()
+                .flatten()
+                .map(|v| v.book_name)
+                .unwrap_or_default()
+            } else {
+                String::new()
+            };
+
+            PredictionResult {
+                verse_ref: format!("{} {}:{}", book_name, vr.chapter, vr.verse_start),
+                verse_text,
+                book_name,
+                book_number: vr.book_number,
+                chapter: vr.chapter,
+                verse: vr.verse_start,
+                confidence: p.confidence,
+                strategy: p.strategy.to_string(),
+            }
+        })
+        .take(limit.unwrap_or(5))
+        .collect();
+
+    Ok(results)
 }

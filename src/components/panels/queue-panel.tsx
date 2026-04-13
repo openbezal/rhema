@@ -1,15 +1,13 @@
+import { useState } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import {
-  PlayIcon,
-  XIcon,
-  GripVerticalIcon,
-} from "lucide-react"
+import { PlayIcon, XIcon, GripVerticalIcon, SparklesIcon } from "lucide-react"
 import { useQueueStore, useBroadcastStore, useBibleStore } from "@/stores"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
 import { bibleActions } from "@/hooks/use-bible"
+import { usePrediction } from "@/hooks/use-prediction"
 import type { QueueItem } from "@/types"
 
 function QueueItemRow({
@@ -26,9 +24,15 @@ function QueueItemRow({
   const handlePresent = () => {
     useQueueStore.getState().setActive(index)
     bibleActions.selectVerse(item.verse)
-    const translation = useBibleStore.getState().translations
-      .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
-    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(item.verse, translation))
+    const translation =
+      useBibleStore
+        .getState()
+        .translations.find(
+          (t) => t.id === useBibleStore.getState().activeTranslationId
+        )?.abbreviation ?? "KJV"
+    useBroadcastStore
+      .getState()
+      .setLiveVerse(toVerseRenderData(item.verse, translation))
   }
 
   const handleRemove = () => {
@@ -60,9 +64,7 @@ function QueueItemRow({
             : "hover:bg-muted/50"
       )}
     >
-      <GripVerticalIcon
-        className="size-3 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100"
-      />
+      <GripVerticalIcon className="size-3 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100" />
 
       <span className="flex-1 truncate text-sm font-medium text-foreground">
         {item.reference}
@@ -86,6 +88,33 @@ export function QueuePanel() {
   const items = useQueueStore((s) => s.items)
   const activeIndex = useQueueStore((s) => s.activeIndex)
   const highlightedId = useQueueStore((s) => s.highlightedId)
+  const { predictions, fetchPredictions } = usePrediction()
+  const [suggesting, setSuggesting] = useState(false)
+
+  const handleSuggest = async () => {
+    setSuggesting(true)
+    try {
+      const results = await fetchPredictions(3)
+      for (const pred of results ?? []) {
+        const verse = {
+          id: 0,
+          book_number: pred.book_number,
+          book_name: pred.book_name,
+          chapter: pred.chapter,
+          verse: pred.verse,
+          text: pred.verse_text,
+        }
+        useQueueStore.getState().addItem({
+          id: `suggest-${Date.now()}-${pred.verse_ref}`,
+          reference: pred.verse_ref,
+          verse,
+          source: "manual",
+        })
+      }
+    } finally {
+      setSuggesting(false)
+    }
+  }
 
   return (
     <div
@@ -95,6 +124,14 @@ export function QueuePanel() {
       <PanelHeader title="Queue">
         <div className="flex items-center gap-2">
           <Badge variant="outline">{items.length}</Badge>
+          <button
+            onClick={handleSuggest}
+            disabled={suggesting}
+            className="text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            <SparklesIcon className="mr-1 inline h-2.5 w-2.5" />
+            Suggest
+          </button>
           <button
             onClick={() => useQueueStore.getState().clearQueue()}
             className="text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
