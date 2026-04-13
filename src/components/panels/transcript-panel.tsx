@@ -220,10 +220,10 @@ export function TranscriptPanel() {
         title="Live transcript"
         icon={<MicIcon className="size-3" />}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2 pb-px">
           {isTranscribing && (
             <span
-              className={`size-2 rounded-full ${
+              className={`mb-1 size-1.5 rounded-full ${
                 connectionStatus === "connected"
                   ? "bg-emerald-500"
                   : connectionStatus === "connecting"
@@ -235,7 +235,7 @@ export function TranscriptPanel() {
               title={connectionStatus}
             />
           )}
-          <LevelMeter level={audioLevel.rms} bars={5} />
+          <LevelMeter level={audioLevel.rms} bars={6} />
         </div>
       </PanelHeader>
 
