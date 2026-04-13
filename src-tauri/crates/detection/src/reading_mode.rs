@@ -228,10 +228,13 @@ impl ReadingMode {
 
         // Check if text contains "chapter" keyword without a number following it
         // This sets context for the next bare number to be interpreted as chapter
-        if (trimmed.contains("chapter") && trimmed.ends_with("chapter")) || trimmed.ends_with("chapter?") || trimmed.ends_with("chapter.") {
-            log::info!("[READING] Detected 'chapter' keyword without number - expecting chapter number next");
-            self.bare_number_context = BareNumberContext::ExpectingChapter;
-            return None; // No navigation yet, just set context
+        // BUT exclude "next chapter" and "previous chapter" commands
+        if !trimmed.contains("next") && !trimmed.contains("previous") {
+            if (trimmed.contains("chapter") && trimmed.ends_with("chapter")) || trimmed.ends_with("chapter?") || trimmed.ends_with("chapter.") {
+                log::info!("[READING] Detected 'chapter' keyword without number - expecting chapter number next");
+                self.bare_number_context = BareNumberContext::ExpectingChapter;
+                return None; // No navigation yet, just set context
+            }
         }
 
         // Check for bare number(s) when expecting chapter or verse
@@ -974,5 +977,86 @@ mod tests {
         assert_eq!(extract_verse_number("5 2"), None);
         assert_eq!(extract_verse_number("three five"), None);
         assert_eq!(extract_verse_number("3 5"), None);
+    }
+
+    // --- Context-aware navigation tests ---
+
+    #[test]
+    fn test_bare_number_as_chapter_after_chapter_keyword() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=10)
+            .map(|i| (i, format!("Verse {i} text.")))
+            .collect();
+        rm.start(1, "Genesis", 1, 1, verses);
+
+        // Say "chapter" - sets context to ExpectingChapter
+        let result = rm.check_chapter_command("chapter");
+        assert_eq!(result, None); // No navigation yet, just context set
+
+        // Now say "5" - should be interpreted as chapter 5
+        let result = rm.check_chapter_command("5");
+        assert!(result.is_some());
+        let change = result.unwrap();
+        assert_eq!(change.new_chapter, 5);
+        assert_eq!(change.start_verse, Some(1));
+    }
+
+    #[test]
+    fn test_bare_two_numbers_as_chapter_verse() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=10)
+            .map(|i| (i, format!("Verse {i} text.")))
+            .collect();
+        rm.start(1, "Genesis", 1, 1, verses);
+
+        // Say "chapter" - sets context
+        let _ = rm.check_chapter_command("chapter");
+
+        // Say "5 2" - should be interpreted as chapter 5 verse 2
+        let result = rm.check_chapter_command("5 2");
+        assert!(result.is_some());
+        let change = result.unwrap();
+        assert_eq!(change.new_chapter, 5);
+        assert_eq!(change.start_verse, Some(2));
+    }
+
+    #[test]
+    fn test_spoken_numbers_in_context() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=10)
+            .map(|i| (i, format!("Verse {i} text.")))
+            .collect();
+        rm.start(1, "Genesis", 1, 1, verses);
+
+        // Say "chapter" - sets context
+        let _ = rm.check_chapter_command("chapter");
+
+        // Say "five" - should be interpreted as chapter 5
+        let result = rm.check_chapter_command("five");
+        assert!(result.is_some());
+        let change = result.unwrap();
+        assert_eq!(change.new_chapter, 5);
+    }
+
+    #[test]
+    fn test_context_resets_after_full_reference() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=10)
+            .map(|i| (i, format!("Verse {i} text.")))
+            .collect();
+        rm.start(1, "Genesis", 1, 1, verses);
+
+        // Say "chapter" - sets context
+        let _ = rm.check_chapter_command("chapter");
+
+        // Say "chapter 3 verse 5" - full reference should reset context
+        let result = rm.check_chapter_command("chapter 3 verse 5");
+        assert!(result.is_some());
+        let change = result.unwrap();
+        assert_eq!(change.new_chapter, 3);
+        assert_eq!(change.start_verse, Some(5));
+
+        // Context should be reset to None after full reference
+        // Next bare number should be handled by verse navigation
     }
 }
