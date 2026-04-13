@@ -597,10 +597,11 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
     // Check for chapter navigation commands (e.g., "let's go to chapter seven").
     {
         let chapter_change = {
-            let Ok(rm) = rm_managed.lock() else { return false };
+            let Ok(mut rm) = rm_managed.lock() else { return false };
             if !rm.is_active() && !rm.has_verses() {
                 None
             } else {
+                log::info!("[READING] Checking chapter command for: {:?}", transcript);
                 rm.check_chapter_command(transcript)
             }
         };
@@ -621,7 +622,15 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
 
             if let Some(chapter_verses) = chapter_data {
                 if !chapter_verses.is_empty() {
-                    let first_text = chapter_verses[0].text.clone();
+                    let start_verse = change.start_verse.unwrap_or(1);
+
+                    // Find the text for the starting verse
+                    let start_verse_text = chapter_verses
+                        .iter()
+                        .find(|v| v.verse == start_verse)
+                        .map(|v| v.text.clone())
+                        .unwrap_or_else(|| chapter_verses[0].text.clone());
+
                     let verses: Vec<(i32, String)> = chapter_verses
                         .into_iter()
                         .map(|v| (v.verse, v.text))
@@ -632,19 +641,19 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
                             change.book_number,
                             &change.book_name,
                             change.new_chapter,
-                            1,
+                            start_verse,
                             verses,
                         );
                     }
 
-                    // Emit verse 1 of the new chapter
-                    let reference = format!("{} {}:1", change.book_name, change.new_chapter);
+                    // Emit the starting verse of the new chapter
+                    let reference = format!("{} {}:{}", change.book_name, change.new_chapter, start_verse);
                     let advance = rhema_detection::ReadingAdvance {
                         book_number: change.book_number,
                         book_name: change.book_name.clone(),
                         chapter: change.new_chapter,
-                        verse: 1,
-                        verse_text: first_text.clone(),
+                        verse: start_verse,
+                        verse_text: start_verse_text.clone(),
                         reference: reference.clone(),
                         confidence: 1.0,
                     };
@@ -652,11 +661,11 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
 
                     let result = super::detection::DetectionResult {
                         verse_ref: reference,
-                        verse_text: first_text,
+                        verse_text: start_verse_text,
                         book_name: change.book_name,
                         book_number: change.book_number,
                         chapter: change.new_chapter,
-                        verse: 1,
+                        verse: start_verse,
                         confidence: 1.0,
                         source: "contextual".to_string(),
                         auto_queued: true,
