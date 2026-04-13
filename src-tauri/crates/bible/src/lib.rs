@@ -2,7 +2,7 @@
 //!
 //! Provides SQLite-backed storage and retrieval for Bible translations,
 //! books, verses, and cross-references. Supports full-text search via
-//! FTS5 and bulk verse loading for quotation matching indexes.
+//! FTS5 with BM25 ranking.
 //!
 //! # Key types
 //!
@@ -20,3 +20,4 @@ pub mod crossref;
 pub use models::*;
 pub use error::*;
 pub use db::*;
+pub use search::Bm25Result;

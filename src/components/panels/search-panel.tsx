@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { invoke } from "@tauri-apps/api/core"
 // Using native overflow-y-auto instead of Radix ScrollArea for reliable scrolling in flex layouts
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { getAutocompleteSuggestion, getTabNavigationResult } from "@/lib/quick-search"
 import {
   Select,
@@ -11,19 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import {
   BookOpenIcon,
@@ -31,7 +17,6 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
-  SearchIcon,
   PlusIcon,
 } from "lucide-react"
 import {
@@ -42,13 +27,13 @@ import {
 } from "@/components/ui/tooltip"
 import { useBible, bibleActions } from "@/hooks/use-bible"
 import { useBibleStore, useQueueStore } from "@/stores"
-import type { Book, Verse } from "@/types"
+import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
 
 type SearchTab = "book" | "context" 
 
-/** Highlights words from the query that appear in the text (like Logos AI). */
+/** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
   if (!query || query.length < 2) return <>{text}</>
 
@@ -78,20 +63,16 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 
 export function SearchPanel() {
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
-  const [bookOpen, setBookOpen] = useState(false)
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState(1)
   const [selectedVerseId, setSelectedVerseId] = useState<number | null>(null)
-  const [chapterInput, setChapterInput] = useState("")
   const [contextQuery, setContextQuery] = useState("")
 
   // EasyWorship-style autocomplete
   const [quickInput, setQuickInput] = useState("")
-  const [quickSuggestion, setQuickSuggestion] = useState("")
   const [showQuickVerses, setShowQuickVerses] = useState(false)
   const [quickVersesList, setQuickVersesList] = useState<Verse[]>([])
 
-  const chapterInputRef = useRef<HTMLInputElement>(null)
   const quickInputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -143,7 +124,6 @@ export function SearchPanel() {
       setActiveTab("book")
       setSelectedBook(book)
       setChapter(navChapter)
-      setChapterInput("")
     },
     []
   )
@@ -188,52 +168,10 @@ export function SearchPanel() {
     return unsubscribe
   }, [applyNavigationSelection])
 
-  // When a book is selected, focus the chapter input
-  const handleBookSelect = useCallback((book: Book) => {
-    setSelectedBook(book)
-    setChapter(1)
-    setChapterInput("")
-    setSelectedVerseId(null)
-    setBookOpen(false)
-    setTimeout(() => chapterInputRef.current?.focus(), 50)
-  }, [])
-
   const handleVerseClick = useCallback((verse: Verse) => {
     setSelectedVerseId(verse.id)
     bibleActions.selectVerse(verse)
   }, [])
-
-  // Parse chapter:verse from the input field
-  const handleChapterInput = useCallback(
-    (value: string) => {
-      setChapterInput(value)
-      const match = value.match(/^(\d+)(?::(\d+))?$/)
-      if (match) {
-        const ch = parseInt(match[1])
-        if (ch >= 1) {
-          setChapter(ch)
-          setSelectedVerseId(null)
-          // If verse specified, auto-select it after chapter loads
-          if (match[2]) {
-            const verseNum = parseInt(match[2])
-            // Wait for chapter to load then select the verse
-            setTimeout(() => {
-              const verses = currentChapter
-              const target = verses.find((v) => v.verse === verseNum)
-              if (target) {
-                setSelectedVerseId(target.id)
-                bibleActions.selectVerse(target)
-                document
-                  .getElementById(`verse-${target.id}`)
-                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
-              }
-            }, 200)
-          }
-        }
-      }
-    },
-    [currentChapter]
-  )
 
   // Arrow key navigation
   const handleKeyDown = useCallback(
@@ -242,13 +180,11 @@ export function SearchPanel() {
         e.preventDefault()
         if (chapter > 1) {
           setChapter((c) => c - 1)
-          setChapterInput("")
-          setSelectedVerseId(null)
+            setSelectedVerseId(null)
         }
       } else if (e.key === "ArrowRight") {
         e.preventDefault()
         setChapter((c) => c + 1)
-        setChapterInput("")
         setSelectedVerseId(null)
       } else if (e.key === "ArrowDown") {
         e.preventDefault()
@@ -285,54 +221,31 @@ export function SearchPanel() {
     [chapter, currentChapter, effectiveSelectedVerseId]
   )
 
-  // Context search — Fuse.js first, then FTS, then semantic fallback.
+  // Context search — hybrid backend (vector + FTS5 BM25) as primary,
+  // Fuse.js fallback when semantic model is not loaded.
   const contextDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contextSearchRequestIdRef = useRef(0)
 
   const runContextSearch = useCallback(async (query: string, translationId: number) => {
     const requestId = ++contextSearchRequestIdRef.current
+    const isStale = () => requestId !== contextSearchRequestIdRef.current
 
-    try {
-      const fuseResults = await searchContextWithFuse(query, translationId, 15)
-      if (requestId !== contextSearchRequestIdRef.current) return
+    // Primary: hybrid search backend (combines vector + FTS5 BM25)
+    const hybridResults = await invoke<SemanticSearchResult[]>(
+      "semantic_search", { query, limit: 15 }
+    ).catch(() => null)
 
-      if (fuseResults.length > 0) {
-        useBibleStore.getState().setSemanticResults(fuseResults)
-        return
-      }
+    if (isStale()) return
 
-      const ftsResults = await bibleActions.searchVerses(query, 20, translationId)
-      if (requestId !== contextSearchRequestIdRef.current) return
-      if (ftsResults.length > 0) {
-        const mapped = ftsResults.slice(0, 15).map((v, idx) => ({
-          verse_ref: `${v.book_name} ${v.chapter}:${v.verse}`,
-          verse_text: v.text,
-          book_name: v.book_name,
-          book_number: v.book_number,
-          chapter: v.chapter,
-          verse: v.verse,
-          similarity: Math.max(0.5, 0.72 - idx * 0.015),
-        }))
-        useBibleStore.getState().setSemanticResults(mapped)
-        return
-      }
-
-      const semanticResults = await invoke<Array<{
-        verse_ref: string
-        verse_text: string
-        book_name: string
-        book_number: number
-        chapter: number
-        verse: number
-        similarity: number
-      }>>("semantic_search", { query, limit: 10 })
-      if (requestId !== contextSearchRequestIdRef.current) return
-      useBibleStore.getState().setSemanticResults(semanticResults)
-    } catch (err) {
-      console.warn("Context search failed:", err)
-      if (requestId !== contextSearchRequestIdRef.current) return
-      useBibleStore.getState().setSemanticResults([])
+    if (hybridResults && hybridResults.length > 0) {
+      useBibleStore.getState().setSemanticResults(hybridResults)
+      return
     }
+
+    // Fallback: client-side Fuse.js when semantic model is not loaded
+    const fuseResults = await searchContextWithFuse(query, translationId, 15).catch(() => [])
+    if (isStale()) return
+    useBibleStore.getState().setSemanticResults(fuseResults)
   }, [])
 
   const handleContextSearch = useCallback((query: string) => {
@@ -363,23 +276,24 @@ export function SearchPanel() {
     }
   }, [])
 
-  // EasyWorship-style autocomplete logic
+  // Derive autocomplete suggestion during render (no setState cascading)
+  const autocompleteResult = useMemo(
+    () => getAutocompleteSuggestion(quickInput, books),
+    [quickInput, books]
+  )
+  const quickSuggestion = autocompleteResult.suggestion
+
+  // Side effects only: navigation + verse loading
   useEffect(() => {
-    const result = getAutocompleteSuggestion(quickInput, books)
+    const result = autocompleteResult
 
-    // Set suggestion
-    setQuickSuggestion(result.suggestion)
-
-    // Handle navigation and verse loading based on stage
     if (result.matchedBook && result.chapter && result.verse) {
-      // Navigate to the verse for preview
       useBibleStore.getState().setPendingNavigation({
         bookNumber: result.matchedBook.book_number,
         chapter: result.chapter,
         verse: result.verse
       })
 
-      // Keep focus on input
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (quickInputRef.current && document.activeElement !== quickInputRef.current) {
@@ -389,8 +303,7 @@ export function SearchPanel() {
       })
     }
 
-    // Load verses for dropdown when at chapter stage
-    if (result.stage === "chapter" && result.matchedBook && result.chapter) {
+    if ((result.stage === "chapter" || result.stage === "verse") && result.matchedBook && result.chapter) {
       invoke<Verse[]>("get_chapter", {
         translationId: activeTranslationId,
         bookNumber: result.matchedBook.book_number,
@@ -399,20 +312,12 @@ export function SearchPanel() {
         setQuickVersesList(verses)
         setShowQuickVerses(true)
       }).catch(console.error)
-    } else if (result.stage === "verse" && result.matchedBook && result.chapter) {
-      // Show verse dropdown when colon is typed
-      invoke<Verse[]>("get_chapter", {
-        translationId: activeTranslationId,
-        bookNumber: result.matchedBook.book_number,
-        chapter: result.chapter
-      }).then(verses => {
-        setQuickVersesList(verses)
-        setShowQuickVerses(true)
-      }).catch(console.error)
-    } else {
-      setShowQuickVerses(false)
     }
-  }, [quickInput, books, activeTranslationId])
+  }, [autocompleteResult, activeTranslationId])
+
+  // Derive dropdown visibility: only show when autocomplete stage is chapter/verse
+  const shouldShowVerseDropdown = showQuickVerses
+    && (autocompleteResult.stage === "chapter" || autocompleteResult.stage === "verse")
 
   const handleQuickKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     // Tab or → accepts suggestion and advances to NEXT STAGE
@@ -427,7 +332,6 @@ export function SearchPanel() {
     if (e.key === "Enter") {
       e.preventDefault()
       setQuickInput("")
-      setQuickSuggestion("")
       setShowQuickVerses(false)
       return
     }
@@ -436,7 +340,6 @@ export function SearchPanel() {
     if (e.key === "Escape") {
       e.preventDefault()
       setQuickInput("")
-      setQuickSuggestion("")
       setShowQuickVerses(false)
       return
     }
@@ -449,7 +352,6 @@ export function SearchPanel() {
       verse: verse.verse
     })
     setQuickInput("")
-    setQuickSuggestion("")
     setShowQuickVerses(false)
   }, [])
 
@@ -528,7 +430,7 @@ export function SearchPanel() {
               />
 
               {/* Verse dropdown */}
-              {showQuickVerses && quickVersesList.length > 0 && (
+              {shouldShowVerseDropdown && quickVersesList.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 z-50 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
                   <div className="p-1">
                     {quickVersesList.map((verse) => (
@@ -625,8 +527,7 @@ export function SearchPanel() {
                 onClick={() => {
                   if (chapter > 1) {
                     setChapter((c) => c - 1)
-                    setChapterInput("")
-                    setSelectedVerseId(null)
+                                setSelectedVerseId(null)
                   }
                 }}
                 disabled={chapter <= 1}
@@ -638,8 +539,7 @@ export function SearchPanel() {
                 size="icon-xs"
                 onClick={() => {
                   setChapter((c) => c + 1)
-                  setChapterInput("")
-                  setSelectedVerseId(null)
+                            setSelectedVerseId(null)
                 }}
               >
                 <ArrowRightIcon className="size-3" />

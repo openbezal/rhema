@@ -1,7 +1,6 @@
 use crate::meter;
 use crate::types::AudioFrame;
 
-/// VAD configuration. Defaults match Logos AI's extracted bytecode values.
 #[derive(Debug, Clone)]
 pub struct VadConfig {
     /// RMS level below which a frame is considered silence (0.0-1.0).
@@ -23,7 +22,7 @@ pub struct VadConfig {
 impl Default for VadConfig {
     fn default() -> Self {
         // At 16kHz with ~1024 sample frames: 1 frame ≈ 64ms
-        // Logos AI defaults: silence_threshold=0.005, frame_threshold=0.0025,
+        // Defaults: silence_threshold=0.005, frame_threshold=0.0025,
         // overall_threshold=0.05
         Self {
             silence_threshold: 0.005,
