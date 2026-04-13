@@ -51,6 +51,7 @@ function QueueItemRow({
 
   return (
     <div
+      data-queue-idx={index}
       className={cn(
         "group flex h-10 items-center gap-2 rounded-md px-2.5 transition-colors",
         isHighlighted
