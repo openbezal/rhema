@@ -191,7 +191,7 @@ impl SemanticDetector {
             },
             verse_id: Some(verse_id),
             confidence: similarity,
-            source: DetectionSource::SemanticLocal {
+            source: DetectionSource::Semantic {
                 similarity,
             },
             transcript_snippet: snippet.to_string(),
@@ -265,7 +265,7 @@ mod tests {
             assert!(d.confidence >= 0.35);
             assert!(matches!(
                 d.source,
-                DetectionSource::SemanticLocal { .. }
+                DetectionSource::Semantic { .. }
             ));
         }
     }

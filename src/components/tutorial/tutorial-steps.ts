@@ -42,6 +42,15 @@ export const TUTORIAL_STEPS: Step[] = [
   },
   {
     ...STEP_DEFAULTS,
+    target: '[data-tour="quick-nav"]',
+    title: "Quick Navigation",
+    content:
+      "Type to instantly navigate: 'J' → 'Joshua' or '1 J' → '1 John', press Tab to advance stages, then type chapter and verse.",
+    placement: "bottom",
+    spotlightPadding: 2,
+  },
+  {
+    ...STEP_DEFAULTS,
     target: '[data-slot="queue-panel"]',
     title: "Verse Queue",
     content:

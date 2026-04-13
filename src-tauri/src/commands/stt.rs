@@ -242,16 +242,6 @@ pub async fn start_transcription(
         }
     });
 
-    // Background quotation matching channel — fast but separate thread
-    let (quotation_tx, mut quotation_rx) = tokio::sync::mpsc::channel::<String>(8);
-
-    let quot_app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        while let Some(text) = quotation_rx.recv().await {
-            run_quotation_matching(&quot_app, &text);
-        }
-    });
-
     tauri::async_runtime::spawn(async move {
         // Sentence buffer accumulates is_final fragments into complete sentences.
         // Flushes on sentence-ending punctuation or speech_final signal.
@@ -307,11 +297,6 @@ pub async fn start_transcription(
 
                         // Reading mode: check if transcript matches expected verse
                         let reading_handled = check_reading_mode(&event_app, &transcript, direct_found);
-
-                        // Quotation matching: run on every is_final (fast, no ONNX)
-                        if !direct_found && !reading_handled {
-                            let _ = quotation_tx.try_send(transcript.clone());
-                        }
 
                         // Only accumulate for semantic if neither direct nor
                         // reading mode handled it. No point running ONNX inference
@@ -406,7 +391,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
 
     // Resolve verse info from DB (needs AppState, but only briefly for DB lookup)
     let app_managed: State<'_, Mutex<AppState>> = app.state();
-    let Ok(mut app_state) = app_managed.try_lock() else {
+    let Ok(app_state) = app_managed.try_lock() else {
         // AppState locked by semantic worker — emit results without verse text
         let results: Vec<super::detection::DetectionResult> = merged
             .iter()
@@ -437,15 +422,6 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
         .map(|m| super::detection::to_result(&app_state, m))
         .collect();
 
-    // Update sermon context with direct detection results
-    for m in &merged {
-        app_state.sermon_context.update(
-            &m.detection.verse_ref,
-            m.detection.confidence,
-            "direct",
-        );
-    }
-
     for r in &results {
         log::info!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
     }
@@ -465,30 +441,21 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
             return;
         }
     };
-    let mut detections = app_state.detection_pipeline.process_semantic(transcript);
+    // Run FTS5 BM25 first (immutable borrow of bible_db), then pass to pipeline
+    let fts_results = app_state.bible_db.as_ref().map(|db| {
+        db.search_verses_bm25(transcript, 10)
+            .unwrap_or_default()
+    });
+
+    // Use hybrid detection (vector + FTS5) when FTS5 results are available
+    let detections = if let Some(fts) = fts_results {
+        app_state.detection_pipeline.process_hybrid_with_fts(transcript, &fts)
+    } else {
+        app_state.detection_pipeline.process_semantic(transcript)
+    };
     if detections.is_empty() {
         log::info!("[DET-SEMANTIC] No detections");
         return;
-    }
-
-    // Apply context boosting: same-book/chapter detections get higher confidence
-    for m in &mut detections {
-        let boost = app_state.sermon_context.confidence_boost(
-            m.detection.verse_ref.book_number,
-            m.detection.verse_ref.chapter,
-        );
-        if boost > 0.0 {
-            m.detection.confidence = (m.detection.confidence + boost).min(1.0);
-        }
-    }
-
-    // Update sermon context with the top detection
-    if let Some(top) = detections.first() {
-        app_state.sermon_context.update(
-            &top.detection.verse_ref,
-            top.detection.confidence,
-            "semantic",
-        );
     }
 
     let results: Vec<super::detection::DetectionResult> = detections
@@ -736,81 +703,6 @@ fn check_translation_command(app: &AppHandle, transcript: &str) {
             }
         }
     }
-}
-
-/// Run quotation matching against all loaded Bible translations.
-fn run_quotation_matching(app: &AppHandle, transcript: &str) {
-    // When reading mode is active, suppress quotation matching entirely.
-    // The reader is actively reading a passage — quotation matches for
-    // OTHER books would hijack the display away from what's being read.
-    {
-        use rhema_detection::ReadingMode;
-        let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-        if let Ok(rm) = rm_managed.lock() {
-            if rm.is_active() || rm.has_verses() {
-                return; // Reading mode owns the display
-            }
-        }
-    }
-
-    let managed: State<'_, Mutex<AppState>> = app.state();
-    let Ok(app_state) = managed.try_lock() else { return }; // AppState busy
-
-    if !app_state.quotation_matcher.is_ready() {
-        return;
-    }
-
-    let detections = app_state.quotation_matcher.match_transcript(transcript);
-    if detections.is_empty() {
-        return;
-    }
-
-    let results: Vec<super::detection::DetectionResult> = detections
-        .iter()
-        .map(|d| {
-            let vr = &d.verse_ref;
-            // Try to resolve verse text from DB
-            let verse_text = if let Some(ref db) = app_state.bible_db {
-                db.get_verse(
-                    app_state.active_translation_id,
-                    vr.book_number,
-                    vr.chapter,
-                    vr.verse_start,
-                )
-                .ok()
-                .flatten()
-                .map(|v| v.text)
-                .unwrap_or_default()
-            } else {
-                String::new()
-            };
-
-            super::detection::DetectionResult {
-                verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
-                verse_text,
-                book_name: vr.book_name.clone(),
-                book_number: vr.book_number,
-                chapter: vr.chapter,
-                verse: vr.verse_start,
-                confidence: d.confidence,
-                source: "quotation".to_string(),
-                auto_queued: d.confidence >= 0.85,
-                transcript_snippet: d.transcript_snippet.clone(),
-            }
-        })
-        .collect();
-
-    for r in &results {
-        log::info!(
-            "[DET-QUOTATION] Found: {} ({:.0}%) auto_q={}",
-            r.verse_ref,
-            r.confidence * 100.0,
-            r.auto_queued
-        );
-    }
-
-    drop(app_state);
-    let _ = app.emit("verse_detections", &results);
 }
 
 /// Stop the transcription pipeline (audio capture + STT provider).

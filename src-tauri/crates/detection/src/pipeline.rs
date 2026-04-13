@@ -1,18 +1,32 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use rhema_bible::Bm25Result;
+
 use crate::direct::detector::DirectDetector;
 use crate::merger::{DetectionMerger, MergedDetection};
-use crate::semantic::cloud::CloudBooster;
 use crate::semantic::detector::SemanticDetector;
+use crate::types::{Detection, DetectionSource, VerseRef};
+
+/// Confidence assigned to the best FTS5 BM25 match (rank 0).
+const FTS5_RANK0_CONFIDENCE: f64 = 0.75;
+
+/// Confidence decrease per FTS5 rank position (rank 1 = 0.71, rank 2 = 0.67, etc.).
+const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
+
+/// FTS5 results below this confidence are not included.
+const FTS5_MIN_CONFIDENCE: f64 = 0.50;
+
+/// Minimum word count for vector embedding search (short text lacks semantic signal).
+const MIN_WORDS_FOR_VECTOR: usize = 5;
 
 /// The main detection pipeline that runs on each transcript segment.
 ///
-/// Orchestrates direct reference detection, semantic search, cloud boost,
-/// and merging into a single call. Consumers should create one pipeline
-/// and reuse it across transcript segments so that the merger's cooldown
-/// state is preserved.
+/// Orchestrates direct reference detection, semantic search, and merging
+/// into a single call. Consumers should create one pipeline and reuse it
+/// across transcript segments so that the merger's cooldown state is preserved.
 pub struct DetectionPipeline {
     direct: DirectDetector,
     semantic: SemanticDetector,
-    cloud: CloudBooster,
     merger: DetectionMerger,
 }
 
@@ -21,7 +35,6 @@ impl DetectionPipeline {
         Self {
             direct: DirectDetector::new(),
             semantic: SemanticDetector::stub(),
-            cloud: CloudBooster::new(),
             merger: DetectionMerger::new(),
         }
     }
@@ -29,11 +42,6 @@ impl DetectionPipeline {
     /// Replace the semantic detector (e.g., after loading an ONNX model).
     pub fn set_semantic(&mut self, detector: SemanticDetector) {
         self.semantic = detector;
-    }
-
-    /// Replace the cloud booster configuration.
-    pub fn set_cloud(&mut self, booster: CloudBooster) {
-        self.cloud = booster;
     }
 
     /// Access the direct detector for configuration.
@@ -46,19 +54,11 @@ impl DetectionPipeline {
         &mut self.merger
     }
 
-    /// Process a transcript segment and return merged detections.
-    ///
-    /// 1. Run direct reference detection (pattern / automaton based).
-    /// 2. Run semantic detection (returns empty if no model loaded).
-    /// 3. TODO: Cloud boost for low-confidence semantic results
-    ///    (will be wired when reqwest is added).
-    /// 4. Merge and rank all results.
-    ///    Run the full pipeline (direct + semantic + merge). Used by `detect_verses` command.
+    /// Run the full pipeline (direct + semantic + merge). Used by `detect_verses` command.
     pub fn process(&mut self, text: &str) -> Vec<MergedDetection> {
         let direct_results = self.direct.detect(text);
 
-        // Skip semantic on short fragments (no signal in < 5 words)
-        let semantic_results = if text.split_whitespace().count() >= 5 {
+        let semantic_results = if text.split_whitespace().count() >= MIN_WORDS_FOR_VECTOR {
             self.semantic.detect(text)
         } else {
             vec![]
@@ -77,7 +77,7 @@ impl DetectionPipeline {
     /// Run only semantic (ONNX embedding) detection. Slow, 50-400ms.
     /// Used on `speech_final` only, in a background task.
     pub fn process_semantic(&mut self, text: &str) -> Vec<MergedDetection> {
-        if text.split_whitespace().count() < 5 {
+        if text.split_whitespace().count() < MIN_WORDS_FOR_VECTOR {
             return vec![];
         }
         let semantic_results = self.semantic.detect(text);
@@ -87,11 +87,6 @@ impl DetectionPipeline {
     /// Check if semantic search is available (model loaded + index populated).
     pub fn has_semantic(&self) -> bool {
         self.semantic.is_ready()
-    }
-
-    /// Check if cloud boost is available (API key configured).
-    pub fn has_cloud(&self) -> bool {
-        self.cloud.is_enabled()
     }
 
     /// Enable or disable synonym expansion (paraphrase detection mode).
@@ -104,10 +99,74 @@ impl DetectionPipeline {
         self.semantic.use_synonyms()
     }
 
+    /// Run hybrid semantic detection combining vector search with pre-fetched
+    /// FTS5 BM25 results. Used by the real-time STT pipeline.
+    ///
+    /// Vector results found by both methods get a confidence boost;
+    /// FTS5-only results are added with rank-derived confidence.
+    #[expect(clippy::cast_precision_loss, reason = "rank index is small")]
+    pub fn process_hybrid_with_fts(
+        &mut self,
+        text: &str,
+        fts_results: &[Bm25Result],
+    ) -> Vec<MergedDetection> {
+        // Vector search needs enough words for meaningful embeddings;
+        // FTS5 keyword matching works with fewer words.
+        let mut vector_detections = if text.split_whitespace().count() >= MIN_WORDS_FOR_VECTOR {
+            self.semantic.detect(text)
+        } else {
+            vec![]
+        };
+
+        if fts_results.is_empty() {
+            return self.merger.merge(vec![], vector_detections);
+        }
+
+        // Add FTS5 results as detections with populated VerseRef (no verse_id).
+        // The merger will dedup if both vector and FTS5 find the same verse.
+        // to_result() resolves VerseRef via the active translation's db.get_verse().
+        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64")]
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        let snippet = text.to_string();
+        for (rank, fts) in fts_results.iter().enumerate() {
+            let confidence = FTS5_RANK0_CONFIDENCE - (rank as f64 * FTS5_CONFIDENCE_DECAY);
+            if confidence < FTS5_MIN_CONFIDENCE {
+                break;
+            }
+            log::debug!(
+                "[HYBRID] FTS5 hit: {} {}:{} rank={} conf={:.0}%",
+                fts.book_name, fts.chapter, fts.verse,
+                rank,
+                confidence * 100.0
+            );
+            vector_detections.push(Detection {
+                verse_ref: VerseRef {
+                    book_number: fts.book_number,
+                    book_name: fts.book_name.clone(),
+                    chapter: fts.chapter,
+                    verse_start: fts.verse,
+                    verse_end: None,
+                },
+                verse_id: None,
+                confidence,
+                source: DetectionSource::Semantic { similarity: confidence },
+                transcript_snippet: snippet.clone(),
+                detected_at: now,
+            });
+        }
+
+        self.merger.merge(vec![], vector_detections)
+    }
+
     /// Run a standalone semantic search query (for the search UI).
     pub fn semantic_search(&mut self, query: &str, k: usize) -> Vec<(i64, f64)> {
         self.semantic.search_query(query, k)
     }
+
 }
 
 impl Default for DetectionPipeline {
@@ -149,12 +208,6 @@ mod tests {
     fn test_pipeline_semantic_not_ready_by_default() {
         let pipeline = DetectionPipeline::new();
         assert!(!pipeline.has_semantic());
-    }
-
-    #[test]
-    fn test_pipeline_cloud_not_ready_by_default() {
-        let pipeline = DetectionPipeline::new();
-        assert!(!pipeline.has_cloud());
     }
 
     #[test]

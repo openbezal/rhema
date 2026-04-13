@@ -39,17 +39,6 @@ pub struct CrossReference {
     pub votes: i32,
 }
 
-/// A verse row used for quotation matching index construction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QuotationVerse {
-    pub id: i64,
-    pub book_number: i32,
-    pub book_name: String,
-    pub chapter: i32,
-    pub verse: i32,
-    pub text: String,
-}
-
 /// A compact verse row used for client-side search indexing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SearchVerse {

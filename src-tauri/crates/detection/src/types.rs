@@ -11,14 +11,10 @@ pub struct VerseRef {
 }
 
 /// Indicates how a detection was made.
-#[non_exhaustive]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum DetectionSource {
     DirectReference,
-    Contextual,
-    QuotationMatch { similarity: f64 },
-    SemanticLocal { similarity: f64 },
-    SemanticCloud { similarity: f64 },
+    Semantic { similarity: f64 },
 }
 
 /// A single detected Bible reference in transcript text.

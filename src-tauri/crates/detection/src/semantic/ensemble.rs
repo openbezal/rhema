@@ -6,7 +6,7 @@ use super::index::VectorIndex;
 use super::synonyms::SynonymExpander;
 use crate::error::DetectionError;
 
-/// Logos AI ensemble search weights (extracted from bytecode).
+/// Ensemble search weights.
 const ORIGINAL_WEIGHT: f64 = 0.7;
 const SYNONYM_WEIGHT: f64 = 0.2;
 const CONCEPT_WEIGHT: f64 = 0.1;
