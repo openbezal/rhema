@@ -126,7 +126,15 @@ export function TranscriptPanel() {
       }
 
       if (d.auto_queued) {
-        useQueueStore.getState().addItem({
+        const queue = useQueueStore.getState()
+        const dupIdx = queue.findDuplicate(d.book_number, d.chapter, d.verse)
+        if (dupIdx !== -1) {
+          const existing = queue.items[dupIdx]
+          queue.flashItem(existing.id)
+          if (!d.is_chapter_only) queue.setActive(dupIdx)
+          continue
+        }
+        queue.addItem({
           id: crypto.randomUUID(),
           verse: {
             id: 0,

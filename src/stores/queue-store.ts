@@ -4,19 +4,28 @@ import type { QueueItem } from "@/types"
 interface QueueState {
   items: QueueItem[]
   activeIndex: number | null
+  /** ID of the queue item currently being flash-highlighted (null = none). */
+  highlightedId: string | null
 
   addItem: (item: QueueItem) => void
   removeItem: (id: string) => void
   reorderItems: (fromIndex: number, toIndex: number) => void
   setActive: (index: number | null) => void
   clearQueue: () => void
+  /** Flash-highlight a queue item briefly (1.5 s). */
+  flashItem: (id: string) => void
+  /** Find an existing item by book+chapter+verse. Returns its index or -1. */
+  findDuplicate: (bookNumber: number, chapter: number, verse: number) => number
   /** Update a chapter-only queue item in place when the verse is refined. */
   updateEarlyRef: (bookNumber: number, chapter: number, verse: number, reference: string, verseText: string) => boolean
 }
 
-export const useQueueStore = create<QueueState>((set) => ({
+let flashTimer: ReturnType<typeof setTimeout> | null = null
+
+export const useQueueStore = create<QueueState>((set, get) => ({
   items: [],
   activeIndex: null,
+  highlightedId: null,
 
   addItem: (item) =>
     set((state) => ({ items: [item, ...state.items] })),
@@ -33,6 +42,18 @@ export const useQueueStore = create<QueueState>((set) => ({
     }),
   setActive: (activeIndex) => set({ activeIndex }),
   clearQueue: () => set({ items: [], activeIndex: null }),
+  flashItem: (id) => {
+    if (flashTimer) clearTimeout(flashTimer)
+    set({ highlightedId: id })
+    flashTimer = setTimeout(() => set({ highlightedId: null }), 1500)
+  },
+  findDuplicate: (bookNumber, chapter, verse) =>
+    get().items.findIndex(
+      (i) =>
+        i.verse.book_number === bookNumber &&
+        i.verse.chapter === chapter &&
+        i.verse.verse === verse,
+    ),
   updateEarlyRef: (bookNumber, chapter, verse, reference, verseText) => {
     let found = false
     set((state) => {
