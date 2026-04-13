@@ -554,6 +554,13 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
                             recent.verse_start,
                             verses,
                         );
+
+                        // Check if transcript contains "chapter" keyword - if so, expect chapter number next
+                        // This handles "Genesis chapter" → pause → "5" → go to chapter 5
+                        let lower = transcript.to_lowercase();
+                        if lower.contains("chapter") && !lower.contains("next") && !lower.contains("previous") {
+                            rm.set_expecting_chapter();
+                        }
                     }
                 }
             }
