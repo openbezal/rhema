@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { deriveLiveVerse } from "@/hooks/use-broadcast"
@@ -38,25 +39,23 @@ export function LiveOutputPanel() {
       )}
     >
       <PanelHeader title="Live display">
-        <button
-          onClick={() => useBroadcastStore.getState().setLive(!isLive)}
-          className={cn(
-            "flex items-center gap-2 rounded-full px-2.5 py-1 text-[0.625rem] font-medium uppercase tracking-wider transition-all",
-            isLive
-              ? "bg-emerald-500/15 text-emerald-400"
-              : "bg-muted text-muted-foreground"
-          )}
-        >
+        <label className="flex items-center gap-2">
           <span
             className={cn(
-              "size-1.5 rounded-full",
-              isLive
-                ? "animate-pulse bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
-                : "bg-muted-foreground/50"
+              "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
+              isLive ? "text-emerald-400" : "text-muted-foreground"
             )}
+          >
+            {isLive ? "Live" : "Go live"}
+          </span>
+          <Switch
+            checked={isLive}
+            onCheckedChange={(checked) =>
+              useBroadcastStore.getState().setLive(checked)
+            }
+            className="data-[state=checked]:bg-emerald-500"
           />
-          {isLive ? "Live" : "Go live"}
-        </button>
+        </label>
       </PanelHeader>
 
       <div
