@@ -9,6 +9,8 @@ export interface DetectionResult {
   source: "direct" | "semantic"
   auto_queued: boolean
   transcript_snippet: string
+  /** True when detected from a chapter-only reference (verse defaults to 1, may be refined). */
+  is_chapter_only: boolean
 }
 
 export interface DetectionStatus {
