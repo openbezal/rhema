@@ -80,9 +80,9 @@ export function TranscriptPanel() {
     useDetectionStore.getState().addDetections(detections)
 
     // Auto-navigate book search + select verse for preview/live
-    // Handle direct, contextual (reading mode), and high-confidence quotation matches
+    // Auto-navigate on direct detection hits
     const directHit = detections.find(
-      (d) => d.source === "direct" || d.source === "contextual" || (d.source === "quotation" && d.auto_queued)
+      (d) => d.source === "direct" && !d.is_chapter_only
     )
     if (directHit && directHit.book_number > 0) {
       // Select verse immediately so preview/live panels update
@@ -108,6 +108,23 @@ export function TranscriptPanel() {
 
     // Auto-queue high-confidence detections
     for (const d of detections) {
+      // Check if this detection refines an existing chapter-only queue item
+      if (
+        !d.is_chapter_only &&
+        d.source === "direct" &&
+        useQueueStore
+          .getState()
+          .updateEarlyRef(
+            d.book_number,
+            d.chapter,
+            d.verse,
+            d.verse_ref,
+            d.verse_text,
+          )
+      ) {
+        continue
+      }
+
       if (d.auto_queued) {
         useQueueStore.getState().addItem({
           id: crypto.randomUUID(),
@@ -125,6 +142,7 @@ export function TranscriptPanel() {
           confidence: d.confidence,
           source: d.source === "direct" ? "ai-direct" : "ai-semantic",
           added_at: Date.now(),
+          is_chapter_only: d.is_chapter_only,
         })
       }
     }

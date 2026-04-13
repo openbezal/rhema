@@ -1,6 +1,6 @@
 use crate::db::BibleDb;
 use crate::error::BibleError;
-use crate::models::{Book, QuotationVerse, SearchVerse, Translation, Verse};
+use crate::models::{Book, SearchVerse, Translation, Verse};
 
 impl BibleDb {
     /// Look up a verse by its database primary key (verses.id).
@@ -130,43 +130,6 @@ impl BibleDb {
             },
         )?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
-    }
-
-    /// Load all verses for quotation matching index.
-    /// Filters to a specific language if provided.
-    pub fn load_all_verses_for_quotation(
-        &self,
-        language: Option<&str>,
-    ) -> Result<Vec<QuotationVerse>, BibleError> {
-        let conn = self.conn.lock().unwrap();
-
-        let mapper = |row: &rusqlite::Row| {
-            Ok(QuotationVerse {
-                id: row.get(0)?,
-                book_number: row.get(1)?,
-                book_name: row.get(2)?,
-                chapter: row.get(3)?,
-                verse: row.get(4)?,
-                text: row.get(5)?,
-            })
-        };
-
-        if let Some(lang) = language {
-            let mut stmt = conn.prepare(
-                "SELECT v.id, v.book_number, v.book_name, v.chapter, v.verse, v.text \
-                 FROM verses v \
-                 JOIN translations t ON v.translation_id = t.id \
-                 WHERE t.language = ?1"
-            )?;
-            let rows = stmt.query_map([lang], mapper)?;
-            Ok(rows.collect::<Result<Vec<_>, _>>()?)
-        } else {
-            let mut stmt = conn.prepare(
-                "SELECT id, book_number, book_name, chapter, verse, text FROM verses"
-            )?;
-            let rows = stmt.query_map([], mapper)?;
-            Ok(rows.collect::<Result<Vec<_>, _>>()?)
-        }
     }
 
     /// Load all verses for one translation for client-side context search indexing.
