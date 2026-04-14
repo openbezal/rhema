@@ -81,7 +81,7 @@ export function TranscriptPanel() {
     // Auto-navigate book search + select verse for preview/live
     // Auto-navigate on direct detection hits AND contextual navigation (reading mode chapter/verse commands)
     const directHit = detections.find(
-      (d) => (d.source === "direct" || d.source === "contextual") && !d.is_chapter_only
+      (d) => (d.source === "direct" || d.source === "semantic") && !d.is_chapter_only
     )
     if (directHit && directHit.book_number > 0) {
       // Select verse immediately so preview/live panels update

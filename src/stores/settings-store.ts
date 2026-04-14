@@ -14,7 +14,6 @@ interface SettingsState {
   cooldownMs: number
   onboardingComplete: boolean
   sttProvider: SttProvider
-
   setDeepgramApiKey: (key: string | null) => void
   setOpenaiApiKey: (key: string | null) => void
   setClaudeApiKey: (key: string | null) => void
@@ -26,6 +25,21 @@ interface SettingsState {
   setOnboardingComplete: (complete: boolean) => void
   setSttProvider: (provider: SttProvider) => void
 }
+
+const PERSISTED_KEYS = [
+  "deepgramApiKey",
+  "openaiApiKey",
+  "claudeApiKey",
+  "audioDeviceId",
+  "gain",
+  "autoMode",
+  "confidenceThreshold",
+  "cooldownMs",
+  "onboardingComplete",
+  "sttProvider",
+] as const satisfies readonly (keyof SettingsState)[]
+
+type PersistedKey = (typeof PERSISTED_KEYS)[number]
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   deepgramApiKey: null,
@@ -51,30 +65,29 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setSttProvider: (sttProvider) => set({ sttProvider }),
 }))
 
-const PERSISTED_KEYS = [
-  "deepgramApiKey",
-  "openaiApiKey",
-  "claudeApiKey",
-  "activeTranslationId",
-  "audioDeviceId",
-  "gain",
-  "autoMode",
-  "confidenceThreshold",
-  "cooldownMs",
-  "onboardingComplete",
-  "sttProvider",
-] as const satisfies readonly (keyof SettingsState)[]
-
-type PersistedKey = (typeof PERSISTED_KEYS)[number]
-
 let tauriStore: Store | null = null
 let hydrationPromise: Promise<void> | null = null
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let pendingSave: Promise<void> = Promise.resolve()
+const SAVE_DEBOUNCE_MS = 250
 
 async function getStore(): Promise<Store> {
   if (!tauriStore) {
     tauriStore = await load("settings.json", { autoSave: false, defaults: {} })
   }
   return tauriStore
+}
+
+async function persistAll(state: SettingsState): Promise<void> {
+  try {
+    const store = await getStore()
+    for (const key of PERSISTED_KEYS) {
+      await store.set(key, state[key] as unknown)
+    }
+    await store.save()
+  } catch {
+    console.warn("[settings] Failed to persist settings")
+  }
 }
 
 /** Load all persisted settings into the Zustand store. Idempotent and
@@ -87,17 +100,15 @@ export function hydrateSettings(): Promise<void> {
       const store = await getStore()
       const patch: Partial<SettingsState> = {}
       for (const key of PERSISTED_KEYS) {
-        const value = await store.get(key)
+        const value = await store.get<unknown>(key)
         if (value !== undefined && value !== null) {
-          ;(patch as Record<string, unknown>)[key] = value
+          ;(patch as Record<PersistedKey, unknown>)[key] = value
         }
       }
       if (Object.keys(patch).length > 0) {
         useSettingsStore.setState(patch)
       }
 
-      // Attach only after successful hydration so as not to overwrite disk with defaults.
-      // Debounce writes, so a dragged slider (e.g. gain) coalesces into a single disk write.
       useSettingsStore.subscribe((state, prevState) => {
         const changed = PERSISTED_KEYS.some((k) => state[k] !== prevState[k])
         if (!changed) return
@@ -114,20 +125,4 @@ export function hydrateSettings(): Promise<void> {
     }
   })()
   return hydrationPromise
-}
-
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let pendingSave: Promise<void> = Promise.resolve()
-const SAVE_DEBOUNCE_MS = 250
-
-async function persistAll(state: SettingsState): Promise<void> {
-  try {
-    const store = await getStore()
-    for (const key of PERSISTED_KEYS) {
-      await store.set(key, state[key] as unknown)
-    }
-    await store.save()
-  } catch {
-    console.warn("[settings] Failed to persist settings")
-  }
 }
