@@ -99,10 +99,8 @@ export function hydrateSettings(): Promise<void> {
       if (Object.keys(patch).length > 0) {
         useSettingsStore.setState(patch)
       }
-    } catch {
-      console.warn("[settings] Failed to load persisted state, using defaults")
-    } finally {
-      // Attach only after hydration so as not to overwrite disk with defaults.
+
+      // Attach only after successful hydration so as not to overwrite disk with defaults.
       // Debounce writes, so a dragged slider (e.g. gain) coalesces into a single disk write.
       useSettingsStore.subscribe((state, prevState) => {
         const changed = PERSISTED_KEYS.some((k) => state[k] !== prevState[k])
@@ -115,6 +113,8 @@ export function hydrateSettings(): Promise<void> {
           )
         }, SAVE_DEBOUNCE_MS)
       })
+    } catch {
+      console.warn("[settings] Failed to load persisted state, using defaults")
     }
   })()
   return hydrationPromise
@@ -128,7 +128,7 @@ async function persistAll(state: SettingsState): Promise<void> {
   try {
     const store = await getStore()
     for (const key of PERSISTED_KEYS) {
-      await store.set(key, state[key] as PersistedKey extends never ? never : unknown)
+      await store.set(key, state[key] as unknown)
     }
     await store.save()
   } catch {
