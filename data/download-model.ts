@@ -14,19 +14,44 @@
  */
 
 import { join } from "node:path"
+import {
+  ensurePythonEnv,
+  getVenvBin,
+  PROJECT_ROOT,
+} from "./lib/python-env"
 
-const MODELS_DIR = join(import.meta.dir, "..", "models", "qwen3-embedding-0.6b")
-const MODELS_DIR_INT8 = join(import.meta.dir, "..", "models", "qwen3-embedding-0.6b-int8")
+const MODELS_DIR = join(PROJECT_ROOT, "models", "qwen3-embedding-0.6b")
+const MODELS_DIR_INT8 = join(
+  PROJECT_ROOT,
+  "models",
+  "qwen3-embedding-0.6b-int8"
+)
 
 async function main() {
-  console.log("\n🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)...\n")
-  console.log("  This downloads the model from HuggingFace and converts it to ONNX format.")
-  console.log("  The export uses --task feature-extraction to avoid KV cache inputs.")
+  // --- Phase 1: Python environment setup ---
+  await ensurePythonEnv([
+    "optimum-onnx[onnxruntime]",
+    "sentence-transformers",
+    "accelerate",
+  ])
+
+  // --- Phase 2: Export model ---
+  const optimumCli = getVenvBin("optimum-cli")
+
+  console.log(
+    "\n🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)...\n"
+  )
+  console.log(
+    "  This downloads the model from HuggingFace and converts it to ONNX format."
+  )
+  console.log(
+    "  The export uses --task feature-extraction to avoid KV cache inputs."
+  )
   console.log("  This may take a few minutes on first run.\n")
 
   const proc = Bun.spawn(
     [
-      "optimum-cli",
+      optimumCli,
       "export",
       "onnx",
       "--model",
@@ -43,8 +68,7 @@ async function main() {
 
   const exitCode = await proc.exited
   if (exitCode !== 0) {
-    console.error("\n❌ Export failed. Make sure optimum-onnx is installed:")
-    console.error("   pip install optimum-onnx")
+    console.error("\n❌ Export failed.")
     process.exit(1)
   }
 
@@ -57,7 +81,7 @@ async function main() {
 
   const quantizeProc = Bun.spawn(
     [
-      "optimum-cli",
+      optimumCli,
       "onnxruntime",
       "quantize",
       "--onnx_model",

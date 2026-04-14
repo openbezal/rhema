@@ -264,6 +264,10 @@ pub async fn start_transcription(
                             },
                         );
 
+                        // Check for translation commands on partials too (cheap string matching)
+                        // This makes translation switching feel instant without waiting for speech_final
+                        check_translation_command(&event_app, &transcript);
+
                         // Run direct detection on partials too — cheap regex
                         // patterns make this feasible on every interim result.
                         // This makes detection feel instant for verbose forms
