@@ -1,70 +1,69 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { Button } from "@/components/ui/button"
 import { ApiKeyPrompt } from "@/components/ui/api-key-prompt"
 import { MicIcon, MicOffIcon } from "lucide-react"
-import { invoke } from "@tauri-apps/api/core"
 import {
-  useTranscriptStore,
   useAudioStore,
-  useSettingsStore,
   useDetectionStore,
   useQueueStore,
   useBibleStore,
+  useTranscriptStore,
 } from "@/stores"
 import { useTauriEvent } from "@/hooks/use-tauri-event"
+import { useTranscription } from "@/hooks/use-transcription"
 import { bibleActions } from "@/hooks/use-bible"
-import type { TranscriptSegment } from "@/types"
 import type { DetectionResult } from "@/types"
 
-export function TranscriptPanel() {
-  const segments = useTranscriptStore((s) => s.segments)
-  const currentPartial = useTranscriptStore((s) => s.currentPartial)
-  const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
-  const connectionStatus = useTranscriptStore((s) => s.connectionStatus)
-  const audioLevel = useAudioStore((s) => s.level)
-  const deepgramApiKey = useSettingsStore((s) => s.deepgramApiKey)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [showKeyPrompt, setShowKeyPrompt] = useState(false)
+/**
+ * Leaf component that subscribes to the audio level only. Isolated so the
+ * high-frequency `audio_level` tick (many times per second during recording)
+ * does NOT re-render the transcript list, connection dot, or button subtree.
+ */
+function AudioLevelMeter() {
+  const rms = useAudioStore((s) => s.level.rms)
+  return <LevelMeter level={rms} bars={6} />
+}
 
-  // Listen for Tauri events
+/**
+ * Leaf component that subscribes to `currentPartial`. Partials update per audio tick.
+ */
+function LivePartialLine({ scrollRef }: { scrollRef: RefObject<HTMLDivElement | null> }) {
+  const currentPartial = useTranscriptStore((s) => s.currentPartial)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [currentPartial, scrollRef])
+
+  if (!currentPartial) return null
+
+  return (
+    <p className="border-l-2 border-primary pl-2 text-base leading-relaxed text-foreground">
+      {currentPartial}
+      <span className="ml-1 inline-block size-1.5 animate-pulse rounded-full bg-primary align-middle" />
+    </p>
+  )
+}
+
+export function TranscriptPanel() {
+  const [showKeyPrompt, setShowKeyPrompt] = useState(false)
+  const onMissingApiKey = useCallback(() => setShowKeyPrompt(true), [])
+  const {
+    segments,
+    isTranscribing,
+    connectionStatus,
+    startTranscription,
+    stopTranscription,
+  } = useTranscription({ onMissingApiKey })
+  const hasPartial = useTranscriptStore((s) => s.currentPartial.length > 0)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   useTauriEvent<{ rms: number; peak: number }>("audio_level", (payload) => {
     useAudioStore.getState().setLevel(payload)
   })
-
-  // Connection status events
-  useTauriEvent("stt_connected", () => {
-    useTranscriptStore.getState().setConnectionStatus("connected")
-  })
-  useTauriEvent("stt_disconnected", () => {
-    useTranscriptStore.getState().setConnectionStatus("disconnected")
-  })
-  useTauriEvent<string>("stt_error", () => {
-    useTranscriptStore.getState().setConnectionStatus("error")
-  })
-
-  useTauriEvent<{ text: string; is_final: boolean; confidence: number }>(
-    "transcript_partial",
-    (payload) => {
-      useTranscriptStore.getState().setPartial(payload.text)
-    }
-  )
-
-  useTauriEvent<{ text: string; is_final: boolean; confidence: number }>(
-    "transcript_final",
-    (payload) => {
-      const segment: TranscriptSegment = {
-        id: crypto.randomUUID(),
-        text: payload.text,
-        is_final: true,
-        confidence: payload.confidence,
-        words: [],
-        timestamp: Date.now(),
-      }
-      useTranscriptStore.getState().addSegment(segment)
-    }
-  )
 
   // Listen for voice translation commands: "read in NIV", "switch to ESV"
   useTauriEvent<{ abbreviation: string; translation_id: number }>(
@@ -165,51 +164,13 @@ export function TranscriptPanel() {
     }
   })
 
-  // Auto-scroll to bottom
+  // Auto-scroll on segment additions. Partial-driven scrolling lives in
+  // LivePartialLine so the panel doesn't re-render per audio tick.
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [segments, currentPartial])
-
-  const handleStart = async () => {
-    try {
-      useTranscriptStore.getState().setConnectionStatus("connecting")
-      const { useSettingsStore } = await import("@/stores")
-      const settings = useSettingsStore.getState()
-      const params = {
-        apiKey: settings.sttProvider === "deepgram" ? (deepgramApiKey ?? "") : "",
-        deviceId: settings.audioDeviceId,
-        gain: settings.gain,
-        provider: settings.sttProvider,
-      }
-      console.log("[AUDIO] Starting transcription:", params)
-      await invoke("start_transcription", params)
-      console.log("[AUDIO] Transcription started successfully")
-      useTranscriptStore.getState().setTranscribing(true)
-    } catch (e) {
-      const errorMsg = String(e)
-      console.error("[AUDIO] Failed to start transcription:", errorMsg)
-      useTranscriptStore.getState().setConnectionStatus("error")
-
-      if (errorMsg.includes("No Deepgram API key")) {
-        setShowKeyPrompt(true)
-      } else {
-        alert(errorMsg)
-      }
-    }
-  }
-
-  const handleStop = async () => {
-    try {
-      await invoke("stop_transcription")
-      useTranscriptStore.getState().setTranscribing(false)
-      useTranscriptStore.getState().setPartial("")
-      useTranscriptStore.getState().setConnectionStatus("disconnected")
-    } catch (e) {
-      console.error("Failed to stop transcription:", e)
-    }
-  }
+  }, [segments])
 
   return (
     <div
@@ -235,7 +196,7 @@ export function TranscriptPanel() {
               title={connectionStatus}
             />
           )}
-          <LevelMeter level={audioLevel.rms} bars={6} />
+          <AudioLevelMeter />
         </div>
       </PanelHeader>
 
@@ -244,7 +205,7 @@ export function TranscriptPanel() {
           {/* Faded top gradient */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b from-card to-transparent" />
 
-          {segments.length === 0 && !currentPartial && !isTranscribing && (
+          {segments.length === 0 && !hasPartial && !isTranscribing && (
             <p className="text-sm text-muted-foreground">
               Click "Start transcribing" to begin
             </p>
@@ -271,13 +232,8 @@ export function TranscriptPanel() {
             )
           })}
 
-          {/* Partial (in-progress) text — larger and brighter than final segments */}
-          {currentPartial && (
-            <p className="border-l-2 border-primary pl-2 text-base leading-relaxed text-foreground">
-              {currentPartial}
-              <span className="ml-1 inline-block size-1.5 animate-pulse rounded-full bg-primary align-middle" />
-            </p>
-          )}
+          {/* Partial (in-progress) text rendered by leaf subscriber */}
+          <LivePartialLine scrollRef={scrollRef} />
         </div>
       </div>
 
@@ -288,13 +244,13 @@ export function TranscriptPanel() {
             variant="ghost"
             size="sm"
             className="text-destructive hover:text-destructive"
-            onClick={handleStop}
+            onClick={stopTranscription}
           >
             <MicOffIcon className="size-3" />
             Stop transcribing
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" onClick={handleStart}>
+          <Button variant="ghost" size="sm" onClick={startTranscription}>
               <MicIcon className="size-3" />
             Start transcribing
           </Button>
