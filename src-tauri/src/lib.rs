@@ -7,6 +7,7 @@ use tauri::Emitter;
 
 #[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+
 pub fn run() {
     // Load .env file — try src-tauri/.env first, then project root ../.env
     dotenvy::dotenv().ok();
