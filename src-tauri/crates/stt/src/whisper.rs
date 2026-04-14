@@ -51,7 +51,6 @@ fn extract_segments(state: &WhisperState) -> (String, Vec<Word>, f64) {
         if n_words > 0 {
             let duration_per_word = (end_sec - start_sec) / n_words as f64;
             for (j, word_text) in text.split_whitespace().enumerate() {
-                let word_text: &str = word_text;
                 let w_start = start_sec + (j as f64 * duration_per_word);
                 let w_end = w_start + duration_per_word;
                 words.push(Word {
@@ -135,12 +134,14 @@ impl SttProvider for WhisperProvider {
 
         let (inference_tx, mut inference_rx) = mpsc::channel::<Vec<i16>>(4);
 
-        // ── Task 1: VAD + audio accumulation ─────────────────────────────────
+        // ── Task 1: VAD + audio accumulation ─────────────────────────────
         let vad_cancelled = cancelled.clone();
         let vad_event_tx = event_tx.clone();
         let vad_handle = tokio::task::spawn_blocking(move || {
             use rhema_audio::{AudioFrame, Vad, VadConfig, VadTransition};
 
+            // Higher thresholds than default to avoid sending near-silence
+            // to Whisper (which causes hallucinations).
             let vad_config = VadConfig {
                 silence_threshold: 0.01,
                 frame_threshold: 0.005,
@@ -199,11 +200,10 @@ impl SttProvider for WhisperProvider {
             }
         });
 
-        // ── Task 2: Whisper inference ─────────────────────────────────────────
+        // ── Task 2: Whisper inference ────────────────────────────────────
         let inf_cancelled = cancelled.clone();
         let inf_event_tx = event_tx.clone();
         let inf_handle = tokio::task::spawn_blocking(move || {
-            // v0.16: new_with_params takes AsRef<Path>, use &* to deref Cow
             let ctx = match WhisperContext::new_with_params(
                 &model_path,
                 WhisperContextParameters::default(),
@@ -239,7 +239,9 @@ impl SttProvider for WhisperProvider {
                 let audio_f32 = i16_to_f32(&audio_i16);
 
                 let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-                params.set_language(Some(language.as_deref().unwrap_or("en")));
+                params.set_language(Some(
+                    language.as_deref().unwrap_or("en"),
+                ));
                 params.set_n_threads(n_threads);
                 params.set_print_progress(false);
                 params.set_print_special(false);
