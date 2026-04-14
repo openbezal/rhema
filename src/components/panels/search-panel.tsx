@@ -85,12 +85,25 @@ export function SearchPanel() {
     selectedVerse,
   } = useBible()
 
+  const queueItems = useQueueStore((s) => s.items)
+  const queuedVerseKeys = useMemo(() => {
+    return new Set(
+      queueItems.map((item) => `${item.verse.book_number}:${item.verse.chapter}:${item.verse.verse}`)
+    )
+  }, [queueItems])
+
   const selectedBookNumber = selectedBook?.book_number
 
-  // Load initial data
+  // Load initial data and default to Genesis 1:1
   useEffect(() => {
     bibleActions.loadTranslations().catch(console.error)
-    bibleActions.loadBooks().catch(console.error)
+    bibleActions.loadBooks().then(() => {
+      useBibleStore.getState().setPendingNavigation({
+        bookNumber: 1,
+        chapter: 1,
+        verse: 1,
+      })
+    }).catch(console.error)
   }, [])
 
   // Load chapter when book + chapter are set
@@ -359,7 +372,7 @@ export function SearchPanel() {
     <div
       ref={panelRef}
       data-slot="search-panel"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card outline-none"
       onKeyDown={activeTab === "book" ? handleKeyDown : undefined}
       tabIndex={-1}
     >
@@ -560,7 +573,7 @@ export function SearchPanel() {
                     "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
                     verse.id === effectiveSelectedVerseId
                       ? "border border-lime-500/50 bg-lime-500/10"
-                      : "hover:bg-muted/50"
+                      : "border border-transparent hover:bg-muted/50"
                   )}
                 >
                   <span className="w-6 shrink-0 text-right text-sm font-semibold text-primary">
@@ -569,39 +582,61 @@ export function SearchPanel() {
                   <p className="flex-1 text-sm leading-relaxed text-foreground/80">
                     {verse.text}
                   </p>
-                  {verse.id === effectiveSelectedVerseId && (
-                    <CheckIcon className="size-4 shrink-0 text-ai-direct" />
+                  {queuedVerseKeys.has(`${verse.book_number}:${verse.chapter}:${verse.verse}`) ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className="flex size-6 shrink-0 cursor-pointer items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const store = useQueueStore.getState()
+                              const idx = store.findDuplicate(verse.book_number, verse.chapter, verse.verse)
+                              if (idx !== -1) {
+                                store.flashItem(store.items[idx].id)
+                                document.querySelector(`[data-slot="queue-panel"] [data-queue-idx="${idx}"]`)
+                                  ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+                              }
+                            }}
+                          >
+                            <CheckIcon className="size-4 text-ai-direct" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">Already in queue</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className={cn(
+                              "shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                              verse.id === effectiveSelectedVerseId
+                                ? "hover:bg-lime-500/20 hover:text-lime-500"
+                                : "bg-primary/40! text-primary-foreground hover:bg-primary!"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              useQueueStore.getState().addItem({
+                                id: crypto.randomUUID(),
+                                verse,
+                                reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+                                confidence: 1,
+                                source: "manual",
+                                added_at: Date.now(),
+                              })
+                            }}
+                          >
+                            <PlusIcon className="size-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">Add to queue</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          className={cn(
-                            "shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
-                            verse.id === effectiveSelectedVerseId
-                              ? "hover:bg-lime-500/20 hover:text-lime-500"
-                              : "bg-primary/40! text-primary-foreground hover:bg-primary!"
-                          )}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            useQueueStore.getState().addItem({
-                              id: crypto.randomUUID(),
-                              verse,
-                              reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
-                              confidence: 1,
-                              source: "manual",
-                              added_at: Date.now(),
-                            })
-                          }}
-                        >
-                          <PlusIcon className="size-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left">Add to queue</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                 </div>
               ))}
             </div>
@@ -653,40 +688,65 @@ export function SearchPanel() {
                 <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
                   <HighlightedText text={result.verse_text} query={contextQuery} />
                 </p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground hover:bg-primary/80"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          useQueueStore.getState().addItem({
-                            id: crypto.randomUUID(),
-                            verse: {
-                              id: 0,
-                              translation_id: activeTranslationId,
-                              book_number: result.book_number,
-                              book_name: result.book_name,
-                              book_abbreviation: "",
-                              chapter: result.chapter,
-                              verse: result.verse,
-                              text: result.verse_text,
-                            },
-                            reference: `${result.book_name} ${result.chapter}:${result.verse}`,
-                            confidence: result.similarity,
-                            source: "manual",
-                            added_at: Date.now(),
-                          })
-                        }}
-                      >
-                        <PlusIcon className="size-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">Add to queue</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                {queuedVerseKeys.has(`${result.book_number}:${result.chapter}:${result.verse}`) ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className="flex size-6 absolute right-2 top-1/2 -translate-y-1/2 shrink-0 cursor-pointer items-center justify-center"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const store = useQueueStore.getState()
+                            const idx = store.findDuplicate(result.book_number, result.chapter, result.verse)
+                            if (idx !== -1) {
+                              store.flashItem(store.items[idx].id)
+                              document.querySelector(`[data-slot="queue-panel"] [data-queue-idx="${idx}"]`)
+                                ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+                            }
+                          }}
+                        >
+                          <CheckIcon className="size-4 text-ai-direct" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">Already in queue</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground hover:bg-primary/80"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            useQueueStore.getState().addItem({
+                              id: crypto.randomUUID(),
+                              verse: {
+                                id: 0,
+                                translation_id: activeTranslationId,
+                                book_number: result.book_number,
+                                book_name: result.book_name,
+                                book_abbreviation: "",
+                                chapter: result.chapter,
+                                verse: result.verse,
+                                text: result.verse_text,
+                              },
+                              reference: `${result.book_name} ${result.chapter}:${result.verse}`,
+                              confidence: result.similarity,
+                              source: "manual",
+                              added_at: Date.now(),
+                            })
+                          }}
+                        >
+                          <PlusIcon className="size-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">Add to queue</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
             ))}
           </div>

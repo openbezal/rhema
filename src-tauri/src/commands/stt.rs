@@ -264,6 +264,10 @@ pub async fn start_transcription(
                             },
                         );
 
+                        // Check for translation commands on partials too (cheap string matching)
+                        // This makes translation switching feel instant without waiting for speech_final
+                        check_translation_command(&event_app, &transcript);
+
                         // Run direct detection on partials too — cheap regex
                         // patterns make this feasible on every interim result.
                         // This makes detection feel instant for verbose forms
@@ -408,6 +412,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
                     source: "direct".to_string(),
                     auto_queued: m.auto_queued,
                     transcript_snippet: m.detection.transcript_snippet.clone(),
+                    is_chapter_only: m.detection.is_chapter_only,
                 }
             })
             .collect();
@@ -553,6 +558,13 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
                             recent.verse_start,
                             verses,
                         );
+
+                        // Check if transcript contains "chapter" keyword - if so, expect chapter number next
+                        // This handles "Genesis chapter" → pause → "5" → go to chapter 5
+                        let lower = transcript.to_lowercase();
+                        if lower.contains("chapter") && !lower.contains("next") && !lower.contains("previous") {
+                            rm.set_expecting_chapter();
+                        }
                     }
                 }
             }
@@ -564,10 +576,11 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
     // Check for chapter navigation commands (e.g., "let's go to chapter seven").
     {
         let chapter_change = {
-            let Ok(rm) = rm_managed.lock() else { return false };
+            let Ok(mut rm) = rm_managed.lock() else { return false };
             if !rm.is_active() && !rm.has_verses() {
                 None
             } else {
+                log::info!("[READING] Checking chapter command for: {:?}", transcript);
                 rm.check_chapter_command(transcript)
             }
         };
@@ -588,7 +601,15 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
 
             if let Some(chapter_verses) = chapter_data {
                 if !chapter_verses.is_empty() {
-                    let first_text = chapter_verses[0].text.clone();
+                    let start_verse = change.start_verse.unwrap_or(1);
+
+                    // Find the text for the starting verse
+                    let start_verse_text = chapter_verses
+                        .iter()
+                        .find(|v| v.verse == start_verse)
+                        .map(|v| v.text.clone())
+                        .unwrap_or_else(|| chapter_verses[0].text.clone());
+
                     let verses: Vec<(i32, String)> = chapter_verses
                         .into_iter()
                         .map(|v| (v.verse, v.text))
@@ -599,19 +620,19 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
                             change.book_number,
                             &change.book_name,
                             change.new_chapter,
-                            1,
+                            start_verse,
                             verses,
                         );
                     }
 
-                    // Emit verse 1 of the new chapter
-                    let reference = format!("{} {}:1", change.book_name, change.new_chapter);
+                    // Emit the starting verse of the new chapter
+                    let reference = format!("{} {}:{}", change.book_name, change.new_chapter, start_verse);
                     let advance = rhema_detection::ReadingAdvance {
                         book_number: change.book_number,
                         book_name: change.book_name.clone(),
                         chapter: change.new_chapter,
-                        verse: 1,
-                        verse_text: first_text.clone(),
+                        verse: start_verse,
+                        verse_text: start_verse_text.clone(),
                         reference: reference.clone(),
                         confidence: 1.0,
                     };
@@ -619,15 +640,16 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
 
                     let result = super::detection::DetectionResult {
                         verse_ref: reference,
-                        verse_text: first_text,
+                        verse_text: start_verse_text,
                         book_name: change.book_name,
                         book_number: change.book_number,
                         chapter: change.new_chapter,
-                        verse: 1,
+                        verse: start_verse,
                         confidence: 1.0,
                         source: "contextual".to_string(),
                         auto_queued: true,
                         transcript_snippet: String::new(),
+                        is_chapter_only: false,
                     };
                     let _ = app.emit("verse_detections", &vec![result]);
 
@@ -662,6 +684,7 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
             source: "contextual".to_string(),
             auto_queued: true,
             transcript_snippet: String::new(),
+            is_chapter_only: false,
         };
         let _ = app.emit("verse_detections", &vec![result]);
         return true;

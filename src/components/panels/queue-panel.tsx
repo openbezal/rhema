@@ -16,10 +16,12 @@ function QueueItemRow({
   item,
   index,
   isActive,
+  isHighlighted,
 }: {
   item: QueueItem
   index: number
   isActive: boolean
+  isHighlighted: boolean
 }) {
   const handlePresent = () => {
     useQueueStore.getState().setActive(index)
@@ -49,11 +51,14 @@ function QueueItemRow({
 
   return (
     <div
+      data-queue-idx={index}
       className={cn(
         "group flex h-10 items-center gap-2 rounded-md px-2.5 transition-colors",
-        isActive
-          ? "border border-primary/30 bg-primary/10"
-          : "hover:bg-muted/50"
+        isHighlighted
+          ? "animate-pulse border border-amber-500/40 bg-amber-500/15"
+          : isActive
+            ? "border border-primary/30 bg-primary/10"
+            : "hover:bg-muted/50"
       )}
     >
       <GripVerticalIcon
@@ -81,6 +86,7 @@ function QueueItemRow({
 export function QueuePanel() {
   const items = useQueueStore((s) => s.items)
   const activeIndex = useQueueStore((s) => s.activeIndex)
+  const highlightedId = useQueueStore((s) => s.highlightedId)
 
   return (
     <div
@@ -112,6 +118,7 @@ export function QueuePanel() {
               item={item}
               index={idx}
               isActive={idx === activeIndex}
+              isHighlighted={item.id === highlightedId}
             />
           ))}
         </div>

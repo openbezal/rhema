@@ -32,6 +32,8 @@ pub struct DetectionResult {
     pub source: String,
     pub auto_queued: bool,
     pub transcript_snippet: String,
+    /// True when detected from a chapter-only reference (verse defaults to 1, may be refined).
+    pub is_chapter_only: bool,
 }
 
 fn source_to_string(source: &rhema_detection::DetectionSource) -> String {
@@ -89,6 +91,7 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
         source: source_to_string(&merged.detection.source),
         auto_queued: merged.auto_queued,
         transcript_snippet: merged.detection.transcript_snippet.clone(),
+        is_chapter_only: merged.detection.is_chapter_only,
     }
 }
 

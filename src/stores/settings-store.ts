@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { load } from "@tauri-apps/plugin-store"
+import { load, type Store } from "@tauri-apps/plugin-store"
 
 type SttProvider = "deepgram" | "whisper"
 
@@ -7,7 +7,6 @@ interface SettingsState {
   deepgramApiKey: string | null
   openaiApiKey: string | null
   claudeApiKey: string | null
-  activeTranslationId: number
   audioDeviceId: string | null
   gain: number
   autoMode: boolean
@@ -18,7 +17,6 @@ interface SettingsState {
   setDeepgramApiKey: (key: string | null) => void
   setOpenaiApiKey: (key: string | null) => void
   setClaudeApiKey: (key: string | null) => void
-  setActiveTranslationId: (id: number) => void
   setAudioDeviceId: (id: string | null) => void
   setGain: (gain: number) => void
   setAutoMode: (auto: boolean) => void
@@ -28,11 +26,10 @@ interface SettingsState {
   setSttProvider: (provider: SttProvider) => void
 }
 
-const PERSISTED_KEYS: (keyof SettingsState)[] = [
+const PERSISTED_KEYS = [
   "deepgramApiKey",
   "openaiApiKey",
   "claudeApiKey",
-  "activeTranslationId",
   "audioDeviceId",
   "gain",
   "autoMode",
@@ -40,50 +37,75 @@ const PERSISTED_KEYS: (keyof SettingsState)[] = [
   "cooldownMs",
   "onboardingComplete",
   "sttProvider",
-]
+] as const satisfies readonly (keyof SettingsState)[]
 
-async function persistSetting(key: string, value: unknown) {
+type PersistedKey = (typeof PERSISTED_KEYS)[number]
+
+let tauriStore: Store | null = null
+let hydrationPromise: Promise<void> | null = null
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let pendingSave: Promise<void> = Promise.resolve()
+const SAVE_DEBOUNCE_MS = 250
+
+async function getStore(): Promise<Store> {
+  if (!tauriStore) {
+    tauriStore = await load("settings.json", { autoSave: false, defaults: {} })
+  }
+  return tauriStore
+}
+
+async function persistAll(state: SettingsState): Promise<void> {
   try {
-    const store = await load("settings.json", { autoSave: false, defaults: {} })
-    await store.set(key, value)
+    const store = await getStore()
+    for (const key of PERSISTED_KEYS) {
+      await store.set(key, state[key] as unknown)
+    }
     await store.save()
   } catch {
-    console.warn(`[settings] Failed to persist ${key}`)
+    console.warn("[settings] Failed to persist settings")
   }
 }
 
-export async function hydrateSettingsStore() {
-  try {
-    const store = await load("settings.json", { autoSave: false, defaults: {} })
-    const updates: Partial<SettingsState> = {}
+export async function hydrateSettingsStore(): Promise<void> {
+  if (hydrationPromise) return hydrationPromise
 
-    for (const key of PERSISTED_KEYS) {
-      const value = await store.get<unknown>(key)
-      if (value !== null && value !== undefined) {
-        // @ts-expect-error dynamic key assignment
-        updates[key] = value
+  hydrationPromise = (async () => {
+    try {
+      const store = await getStore()
+      const patch: Partial<SettingsState> = {}
+
+      for (const key of PERSISTED_KEYS) {
+        const value = await store.get<unknown>(key)
+        if (value !== null && value !== undefined) {
+          ;(patch as Record<PersistedKey, unknown>)[key] = value
+        }
       }
+
+      if (Object.keys(patch).length > 0) {
+        useSettingsStore.setState(patch)
+      }
+
+      useSettingsStore.subscribe((state, prevState) => {
+        const changed = PERSISTED_KEYS.some((key) => state[key] !== prevState[key])
+        if (!changed) return
+        if (saveTimer) clearTimeout(saveTimer)
+        saveTimer = setTimeout(() => {
+          saveTimer = null
+          pendingSave = pendingSave.then(() => persistAll(useSettingsStore.getState()))
+        }, SAVE_DEBOUNCE_MS)
+      })
+    } catch {
+      console.warn("[settings] Failed to hydrate settings, using defaults")
     }
+  })()
 
-    useSettingsStore.setState(updates)
-    console.log("[settings] Hydrated from disk", updates)
-  } catch {
-    console.warn("[settings] Failed to hydrate settings, using defaults")
-  }
-}
-
-function makePersisted<T>(key: string, setter: (val: T) => void) {
-  return (val: T) => {
-    setter(val)
-    persistSetting(key, val)
-  }
+  return hydrationPromise
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   deepgramApiKey: null,
   openaiApiKey: null,
   claudeApiKey: null,
-  activeTranslationId: 1,
   audioDeviceId: null,
   gain: 1.0,
   autoMode: false,
@@ -91,16 +113,14 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   cooldownMs: 2500,
   onboardingComplete: false,
   sttProvider: "deepgram",
-
-  setDeepgramApiKey: makePersisted("deepgramApiKey", (deepgramApiKey) => set({ deepgramApiKey })),
-  setOpenaiApiKey: makePersisted("openaiApiKey", (openaiApiKey) => set({ openaiApiKey })),
-  setClaudeApiKey: makePersisted("claudeApiKey", (claudeApiKey) => set({ claudeApiKey })),
-  setActiveTranslationId: makePersisted("activeTranslationId", (activeTranslationId) => set({ activeTranslationId })),
-  setAudioDeviceId: makePersisted("audioDeviceId", (audioDeviceId) => set({ audioDeviceId })),
-  setGain: makePersisted("gain", (gain) => set({ gain })),
-  setAutoMode: makePersisted("autoMode", (autoMode) => set({ autoMode })),
-  setConfidenceThreshold: makePersisted("confidenceThreshold", (confidenceThreshold) => set({ confidenceThreshold })),
-  setCooldownMs: makePersisted("cooldownMs", (cooldownMs) => set({ cooldownMs })),
-  setOnboardingComplete: makePersisted("onboardingComplete", (onboardingComplete) => set({ onboardingComplete })),
-  setSttProvider: makePersisted("sttProvider", (sttProvider) => set({ sttProvider })),
+  setDeepgramApiKey: (deepgramApiKey) => set({ deepgramApiKey }),
+  setOpenaiApiKey: (openaiApiKey) => set({ openaiApiKey }),
+  setClaudeApiKey: (claudeApiKey) => set({ claudeApiKey }),
+  setAudioDeviceId: (audioDeviceId) => set({ audioDeviceId }),
+  setGain: (gain) => set({ gain }),
+  setAutoMode: (autoMode) => set({ autoMode }),
+  setConfidenceThreshold: (confidenceThreshold) => set({ confidenceThreshold }),
+  setCooldownMs: (cooldownMs) => set({ cooldownMs }),
+  setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
+  setSttProvider: (sttProvider) => set({ sttProvider }),
 }))

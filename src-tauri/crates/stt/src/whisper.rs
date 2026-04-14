@@ -38,9 +38,8 @@ fn extract_segments(state: &WhisperState) -> (String, Vec<Word>, f64) {
     let mut total_confidence: f64 = 0.0;
 
     for i in 0..n_segments {
-        let Some(segment) = state.get_segment(i) else { continue };
-
-        let text = segment.to_str_lossy().unwrap_or_default().into_owned();
+        let Some(segment) = state.get_segment(i) else { continue; };
+        let text = segment.to_str_lossy().unwrap_or_default().to_string();
         let start_ts = segment.start_timestamp();
         let end_ts = segment.end_timestamp();
 
@@ -206,7 +205,7 @@ impl SttProvider for WhisperProvider {
         let inf_handle = tokio::task::spawn_blocking(move || {
             // v0.16: new_with_params takes AsRef<Path>, use &* to deref Cow
             let ctx = match WhisperContext::new_with_params(
-                &*model_path.to_string_lossy(),
+                &model_path,
                 WhisperContextParameters::default(),
             ) {
                 Ok(ctx) => ctx,
@@ -249,7 +248,6 @@ impl SttProvider for WhisperProvider {
                 params.set_token_timestamps(true);
                 params.set_no_speech_thold(0.6);
                 params.set_suppress_blank(true);
-                // v0.16: renamed from set_suppress_non_speech_tokens
                 params.set_suppress_nst(true);
 
                 let start = std::time::Instant::now();

@@ -7,23 +7,30 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 ## Features
 
 - **Real-time speech-to-text** via local Whisper or cloud Deepgram (WebSocket streaming + REST fallback)
-  - [Whisper setup guide](Documentation/whisper.md) — Local, offline transcription (no API costs)
+  - Whisper runs locally with no API costs; Deepgram streams via WebSocket with REST fallback
+- **Voice-controlled translation switching** — say "read in NIV" or "switch to ESV" to change translations instantly during a sermon
 - **Multi-strategy verse detection**
   - Direct reference parsing (Aho-Corasick automaton + fuzzy matching)
   - Semantic search (Qwen3-0.6B ONNX embeddings + HNSW vector index)
   - Quotation matching against known verse text
   - Cloud booster (optional, OpenAI/Claude)
+  - Reading mode — locks to book/chapter as soon as it's mentioned, with voice navigation ("next chapter", "chapter 5")
   - Sermon context tracking and sentence buffering
-- **SQLite Bible database** with FTS5 full-text search
+- **SQLite Bible database** with FTS5 full-text search and BM25 ranking
 - **Multiple translations** — KJV, NIV, ESV, NASB, NKJV, NLT, AMP + Spanish, French, Portuguese
 - **Cross-reference lookup** (340k+ refs from openbible.info)
 - **NDI broadcast output** for live production integration
 - **Theme designer** — visual canvas editor for verse overlays with backgrounds (solid, gradient, image), text styling, positioning, shadows, and outlines
-- **Verse queue** with drag-and-drop ordering
+- **Verse queue** with drag-and-drop ordering and duplicate prevention (flash-highlight on duplicates)
+- **Quick navigation** — keyboard-driven verse entry with autocomplete (e.g., type "J" → Joshua, Tab through book → chapter → verse)
 - **Fuzzy contextual search** (Fuse.js client-side)
 - **Audio level metering**, live indicator, and session timer
+- **Interactive onboarding tutorial** — 11-step guided tour covering all panels, auto-launches on first startup
+- **Light/dark mode** with system theme detection (light, dark, or follow OS)
+- **Settings persistence** — all preferences auto-saved to disk across restarts
+- **Cross-platform** — Windows, macOS, and Linux
 - **Remote control** via OSC and HTTP API for hardware controllers and automation
-  - [Remote control guide](Documentation/remote-control.md) — Stream Deck, TouchOSC, REST API integration
+  - [Remote control guide](documentation/remote-control.md) — Stream Deck, TouchOSC, REST API integration
 
 ## Tech Stack
 

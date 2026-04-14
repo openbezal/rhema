@@ -76,10 +76,8 @@ export function ApiKeyPrompt({
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => {
               onOpenChange(false)
-              // Give the current dialog one frame to close before opening the
-              // settings dialog on the API key section.
               window.setTimeout(() => {
-                openSettings("api-keys")
+                openSettings("speech")
               }, 120)
             }}
           >
