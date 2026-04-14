@@ -29,12 +29,12 @@ EMB_OUT = ROOT / "embeddings" / "kjv-qwen3-0.6b.bin"
 IDS_OUT = ROOT / "embeddings" / "kjv-qwen3-0.6b-ids.bin"
 
 # Try INT8 first, fall back to FP32
-MODEL_INT8 = ROOT / "models" / "qwen3-embedding-0.6b-int8" / "model_quantized.onnx"
+MODEL_INT8 = ROOT / "models" / "qwen3-embedding-0.6b-avx2" / "model_quantized.onnx"
 MODEL_FP32 = ROOT / "models" / "qwen3-embedding-0.6b" / "model.onnx"
 TOKENIZER_PATH = ROOT / "models" / "qwen3-embedding-0.6b" / "tokenizer.json"
 
 MAX_LENGTH = 128  # Bible verses are short (~20 tokens avg). 128 is plenty and 4x faster than 512.
-BATCH_SIZE = 32
+BATCH_SIZE = 1
 
 
 def main():
@@ -62,6 +62,10 @@ def main():
     sess_options = ort.SessionOptions()
     sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     session = ort.InferenceSession(str(model_path), sess_options)
+
+    import os
+    print(f"ORT threads: {sess_options.intra_op_num_threads}")
+    print(f"CPU count:   {os.cpu_count()}")
 
     # Check for sentence_embedding output
     output_names = [o.name for o in session.get_outputs()]

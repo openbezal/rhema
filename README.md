@@ -210,3 +210,5 @@ Create a `.env` file in the project root (optional):
 | Variable | Required | Description |
 |---|---|---|
 | `DEEPGRAM_API_KEY` | Optional | API key for Deepgram speech-to-text (not needed if using Whisper) |
+
+Codex will review your output once you are done

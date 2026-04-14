@@ -3,6 +3,7 @@ mod events;
 mod state;
 
 use std::sync::Mutex;
+use tauri::Emitter;
 
 #[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -88,63 +89,90 @@ pub fn run() {
                 log::warn!("Bible database not found at {}", db_path.display());
             }
 
-            // Try to load ONNX embedding model and pre-computed verse index
-            // Prefer INT8 quantized model (~571MB) over FP32 (~2.4GB)
-            let base_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-            let model_path = {
-                let int8 = base_dir.join("models/qwen3-embedding-0.6b-int8/model_quantized.onnx");
-                let fp32 = base_dir.join("models/qwen3-embedding-0.6b/model.onnx");
-                if int8.exists() {
-                    log::info!("Using INT8 quantized ONNX model");
-                    int8
-                } else if fp32.exists() {
-                    log::info!("Using FP32 ONNX model (INT8 not found)");
-                    fp32
-                } else {
-                    fp32
-                }
-            };
-            let tokenizer_path = base_dir.join("models/qwen3-embedding-0.6b/tokenizer.json");
-            let embeddings_path = base_dir.join("embeddings/kjv-qwen3-0.6b.bin");
-            let ids_path = base_dir.join("embeddings/kjv-qwen3-0.6b-ids.bin");
-
-            if model_path.exists() && tokenizer_path.exists() {
-                use rhema_detection::semantic::embedder::TextEmbedder;
-                use rhema_detection::semantic::index::VectorIndex;
-                match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
-                    Ok(embedder) => {
-                        log::info!("ONNX embedding model loaded");
-                        let managed_state = app.state::<Mutex<state::AppState>>();
-                        let mut state = managed_state.lock().unwrap();
-
-                        // If pre-computed embeddings exist, load the vector index
-                        if embeddings_path.exists() && ids_path.exists() {
-                            let dim = embedder.dimension();
-                            match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
-                                Ok(index) => {
-                                    log::info!("Verse embeddings loaded ({} vectors)", index.len());
-                                    state.detection_pipeline.set_semantic(
-                                        rhema_detection::SemanticDetector::new(
-                                            Box::new(embedder),
-                                            Box::new(index),
-                                        ),
-                                    );
-                                }
-                                Err(e) => {
-                                    log::warn!("Failed to load verse embeddings: {e}");
-                                }
-                            }
+            // Load ONNX model in background so window appears immediately.
+            // Semantic search becomes available a few seconds after launch.
+            let app_handle = app.handle().clone();
+            std::thread::Builder::new()
+                .name("model-loader".into())
+                .spawn(move || {
+                    let base_dir =
+                        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+                    let model_path = {
+                        let int8 = base_dir
+                            .join("models/qwen3-embedding-0.6b-int8/model_quantized.onnx");
+                        let fp32 =
+                            base_dir.join("models/qwen3-embedding-0.6b/model.onnx");
+                        if int8.exists() {
+                            log::info!("Using INT8 quantized ONNX model");
+                            int8
+                        } else if fp32.exists() {
+                            log::info!("Using FP32 ONNX model (INT8 not found)");
+                            fp32
                         } else {
-                            log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                            fp32
                         }
+                    };
+                    let tokenizer_path =
+                        base_dir.join("models/qwen3-embedding-0.6b/tokenizer.json");
+                    let embeddings_path =
+                        base_dir.join("embeddings/kjv-qwen3-0.6b.bin");
+                    let ids_path =
+                        base_dir.join("embeddings/kjv-qwen3-0.6b-ids.bin");
+
+                    if model_path.exists() && tokenizer_path.exists() {
+                        use rhema_detection::semantic::embedder::TextEmbedder;
+                        use rhema_detection::semantic::index::VectorIndex;
+                        match rhema_detection::OnnxEmbedder::load(
+                            &model_path,
+                            &tokenizer_path,
+                        ) {
+                            Ok(embedder) => {
+                                log::info!("ONNX embedding model loaded");
+                                let managed_state =
+                                    app_handle.state::<Mutex<state::AppState>>();
+                                let mut state = managed_state.lock().unwrap();
+
+                                if embeddings_path.exists() && ids_path.exists() {
+                                    let dim = embedder.dimension();
+                                    match rhema_detection::HnswVectorIndex::load(
+                                        &embeddings_path,
+                                        &ids_path,
+                                        dim,
+                                    ) {
+                                        Ok(index) => {
+                                            log::info!(
+                                                "Verse embeddings loaded ({} vectors)",
+                                                index.len()
+                                            );
+                                            state.detection_pipeline.set_semantic(
+                                                rhema_detection::SemanticDetector::new(
+                                                    Box::new(embedder),
+                                                    Box::new(index),
+                                                ),
+                                            );
+                                        }
+                                        Err(e) => {
+                                            log::warn!(
+                                                "Failed to load verse embeddings: {e}"
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                                }
+
+                                drop(state);
+                                let _ = app_handle.emit("semantic_ready", ());
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to load ONNX model: {e}");
+                            }
+                        }
+                    } else {
+                        log::info!("ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download.");
                     }
-                    Err(e) => {
-                        log::warn!("Failed to load ONNX model: {e}");
-                    }
-                }
-            } else {
-                log::info!("ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download.");
-            }
+                })
+                .expect("Failed to spawn model loader thread");
 
             Ok(())
         })

@@ -3,7 +3,7 @@ import type { Step } from "react-joyride"
 const STEP_DEFAULTS = {
   disableBeacon: true,
   skipBeacon: true,
-} as const satisfies Partial<Step>
+ } as Partial<Step>
 
 export const TUTORIAL_STEPS: Step[] = [
   {

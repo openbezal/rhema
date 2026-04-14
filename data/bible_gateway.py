@@ -1,3 +1,14 @@
+import builtins
+
+_original_open = open
+
+def utf8_open(*args, **kwargs):
+    if "encoding" not in kwargs:
+        kwargs["encoding"] = "utf-8"
+    return _original_open(*args, **kwargs)
+
+builtins.open = utf8_open
+
 import json
 import os
 import re

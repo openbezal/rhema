@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { load } from "@tauri-apps/plugin-store"
 
 type SttProvider = "deepgram" | "whisper"
 
@@ -14,7 +15,6 @@ interface SettingsState {
   cooldownMs: number
   onboardingComplete: boolean
   sttProvider: SttProvider
-
   setDeepgramApiKey: (key: string | null) => void
   setOpenaiApiKey: (key: string | null) => void
   setClaudeApiKey: (key: string | null) => void
@@ -26,6 +26,57 @@ interface SettingsState {
   setCooldownMs: (ms: number) => void
   setOnboardingComplete: (complete: boolean) => void
   setSttProvider: (provider: SttProvider) => void
+}
+
+const PERSISTED_KEYS: (keyof SettingsState)[] = [
+  "deepgramApiKey",
+  "openaiApiKey",
+  "claudeApiKey",
+  "activeTranslationId",
+  "audioDeviceId",
+  "gain",
+  "autoMode",
+  "confidenceThreshold",
+  "cooldownMs",
+  "onboardingComplete",
+  "sttProvider",
+]
+
+async function persistSetting(key: string, value: unknown) {
+  try {
+    const store = await load("settings.json", { autoSave: false, defaults: {} })
+    await store.set(key, value)
+    await store.save()
+  } catch {
+    console.warn(`[settings] Failed to persist ${key}`)
+  }
+}
+
+export async function hydrateSettingsStore() {
+  try {
+    const store = await load("settings.json", { autoSave: false, defaults: {} })
+    const updates: Partial<SettingsState> = {}
+
+    for (const key of PERSISTED_KEYS) {
+      const value = await store.get<unknown>(key)
+      if (value !== null && value !== undefined) {
+        // @ts-expect-error dynamic key assignment
+        updates[key] = value
+      }
+    }
+
+    useSettingsStore.setState(updates)
+    console.log("[settings] Hydrated from disk", updates)
+  } catch {
+    console.warn("[settings] Failed to hydrate settings, using defaults")
+  }
+}
+
+function makePersisted<T>(key: string, setter: (val: T) => void) {
+  return (val: T) => {
+    setter(val)
+    persistSetting(key, val)
+  }
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -41,15 +92,15 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   onboardingComplete: false,
   sttProvider: "deepgram",
 
-  setDeepgramApiKey: (deepgramApiKey) => set({ deepgramApiKey }),
-  setOpenaiApiKey: (openaiApiKey) => set({ openaiApiKey }),
-  setClaudeApiKey: (claudeApiKey) => set({ claudeApiKey }),
-  setActiveTranslationId: (activeTranslationId) => set({ activeTranslationId }),
-  setAudioDeviceId: (audioDeviceId) => set({ audioDeviceId }),
-  setGain: (gain) => set({ gain }),
-  setAutoMode: (autoMode) => set({ autoMode }),
-  setConfidenceThreshold: (confidenceThreshold) => set({ confidenceThreshold }),
-  setCooldownMs: (cooldownMs) => set({ cooldownMs }),
-  setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
-  setSttProvider: (sttProvider) => set({ sttProvider }),
+  setDeepgramApiKey: makePersisted("deepgramApiKey", (deepgramApiKey) => set({ deepgramApiKey })),
+  setOpenaiApiKey: makePersisted("openaiApiKey", (openaiApiKey) => set({ openaiApiKey })),
+  setClaudeApiKey: makePersisted("claudeApiKey", (claudeApiKey) => set({ claudeApiKey })),
+  setActiveTranslationId: makePersisted("activeTranslationId", (activeTranslationId) => set({ activeTranslationId })),
+  setAudioDeviceId: makePersisted("audioDeviceId", (audioDeviceId) => set({ audioDeviceId })),
+  setGain: makePersisted("gain", (gain) => set({ gain })),
+  setAutoMode: makePersisted("autoMode", (autoMode) => set({ autoMode })),
+  setConfidenceThreshold: makePersisted("confidenceThreshold", (confidenceThreshold) => set({ confidenceThreshold })),
+  setCooldownMs: makePersisted("cooldownMs", (cooldownMs) => set({ cooldownMs })),
+  setOnboardingComplete: makePersisted("onboardingComplete", (onboardingComplete) => set({ onboardingComplete })),
+  setSttProvider: makePersisted("sttProvider", (sttProvider) => set({ sttProvider })),
 }))

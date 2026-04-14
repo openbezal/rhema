@@ -44,7 +44,7 @@ import {
 } from "lucide-react"
 import { useSettingsStore } from "@/stores"
 import { useTutorialStore } from "@/stores/tutorial-store"
-import { useSettingsDialogStore } from "@/lib/settings-dialog"
+import { useSettingsDialogStore, type SettingsSection } from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
 
 /* -------------------------------------------------------------------------- */
@@ -558,8 +558,6 @@ interface CommandLogEntry {
 }
 
 function RemoteControlSection() {
-  const [oscEnabled, setOscEnabled] = useState(false)
-  const [httpEnabled, setHttpEnabled] = useState(false)
   const [oscPort, setOscPort] = useState("8000")
   const [httpPort, setHttpPort] = useState("8080")
   const [oscStatus, setOscStatus] = useState<RemoteStatus>({ running: false, port: null })
@@ -625,12 +623,10 @@ function RemoteControlSection() {
     try {
       if (oscStatus.running) {
         await invoke("stop_osc")
-        setOscEnabled(false)
         setOscError(null)
       } else {
         const port = parseInt(oscPort) || 8000
         const boundPort = await invoke<number>("start_osc", { port })
-        setOscEnabled(true)
         setOscPort(String(boundPort))
         setOscError(null)
       }
@@ -643,12 +639,10 @@ function RemoteControlSection() {
     try {
       if (httpStatus.running) {
         await invoke("stop_http")
-        setHttpEnabled(false)
         setHttpError(null)
       } else {
         const port = parseInt(httpPort) || 8080
         const boundPort = await invoke<number>("start_http", { port })
-        setHttpEnabled(true)
         setHttpPort(String(boundPort))
         setHttpError(null)
       }
@@ -924,7 +918,7 @@ export function SettingsDialog() {
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
                           isActive={item.id === activeSection}
-                          onClick={() => setActiveSection(item.id)}
+                          onClick={() => setActiveSection(item.id as SettingsSection)}
                         >
                           {item.icon}
                           <span>{item.name}</span>

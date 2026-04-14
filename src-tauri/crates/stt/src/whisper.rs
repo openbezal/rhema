@@ -32,15 +32,17 @@ fn i16_to_f32(samples: &[i16]) -> Vec<f32> {
 /// Extract transcript text, words, and average confidence from Whisper state.
 #[expect(clippy::cast_precision_loss, reason = "timestamps and word counts are small enough")]
 fn extract_segments(state: &WhisperState) -> (String, Vec<Word>, f64) {
-    let n_segments = state.full_n_segments().unwrap_or(0);
+    let n_segments = state.full_n_segments();
     let mut full_text = String::new();
     let mut words = Vec::new();
     let mut total_confidence: f64 = 0.0;
 
     for i in 0..n_segments {
-        let text = state.full_get_segment_text(i).unwrap_or_default();
-        let start_ts = state.full_get_segment_t0(i).unwrap_or(0);
-        let end_ts = state.full_get_segment_t1(i).unwrap_or(0);
+        let Some(segment) = state.get_segment(i) else { continue };
+
+        let text = segment.to_str_lossy().unwrap_or_default().into_owned();
+        let start_ts = segment.start_timestamp();
+        let end_ts = segment.end_timestamp();
 
         let start_sec = start_ts as f64 / 100.0;
         let end_sec = end_ts as f64 / 100.0;
@@ -50,6 +52,7 @@ fn extract_segments(state: &WhisperState) -> (String, Vec<Word>, f64) {
         if n_words > 0 {
             let duration_per_word = (end_sec - start_sec) / n_words as f64;
             for (j, word_text) in text.split_whitespace().enumerate() {
+                let word_text: &str = word_text;
                 let w_start = start_sec + (j as f64 * duration_per_word);
                 let w_end = w_start + duration_per_word;
                 words.push(Word {
@@ -133,14 +136,12 @@ impl SttProvider for WhisperProvider {
 
         let (inference_tx, mut inference_rx) = mpsc::channel::<Vec<i16>>(4);
 
-        // ── Task 1: VAD + audio accumulation ─────────────────────────────
+        // ── Task 1: VAD + audio accumulation ─────────────────────────────────
         let vad_cancelled = cancelled.clone();
         let vad_event_tx = event_tx.clone();
         let vad_handle = tokio::task::spawn_blocking(move || {
             use rhema_audio::{AudioFrame, Vad, VadConfig, VadTransition};
 
-            // Higher thresholds than default to avoid sending near-silence
-            // to Whisper (which causes hallucinations).
             let vad_config = VadConfig {
                 silence_threshold: 0.01,
                 frame_threshold: 0.005,
@@ -199,12 +200,13 @@ impl SttProvider for WhisperProvider {
             }
         });
 
-        // ── Task 2: Whisper inference ────────────────────────────────────
+        // ── Task 2: Whisper inference ─────────────────────────────────────────
         let inf_cancelled = cancelled.clone();
         let inf_event_tx = event_tx.clone();
         let inf_handle = tokio::task::spawn_blocking(move || {
+            // v0.16: new_with_params takes AsRef<Path>, use &* to deref Cow
             let ctx = match WhisperContext::new_with_params(
-                &model_path.to_string_lossy(),
+                &*model_path.to_string_lossy(),
                 WhisperContextParameters::default(),
             ) {
                 Ok(ctx) => ctx,
@@ -238,9 +240,7 @@ impl SttProvider for WhisperProvider {
                 let audio_f32 = i16_to_f32(&audio_i16);
 
                 let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-                params.set_language(Some(
-                    language.as_deref().unwrap_or("en"),
-                ));
+                params.set_language(Some(language.as_deref().unwrap_or("en")));
                 params.set_n_threads(n_threads);
                 params.set_print_progress(false);
                 params.set_print_special(false);
@@ -249,7 +249,8 @@ impl SttProvider for WhisperProvider {
                 params.set_token_timestamps(true);
                 params.set_no_speech_thold(0.6);
                 params.set_suppress_blank(true);
-                params.set_suppress_non_speech_tokens(true);
+                // v0.16: renamed from set_suppress_non_speech_tokens
+                params.set_suppress_nst(true);
 
                 let start = std::time::Instant::now();
                 if let Err(e) = state.full(params, &audio_f32) {

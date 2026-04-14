@@ -4,8 +4,8 @@ Pre-compute verse embeddings for Rhema.
 
 Automatically picks the fastest available backend:
   1. sentence-transformers + GPU (MPS/CUDA) — fastest
-  2. sentence-transformers + CPU — medium
-  3. ONNX Runtime (local model) — fallback if torch not installed
+  2. ONNX Runtime (local model) — preferred on CPU
+  3. sentence-transformers + CPU — slowest, only if ONNX unavailable
 
 Outputs match the Rust binary format expected by HnswVectorIndex::load():
   - embeddings file: flat f32 array, little-endian, dim floats per verse
@@ -16,7 +16,7 @@ Usage:
 
 Requires (one of):
   pip install sentence-transformers torch numpy   (GPU path)
-  pip install onnxruntime tokenizers numpy         (ONNX fallback)
+  pip install onnxruntime tokenizers numpy         (ONNX path)
 """
 
 import json
@@ -33,7 +33,7 @@ EMB_OUT = ROOT / "embeddings" / "kjv-qwen3-0.6b.bin"
 IDS_OUT = ROOT / "embeddings" / "kjv-qwen3-0.6b-ids.bin"
 MODEL_NAME = "Qwen/Qwen3-Embedding-0.6B"
 
-# ONNX model paths (for fallback)
+# ONNX model paths
 MODEL_INT8 = ROOT / "models" / "qwen3-embedding-0.6b-int8" / "model_quantized.onnx"
 MODEL_FP32 = ROOT / "models" / "qwen3-embedding-0.6b" / "model.onnx"
 TOKENIZER_PATH = ROOT / "models" / "qwen3-embedding-0.6b" / "tokenizer.json"
@@ -43,21 +43,12 @@ BATCH_SIZE_ONNX = 32
 BATCH_SIZE_GPU = 64
 
 
-def encode_with_sentence_transformers(texts):
-    """Encode using sentence-transformers (GPU-accelerated if available)."""
-    import torch
+def encode_with_sentence_transformers(texts, device):
+    """Encode using sentence-transformers (GPU-accelerated)."""
     from sentence_transformers import SentenceTransformer
-
-    if torch.backends.mps.is_available():
-        device = "mps"
-    elif torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
 
     print(f"Backend: sentence-transformers ({device})")
     print(f"Model:   {MODEL_NAME}")
-
     print(f"\nLoading model (may download on first run)...")
     model = SentenceTransformer(MODEL_NAME, device=device)
     dim = model.get_embedding_dimension()
@@ -82,7 +73,7 @@ def encode_with_onnx(texts):
     import onnxruntime as ort
     from tokenizers import Tokenizer
 
-    # Select model
+    # Select model — INT8 is faster on CPU
     if MODEL_INT8.exists():
         model_path = MODEL_INT8
         print(f"Backend: ONNX Runtime (INT8 quantized)")
@@ -90,26 +81,39 @@ def encode_with_onnx(texts):
         model_path = MODEL_FP32
         print(f"Backend: ONNX Runtime (FP32)")
     else:
-        print(f"ERROR: No ONNX model found at {MODEL_INT8} or {MODEL_FP32}")
+        print(f"ERROR: No ONNX model found.")
+        print(f"  Expected: {MODEL_INT8}")
+        print(f"  Or:       {MODEL_FP32}")
+        print(f"  Run: bun run download:model")
         sys.exit(1)
 
     print(f"Model:   {model_path}")
 
     # Load tokenizer
+    if not TOKENIZER_PATH.exists():
+        print(f"ERROR: Tokenizer not found at {TOKENIZER_PATH}")
+        sys.exit(1)
+
     tokenizer = Tokenizer.from_file(str(TOKENIZER_PATH))
     tokenizer.enable_truncation(max_length=MAX_LENGTH)
     tokenizer.enable_padding(length=MAX_LENGTH)
 
-    # Load ONNX model
+    # Load ONNX session
     print(f"Loading ONNX model...")
     sess_options = ort.SessionOptions()
     sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    # Use all available CPU threads
+    sess_options.intra_op_num_threads = 0
+    sess_options.inter_op_num_threads = 0
     session = ort.InferenceSession(str(model_path), sess_options)
 
     output_names = [o.name for o in session.get_outputs()]
-    has_sentence_embedding = "sentence_embedding" in output_names
     input_names = [i.name for i in session.get_inputs()]
+    has_sentence_embedding = "sentence_embedding" in output_names
     has_position_ids = "position_ids" in input_names
+
+    print(f"  Inputs:  {input_names}")
+    print(f"  Outputs: {output_names}")
 
     if has_sentence_embedding:
         print("  Using 'sentence_embedding' output (pre-pooled)")
@@ -129,10 +133,7 @@ def encode_with_onnx(texts):
         input_ids = np.array([e.ids for e in encodings], dtype=np.int64)
         attention_mask = np.array([e.attention_mask for e in encodings], dtype=np.int64)
 
-        feeds = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-        }
+        feeds = {"input_ids": input_ids, "attention_mask": attention_mask}
 
         if has_position_ids:
             seq_len = input_ids.shape[1]
@@ -155,7 +156,6 @@ def encode_with_onnx(texts):
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         norms = np.maximum(norms, 1e-12)
         embeddings = embeddings / norms
-
         all_embeddings.append(embeddings.astype(np.float32))
 
         done = batch_end
@@ -163,11 +163,14 @@ def encode_with_onnx(texts):
             elapsed = time.time() - t0
             rate = done / elapsed if elapsed > 0 else 0
             remaining = (len(texts) - done) / rate if rate > 0 else 0
-            print(f"  {done}/{len(texts)} ({rate:.0f} verses/sec, ~{remaining/60:.0f} min remaining)", flush=True)
+            print(
+                f"  {done}/{len(texts)} ({rate:.0f} verses/sec,"
+                f" ~{remaining/60:.1f} min remaining)",
+                flush=True,
+            )
 
     elapsed = time.time() - t0
     print(f"  Done in {elapsed:.1f}s ({len(texts) / elapsed:.0f} verses/sec)")
-
     return np.concatenate(all_embeddings, axis=0)
 
 
@@ -183,16 +186,26 @@ def main():
     ids = [e["id"] for e in entries]
     texts = [e["text"] for e in entries]
 
-    # Try GPU path first, fall back to ONNX
+    # Pick best backend: GPU > ONNX > CPU torch
+    all_embeddings = None
+
     try:
         import torch
-        all_embeddings = encode_with_sentence_transformers(texts)
+        has_mps = torch.backends.mps.is_available()
+        has_cuda = torch.cuda.is_available()
+        if has_cuda:
+            all_embeddings = encode_with_sentence_transformers(texts, "cuda")
+        elif has_mps:
+            all_embeddings = encode_with_sentence_transformers(texts, "mps")
     except ImportError:
-        print("  torch not available, falling back to ONNX Runtime...")
+        pass
+
+    if all_embeddings is None:
+        # No GPU — use ONNX Runtime which is much faster than CPU torch
         all_embeddings = encode_with_onnx(texts)
 
     dim = all_embeddings.shape[1]
-    print(f"  Embedding dimension: {dim}")
+    print(f"\nEmbedding dimension: {dim}")
 
     # Write embeddings binary (flat f32, little-endian)
     EMB_OUT.parent.mkdir(parents=True, exist_ok=True)

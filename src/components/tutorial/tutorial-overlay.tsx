@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Joyride, STATUS, type EventData } from "react-joyride"
+import { Joyride, STATUS } from "react-joyride"
+import type { EventData } from "react-joyride"
 import { toast } from "sonner"
 import { useSettingsStore } from "@/stores/settings-store"
 import {
@@ -72,12 +73,16 @@ export function TutorialOverlay() {
       steps={steps}
       run={isRunning}
       continuous
-      buttons={["back", "primary", "skip"]}
-      skipScroll
       tooltipComponent={TutorialTooltip}
       onEvent={handleEvent}
-      zIndex={60}
-      overlayColor="rgba(0, 0, 0, 0.5)"
+      styles={{
+          floater: {
+            zIndex: 60,
+          },
+          overlay: {
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          },
+        }}
     />
   )
 }
