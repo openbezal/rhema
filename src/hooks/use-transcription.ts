@@ -11,22 +11,84 @@ interface TranscriptPartialPayload {
   confidence: number
 }
 
-export function useTranscription() {
+interface UseTranscriptionOptions {
+  /**
+   * Called when `start_transcription` fails because the user picked the
+   * Deepgram provider but hasn't set an API key. Panels typically react by
+   * opening a key-prompt dialog instead of showing the default toast.
+   */
+  onMissingApiKey?: () => void
+}
+
+const MISSING_DEEPGRAM_KEY_MARKER = "No Deepgram API key"
+const NOT_RUNNING_ERROR = "Transcription is not running"
+
+export const transcriptionActions = {
+  async start(onMissingApiKey?: () => void): Promise<void> {
+    const transcript = useTranscriptStore.getState()
+    transcript.setConnectionStatus("connecting")
+
+    const settings = useSettingsStore.getState()
+    try {
+      await invoke("start_transcription", {
+        apiKey:
+          settings.sttProvider === "deepgram"
+            ? (settings.deepgramApiKey ?? "")
+            : "",
+        deviceId: settings.audioDeviceId,
+        gain: settings.gain,
+        provider: settings.sttProvider,
+      })
+      transcript.setTranscribing(true)
+    } catch (e) {
+      const msg = String(e)
+      transcript.setConnectionStatus("error")
+      if (msg.includes(MISSING_DEEPGRAM_KEY_MARKER) && onMissingApiKey) {
+        onMissingApiKey()
+      } else {
+        toast.error("Could not start transcription", { description: msg })
+      }
+    }
+  },
+
+  async stop(): Promise<void> {
+    const transcript = useTranscriptStore.getState()
+    try {
+      await invoke("stop_transcription")
+    } catch (e) {
+      if (String(e) !== NOT_RUNNING_ERROR) {
+        toast.error("Could not stop transcription", { description: String(e) })
+      }
+    }
+    transcript.setTranscribing(false)
+    transcript.setPartial("")
+    transcript.setConnectionStatus("disconnected")
+  },
+}
+
+export function useTranscription(options?: UseTranscriptionOptions) {
   const segments = useTranscriptStore((s) => s.segments)
-  const currentPartial = useTranscriptStore((s) => s.currentPartial)
   const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
   const connectionStatus = useTranscriptStore((s) => s.connectionStatus)
 
-  const setPartial = useTranscriptStore((s) => s.setPartial)
-  const addSegment = useTranscriptStore((s) => s.addSegment)
-  const setTranscribing = useTranscriptStore((s) => s.setTranscribing)
+  // STT lifecycle events
+  useTauriEvent("stt_connected", () => {
+    useTranscriptStore.getState().setConnectionStatus("connected")
+  })
+  useTauriEvent("stt_disconnected", () => {
+    useTranscriptStore.getState().setConnectionStatus("disconnected")
+  })
+  useTauriEvent<string>("stt_error", (msg) => {
+    useTranscriptStore.getState().setConnectionStatus("error")
+    toast.error("Transcription error", { description: msg })
+  })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_partial", (payload) => {
-    setPartial(payload.text)
+    useTranscriptStore.getState().setPartial(payload.text)
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_final", (payload) => {
-    addSegment({
+    useTranscriptStore.getState().addSegment({
       id: crypto.randomUUID(),
       text: payload.text,
       is_final: true,
@@ -36,39 +98,18 @@ export function useTranscription() {
     })
   })
 
-  const startTranscription = useCallback(async () => {
-    const settings = useSettingsStore.getState()
-    try {
-      await invoke("start_transcription", {
-        apiKey: settings.sttProvider === "deepgram" ? (settings.deepgramApiKey ?? "") : "",
-        provider: settings.sttProvider,
-      })
-      setTranscribing(true)
-    } catch (e) {
-      toast.error("Could not start transcription", { description: String(e) })
-    }
-  }, [setTranscribing])
+  const onMissingApiKey = options?.onMissingApiKey
 
-  const stopTranscription = useCallback(async () => {
-    try {
-      await invoke("stop_transcription")
-    } catch (e) {
-      // Expected when backend state is already clean (e.g. after a webview
-      // reload reset). Must match stop_transcription in src-tauri/src/commands/stt.rs exactly.
-      if (String(e) !== "Transcription is not running") {
-        toast.error("Could not stop transcription", { description: String(e) })
-      }
-    }
-    setTranscribing(false)
-    setPartial("")
-  }, [setTranscribing, setPartial])
+  const startTranscription = useCallback(
+    () => transcriptionActions.start(onMissingApiKey),
+    [onMissingApiKey]
+  )
 
   return {
     segments,
-    currentPartial,
     isTranscribing,
     connectionStatus,
     startTranscription,
-    stopTranscription,
+    stopTranscription: transcriptionActions.stop,
   }
 }
