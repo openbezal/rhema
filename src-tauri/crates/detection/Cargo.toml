@@ -16,7 +16,7 @@ lru = "0.12"
 rhema-bible = { path = "../bible" }
 
 # Optional heavy dependencies for real embedding / vector search
-ort = { version = "2.0.0-rc.12", optional = true }
+ort = { version = "2.0.0-rc.12", features = ["download-binaries"], optional = true }
 ndarray = { version = "0.16", optional = true }
 tokenizers = { version = "0.22", optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
