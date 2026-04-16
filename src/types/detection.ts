@@ -13,6 +13,16 @@ export interface DetectionResult {
   is_chapter_only: boolean
 }
 
+export interface ReadingAdvance {
+  book_number: number
+  book_name: string
+  chapter: number
+  verse: number
+  verse_text: string
+  reference: string
+  confidence: number
+}
+
 export interface DetectionStatus {
   has_direct: boolean
   has_semantic: boolean

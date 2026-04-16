@@ -284,9 +284,9 @@ function drawBackground(
       ctx.save()
 
       if (bg.image.blur > 0) {
-        ctx.filter = `blur(${bg.image.blur}px) brightness(${bg.image.brightness})`
-      } else if (bg.image.brightness !== 1) {
-        ctx.filter = `brightness(${bg.image.brightness})`
+        ctx.filter = `blur(${bg.image.blur}px) brightness(${bg.image.brightness / 100})`
+      } else if (bg.image.brightness !== 100) {
+        ctx.filter = `brightness(${bg.image.brightness / 100})`
       }
 
       let drawX = 0

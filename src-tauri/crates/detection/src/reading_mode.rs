@@ -584,14 +584,6 @@ fn parse_number_token(text: &str) -> Option<i32> {
     None
 }
 
-/// Extract a chapter number from text containing "chapter N" anywhere.
-fn extract_chapter_number(text: &str) -> Option<i32> {
-    let pos = text.find("chapter ")?;
-    let rest = &text[pos + "chapter ".len()..];
-    // Reuse the same number parsing (max chapter is 150 in Psalms)
-    parse_number_token(rest)
-}
-
 /// Extract both chapter and optional verse from patterns like:
 /// - "chapter 3" → (3, None)
 /// - "chapter 3 verse 5" → (3, Some(5))
@@ -907,14 +899,6 @@ mod tests {
 
         let result = rm.check_chapter_command("previous chapter");
         assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_extract_chapter_number() {
-        assert_eq!(extract_chapter_number("chapter seven"), Some(7));
-        assert_eq!(extract_chapter_number("chapter 8"), Some(8));
-        assert_eq!(extract_chapter_number("let's go to chapter twelve"), Some(12));
-        assert_eq!(extract_chapter_number("hello world"), None);
     }
 
     #[test]

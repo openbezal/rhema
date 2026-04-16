@@ -308,10 +308,6 @@ fn is_valid_reference(book_number: i32, chapter: i32) -> bool {
     chapter >= 1 && chapter <= max_ch
 }
 
-/// Confidence assigned to chapter-only references (no verse specified).
-/// Set above the auto-queue threshold (0.80) so partial refs reach the queue immediately.
-const CHAPTER_ONLY_CONFIDENCE: f64 = 0.85;
-
 /// Filler phrases commonly found in sermon transcripts that confuse detection.
 /// These are stripped (case-insensitively) before the text reaches the automaton.
 const FILLER_PHRASES: &[&str] = &[
@@ -584,39 +580,10 @@ impl DirectDetector {
                     continue;
                 }
 
-                // Chapter-only: emit immediately with verse 1, hold for refinement (DET-01)
+                // Chapter-only: hold for refinement, don't emit yet.
+                // The full reference (with verse) will arrive when the user
+                // finishes speaking and will be emitted then.
                 if resolved.verse_start == 0 {
-                    // Skip re-emission if this exact book+chapter is already pending
-                    let already_pending = self.incomplete.as_ref().is_some_and(|inc| {
-                        inc.verse_ref.book_number == resolved.book_number
-                            && inc.verse_ref.chapter == resolved.chapter
-                    });
-
-                    if !already_pending {
-                        // Emit chapter-only detection immediately (defaults to verse 1)
-                        let mut ref_with_verse = resolved.clone();
-                        ref_with_verse.verse_start = 1;
-
-                        let snippet = extract_snippet(text, book_match.start, book_match.end);
-                        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
-                        let now = SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_millis() as u64;
-
-                        detections.push(Detection {
-                            verse_ref: ref_with_verse.clone(),
-                            verse_id: None,
-                            confidence: CHAPTER_ONLY_CONFIDENCE,
-                            source: DetectionSource::DirectReference,
-                            transcript_snippet: snippet,
-                            detected_at: now,
-                            is_chapter_only: true,
-                        });
-                        self.push_recent(&ref_with_verse);
-                    }
-
-                    // Store/refresh as incomplete for verse refinement
                     self.incomplete = Some(IncompleteRef {
                         verse_ref: resolved.clone(),
                         timestamp: Instant::now(),
@@ -874,29 +841,26 @@ mod tests {
     }
 
     #[test]
-    fn test_chapter_only_emitted_immediately() {
-        // Chapter-only references are emitted immediately with verse=1 and is_chapter_only=true
+    fn test_chapter_only_held_as_incomplete() {
+        // Chapter-only references are NOT emitted — just held as incomplete for refinement
         let mut detector = DirectDetector::new();
         let results = detector.detect("Genesis 3 is about the fall of man");
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].verse_ref.book_name, "Genesis");
-        assert_eq!(results[0].verse_ref.chapter, 3);
-        assert_eq!(results[0].verse_ref.verse_start, 1);
-        assert!(results[0].is_chapter_only);
-        assert!((results[0].confidence - 0.85).abs() < f64::EPSILON);
-        // Also held as incomplete for verse refinement
-        assert!(detector.incomplete.is_some());
+        assert!(results.is_empty()); // No emission
+        assert!(detector.incomplete.is_some()); // Held for refinement
+        let inc = detector.incomplete.as_ref().unwrap();
+        assert_eq!(inc.verse_ref.book_name, "Genesis");
+        assert_eq!(inc.verse_ref.chapter, 3);
     }
 
     #[test]
     fn test_chapter_only_no_duplicate_on_repeat() {
-        // Same book+chapter in a subsequent call should not re-emit
+        // Same book+chapter in a subsequent call — still held, no emission
         let mut detector = DirectDetector::new();
         let results = detector.detect("Genesis 3");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_chapter_only);
+        assert!(results.is_empty());
+        assert!(detector.incomplete.is_some());
 
-        // Same text again — already pending, skip re-emission
+        // Same text again — still held
         let results = detector.detect("Genesis 3");
         assert!(results.is_empty());
         assert!(detector.incomplete.is_some());
@@ -904,12 +868,11 @@ mod tests {
 
     #[test]
     fn test_incomplete_ref_completed_by_verse() {
-        // Chapter-only emitted first, then refined by verse continuation
+        // Chapter-only held, then refined by verse continuation
         let mut detector = DirectDetector::new();
-        // First: chapter-only — emitted immediately
+        // First: chapter-only — held as incomplete, not emitted
         let results = detector.detect("Genesis 3");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_chapter_only);
+        assert!(results.is_empty());
         assert!(detector.incomplete.is_some());
 
         // Second: verse continuation — refines the detection
@@ -927,15 +890,12 @@ mod tests {
         // EDGE-01: a new book/chapter replaces the pending incomplete cleanly
         let mut detector = DirectDetector::new();
         let results = detector.detect("Genesis 3");
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].verse_ref.book_name, "Genesis");
+        assert!(results.is_empty()); // chapter-only, not emitted
+        assert!(detector.incomplete.is_some());
 
         // Different book — supersedes Genesis 3
         let results = detector.detect("let's look at John 1");
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].verse_ref.book_name, "John");
-        assert_eq!(results[0].verse_ref.chapter, 1);
-        assert!(results[0].is_chapter_only);
+        assert!(results.is_empty()); // also chapter-only, not emitted
         // Incomplete now tracks John 1, not Genesis 3
         let inc = detector.incomplete.as_ref().unwrap();
         assert_eq!(inc.verse_ref.book_name, "John");
@@ -946,7 +906,7 @@ mod tests {
         // EDGE-02: after timeout, incomplete is cleaned up without re-emission
         let mut detector = DirectDetector::new();
         let results = detector.detect("Genesis 3");
-        assert_eq!(results.len(), 1);
+        assert!(results.is_empty()); // chapter-only, not emitted
         assert!(detector.incomplete.is_some());
 
         // Simulate timeout by replacing with an expired timestamp

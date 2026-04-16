@@ -61,6 +61,8 @@ rhema-api = { path = "crates/api" }
 crossbeam-channel = "0.5"
 dotenvy = "0.15"
 base64 = "0.22"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 
 [features]
 default = ["whisper"]

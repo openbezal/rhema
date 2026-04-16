@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { TooltipProvider } from "@/components/ui/tooltip.tsx"
 import { hydrateSettings } from "@/stores/settings-store"
 import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
+import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
 
 // Webview reloads do NOT restart the Rust backend, so any STT pipeline
 // left running from the previous webview session still has
@@ -17,7 +18,7 @@ import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
 // bible store so the UI reflects the user's choices immediately.
 invoke("stop_transcription")
   .catch(() => {})
-  .then(() => Promise.all([hydrateSettings(), hydrateBibleStore()]))
+  .then(() => Promise.all([hydrateSettings(), hydrateBibleStore(), hydrateBroadcastThemes()]))
   .then(() => initBiblePersistence())
   .finally(() => {
     createRoot(document.getElementById("root")!).render(

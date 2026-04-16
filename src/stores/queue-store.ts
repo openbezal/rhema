@@ -66,12 +66,21 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   updateEarlyRef: (bookNumber, chapter, verse, reference, verseText) => {
     let found = false
     set((state) => {
-      const idx = state.items.findIndex(
+      // First try exact match: same book + same chapter
+      let idx = state.items.findIndex(
         (i) =>
           i.is_chapter_only &&
           i.verse.book_number === bookNumber &&
           i.verse.chapter === chapter,
       )
+      // Fallback: same book, any chapter (book-only detection guessed chapter 1)
+      if (idx === -1) {
+        idx = state.items.findIndex(
+          (i) =>
+            i.is_chapter_only &&
+            i.verse.book_number === bookNumber,
+        )
+      }
       if (idx === -1) return state
       found = true
       const items = [...state.items]

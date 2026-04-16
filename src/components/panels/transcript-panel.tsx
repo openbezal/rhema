@@ -14,7 +14,7 @@ import {
 import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
 import { bibleActions } from "@/hooks/use-bible"
-import type { DetectionResult } from "@/types"
+import type { DetectionResult, ReadingAdvance } from "@/types"
 
 /**
  * Leaf component that subscribes to the audio level only. Isolated so the
@@ -79,9 +79,8 @@ export function TranscriptPanel() {
     useDetectionStore.getState().addDetections(detections)
 
     // Auto-navigate book search + select verse for preview/live
-    // Auto-navigate on direct detection hits AND contextual navigation (reading mode chapter/verse commands)
     const directHit = detections.find(
-      (d) => (d.source === "direct" || d.source === "contextual") && !d.is_chapter_only
+      (d) => d.source === "direct" && !d.is_chapter_only
     )
     if (directHit && directHit.book_number > 0) {
       // Select verse immediately so preview/live panels update
@@ -161,6 +160,29 @@ export function TranscriptPanel() {
           is_chapter_only: d.is_chapter_only,
         })
       }
+    }
+  })
+
+  // Reading mode navigation: auto-navigate book panel when reading mode
+  // advances to a new verse (chapter commands, verse commands, text matching).
+  // Does NOT add to queue — only direct/semantic feed the queue.
+  useTauriEvent<ReadingAdvance>("reading_mode_verse", (advance) => {
+    if (advance.book_number > 0) {
+      bibleActions.selectVerse({
+        id: 0,
+        translation_id: useBibleStore.getState().activeTranslationId,
+        book_number: advance.book_number,
+        book_name: advance.book_name,
+        book_abbreviation: "",
+        chapter: advance.chapter,
+        verse: advance.verse,
+        text: advance.verse_text,
+      })
+      useBibleStore.getState().setPendingNavigation({
+        bookNumber: advance.book_number,
+        chapter: advance.chapter,
+        verse: advance.verse,
+      })
     }
   })
 

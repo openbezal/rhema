@@ -13,14 +13,14 @@ pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
     // Tokenize the text after the book name for easier parsing
     let tokens = tokenize(after_trimmed);
 
-    // Pattern: Book name only (no chapter/verse) → defaults to 1:1
-    // e.g., "Genesis" → Genesis 1:1
+    // Pattern: Book name only (no chapter/verse) → chapter-only, held for refinement
+    // e.g., "Genesis" on a partial transcript — wait for chapter:verse to follow
     if tokens.is_empty() {
         return Some(VerseRef {
             book_number: book_match.book_number,
             book_name: book_match.book_name.clone(),
             chapter: 1,
-            verse_start: 1,
+            verse_start: 0, // chapter-only — held for refinement by detector
             verse_end: None,
         });
     }
@@ -288,23 +288,23 @@ fn try_chapter_verse_spoken(tokens: &[Token], book_match: &BookMatch) -> Option<
                             }
                         }
                     }
-                    // No verse keyword found, treat as chapter-only (default to verse 1)
-                    // e.g., "Genesis chapter 3" → Genesis 3:1
+                    // No verse keyword found — chapter-only, held for refinement
+                    // e.g., "Genesis chapter 3" → Genesis 3:0 (incomplete)
                     return Some(VerseRef {
                         book_number: book_match.book_number,
                         book_name: book_match.book_name.clone(),
                         chapter,
-                        verse_start: 1,
+                        verse_start: 0,
                         verse_end: None,
                     });
                 } else {
                     // "chapter" keyword found but no number follows
-                    // e.g., "Genesis chapter" (incomplete) → Genesis 1:1
+                    // e.g., "Genesis chapter" (incomplete) → chapter-only
                     return Some(VerseRef {
                         book_number: book_match.book_number,
                         book_name: book_match.book_name.clone(),
                         chapter: 1,
-                        verse_start: 1,
+                        verse_start: 0,
                         verse_end: None,
                     });
                 }
@@ -799,24 +799,24 @@ mod tests {
     }
 
     #[test]
-    fn test_book_only_defaults_to_1_1() {
-        // Pattern: Just book name → defaults to 1:1
+    fn test_book_only_is_chapter_only() {
+        // Pattern: Just book name → chapter-only (held for refinement)
         let bm = make_book_match("Genesis", 1, 7);
         let text = "Genesis";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 1);
-        assert_eq!(result.verse_start, 1);
+        assert_eq!(result.verse_start, 0); // chapter-only
         assert_eq!(result.verse_end, None);
     }
 
     #[test]
-    fn test_book_chapter_defaults_to_verse_1() {
-        // Pattern: "Genesis chapter 3" → Genesis 3:1
+    fn test_book_chapter_is_chapter_only() {
+        // Pattern: "Genesis chapter 3" → chapter-only (held for refinement)
         let bm = make_book_match("Genesis", 1, 7);
         let text = "Genesis chapter 3";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 3);
-        assert_eq!(result.verse_start, 1);
+        assert_eq!(result.verse_start, 0); // chapter-only
         assert_eq!(result.verse_end, None);
     }
 
@@ -844,24 +844,24 @@ mod tests {
     }
 
     #[test]
-    fn test_john_only_defaults_to_1_1() {
-        // Pattern: "John" → John 1:1
+    fn test_john_only_is_chapter_only() {
+        // Pattern: "John" → chapter-only (held for refinement)
         let bm = make_book_match("John", 43, 4);
         let text = "John";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 1);
-        assert_eq!(result.verse_start, 1);
+        assert_eq!(result.verse_start, 0); // chapter-only
         assert_eq!(result.verse_end, None);
     }
 
     #[test]
-    fn test_romans_chapter_8_defaults_to_verse_1() {
-        // Pattern: "Romans chapter 8" → Romans 8:1
+    fn test_romans_chapter_8_is_chapter_only() {
+        // Pattern: "Romans chapter 8" → chapter-only (held for refinement)
         let bm = make_book_match("Romans", 45, 6);
         let text = "Romans chapter 8";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 8);
-        assert_eq!(result.verse_start, 1);
+        assert_eq!(result.verse_start, 0); // chapter-only
         assert_eq!(result.verse_end, None);
     }
 
@@ -944,12 +944,12 @@ mod tests {
 
     #[test]
     fn test_incomplete_chapter_keyword() {
-        // Pattern: "Genesis chapter" (incomplete, no number) → Genesis 1:1
+        // Pattern: "Genesis chapter" (incomplete, no number) → chapter-only
         let bm = make_book_match("Genesis", 1, 7);
         let text = "Genesis chapter";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 1);
-        assert_eq!(result.verse_start, 1);
+        assert_eq!(result.verse_start, 0); // chapter-only
         assert_eq!(result.verse_end, None);
     }
 

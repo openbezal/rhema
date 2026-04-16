@@ -6,18 +6,18 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::State;
 
-use rhema_detection::{MergedDetection, ReadingMode};
+use rhema_detection::{DetectionPipeline, MergedDetection, ReadingMode};
 
 use crate::state::AppState;
 
 /// Confidence assigned to the best FTS5 BM25 match (rank 0) in context search.
-const FTS5_RANK0_CONFIDENCE: f64 = 0.75;
+pub(crate) const FTS5_RANK0_CONFIDENCE: f64 = 0.75;
 
 /// Confidence decrease per FTS5 rank position.
-const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
+pub(crate) const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
 
 /// FTS5 results below this confidence are not included.
-const FTS5_MIN_CONFIDENCE: f64 = 0.50;
+pub(crate) const FTS5_MIN_CONFIDENCE: f64 = 0.50;
 
 /// Serializable detection result for the frontend
 #[derive(Clone, Serialize)]
@@ -99,10 +99,14 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
 #[tauri::command]
 pub fn detect_verses(
     state: State<'_, Mutex<AppState>>,
+    pipeline_state: State<'_, Mutex<DetectionPipeline>>,
     text: String,
 ) -> Result<Vec<DetectionResult>, String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
-    let merged = app_state.detection_pipeline.process(&text);
+    let merged = {
+        let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
+        pipeline.process(&text)
+    };
+    let app_state = state.lock().map_err(|e| e.to_string())?;
     let results: Vec<DetectionResult> = merged.iter().map(|m| to_result(&app_state, m)).collect();
     Ok(results)
 }
@@ -110,24 +114,24 @@ pub fn detect_verses(
 /// Check if semantic search is available
 #[tauri::command]
 pub fn detection_status(
-    state: State<'_, Mutex<AppState>>,
+    pipeline_state: State<'_, Mutex<DetectionPipeline>>,
 ) -> Result<DetectionStatusResult, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
+    let pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
     Ok(DetectionStatusResult {
         has_direct: true,
-        has_semantic: app_state.detection_pipeline.has_semantic(),
-        paraphrase_enabled: app_state.detection_pipeline.use_synonyms(),
+        has_semantic: pipeline.has_semantic(),
+        paraphrase_enabled: pipeline.use_synonyms(),
     })
 }
 
 /// Toggle paraphrase detection (synonym expansion) on/off
 #[tauri::command]
 pub fn toggle_paraphrase_detection(
-    state: State<'_, Mutex<AppState>>,
+    pipeline_state: State<'_, Mutex<DetectionPipeline>>,
     enabled: bool,
 ) -> Result<bool, String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
-    app_state.detection_pipeline.set_use_synonyms(enabled);
+    let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
+    pipeline.set_use_synonyms(enabled);
     log::info!("[DET] Paraphrase detection (synonyms) set to: {enabled}");
     Ok(enabled)
 }
@@ -153,18 +157,23 @@ pub struct SemanticSearchResult {
 #[tauri::command]
 pub fn semantic_search(
     state: State<'_, Mutex<AppState>>,
+    pipeline_state: State<'_, Mutex<DetectionPipeline>>,
     query: String,
     limit: Option<usize>,
 ) -> Result<Vec<SemanticSearchResult>, String> {
     let k = limit.unwrap_or(10);
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
 
-    if !app_state.detection_pipeline.has_semantic() {
-        return Err("Semantic search not available — model or embeddings not loaded".into());
-    }
+    // Lock pipeline for vector search (may be slow if ONNX runs)
+    let vector_results = {
+        let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
+        if !pipeline.has_semantic() {
+            return Err("Semantic search not available — model or embeddings not loaded".into());
+        }
+        pipeline.semantic_search(&query, k)
+    }; // Pipeline lock dropped
 
-    // Vector search results (KJV verse_ids)
-    let vector_results = app_state.detection_pipeline.semantic_search(&query, k);
+    // Lock AppState for DB lookups only (fast)
+    let app_state = state.lock().map_err(|e| e.to_string())?;
 
     let mut results: Vec<SemanticSearchResult> = vector_results
         .into_iter()

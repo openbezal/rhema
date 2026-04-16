@@ -1,4 +1,5 @@
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { pickThemeBackgroundImage } from "@/lib/theme-designer-files"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import {
@@ -197,17 +198,10 @@ function ImageSection() {
           size="sm"
           className="w-full"
           onClick={() => {
-            const input = document.createElement("input")
-            input.type = "file"
-            input.accept = "image/*"
-            input.onchange = (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0]
-              if (file) {
-                const url = URL.createObjectURL(file)
-                update("background.image.url", url)
-              }
-            }
-            input.click()
+            void (async () => {
+              const dataUrl = await pickThemeBackgroundImage()
+              if (dataUrl) update("background.image.url", dataUrl)
+            })()
           }}
         >
           Change Image
@@ -353,7 +347,12 @@ function TextBoxSection() {
         <input
           type="checkbox"
           checked={textBox.enabled}
-          onChange={(e) => update("textBox.enabled", e.target.checked)}
+          onChange={(e) => {
+            update("textBox.enabled", e.target.checked)
+            if (e.target.checked && textBox.opacity === 0) {
+              update("textBox.opacity", 0.5)
+            }
+          }}
           className="h-4 w-4 rounded border-input accent-primary"
         />
       </div>

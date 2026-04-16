@@ -9,6 +9,8 @@
   ],
   "permissions": [
     "core:default",
-    "store:default"
+    "store:default",
+    "dialog:default",
+    "fs:default"
   ]
 }

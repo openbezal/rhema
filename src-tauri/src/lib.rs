@@ -18,7 +18,10 @@ pub fn run() {
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(Mutex::new(state::AppState::new()))
+        .manage(Mutex::new(rhema_detection::DetectionPipeline::new()))
         .manage(Mutex::new(rhema_broadcast::ndi::NdiRuntime::default()))
         .manage(Mutex::new(rhema_detection::DirectDetector::new()))
         .manage(Mutex::new(rhema_detection::DetectionMerger::new()))
@@ -114,8 +117,8 @@ pub fn run() {
                 match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
                     Ok(embedder) => {
                         log::info!("ONNX embedding model loaded");
-                        let managed_state = app.state::<Mutex<state::AppState>>();
-                        let mut state = managed_state.lock().unwrap();
+                        let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
+                        let mut pipeline = managed_pipeline.lock().unwrap();
 
                         // If pre-computed embeddings exist, load the vector index
                         if embeddings_path.exists() && ids_path.exists() {
@@ -123,7 +126,7 @@ pub fn run() {
                             match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
                                 Ok(index) => {
                                     log::info!("Verse embeddings loaded ({} vectors)", index.len());
-                                    state.detection_pipeline.set_semantic(
+                                    pipeline.set_semantic(
                                         rhema_detection::SemanticDetector::new(
                                             Box::new(embedder),
                                             Box::new(index),

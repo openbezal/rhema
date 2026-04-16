@@ -7,14 +7,27 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   PlusIcon,
   HeartIcon,
   MoreHorizontalIcon,
   SearchIcon,
   DownloadIcon,
   UploadIcon,
+  CheckCircleIcon,
+  PinIcon,
+  PinOffIcon,
+  EditIcon,
+  Trash2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { importTheme, exportTheme } from "@/lib/theme-designer-files"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 
 type FilterTab = "all" | "pinned" | "custom"
@@ -85,16 +98,68 @@ function ThemeCard({
         </div>
 
         {/* More menu */}
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation()
-          }}
-        >
-          <MoreHorizontalIcon className="size-3" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontalIcon className="size-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-50">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                useBroadcastStore.getState().setActiveTheme(theme.id)
+              }}
+            >
+              <CheckCircleIcon className="mr-2 size-3.5" />
+              Set as Active
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                useBroadcastStore.getState().togglePinTheme(theme.id)
+              }}
+            >
+              {theme.pinned ? (
+                <><PinOffIcon className="mr-2 size-3.5" />Unpin</>
+              ) : (
+                <><PinIcon className="mr-2 size-3.5" />Pin</>
+              )}
+            </DropdownMenuItem>
+            {!theme.builtin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const newName = window.prompt("Rename theme:", theme.name)
+                    if (newName?.trim()) {
+                      useBroadcastStore.getState().renameTheme(theme.id, newName.trim())
+                    }
+                  }}
+                >
+                  <EditIcon className="mr-2 size-3.5" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    useBroadcastStore.getState().deleteTheme(theme.id)
+                  }}
+                >
+                  <Trash2Icon className="mr-2 size-3.5" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )
@@ -122,10 +187,7 @@ export function ThemeLibrary() {
   const customThemes = filteredThemes.filter((t) => !t.builtin)
 
   const handleNewTheme = () => {
-    const firstTheme = themes[0]
-    if (firstTheme) {
-      useBroadcastStore.getState().duplicateTheme(firstTheme.id)
-    }
+    useBroadcastStore.getState().createNewTheme()
   }
 
   return (
@@ -167,13 +229,47 @@ export function ThemeLibrary() {
 
       {/* Import / Export */}
       <div className="flex gap-1.5 px-3 pb-3">
-        <Button variant="outline" className="flex-1 border-border bg-transparent">
+        <Button
+          variant="outline"
+          className="flex-1 border-border bg-transparent"
+          onClick={() => {
+            void (async () => {
+              try {
+                const theme = await importTheme()
+                if (theme) {
+                  useBroadcastStore.getState().saveTheme(theme)
+                  useBroadcastStore.getState().startEditing(theme.id)
+                }
+              } catch (err) {
+                console.error("[theme-library] import failed:", err)
+              }
+            })()
+          }}
+        >
           <UploadIcon className="size-2.5" />
           Import
         </Button>
-        <Button variant="outline" className="flex-1 border-border bg-transparent">
+        <Button
+          variant="outline"
+          className="flex-1 border-border bg-transparent"
+          onClick={() => {
+            void (async () => {
+              const id = useBroadcastStore.getState().editingThemeId
+              const theme = id
+                ? useBroadcastStore.getState().themes.find((t) => t.id === id)
+                : null
+              if (theme) {
+                try {
+                  await exportTheme(theme)
+                } catch (err) {
+                  console.error("[theme-library] export failed:", err)
+                }
+              }
+            })()
+          }}
+        >
           <DownloadIcon className="size-2.5" />
-          Export All
+          Export
         </Button>
       </div>
 
