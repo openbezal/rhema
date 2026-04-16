@@ -10,6 +10,7 @@ pub struct AppState {
     pub active_translation_id: i64,
     pub audio_active: Arc<AtomicBool>,
     pub stt_active: Arc<AtomicBool>,
+    pub verse_predictor: VersePredictor,
     #[expect(dead_code, reason = "reserved for future Deepgram key injection")]
     pub deepgram_api_key: Option<String>,
 }
@@ -19,9 +20,10 @@ impl AppState {
         Self {
             bible_db: None,
             detection_pipeline: DetectionPipeline::new(),
-            active_translation_id: 1, // Default to first translation (KJV)
+            active_translation_id: 1,
             audio_active: Arc::new(AtomicBool::new(false)),
             stt_active: Arc::new(AtomicBool::new(false)),
+            verse_predictor: VersePredictor::new(),
             deepgram_api_key: None,
         }
     }

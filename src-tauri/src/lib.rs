@@ -41,6 +41,7 @@ pub fn run() {
             commands::detection::toggle_paraphrase_detection,
             commands::detection::reading_mode_status,
             commands::detection::stop_reading_mode,
+            commands::detection::predict_next_verses,
             commands::audio::get_audio_devices,
             commands::stt::start_transcription,
             commands::stt::stop_transcription,
