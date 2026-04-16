@@ -391,14 +391,18 @@ fn clean_transcript(text: &str) -> String {
     collapsed.trim().to_string()
 }
 
-/// How long to wait for an incomplete reference to be completed (5 seconds).
-const INCOMPLETE_REF_TIMEOUT_MS: u128 = 5000;
+/// How long to wait for an incomplete reference to be completed (15 seconds).
+/// Preachers often pause between book name and chapter/verse.
+const INCOMPLETE_REF_TIMEOUT_MS: u128 = 15_000;
 
 /// An incomplete reference waiting for verse completion.
 #[derive(Debug, Clone)]
 struct IncompleteRef {
     verse_ref: VerseRef,
     timestamp: Instant,
+    /// When true, the chapter field is a default (1), not explicitly spoken.
+    /// Bare numbers should be interpreted as chapter, not verse.
+    chapter_is_default: bool,
 }
 
 /// Main orchestrator for direct Bible reference detection.
@@ -516,30 +520,64 @@ impl DirectDetector {
         }
 
         // Step 0c: Check if there's a pending incomplete reference.
-        // Try to complete it with a verse continuation, or expire it on timeout.
-        // The chapter-only detection was already emitted when first seen — no
-        // re-emission needed on timeout.
+        // Try to complete it with chapter/verse continuation, or expire on timeout.
         if let Some(ref incomplete) = self.incomplete.clone() {
             let elapsed = incomplete.timestamp.elapsed().as_millis();
             if elapsed > INCOMPLETE_REF_TIMEOUT_MS {
-                // Timeout: chapter-only ref was already emitted immediately.
-                // Just clean up the pending state (EDGE-02).
+                // Timeout: clean up pending state (EDGE-02).
                 self.incomplete = None;
-            } else if let Some(verse) = try_extract_verse_continuation(text) {
-                // Verse spoken — refine the chapter-only detection (DET-02).
-                let mut completed = incomplete.verse_ref.clone();
-                completed.verse_start = verse;
-                detections.push(self.make_direct_detection(
-                    &completed,
-                    compute_confidence(&completed, &completed),
-                    text,
-                    0,
-                    text.len(),
-                ));
-                self.push_recent(&completed);
-                self.context.update(&completed);
-                self.incomplete = None;
-                return detections;
+            } else if let Some(cont) =
+                parser::try_extract_continuation(text, incomplete.chapter_is_default)
+            {
+                match cont {
+                    parser::Continuation::ChapterAndVerse(ch, v) => {
+                        let mut completed = incomplete.verse_ref.clone();
+                        completed.chapter = ch;
+                        completed.verse_start = v;
+                        if is_valid_reference(completed.book_number, completed.chapter) {
+                            detections.push(self.make_direct_detection(
+                                &completed,
+                                compute_confidence(&completed, &completed),
+                                text,
+                                0,
+                                text.len(),
+                            ));
+                            self.push_recent(&completed);
+                            self.context.update(&completed);
+                        }
+                        self.incomplete = None;
+                        return detections;
+                    }
+                    parser::Continuation::VerseOnly(v) => {
+                        let mut completed = incomplete.verse_ref.clone();
+                        completed.verse_start = v;
+                        if is_valid_reference(completed.book_number, completed.chapter) {
+                            detections.push(self.make_direct_detection(
+                                &completed,
+                                compute_confidence(&completed, &completed),
+                                text,
+                                0,
+                                text.len(),
+                            ));
+                            self.push_recent(&completed);
+                            self.context.update(&completed);
+                        }
+                        self.incomplete = None;
+                        return detections;
+                    }
+                    parser::Continuation::ChapterOnly(ch) => {
+                        // Update chapter, reset timeout, keep waiting for verse.
+                        let mut updated = incomplete.verse_ref.clone();
+                        updated.chapter = ch;
+                        self.incomplete = Some(IncompleteRef {
+                            verse_ref: updated.clone(),
+                            timestamp: Instant::now(),
+                            chapter_is_default: false,
+                        });
+                        self.context.update(&updated);
+                        // Fall through to book matcher (text may also contain a new book)
+                    }
+                }
             }
         }
 
@@ -584,9 +622,15 @@ impl DirectDetector {
                 // The full reference (with verse) will arrive when the user
                 // finishes speaking and will be emitted then.
                 if resolved.verse_start == 0 {
+                    // Detect if chapter was explicitly spoken or defaulted.
+                    let after_book = text[book_match.end..].trim();
+                    let has_explicit_chapter =
+                        after_book.starts_with(|c: char| c.is_ascii_digit())
+                            || after_book.to_lowercase().starts_with("chapter");
                     self.incomplete = Some(IncompleteRef {
                         verse_ref: resolved.clone(),
                         timestamp: Instant::now(),
+                        chapter_is_default: !has_explicit_chapter,
                     });
                     self.context.update(&resolved);
                     continue;
@@ -702,47 +746,6 @@ impl Default for DirectDetector {
     }
 }
 
-/// Try to extract a verse number from text that may be a continuation
-/// of an incomplete reference. Matches patterns like:
-/// - "verse 16", "verses 3"
-/// - "16" (bare number at start)
-/// - "and verse 5"
-fn try_extract_verse_continuation(text: &str) -> Option<i32> {
-    let lower = text.to_lowercase();
-    let trimmed = lower.trim();
-
-    // Pattern: "verse N" or "verses N"
-    for prefix in &["verse ", "verses ", "and verse ", "and verses "] {
-        if let Some(rest) = trimmed.strip_prefix(prefix) {
-            let num_str: String = rest.chars().take_while(char::is_ascii_digit).collect();
-            if let Ok(n) = num_str.parse::<i32>() {
-                if n > 0 {
-                    return Some(n);
-                }
-            }
-            // Try spoken number
-            let word: String = rest.chars().take_while(|c| c.is_alphabetic()).collect();
-            if let Some(n) = parser::parse_spoken_number(&word) {
-                if n > 0 {
-                    return Some(n);
-                }
-            }
-        }
-    }
-
-    // Pattern: bare number at start (e.g., "16 for God so loved")
-    let num_str: String = trimmed.chars().take_while(char::is_ascii_digit).collect();
-    if !num_str.is_empty() && num_str.len() <= 3 {
-        if let Ok(n) = num_str.parse::<i32>() {
-            if n > 0 && n <= 176 {
-                // Max verse number in Bible (Psalm 119)
-                return Some(n);
-            }
-        }
-    }
-
-    None
-}
 
 /// Compute a confidence score for the detection.
 /// Full explicit references (book + chapter + verse) get 1.0.
@@ -909,10 +912,11 @@ mod tests {
         assert!(results.is_empty()); // chapter-only, not emitted
         assert!(detector.incomplete.is_some());
 
-        // Simulate timeout by replacing with an expired timestamp
+        // Simulate timeout by replacing with an expired timestamp (exceeds 15s)
         detector.incomplete = Some(IncompleteRef {
             verse_ref: detector.incomplete.as_ref().unwrap().verse_ref.clone(),
-            timestamp: Instant::now() - std::time::Duration::from_secs(10),
+            timestamp: Instant::now() - std::time::Duration::from_secs(20),
+            chapter_is_default: detector.incomplete.as_ref().unwrap().chapter_is_default,
         });
 
         // Next detect call should clean up without emitting
@@ -1217,5 +1221,88 @@ mod tests {
             detector.detect_translation_command("could you show me that verse in the niv translation"),
             Some("NIV".to_string())
         );
+    }
+
+    // ========== Cross-Segment Detection Tests ==========
+
+    #[test]
+    fn test_cross_segment_acts_3_22() {
+        // The exact bug scenario from logs:
+        // "...Acts" → "chapter three..." → "22..."
+        let mut detector = DirectDetector::new();
+
+        // Segment 1: Book-only "Acts"
+        let results = detector.detect("God had put in his mouth. Acts");
+        assert!(results.is_empty());
+        assert!(detector.incomplete.is_some());
+        let inc = detector.incomplete.as_ref().unwrap();
+        assert_eq!(inc.verse_ref.book_name, "Acts");
+        assert!(inc.chapter_is_default);
+
+        // Segment 2: Chapter continuation
+        let results = detector.detect("chapter three, and I'm reading from verse");
+        assert!(results.is_empty()); // ChapterOnly — still waiting for verse
+        assert!(detector.incomplete.is_some());
+        let inc = detector.incomplete.as_ref().unwrap();
+        assert_eq!(inc.verse_ref.chapter, 3);
+        assert!(!inc.chapter_is_default);
+
+        // Segment 3: Verse completion via bare number
+        let results = detector.detect("22. Acts three, for Moses truly");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name, "Acts");
+        assert_eq!(results[0].verse_ref.chapter, 3);
+        assert_eq!(results[0].verse_ref.verse_start, 22);
+    }
+
+    #[test]
+    fn test_cross_segment_chapter_and_verse_combined() {
+        // Book-only → "chapter 3 verse 22" in one segment
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("let's read Acts");
+        assert!(results.is_empty());
+
+        let results = detector.detect("chapter 3 verse 22");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name, "Acts");
+        assert_eq!(results[0].verse_ref.chapter, 3);
+        assert_eq!(results[0].verse_ref.verse_start, 22);
+    }
+
+    #[test]
+    fn test_bare_number_as_chapter_after_book_only() {
+        // "Acts" → "3" → "22"
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("turn to Acts");
+        assert!(results.is_empty());
+        assert!(detector.incomplete.as_ref().unwrap().chapter_is_default);
+
+        // Bare "3" = chapter (because book-only)
+        let results = detector.detect("3");
+        assert!(results.is_empty());
+        let inc = detector.incomplete.as_ref().unwrap();
+        assert_eq!(inc.verse_ref.chapter, 3);
+
+        // Bare "22" = verse (chapter already set)
+        let results = detector.detect("22");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.chapter, 3);
+        assert_eq!(results[0].verse_ref.verse_start, 22);
+    }
+
+    #[test]
+    fn test_verse_keyword_anywhere_in_text() {
+        // "Genesis 3" → "and I'm reading from verse 15"
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Genesis 3");
+        assert!(results.is_empty());
+
+        let results = detector.detect("and I'm reading from verse 15");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.chapter, 3);
+        assert_eq!(results[0].verse_ref.verse_start, 15);
     }
 }

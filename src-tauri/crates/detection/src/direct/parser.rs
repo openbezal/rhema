@@ -1,6 +1,17 @@
 use super::automaton::BookMatch;
 use crate::types::VerseRef;
 
+/// Result of attempting to extract a continuation from text for an incomplete reference.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Continuation {
+    /// Found both chapter and verse: "chapter 3 verse 22"
+    ChapterAndVerse(i32, i32),
+    /// Found chapter only: "chapter 3" (still waiting for verse)
+    ChapterOnly(i32),
+    /// Found verse only: "verse 22", bare "22"
+    VerseOnly(i32),
+}
+
 /// Parse a Bible reference from text given a book match position.
 ///
 /// Looks ahead from the end of the book match for chapter:verse patterns.
@@ -641,6 +652,81 @@ pub fn parse_spoken_number(word: &str) -> Option<i32> {
     }
 }
 
+/// Try to extract a chapter and/or verse continuation from text that follows
+/// an incomplete reference (book-only or book+chapter).
+///
+/// Used when the previous STT segment detected a book name (possibly with
+/// chapter) and the current segment may contain the chapter/verse info.
+///
+/// The `is_book_only` flag indicates the incomplete ref has a defaulted chapter (1).
+/// When true, a bare number at start is interpreted as chapter, not verse.
+pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Continuation> {
+    let lower = text.to_lowercase();
+    let trimmed = lower.trim();
+    let tokens = tokenize(trimmed);
+
+    if tokens.is_empty() {
+        return None;
+    }
+
+    // Pattern 1: "chapter N [... verse M]"
+    for i in 0..tokens.len() {
+        if let Token::Word(w) = &tokens[i] {
+            if w == "chapter" {
+                if let Some((chapter, next_idx)) = consume_number(&tokens, i + 1) {
+                    if chapter <= 0 {
+                        continue;
+                    }
+                    // Scan forward for "verse" keyword (up to 15 tokens)
+                    let scan_limit = (next_idx + 15).min(tokens.len());
+                    for j in next_idx..scan_limit {
+                        if let Token::Word(vw) = &tokens[j] {
+                            if vw == "verse" || vw == "verses" {
+                                if let Some((verse, _)) = consume_number(&tokens, j + 1) {
+                                    if verse > 0 && verse <= 176 {
+                                        return Some(Continuation::ChapterAndVerse(
+                                            chapter, verse,
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // No verse found — chapter only
+                    return Some(Continuation::ChapterOnly(chapter));
+                }
+            }
+        }
+    }
+
+    // Pattern 2: "verse N" / "verses N" anywhere in text
+    for i in 0..tokens.len() {
+        if let Token::Word(w) = &tokens[i] {
+            if w == "verse" || w == "verses" {
+                if let Some((verse, _)) = consume_number(&tokens, i + 1) {
+                    if verse > 0 && verse <= 176 {
+                        return Some(Continuation::VerseOnly(verse));
+                    }
+                }
+            }
+        }
+    }
+
+    // Pattern 3: Bare number at start
+    if let Some((num, _)) = consume_number_at(&tokens, 0) {
+        if num > 0 && num <= 176 {
+            if is_book_only {
+                // After book-only (e.g., "Acts"), bare "3" = chapter
+                return Some(Continuation::ChapterOnly(num));
+            }
+            // After book+chapter (e.g., "Acts 3"), bare "22" = verse
+            return Some(Continuation::VerseOnly(num));
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -962,5 +1048,78 @@ mod tests {
         assert_eq!(result.chapter, 1);
         assert_eq!(result.verse_start, 1);
         assert_eq!(result.verse_end, None);
+    }
+
+    // ========== Continuation Extraction Tests ==========
+
+    #[test]
+    fn test_continuation_chapter_and_verse() {
+        assert_eq!(
+            try_extract_continuation("chapter 3 verse 22", false),
+            Some(Continuation::ChapterAndVerse(3, 22))
+        );
+        assert_eq!(
+            try_extract_continuation("chapter three and I'm reading from verse twenty two", false),
+            Some(Continuation::ChapterAndVerse(3, 22))
+        );
+    }
+
+    #[test]
+    fn test_continuation_chapter_only() {
+        assert_eq!(
+            try_extract_continuation("chapter three, and I'm reading from verse", false),
+            Some(Continuation::ChapterOnly(3))
+        );
+        assert_eq!(
+            try_extract_continuation("chapter 5", false),
+            Some(Continuation::ChapterOnly(5))
+        );
+    }
+
+    #[test]
+    fn test_continuation_verse_anywhere() {
+        assert_eq!(
+            try_extract_continuation("and I'm reading from verse 22", false),
+            Some(Continuation::VerseOnly(22))
+        );
+        assert_eq!(
+            try_extract_continuation("verse sixteen", false),
+            Some(Continuation::VerseOnly(16))
+        );
+    }
+
+    #[test]
+    fn test_continuation_bare_number_book_only() {
+        // After book-only detection, bare number = chapter
+        assert_eq!(
+            try_extract_continuation("3", true),
+            Some(Continuation::ChapterOnly(3))
+        );
+        assert_eq!(
+            try_extract_continuation("three", true),
+            Some(Continuation::ChapterOnly(3))
+        );
+    }
+
+    #[test]
+    fn test_continuation_bare_number_with_chapter() {
+        // After book+chapter detection, bare number = verse
+        assert_eq!(
+            try_extract_continuation("22", false),
+            Some(Continuation::VerseOnly(22))
+        );
+        assert_eq!(
+            try_extract_continuation("22. Acts three for Moses", false),
+            Some(Continuation::VerseOnly(22))
+        );
+    }
+
+    #[test]
+    fn test_continuation_no_match() {
+        assert_eq!(try_extract_continuation("the weather is nice", false), None);
+        assert_eq!(
+            try_extract_continuation("something unrelated here", false),
+            None
+        );
     }
 }
