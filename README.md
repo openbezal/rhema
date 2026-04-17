@@ -210,6 +210,20 @@ rhema/
 | `quantize:model` | Quantize ONNX model to INT8 for ARM64 |
 | `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
 
+## Security
+
+Rhema implements a restrictive **Content Security Policy (CSP)** to protect against script injection attacks and unauthorized data exfiltration. The CSP:
+
+- ✅ Blocks inline scripts and external script loading (`script-src 'self'`)
+- ✅ Whitelists only Deepgram API for network connections
+- ✅ Prevents clickjacking with `frame-src 'none'`
+- ✅ Allows theme background images from HTTPS sources only
+- ✅ Blocks forms from submitting to external sites
+
+For detailed security documentation, including threat model, CSP configuration, and security best practices, see **[SECURITY.md](SECURITY.md)**.
+
+To report security vulnerabilities,please reachout to the maintainer instead of opening public issues.
+
 ## Environment Variables
 
 Create a `.env` file in the project root (optional):
