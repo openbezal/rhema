@@ -18,7 +18,7 @@ rhema-bible = { path = "../bible" }
 # Optional heavy dependencies for real embedding / vector search
 ort = { version = "2.0.0-rc.12", optional = true }
 ndarray = { version = "0.16", optional = true }
-tokenizers = { version = "0.22", optional = true }
+tokenizers = { version = "0.22", default-features = false, features = ["progressbar", "onig"], optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
 
 # Dependencies only needed by the precompute binary

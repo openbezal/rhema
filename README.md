@@ -61,8 +61,44 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 - [Rust](https://rustup.rs/) toolchain (stable, 1.77.2+)
 - [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (platform-specific system dependencies)
 - [Python 3](https://www.python.org/) (for downloading copyrighted translations and embedding model export)
-- [CMake](https://cmake.org/) (for Whisper local transcription) — install via `brew install cmake`
+- CMake + LLVM/libclang (required for local Whisper STT) — see [Platform-specific setup](#platform-specific-setup) below
 - [Deepgram API key](https://deepgram.com/) (optional, for cloud speech-to-text instead of Whisper)
+
+### Platform-specific setup
+
+The local Whisper STT build compiles `whisper.cpp` from source, which requires CMake and `libclang` (via `bindgen`). Pick the command block for your OS:
+
+**macOS**
+
+```bash
+brew install cmake
+```
+
+**Linux (Debian/Ubuntu)**
+
+```bash
+sudo apt install cmake clang libclang-dev
+```
+
+**Linux (Arch)**
+
+```bash
+sudo pacman -S llvm clang cmake
+```
+
+**Windows**
+
+Windows needs an extra build-tools bootstrap before the shared setup pipeline — LLVM/libclang and CMake aren't available out of the box.
+
+1. Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/) with the **Desktop development with C++** workload (provides MSVC).
+2. From the repo root:
+   ```powershell
+   bun install
+   bun run setup:windows
+   ```
+   This installs LLVM + CMake via `winget` and persists `LIBCLANG_PATH`.
+3. **Close the terminal and open a new one** so `LIBCLANG_PATH` is inherited by subsequent commands.
+4. Continue with [Quick Setup](#quick-setup-recommended) (`bun run setup:all`) and then `bun run tauri dev`.
 
 ## Getting Started
 
@@ -75,6 +111,8 @@ bun install
 ### Quick Setup (recommended)
 
 One command sets up everything — Python virtual environment, Bible data, copyrighted translations, database, ONNX model, and precomputed embeddings:
+
+> **Windows:** run `bun run setup:windows` *before* `setup:all` and restart your terminal. See [Platform-specific setup](#platform-specific-setup) above.
 
 ```bash
 bun run setup:all
@@ -98,7 +136,7 @@ Rhema supports two speech-to-text engines:
 
 **Option 1: Whisper (Local, Free)**
 No setup required! Whisper runs locally on your machine with no API costs or internet dependency.
-- Requires CMake: `brew install cmake`
+- Requires CMake + libclang — see [Platform-specific setup](#platform-specific-setup) above
 - Model downloads automatically on first use
 
 **Option 2: Deepgram (Cloud, Paid)**
