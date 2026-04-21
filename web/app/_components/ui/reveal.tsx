@@ -47,7 +47,7 @@ export function Reveal({
     if (!node) return;
     const observer = getObserver();
     if (!observer) {
-      setVisible(true);
+      queueMicrotask(() => setVisible(true));
       return;
     }
     callbacks.set(node, () => setVisible(true));
