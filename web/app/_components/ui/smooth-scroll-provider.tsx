@@ -31,7 +31,6 @@ export function SmoothScrollProvider({
       });
 
       const onAnchorClick = (event: MouseEvent) => {
-        if (event.defaultPrevented) return;
         if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
         const anchor = (event.target as Element | null)?.closest(
           'a[href^="#"]'
@@ -42,14 +41,15 @@ export function SmoothScrollProvider({
         const target = document.querySelector(hash);
         if (!target) return;
         event.preventDefault();
+        event.stopPropagation();
         lenis.scrollTo(target as HTMLElement, { offset: -64 });
         history.pushState(null, "", hash);
       };
-      document.addEventListener("click", onAnchorClick);
+      document.addEventListener("click", onAnchorClick, { capture: true });
 
       cleanup = () => {
         cancelAnimationFrame(rafId);
-        document.removeEventListener("click", onAnchorClick);
+        document.removeEventListener("click", onAnchorClick, { capture: true });
         lenis.destroy();
       };
     };
