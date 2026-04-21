@@ -16,7 +16,7 @@ export function ComparisonSection() {
         <Reveal>
           <SectionHeading id="comparison-heading">Why Rhema</SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-2 [&>*]:-ml-px [&>*]:-mt-px">
+        <div className="grid grid-cols-1 md:grid-cols-2 md:overflow-hidden md:[&>*]:-ml-px md:[&>*]:-mt-px">
           <Reveal className="flex">
             <ComparisonCard
               title="Without Rhema"

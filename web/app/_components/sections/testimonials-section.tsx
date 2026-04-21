@@ -45,7 +45,7 @@ export function TestimonialsSection() {
             Hear what people are saying!
           </SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-2 lg:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
+        <div className="grid grid-cols-1 md:grid-cols-2 md:overflow-hidden md:[&>*]:-ml-px md:[&>*]:-mt-px lg:grid-cols-3">
           {TESTIMONIALS.map((t, i) => (
             <Reveal key={t.handle} delay={(i % 3) * 80} className="flex">
               <figure className="flex h-full w-full flex-col justify-between gap-8 border border-border-strong p-8">

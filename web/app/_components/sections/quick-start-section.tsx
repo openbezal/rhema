@@ -36,7 +36,7 @@ export function QuickStartSection() {
             Ready in under five minutes.
           </SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
+        <div className="grid grid-cols-1 md:grid-cols-3 md:overflow-hidden md:[&>*]:-ml-px md:[&>*]:-mt-px">
           {STEPS.map((s, i) => (
             <Reveal key={s.no} delay={i * 80} className="flex">
               <div className="flex h-full w-full min-h-[320px] flex-col justify-between gap-8 border border-border-strong p-8 md:min-h-[400px]">

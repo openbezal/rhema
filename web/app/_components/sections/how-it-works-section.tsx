@@ -33,7 +33,7 @@ export function HowItWorksSection() {
         <Reveal>
           <SectionHeading id="how-it-works-heading">How it works</SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
+        <div className="grid grid-cols-1 md:grid-cols-3 md:overflow-hidden md:[&>*]:-ml-px md:[&>*]:-mt-px">
           {STEPS.map((s, i) => (
             <Reveal key={s.title} delay={i * 80} className="flex">
               <FeatureCard
