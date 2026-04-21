@@ -27,7 +27,7 @@ manifest-src 'self';
 
 - **`default-src 'self'`** — same-origin fallback for any directive not listed.
 - **`script-src 'self'`** — no inline scripts, no `eval`, no external CDNs. The frontend bundle is the only script source.
-- **`style-src 'self' 'unsafe-inline'`** — `'unsafe-inline'` is required by Tailwind utility generation, React inline `style={}` props, and the `<style>` block in `broadcast-output.html`.
+- **`style-src 'self' 'unsafe-inline'`** — `'unsafe-inline'` is required by Tailwind utility generation, React inline `style={}` props, the `<style>` block in `broadcast-output.html`, and the dynamic `<style>` element that `src/components/theme-provider.tsx` injects during theme switches to suppress transitions.
 - **`img-src 'self' data: blob:`** — `data:` covers theme background images (loaded via `@tauri-apps/plugin-fs` and converted to base64 in `src/lib/theme-designer-files.ts`); `blob:` covers canvas-derived images in the broadcast output window. External HTTPS images are deliberately **not** allowed: there is no feature that accepts an HTTPS URL from a user, and allowing `https:` would open an `<img src>`-based exfil path.
 - **`font-src 'self' data:`** — fonts ship bundled via `@fontsource-variable/*`; `data:` permits inline font data.
 - **`connect-src 'self'`** — the frontend makes no direct external network calls. All external traffic (e.g., Deepgram STT over WebSocket in `src-tauri/crates/stt/`) is initiated from Rust and is out of scope for CSP.
