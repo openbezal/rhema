@@ -67,15 +67,15 @@ export function FeaturesSection() {
             Everything your media team needs
           </SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-2 lg:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
           {FEATURES.map((f, i) => (
-            <Reveal key={f.title} delay={(i % 3) * 80}>
+            <Reveal key={f.title} delay={(i % 3) * 80} className="flex">
               <FeatureCard
                 icon={f.icon}
                 title={f.title}
                 body={f.body}
                 emphasize={f.emphasize}
-                className="h-full"
+                iconTone="accent"
               />
             </Reveal>
           ))}

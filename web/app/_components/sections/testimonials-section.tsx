@@ -45,10 +45,10 @@ export function TestimonialsSection() {
             Hear what people are saying!
           </SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-2 lg:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
           {TESTIMONIALS.map((t, i) => (
-            <Reveal key={t.handle} delay={(i % 3) * 80}>
-              <figure className="flex h-full flex-col justify-between gap-8 border border-border-strong p-8">
+            <Reveal key={t.handle} delay={(i % 3) * 80} className="flex">
+              <figure className="flex h-full w-full flex-col justify-between gap-8 border border-border-strong p-8">
                 <blockquote className="text-xl font-medium leading-8 tracking-[-0.02em] text-foreground md:text-2xl md:tracking-[-0.04em]">
                   {t.quote}
                 </blockquote>

@@ -1,7 +1,7 @@
-import { Accordion } from "../ui/accordion";
 import { Container } from "../ui/container";
 import { Reveal } from "../ui/reveal";
 import { SectionHeading } from "./section-heading";
+import { cn } from "../../_lib/utils";
 
 const FAQS = [
   {
@@ -58,7 +58,24 @@ export function FaqSection() {
           <SectionHeading id="faq-heading">Common questions</SectionHeading>
         </Reveal>
         <Reveal>
-          <Accordion items={FAQS} />
+          <dl className="flex flex-col">
+            {FAQS.map((faq, i) => (
+              <div
+                key={faq.question}
+                className={cn(
+                  "flex flex-col gap-3 py-8",
+                  i > 0 && "border-t border-border-strong"
+                )}
+              >
+                <dt className="text-xl font-medium leading-8 tracking-[-0.02em] text-foreground md:text-2xl md:tracking-[-0.04em]">
+                  {faq.question}
+                </dt>
+                <dd className="text-[17px] leading-6 tracking-[-0.01em] text-muted-foreground">
+                  {faq.answer}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </Reveal>
       </Container>
     </section>

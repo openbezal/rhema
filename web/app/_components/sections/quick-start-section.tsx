@@ -6,7 +6,7 @@ const STEPS = [
   {
     no: "1",
     title: "Download the app",
-    body: "Free for Windows. MacOS coming soon",
+    body: "Free for Windows and macOS",
   },
   {
     no: "2",
@@ -36,10 +36,10 @@ export function QuickStartSection() {
             Ready in under five minutes.
           </SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-3">
+        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
           {STEPS.map((s, i) => (
-            <Reveal key={s.no} delay={i * 80}>
-              <div className="flex h-full min-h-[320px] flex-col justify-between gap-8 border border-border-strong p-8 md:min-h-[400px]">
+            <Reveal key={s.no} delay={i * 80} className="flex">
+              <div className="flex h-full w-full min-h-[320px] flex-col justify-between gap-8 border border-border-strong p-8 md:min-h-[400px]">
                 <p className="text-2xl font-medium leading-8 tracking-[-0.04em] text-foreground">
                   {s.no}
                 </p>

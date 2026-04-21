@@ -16,15 +16,15 @@ export function ComparisonSection() {
         <Reveal>
           <SectionHeading id="comparison-heading">Why Rhema</SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <Reveal>
+        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-2 [&>*]:-ml-px [&>*]:-mt-px">
+          <Reveal className="flex">
             <ComparisonCard
               title="Without Rhema"
               items={WITHOUT}
               tone="negative"
             />
           </Reveal>
-          <Reveal delay={80}>
+          <Reveal delay={80} className="flex">
             <ComparisonCard title="With Rhema" items={WITH} tone="positive" />
           </Reveal>
         </div>
@@ -43,9 +43,10 @@ function ComparisonCard({
   tone: "positive" | "negative";
 }) {
   const Icon = tone === "positive" ? IconCircleCheck : IconCircleX;
-  const iconColor = tone === "positive" ? "text-accent" : "text-muted-foreground";
+  const iconColor =
+    tone === "positive" ? "text-emerald-500" : "text-red-500";
   return (
-    <div className="flex flex-col gap-2 border border-border-strong p-8 opacity-90">
+    <div className="flex h-full w-full flex-col gap-2 border border-border-strong p-8 opacity-90">
       <h3 className="text-lg font-medium leading-6 tracking-[-0.01em] text-foreground">
         {title}
       </h3>
@@ -55,7 +56,9 @@ function ComparisonCard({
             key={item}
             className="flex items-center gap-1.5 text-[15px] leading-6 text-muted-foreground"
           >
-            <Icon size={16} aria-hidden className={iconColor} stroke={2} />
+            <span className={iconColor}>
+              <Icon size={16} aria-hidden stroke={2} />
+            </span>
             <span>{item}</span>
           </li>
         ))}

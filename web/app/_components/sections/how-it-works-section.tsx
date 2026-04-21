@@ -33,10 +33,15 @@ export function HowItWorksSection() {
         <Reveal>
           <SectionHeading id="how-it-works-heading">How it works</SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-3">
+        <div className="grid grid-cols-1 overflow-hidden md:grid-cols-3 [&>*]:-ml-px [&>*]:-mt-px">
           {STEPS.map((s, i) => (
-            <Reveal key={s.title} delay={i * 80}>
-              <FeatureCard icon={s.icon} title={s.title} body={s.body} />
+            <Reveal key={s.title} delay={i * 80} className="flex">
+              <FeatureCard
+                icon={s.icon}
+                title={s.title}
+                body={s.body}
+                iconTone="accent"
+              />
             </Reveal>
           ))}
         </div>
