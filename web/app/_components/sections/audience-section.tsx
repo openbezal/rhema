@@ -32,7 +32,7 @@ export function AudienceSection() {
         <Reveal>
           <SectionHeading id="audience-heading">Who this is for</SectionHeading>
         </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-3 md:overflow-hidden md:[&>*]:-ml-px md:[&>*]:-mt-px">
+        <div className="grid grid-cols-1 md:grid-cols-3 md:[&>*]:-ml-px md:[&>*]:-mt-px">
           {AUDIENCE.map((a, i) => (
             <Reveal key={a.title} delay={i * 80} className="flex">
               <FeatureCard
