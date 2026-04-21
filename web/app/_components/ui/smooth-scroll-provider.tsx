@@ -1,6 +1,5 @@
 "use client";
 
-import Lenis from "lenis";
 import { useEffect } from "react";
 
 export function SmoothScrollProvider({
@@ -9,30 +8,49 @@ export function SmoothScrollProvider({
   children: React.ReactNode;
 }) {
   useEffect(() => {
-    const prefersReducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    if (prefersReducedMotion) return;
+    let cancelled = false;
+    let cleanup: (() => void) | undefined;
 
-    const lenis = new Lenis({
-      duration: 1.15,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      wheelMultiplier: 1,
-      touchMultiplier: 1.4,
-      lerp: 0.1,
-    });
+    const start = async () => {
+      const { default: Lenis } = await import("lenis");
+      if (cancelled) return;
 
-    let rafId = 0;
-    const raf = (time: number) => {
-      lenis.raf(time);
-      rafId = requestAnimationFrame(raf);
+      const lenis = new Lenis({
+        duration: 1.15,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        wheelMultiplier: 1,
+        touchMultiplier: 1.4,
+        lerp: 0.1,
+      });
+
+      let rafId = requestAnimationFrame(function raf(time) {
+        lenis.raf(time);
+        rafId = requestAnimationFrame(raf);
+      });
+
+      cleanup = () => {
+        cancelAnimationFrame(rafId);
+        lenis.destroy();
+      };
     };
-    rafId = requestAnimationFrame(raf);
+
+    const schedule =
+      typeof requestIdleCallback === "function"
+        ? (cb: () => void) => requestIdleCallback(cb, { timeout: 500 })
+        : (cb: () => void) => setTimeout(cb, 0);
+    const cancel =
+      typeof cancelIdleCallback === "function"
+        ? (id: number) => cancelIdleCallback(id)
+        : (id: number) => clearTimeout(id);
+
+    const handle = schedule(() => void start());
 
     return () => {
-      cancelAnimationFrame(rafId);
-      lenis.destroy();
+      cancelled = true;
+      cancel(handle as number);
+      cleanup?.();
     };
   }, []);
 
