@@ -6,18 +6,20 @@ export function FeatureCard({
   title,
   body,
   emphasize,
+  iconTone = "default",
   className,
 }: {
   icon: TablerIcon;
   title: string;
   body: string;
   emphasize?: boolean;
+  iconTone?: "default" | "accent";
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "relative flex flex-col items-center gap-4 border border-border p-8 text-center transition-colors duration-300 md:p-10",
+        "relative flex h-full w-full flex-col items-center gap-4 border border-border p-8 text-center transition-colors duration-300 md:p-10",
         emphasize ? "bg-surface" : "bg-background",
         "hover:bg-surface",
         className
@@ -27,7 +29,10 @@ export function FeatureCard({
         size={32}
         stroke={1.75}
         aria-hidden
-        className="shrink-0 text-foreground"
+        className={cn(
+          "shrink-0",
+          iconTone === "accent" ? "text-accent" : "text-foreground"
+        )}
       />
       <div className="flex flex-col gap-2">
         <h3 className="text-lg font-medium leading-6 tracking-[-0.01em] text-foreground">
