@@ -30,8 +30,26 @@ export function SmoothScrollProvider({
         rafId = requestAnimationFrame(raf);
       });
 
+      const onAnchorClick = (event: MouseEvent) => {
+        if (event.defaultPrevented) return;
+        if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
+        const anchor = (event.target as Element | null)?.closest(
+          'a[href^="#"]'
+        ) as HTMLAnchorElement | null;
+        if (!anchor) return;
+        const hash = anchor.getAttribute("href");
+        if (!hash || hash === "#") return;
+        const target = document.querySelector(hash);
+        if (!target) return;
+        event.preventDefault();
+        lenis.scrollTo(target as HTMLElement, { offset: -64 });
+        history.pushState(null, "", hash);
+      };
+      document.addEventListener("click", onAnchorClick);
+
       cleanup = () => {
         cancelAnimationFrame(rafId);
+        document.removeEventListener("click", onAnchorClick);
         lenis.destroy();
       };
     };
