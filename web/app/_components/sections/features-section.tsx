@@ -17,7 +17,6 @@ type Feature = {
   icon: TablerIcon;
   title: string;
   body: string;
-  emphasize?: boolean;
 };
 
 const FEATURES: Feature[] = [
@@ -30,7 +29,6 @@ const FEATURES: Feature[] = [
     icon: IconSearch,
     title: "Finds Bible Verses Automatically",
     body: "Detects Bible verses from both direct references and spoken quotes. It understands imperfect speech and partial phrasing.",
-    emphasize: true,
   },
   {
     icon: IconScreenShare,
@@ -74,7 +72,6 @@ export function FeaturesSection() {
                 icon={f.icon}
                 title={f.title}
                 body={f.body}
-                emphasize={f.emphasize}
                 iconTone="accent"
               />
             </Reveal>

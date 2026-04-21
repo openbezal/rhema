@@ -5,23 +5,19 @@ export function FeatureCard({
   icon: Icon,
   title,
   body,
-  emphasize,
   iconTone = "default",
   className,
 }: {
   icon: TablerIcon;
   title: string;
   body: string;
-  emphasize?: boolean;
   iconTone?: "default" | "accent";
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "relative flex h-full w-full flex-col items-center gap-4 border border-border p-8 text-center transition-colors duration-300 md:p-10",
-        emphasize ? "bg-surface" : "bg-background",
-        "hover:bg-surface",
+        "relative flex h-full w-full flex-col items-center gap-4 border border-border bg-background p-8 text-center transition-colors duration-300 hover:bg-surface md:p-10",
         className
       )}
     >
