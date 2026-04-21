@@ -66,7 +66,7 @@ export function SiteFooter() {
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-border-strong px-[14px] py-[6px] text-[15px] text-foreground">
                 <IconBrandApple size={16} aria-hidden stroke={2} />
-                Mac <span className="text-muted-foreground">• coming soon</span>
+                macOS
               </span>
             </div>
           </div>

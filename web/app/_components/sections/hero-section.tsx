@@ -1,6 +1,7 @@
-import { IconBrandGithub, IconBrandWindows } from "@tabler/icons-react";
+import { IconBrandGithub } from "@tabler/icons-react";
 import { Button } from "../ui/button";
 import { Container } from "../ui/container";
+import { DownloadButton } from "../ui/download-button";
 import { SITE } from "../../_lib/site";
 
 export function HeroSection({ stars }: { stars: number }) {
@@ -30,10 +31,7 @@ export function HeroSection({ stars }: { stars: number }) {
 
         <div className="flex flex-col items-center gap-4">
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button href={SITE.repo.releasesLatest} variant="primary" size="md">
-              <IconBrandWindows size={16} aria-hidden stroke={2} />
-              Download for windows
-            </Button>
+            <DownloadButton />
             <Button
               href={SITE.repo.url}
               variant="secondary"
@@ -48,7 +46,7 @@ export function HeroSection({ stars }: { stars: number }) {
             </Button>
           </div>
           <p className="text-[15px] leading-6 text-muted-foreground">
-            Windows support only • MacOs coming soon
+            Available for Windows and macOS
           </p>
         </div>
       </Container>
