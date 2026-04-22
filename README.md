@@ -1,6 +1,10 @@
-# Rhema
+<p align="center">
+  <img src="public/rhema.svg" alt="Rhema logo" width="160" height="160" />
+</p>
 
-Real-time AI-powered Bible verse detection for live sermons and broadcasts. A Tauri v2 desktop app with a React frontend and Rust backend.
+<h1 align="center">Rhema</h1>
+
+<p align="center">Real-time AI-powered Bible verse detection for live sermons and broadcasts. A Tauri v2 desktop app with a React frontend and Rust backend.</p>
 
 Rhema listens to a live sermon audio feed, transcribes speech in real time, detects Bible verse references (both explicit citations and quoted passages), and renders them as broadcast-ready overlays via NDI for live production.
 
