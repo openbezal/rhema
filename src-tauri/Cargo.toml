@@ -28,7 +28,7 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
 [package]
-name = "app"
+name = "rhema"
 version = "0.1.0"
 description = "Rhema - Real-Time AI Bible Verse Detection"
 authors = ["Faithful"]
@@ -38,8 +38,12 @@ edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "app_lib"
+name = "rhema_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "Rhema"
+path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.5.6", features = [] }

@@ -168,32 +168,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
-name = "app"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "crossbeam-channel",
- "dotenvy",
- "log",
- "rhema-api",
- "rhema-audio",
- "rhema-bible",
- "rhema-broadcast",
- "rhema-detection",
- "rhema-stt",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-log",
- "tauri-plugin-store",
- "tokio",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4094,6 +4068,32 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "rhema"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "crossbeam-channel",
+ "dotenvy",
+ "log",
+ "rhema-api",
+ "rhema-audio",
+ "rhema-bible",
+ "rhema-broadcast",
+ "rhema-detection",
+ "rhema-stt",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-log",
+ "tauri-plugin-store",
+ "tokio",
 ]
 
 [[package]]
