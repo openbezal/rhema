@@ -1,0 +1,13 @@
+{
+  "name": "Rhema",
+  "short_name": "Rhema",
+  "description": "Live scripture for worship — real-time transcription and Bible-verse detection.",
+  "start_url": "/rhema/",
+  "scope": "/rhema/",
+  "display": "standalone",
+  "background_color": "#0c0c10",
+  "theme_color": "#0c0c10",
+  "icons": [
+    { "src": "/rhema/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

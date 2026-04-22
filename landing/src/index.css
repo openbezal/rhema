@@ -1,0 +1,238 @@
+@import "tailwindcss";
+
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/geist";
+@import "@fontsource/geist-mono";
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Fraunces Variable", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Ink — warm near-blacks, matched to the desktop app's dark theme base */
+  --color-ink-0: oklch(0.131 0.008 285);
+  --color-ink-1: oklch(0.175 0.008 285);
+  --color-ink-2: oklch(0.22 0.008 285);
+  --color-ink-3: oklch(0.28 0.008 285);
+
+  /* Paper — warm off-whites, never cold */
+  --color-paper-0: oklch(0.975 0.01 90);
+  --color-paper-1: oklch(0.88 0.012 90);
+  --color-paper-2: oklch(0.72 0.014 90);
+  --color-paper-3: oklch(0.55 0.013 285);
+  --color-paper-4: oklch(0.42 0.01 285);
+
+  /* Live — the chartreuse tally. Used sparingly for CTAs, detections, dots. */
+  --color-live: oklch(0.88 0.21 128);
+  --color-live-soft: oklch(0.75 0.18 128);
+  --color-live-glow: oklch(0.88 0.21 128 / 0.18);
+
+  /* Pulse — a deep warm red/orange, reserved for "recording" moments */
+  --color-pulse: oklch(0.68 0.24 28);
+
+  /* Hairlines */
+  --color-rule: oklch(1 0 0 / 0.08);
+  --color-rule-strong: oklch(1 0 0 / 0.16);
+
+  /* Radii carried from the desktop app */
+  --radius: 0.875rem;
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+
+  /* Breakpoint aliases we reference from components */
+  --shell-max: 78rem;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--color-ink-0);
+    color: var(--color-paper-0);
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background-color: var(--color-live);
+    color: var(--color-ink-0);
+  }
+
+  /* Focus ring — chartreuse hairline, not the browser default blue */
+  :focus-visible {
+    outline: 2px solid var(--color-live);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+/* Utility classes for typography tokens that Tailwind v4 can't auto-emit */
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    /* Fraunces SOFT+WONK axes — characterful, not fussy */
+    font-variation-settings: "SOFT" 30, "WONK" 0;
+  }
+
+  .font-display-wonk {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-variation-settings: "SOFT" 80, "WONK" 1;
+  }
+
+  .font-sans {
+    font-family: var(--font-sans);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Small-caps mono label, the "broadcast chyron" vibe */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-paper-3);
+  }
+
+  /* Thin top/bottom grid hairlines, used to segment editorial sections */
+  .rule-y {
+    border-block: 1px solid var(--color-rule);
+  }
+
+  @property --glow-top-x {
+    syntax: "<percentage>";
+    inherits: false;
+    initial-value: 50%;
+  }
+  @property --glow-bottom-x {
+    syntax: "<percentage>";
+    inherits: false;
+    initial-value: 20%;
+  }
+
+  @keyframes stage-lights {
+    0%, 100% {
+      --glow-top-x: 30%;
+      --glow-bottom-x: 72%;
+    }
+    50% {
+      --glow-top-x: 70%;
+      --glow-bottom-x: 28%;
+    }
+  }
+
+  .atmosphere {
+    --glow-top-x: 50%;
+    --glow-bottom-x: 20%;
+    background-image:
+      radial-gradient(
+        ellipse 65% 55% at var(--glow-top-x) 0%,
+        var(--color-live-glow),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 55% 40% at var(--glow-bottom-x) 100%,
+        oklch(0.2 0.02 285 / 0.6),
+        transparent 65%
+      );
+    animation: stage-lights 18s ease-in-out infinite;
+  }
+
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.7'/%3E%3C/svg%3E");
+  }
+
+  /* Pulsing tally dot, for the "live" wordmark marker */
+  @keyframes tally-pulse {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 var(--color-live-glow);
+    }
+    50% {
+      opacity: 0.75;
+      box-shadow: 0 0 0 6px transparent;
+    }
+  }
+
+  .tally {
+    animation: tally-pulse 2.4s ease-in-out infinite;
+  }
+
+  /* ── Entrance animations ─────────────────────────────────────────────
+     Hero content uses .reveal with .delay-{step} to stagger children. No
+     JS animation library — one keyframe, a handful of delay utilities. */
+  @keyframes reveal-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .reveal {
+    opacity: 0;
+    animation: reveal-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  .reveal-delay-1 { animation-delay: 0.08s; }
+  .reveal-delay-2 { animation-delay: 0.16s; }
+  .reveal-delay-3 { animation-delay: 0.24s; }
+  .reveal-delay-4 { animation-delay: 0.32s; }
+  .reveal-delay-5 { animation-delay: 0.40s; }
+  .reveal-delay-hero-panel { animation-delay: 0.24s; }
+
+  /* Detection card enters when it mounts (remounted via React key). */
+  @keyframes detection-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .detection-enter {
+    animation: detection-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  /* Respect reduced-motion — collapse entrance animations to opacity fades,
+     pin the stage lights, and stop the tally pulse. */
+  @media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .detection-enter {
+      animation-duration: 0.001s;
+      animation-delay: 0s !important;
+    }
+    .tally {
+      animation: none;
+    }
+    .atmosphere {
+      animation: none;
+    }
+  }
+}

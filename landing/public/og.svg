@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="80%">
+      <stop offset="0%" stop-color="#c6ff3d" stop-opacity="0.14"/>
+      <stop offset="60%" stop-color="#c6ff3d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="15%" cy="100%" r="70%">
+      <stop offset="0%" stop-color="#1a1a24" stop-opacity="0.85"/>
+      <stop offset="70%" stop-color="#0c0c10" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix values="0 0 0 0 0.55  0 0 0 0 0.55  0 0 0 0 0.55  0 0 0 0.035 0"/>
+      <feComposite in2="SourceGraphic" operator="in"/>
+    </filter>
+  </defs>
+
+  <!-- Base layers -->
+  <rect width="1200" height="630" fill="#0c0c10"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+  <rect width="1200" height="630" filter="url(#grain)" opacity="0.45"/>
+
+  <!-- Eyebrow: logomark + label -->
+  <g transform="translate(72, 72)">
+    <rect width="26" height="26" rx="6" fill="#16161e" stroke="#ffffff" stroke-opacity="0.12"/>
+    <circle cx="13" cy="13" r="5" fill="#c6ff3d"/>
+    <text x="42" y="18" font-family="ui-monospace, Menlo, monospace" font-size="14"
+          fill="#8a8a95" letter-spacing="3" font-weight="500">
+      RHEMA · LIVE SCRIPTURE · OPEN SOURCE
+    </text>
+  </g>
+
+  <!-- Headline (left column, 72 → 700) -->
+  <g transform="translate(72, 220)" fill="#f6f6ef"
+     font-family="Georgia, 'Times New Roman', serif"
+     font-weight="500" letter-spacing="-2.4">
+    <text font-size="92">Catch the verse</text>
+    <text y="100" font-size="92">
+      <tspan font-style="italic" fill="#c6ff3d">before</tspan>
+      <tspan> it finishes.</tspan>
+    </text>
+  </g>
+
+  <!-- Subhead -->
+  <g transform="translate(72, 480)">
+    <text font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
+          font-size="22" fill="#b4b4a8" letter-spacing="-0.2">
+      Live transcription · Automatic verse detection · NDI / HTTP / OSC output
+    </text>
+  </g>
+
+  <!-- Bottom stripe: download pill + URL -->
+  <g transform="translate(72, 540)">
+    <rect x="0" y="0" width="118" height="30" rx="15"
+          fill="#c6ff3d"/>
+    <text x="59" y="20" text-anchor="middle"
+          font-family="ui-monospace, Menlo, monospace" font-size="11"
+          fill="#0c0c10" letter-spacing="3" font-weight="700">
+      DOWNLOAD
+    </text>
+    <text x="142" y="20" font-family="ui-monospace, Menlo, monospace" font-size="11"
+          fill="#8a8a95" letter-spacing="3" font-weight="500">
+      OPENBEZAL.GITHUB.IO/RHEMA
+    </text>
+  </g>
+
+  <!-- Right column: transcript / detection card.
+       Positioned so it never overlaps the headline — card starts at x=780,
+       headline column ends around x=700. -->
+  <g transform="translate(780, 180)">
+    <!-- Chartreuse top accent line — ties the card to the "live" tally -->
+    <rect x="0" y="0" width="348" height="1.5" fill="#c6ff3d" fill-opacity="0.55"/>
+
+    <!-- Card body -->
+    <rect x="0" y="1.5" width="348" height="270" rx="16"
+          fill="#16161e" stroke="#ffffff" stroke-opacity="0.09"/>
+
+    <!-- Card header -->
+    <g transform="translate(20, 32)">
+      <circle cx="4" cy="-4" r="3.5" fill="#b4b4a8"/>
+      <text x="16" y="0" font-family="ui-monospace, monospace" font-size="11"
+            fill="#8a8a95" letter-spacing="2.5" font-weight="500">
+        LIVE TRANSCRIPT
+      </text>
+      <circle cx="300" cy="-4" r="4" fill="#c6ff3d"/>
+      <text x="290" y="0" text-anchor="end" font-family="ui-monospace, monospace"
+            font-size="11" fill="#8a8a95" letter-spacing="2.5" font-weight="500">
+        LISTENING
+      </text>
+    </g>
+
+    <!-- Divider -->
+    <rect x="0" y="58" width="348" height="1" fill="#ffffff" fill-opacity="0.08"/>
+
+    <!-- Partial transcript -->
+    <g transform="translate(20, 90)">
+      <text font-family="ui-monospace, monospace" font-size="10"
+            fill="#8a8a95" letter-spacing="2.5" font-weight="500">
+        PARTIAL
+      </text>
+      <text y="26" font-family="ui-sans-serif, system-ui, sans-serif"
+            font-size="16" fill="#f6f6ef">
+        …whereunto shall we liken
+      </text>
+      <text y="48" font-family="ui-sans-serif, system-ui, sans-serif"
+            font-size="16" fill="#f6f6ef">
+        the kingdom of God?
+      </text>
+    </g>
+
+    <!-- Detection card -->
+    <g transform="translate(20, 174)">
+      <rect x="0" y="0" width="308" height="76" rx="10"
+            fill="#c6ff3d" fill-opacity="0.05"
+            stroke="#c6ff3d" stroke-opacity="0.35"/>
+      <text x="14" y="22" font-family="ui-monospace, monospace" font-size="10"
+            fill="#c6ff3d" letter-spacing="2.5" font-weight="500">
+        SEMANTIC MATCH · 94%
+      </text>
+      <text x="14" y="54" font-family="Georgia, serif" font-size="22"
+            fill="#f6f6ef" font-weight="500">
+        Mark 4:30
+      </text>
+    </g>
+  </g>
+</svg>
