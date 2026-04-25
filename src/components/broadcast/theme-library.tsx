@@ -40,12 +40,14 @@ const THUMBNAIL_VERSE: VerseRenderData = {
 function ThemeCard({
   theme,
   isActive,
-  isEditing,
+  isRenaming,
+  isSelected,
   onSelect,
 }: {
   theme: BroadcastTheme
   isActive: boolean
-  isEditing: boolean
+  isRenaming: boolean
+  isSelected: boolean
   onSelect: () => void
 }) {
   return (
@@ -53,12 +55,12 @@ function ThemeCard({
       role="button"
       tabIndex={0}
       onClick={() => {
-        if (isEditing) return
+        if (isRenaming) return
         onSelect()
       }}
       className={cn(
         "group relative flex w-full flex-col gap-1.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted/50",
-        isEditing && "ring-2 ring-primary"
+        isSelected && "ring-2 ring-primary"
       )}
     >
       {/* Thumbnail */}
@@ -83,7 +85,7 @@ function ThemeCard({
       {/* Info */}
       <div className="flex items-center gap-1.5 px-0.5">
         <div className="min-w-0 flex-1">
-          {isEditing && !theme.builtin ? (
+          {isRenaming && !theme.builtin ? (
             <Input
               autoFocus
               defaultValue={theme.name}
@@ -329,7 +331,8 @@ export function ThemeLibrary() {
                   key={theme.id}
                   theme={theme}
                   isActive={theme.id === activeThemeId}
-                  isEditing={theme.id === renamingThemeId}
+                  isRenaming={theme.id === renamingThemeId}
+                  isSelected={theme.id === editingThemeId}
                   onSelect={() =>
                     useBroadcastStore.getState().startEditing(theme.id)
                   }
@@ -349,7 +352,8 @@ export function ThemeLibrary() {
                   key={theme.id}
                   theme={theme}
                   isActive={theme.id === activeThemeId}
-                  isEditing={theme.id === renamingThemeId}
+                  isRenaming={theme.id === renamingThemeId}
+                  isSelected={theme.id === editingThemeId}
                   onSelect={() =>
                     useBroadcastStore.getState().startEditing(theme.id)
                   }
