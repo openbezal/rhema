@@ -37,6 +37,7 @@ interface BroadcastState {
   // Designer actions
   setDesignerOpen: (open: boolean) => void
   startEditing: (themeId: string) => void
+  stopEditing: () => void
   updateDraft: (updates: Partial<BroadcastTheme>) => void
   updateDraftNested: (path: string, value: unknown) => void
   saveDraft: () => void
@@ -206,6 +207,13 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set({
       editingThemeId: themeId,
       draftTheme: { ...theme, updatedAt: Date.now() },
+      selectedElement: null,
+    })
+  },
+  stopEditing: () => {
+    set({
+      editingThemeId: null,
+      draftTheme: null,
       selectedElement: null,
     })
   },

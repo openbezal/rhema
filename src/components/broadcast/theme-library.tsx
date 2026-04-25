@@ -52,7 +52,10 @@ function ThemeCard({
     <div
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={() => {
+        if (isEditing) return
+        onSelect()
+      }}
       className={cn(
         "group relative flex w-full flex-col gap-1.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted/50",
         isEditing && "ring-2 ring-primary"
@@ -80,9 +83,38 @@ function ThemeCard({
       {/* Info */}
       <div className="flex items-center gap-1.5 px-0.5">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium text-foreground">
-            {theme.name}
-          </p>
+          {isEditing && !theme.builtin ? (
+            <Input
+              autoFocus
+              defaultValue={theme.name}
+              className="h-6 text-xs"
+              onClick={(e) => e.stopPropagation()}
+              onBlur={(e) => {
+                const value = e.target.value.trim()
+                if (value && value !== theme.name) {
+                  useBroadcastStore.getState().renameTheme(theme.id, value)
+                }
+                useBroadcastStore.getState().stopEditing()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const value = (e.target as HTMLInputElement).value.trim()
+                  if (value && value !== theme.name) {
+                    useBroadcastStore.getState().renameTheme(theme.id, value)
+                  }
+                  useBroadcastStore.getState().stopEditing()
+                }
+                if (e.key === "Escape") {
+                  useBroadcastStore.getState().stopEditing()
+                }
+              }}
+            />
+          ) : (
+            <p className="truncate text-xs font-medium text-foreground">
+              {theme.name}
+            </p>
+          )}
+
           {isActive && (
             <p className="text-[0.5rem] text-muted-foreground">Default</p>
           )}
@@ -126,9 +158,15 @@ function ThemeCard({
               }}
             >
               {theme.pinned ? (
-                <><PinOffIcon className="mr-2 size-3.5" />Unpin</>
+                <>
+                  <PinOffIcon className="mr-2 size-3.5" />
+                  Unpin
+                </>
               ) : (
-                <><PinIcon className="mr-2 size-3.5" />Pin</>
+                <>
+                  <PinIcon className="mr-2 size-3.5" />
+                  Pin
+                </>
               )}
             </DropdownMenuItem>
             {!theme.builtin && (
@@ -136,11 +174,9 @@ function ThemeCard({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={(e) => {
+                    console.log("DropDown for Rename has been clicked")
                     e.stopPropagation()
-                    const newName = window.prompt("Rename theme:", theme.name)
-                    if (newName?.trim()) {
-                      useBroadcastStore.getState().renameTheme(theme.id, newName.trim())
-                    }
+                    useBroadcastStore.getState().startEditing(theme.id)
                   }}
                 >
                   <EditIcon className="mr-2 size-3.5" />
@@ -221,9 +257,15 @@ export function ThemeLibrary() {
         className="shrink-0 px-3 pb-4"
       >
         <TabsList className="h-7 w-full">
-          <TabsTrigger value="all" className="capitalize">all</TabsTrigger>
-          <TabsTrigger value="pinned" className="capitalize">pinned</TabsTrigger>
-          <TabsTrigger value="custom" className="capitalize">custom</TabsTrigger>
+          <TabsTrigger value="all" className="capitalize">
+            all
+          </TabsTrigger>
+          <TabsTrigger value="pinned" className="capitalize">
+            pinned
+          </TabsTrigger>
+          <TabsTrigger value="custom" className="capitalize">
+            custom
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -309,7 +351,7 @@ export function ThemeLibrary() {
                   isActive={theme.id === activeThemeId}
                   isEditing={theme.id === editingThemeId}
                   onSelect={() =>
-                    useBroadcastStore.getState().startEditing(theme.id)
+                    useBroadcastStore.getState().setActiveTheme(theme.id)
                   }
                 />
               ))}
