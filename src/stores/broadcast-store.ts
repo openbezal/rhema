@@ -16,6 +16,7 @@ interface BroadcastState {
   // Designer state
   isDesignerOpen: boolean
   editingThemeId: string | null
+  renamingThemeId: string | null
   draftTheme: BroadcastTheme | null
   selectedElement: SelectedElement
 
@@ -43,6 +44,7 @@ interface BroadcastState {
   saveDraft: () => void
   discardDraft: () => void
   setSelectedElement: (el: SelectedElement) => void
+  setRenamingTheme: (id: string | null) => void
 }
 
 function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
@@ -100,6 +102,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   liveVerse: null,
   isDesignerOpen: false,
   editingThemeId: null,
+  renamingThemeId: null,
   draftTheme: null,
   selectedElement: null,
 
@@ -261,6 +264,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     }
   },
   setSelectedElement: (selectedElement) => set({ selectedElement }),
+  setRenamingTheme: (id) => set({ renamingThemeId: id }),
 }))
 
 // ── Theme persistence via tauri-plugin-store ──

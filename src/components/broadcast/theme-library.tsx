@@ -94,7 +94,7 @@ function ThemeCard({
                 if (value && value !== theme.name) {
                   useBroadcastStore.getState().renameTheme(theme.id, value)
                 }
-                useBroadcastStore.getState().stopEditing()
+                useBroadcastStore.getState().setRenamingTheme(null)
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -102,10 +102,10 @@ function ThemeCard({
                   if (value && value !== theme.name) {
                     useBroadcastStore.getState().renameTheme(theme.id, value)
                   }
-                  useBroadcastStore.getState().stopEditing()
+                  useBroadcastStore.getState().setRenamingTheme(null)
                 }
                 if (e.key === "Escape") {
-                  useBroadcastStore.getState().stopEditing()
+                  useBroadcastStore.getState().setRenamingTheme(null)
                 }
               }}
             />
@@ -174,9 +174,8 @@ function ThemeCard({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={(e) => {
-                    console.log("DropDown for Rename has been clicked")
                     e.stopPropagation()
-                    useBroadcastStore.getState().startEditing(theme.id)
+                    useBroadcastStore.getState().setRenamingTheme(theme.id)
                   }}
                 >
                   <EditIcon className="mr-2 size-3.5" />
@@ -205,6 +204,7 @@ export function ThemeLibrary() {
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
+  const renamingThemeId = useBroadcastStore((s) => s.renamingThemeId)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
 
@@ -329,7 +329,7 @@ export function ThemeLibrary() {
                   key={theme.id}
                   theme={theme}
                   isActive={theme.id === activeThemeId}
-                  isEditing={theme.id === editingThemeId}
+                  isEditing={theme.id === renamingThemeId}
                   onSelect={() =>
                     useBroadcastStore.getState().startEditing(theme.id)
                   }
@@ -349,9 +349,9 @@ export function ThemeLibrary() {
                   key={theme.id}
                   theme={theme}
                   isActive={theme.id === activeThemeId}
-                  isEditing={theme.id === editingThemeId}
+                  isEditing={theme.id === renamingThemeId}
                   onSelect={() =>
-                    useBroadcastStore.getState().setActiveTheme(theme.id)
+                    useBroadcastStore.getState().startEditing(theme.id)
                   }
                 />
               ))}
