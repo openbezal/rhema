@@ -55,6 +55,7 @@ function ThemeCard({
       role="button"
       tabIndex={0}
       onClick={() => {
+        // Prevent rename exit when card is selected during rename
         if (isRenaming) return
         onSelect()
       }}
