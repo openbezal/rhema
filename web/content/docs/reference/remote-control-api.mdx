@@ -19,91 +19,81 @@ Eight commands are supported by both protocols:
 | `prev` | Move back one in the queue |
 | `show` | Bring the overlay on-air |
 | `hide` | Take the overlay off-air |
-| `theme <name>` | Switch the active theme |
-| `opacity <0..1>` | Set overlay opacity |
-| `confidence <0..1>` | Set the detector's confidence threshold |
-| `on_air <0\|1>` | Force the on-air toggle to the given value |
+| `theme <value>` | Switch the active theme by name |
+| `opacity <value>` | Set overlay opacity (placeholder — wired but not yet effective) |
+| `confidence <value>` | Set the detector's confidence threshold |
+| `on_air <value>` | Force the on-air toggle to the given value |
+
+Commands are case-insensitive on input. `value` argument types vary:
+`theme` is a string, `opacity` and `confidence` are floats in `[0.0,
+1.0]`, and `on_air` is a boolean (`true` / `false`).
 
 ## OSC
 
-OSC runs over UDP on a configurable port (default `9000`). Type
-coercion is permissive — `int`, `float`, and `bool` argument types
-are coerced to the target command variant without error, so any
-controller's idea of how to send a number works.
+OSC runs over UDP on port `8000` (configurable). Address pattern is
+`/rhema/<command>`. Type coercion is permissive — `int`, `float`, and
+`bool` argument types are coerced to the target command variant
+without error, so any controller's idea of how to send a number
+works.
 
 | Address | Argument | Example |
 | --- | --- | --- |
-| `/pew/next` | none | `oscsend localhost 9000 /pew/next` |
-| `/pew/prev` | none | `oscsend localhost 9000 /pew/prev` |
-| `/pew/show` | none | `oscsend localhost 9000 /pew/show` |
-| `/pew/hide` | none | `oscsend localhost 9000 /pew/hide` |
-| `/pew/theme` | string | `oscsend localhost 9000 /pew/theme s lower-third` |
-| `/pew/opacity` | float | `oscsend localhost 9000 /pew/opacity f 0.85` |
-| `/pew/confidence` | float | `oscsend localhost 9000 /pew/confidence f 0.65` |
-| `/pew/on_air` | int (0/1) | `oscsend localhost 9000 /pew/on_air i 1` |
+| `/rhema/next` | none | `oscsend localhost 8000 /rhema/next` |
+| `/rhema/prev` | none | `oscsend localhost 8000 /rhema/prev` |
+| `/rhema/show` | none | `oscsend localhost 8000 /rhema/show` |
+| `/rhema/hide` | none | `oscsend localhost 8000 /rhema/hide` |
+| `/rhema/theme` | string | `oscsend localhost 8000 /rhema/theme s "Classic Dark"` |
+| `/rhema/opacity` | float | `oscsend localhost 8000 /rhema/opacity f 0.75` |
+| `/rhema/confidence` | float | `oscsend localhost 8000 /rhema/confidence f 0.8` |
+| `/rhema/on_air` | bool | `oscsend localhost 8000 /rhema/on_air T` |
 
 ## HTTP API
 
-The HTTP server listens on a configurable port (default `8910`) under
-the `/api/v1/` prefix.
+The HTTP server listens on port `8080` (configurable) under the
+`/api/v1/` prefix. Two endpoints are exposed.
 
-### `GET /api/v1/health`
-
-```bash
-curl http://localhost:8910/api/v1/health
-```
-
-```json
-{ "status": "ok", "version": "1.2.0" }
-```
-
-Returns 200 when the server is running; useful for liveness checks.
-
-### `POST /api/v1/control`
+### `POST /api/v1/command`
 
 Dispatch any command from the catalog. The body is JSON with a
-`command` key and any additional parameters:
+`command` key and (for commands that take a parameter) a `value` key:
 
 ```bash
-curl -sX POST http://localhost:8910/api/v1/control \
+curl -X POST http://localhost:8080/api/v1/command \
   -H 'Content-Type: application/json' \
-  -d '{"command":"theme","name":"lower-third"}'
+  -d '{"command":"theme","value":"Classic Dark"}'
 ```
 
 ```json
-{ "ok": true }
+{ "status": "ok" }
 ```
 
-Failures return a structured error:
-
-```json
-{ "ok": false, "error": "unknown_theme" }
-```
+Unknown commands and invalid JSON are rejected.
 
 ### `GET /api/v1/status`
 
 ```bash
-curl http://localhost:8910/api/v1/status
+curl http://localhost:8080/api/v1/status
 ```
 
-Returns a state snapshot from a Rust-side cache (no Tauri-frontend
-round-trip needed):
+Returns a state snapshot from a Rust-side cache that the frontend
+refreshes once per second:
 
 ```json
 {
-  "live_verse": { "ref": "John 3:16", "translation": "NIV" },
-  "queue": ["John 3:16", "John 3:17"],
-  "theme": "lower-third",
   "on_air": true,
-  "confidence": 0.65
+  "active_theme": "Classic Dark",
+  "live_verse": "John 3:16",
+  "queue_length": 12,
+  "confidence_threshold": 0.75
 }
 ```
 
-<Callout title="CORS" type="info">
-The HTTP API ships with permissive CORS so a phone's browser, a
-staff laptop, or a Node-RED workflow on the local network can drive
-Rhema directly. Bind to `127.0.0.1` (the default) if you don't want
-that.
+<Callout title="CORS is disabled by default" type="warn">
+The HTTP server is built with Axum and does **not** advertise CORS
+headers. Local-network and same-machine requests work fine; browser
+fetches from a different origin will be blocked by the browser. Front
+it with a reverse proxy if you need cross-origin access from a web
+dashboard.
 </Callout>
 
 ## Persistence and shutdown semantics
@@ -116,8 +106,21 @@ orphaned ports.
 
 ## Authentication
 
-By default both protocols are unauthenticated and bound to localhost.
+By default both protocols are unauthenticated and bind to `0.0.0.0`.
 For multi-machine deployments, route them through your network's
 existing auth (a reverse proxy with mTLS, a Tailscale ACL, etc.) —
 the API is intentionally simple and protocol-only so it composes
-with whatever you already trust.
+with whatever you already trust. For local-only access, bind to
+`127.0.0.1` in Settings → Remote.
+
+## Status field reference
+
+The keys returned by `/api/v1/status`:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `on_air` | boolean | Whether the broadcast overlay is currently on-air |
+| `active_theme` | string | Name of the currently selected theme |
+| `live_verse` | string | Reference of the verse currently displayed (e.g. `"John 3:16"`) |
+| `queue_length` | integer | Number of verses staged in the queue |
+| `confidence_threshold` | number | Detection confidence threshold in `[0.0, 1.0]` |

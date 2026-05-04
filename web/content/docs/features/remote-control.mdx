@@ -9,7 +9,8 @@ import { Callout } from "fumadocs-ui/components/callout";
 Live operators rarely have a free hand on a keyboard. Rhema exposes its
 controls over **OSC** and an **HTTP API** so you can wire them into
 hardware controllers, automation scripts, and stage-management
-software.
+software. Both protocols can run simultaneously and share the same
+command set.
 
 <Callout title="In-depth guide" type="info">
 This page is a high-level overview. The full protocol reference,
@@ -18,34 +19,51 @@ authentication notes, and example payloads live in the
 in the repository.
 </Callout>
 
+## Protocols at a glance
+
+| Protocol | Default port | Transport | Best for |
+| --- | --- | --- | --- |
+| OSC | `8000` | UDP | Stream Deck (via Companion), TouchOSC, QLab, hardware |
+| HTTP | `8080` | TCP | REST clients, dashboards, scripting, status polling |
+
+Both default to binding `0.0.0.0` so a phone, a staff laptop, or a
+hardware controller on the LAN can reach them. Bind to `127.0.0.1` in
+Settings → Remote for local-only access.
+
 ## What you can do remotely
 
 | Action | OSC address | HTTP body |
 | --- | --- | --- |
-| Next verse in queue | `/pew/next` | `{ "command": "next" }` |
-| Previous verse | `/pew/prev` | `{ "command": "prev" }` |
-| Show / hide overlay | `/pew/show`, `/pew/hide` | `{ "command": "show" }` |
-| Switch theme | `/pew/theme <name>` | `{ "command": "theme", "name": "lower-third" }` |
-| Set opacity | `/pew/opacity <0-1>` | `{ "command": "opacity", "value": 0.85 }` |
-| Set confidence threshold | `/pew/confidence <0-1>` | `{ "command": "confidence", "value": 0.65 }` |
-| Toggle on-air | `/pew/on_air <0\|1>` | `{ "command": "on_air", "value": true }` |
+| Next verse in queue | `/rhema/next` | `{ "command": "next" }` |
+| Previous verse | `/rhema/prev` | `{ "command": "prev" }` |
+| Show / hide overlay | `/rhema/show`, `/rhema/hide` | `{ "command": "show" }` |
+| Switch theme | `/rhema/theme "Classic Dark"` | `{ "command": "theme", "value": "Classic Dark" }` |
+| Set opacity | `/rhema/opacity 0.75` | `{ "command": "opacity", "value": 0.75 }` |
+| Set confidence threshold | `/rhema/confidence 0.8` | `{ "command": "confidence", "value": 0.8 }` |
+| Toggle on-air | `/rhema/on_air true` | `{ "command": "on_air", "value": true }` |
 
 All eight commands work identically across both protocols, so any
 controller you already own (or build) talks the same dialect.
 
+<Callout title="Opacity is a stub today" type="warn">
+The `opacity` command is wired through the dispatcher but currently a
+placeholder — it'll take effect when the broadcast store gains opacity
+support. The other seven commands are fully live.
+</Callout>
+
 ## OSC
 
-OSC runs on UDP. Configure the listening port in Settings → Remote, and
-send messages from your favorite controller:
+OSC runs on UDP port `8000`. Configure the listening port in
+Settings → Remote, and send messages from your favorite controller:
 
 - **TouchOSC** templates with verse-show/hide pads, opacity sliders,
   and theme buttons drop right onto a tablet.
-- **Stream Deck** + an OSC plugin maps each pad to one of the
-  addresses above.
+- **Stream Deck** + Bitfocus Companion's Generic OSC module maps each
+  pad to one of the addresses above.
 - **A simple test from the command line**:
 
   ```bash
-  oscsend localhost 9000 /pew/next
+  oscsend localhost 8000 /rhema/next
   ```
 
 The Settings panel shows a **live command log** with timestamps so you
@@ -58,24 +76,30 @@ controls under `/api/v1/`:
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/api/v1/health` | GET | 200 OK + server info when listening |
-| `/api/v1/control` | POST | Dispatch a command (table above) |
-| `/api/v1/status` | GET | Current state snapshot — live verse, queue, theme, on-air |
-
-CORS is permissive on the local network so a phone's browser, a staff
-laptop, or a Node-RED workflow can drive Rhema directly.
+| `/api/v1/command` | POST | Dispatch a command (table above) |
+| `/api/v1/status` | GET | Current state snapshot — on-air, active theme, live verse, queue length, confidence threshold |
 
 ```bash
-curl -sX POST http://rhema.local:8910/api/v1/control \
+curl -X POST http://localhost:8080/api/v1/command \
   -H 'Content-Type: application/json' \
-  -d '{"command":"theme","name":"lower-third"}'
+  -d '{"command":"theme","value":"Classic Dark"}'
 ```
 
 The status endpoint returns an authoritative view from a Rust-side
-state cache, so no Tauri-frontend round-trip is needed:
+state cache that the frontend refreshes once a second:
 
 ```bash
-curl http://rhema.local:8910/api/v1/status
+curl http://localhost:8080/api/v1/status
+```
+
+```json
+{
+  "on_air": true,
+  "active_theme": "Classic Dark",
+  "live_verse": "John 3:16",
+  "queue_length": 12,
+  "confidence_threshold": 0.75
+}
 ```
 
 ## Persistence and shutdown
@@ -84,3 +108,12 @@ OSC and HTTP listeners can be started and stopped without restarting
 the app. Port-bind failures surface as visible errors in the Settings
 panel rather than as silent listener crashes, and both listeners shut
 down cleanly on app exit (no zombie threads, no orphaned ports).
+
+## Security
+
+By default, both protocols bind to `0.0.0.0` and HTTP runs **without
+CORS** for local use only. Before exposing Rhema beyond the local
+network, bind to `127.0.0.1` in Settings, or front it with a reverse
+proxy that adds authentication and TLS. The repo's
+[remote control guide](https://github.com/openbezal/rhema/blob/main/documentation/remote-control.md#security-considerations)
+covers the threat model in more depth.
