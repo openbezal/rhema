@@ -24,7 +24,7 @@ these patterns:
 - "read in **Amplified**" / "switch to **Amplified**" → AMP
 - "read in **Spanish**" / "read in **Reina Valera**" → SpaRV
 - "read in **French**" → FreJND
-- "read in **Portuguese**" → PorAA
+- "read in **Portuguese**" → PorBLivre
 
 Patterns are case-insensitive. Once recognized, the active translation
 flips immediately and the live overlay reflows. The full alias table
@@ -64,12 +64,14 @@ fall back to UI/remote control only.
 
 ## Detection guards
 
-Voice commands are protected by:
+The command lookup happens in
+`Detector::detect_translation_command` in `direct/detector.rs`, which
+searches a fixed alias table and returns the matched translation code
+(or `None`). Behavioral guards layered on top:
 
-- A **dedup guard** in `check_translation_command` so a command isn't
-  fired twice from the same transcript window.
-- **Sermon context** awareness — commands during reading mode prefer
-  navigation patterns; commands outside reading mode prefer translation
-  switching.
-- A short cooldown after each command so a rapid back-to-back utterance
-  ("read in NIV — actually NLT") only triggers the latest one.
+- **Sermon context** awareness — when reading mode is engaged the
+  detector prefers navigation patterns over fresh translation
+  switches.
+- **Duplicate suppression on the recent-command path** — the direct
+  detector tracks recently pushed candidates and skips re-emitting an
+  identical match into the same window.

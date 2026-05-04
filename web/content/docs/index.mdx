@@ -93,7 +93,7 @@ for a guided walkthrough.
   <Card
     icon={<Palette />}
     title="ONNX-quantized embeddings"
-    description="Qwen3-Embedding-0.6B exported to INT8 ONNX, indexed with HNSW for sub-second semantic recall."
+    description="Qwen3-Embedding-0.6B exported to INT8 ONNX with brute-force cosine similarity over ~31k verse vectors — fast enough on CPU without an HNSW index."
     href="/docs/features/verse-detection"
   />
 </Cards>

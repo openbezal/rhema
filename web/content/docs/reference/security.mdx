@@ -13,56 +13,97 @@ seriously.
 
 ## Content Security Policy
 
-The Tauri WebView ships with a **restrictive CSP** to prevent script
-injection and unauthorized data exfiltration. The policy is defined
-in `src-tauri/tauri.conf.json` and locks down:
+The Tauri WebView ships with a restrictive CSP defined verbatim in
+`src-tauri/tauri.conf.json`. The full directive list:
 
-- `script-src` to `'self'` plus a hashed inline-bootstrap, so no
-  third-party scripts execute.
-- `connect-src` to `'self'`, the Tauri IPC channel, and the
-  explicitly allow-listed Deepgram WebSocket endpoint when the cloud
-  STT engine is active.
-- `img-src` to `'self'` and `data:` for the canvas-rendered overlays.
-- `style-src` to `'self'` plus `'unsafe-inline'` (required by the
-  shadcn animation tokens).
-- `frame-ancestors` to `'none'` so the WebView can't be embedded.
+```
+default-src 'self';
+script-src 'self';
+style-src 'self' 'unsafe-inline';
+img-src 'self' data: blob:;
+font-src 'self' data:;
+connect-src 'self';
+media-src 'self' blob:;
+worker-src 'self';
+frame-src 'none';
+frame-ancestors 'none';
+object-src 'none';
+base-uri 'self';
+form-action 'self';
+manifest-src 'self'
+```
 
-The full directive-by-directive rationale and threat model lives in
-[**SECURITY.md**](https://github.com/openbezal/rhema/blob/main/.github/SECURITY.md)
-in the repo.
+A few things worth calling out:
+
+- **`script-src 'self'`** — no inline scripts, no `eval`, no
+  third-party JS. The Tauri runtime injects its IPC bootstrap before
+  the CSP applies.
+- **`style-src 'self' 'unsafe-inline'`** — required by Radix /
+  shadcn for runtime style injection on portals and animations.
+- **`connect-src 'self'`** — the WebView itself only talks to the
+  Tauri IPC channel. Outbound network traffic (Deepgram WebSocket,
+  Bible data downloads) all happens from the Rust side, so the
+  webview doesn't need to allow-list those endpoints.
+- **`frame-ancestors 'none'`** — the WebView can't be embedded
+  anywhere.
+- **`object-src 'none'`** + **`base-uri 'self'`** — block plugin
+  vectors and base-tag injection.
 
 ## Reporting a vulnerability
 
 <Callout title="Please report privately first" type="warn">
 If you find a security issue, **do not open a public GitHub issue.**
 Send a private report by following the instructions in
-[SECURITY.md](https://github.com/openbezal/rhema/blob/main/.github/SECURITY.md).
-We aim to acknowledge within two business days.
+[SECURITY.md](https://github.com/openbezal/rhema/blob/main/.github/SECURITY.md)
+in the repo.
 </Callout>
 
 ## Tauri capabilities
 
 Rhema follows Tauri v2's principle-of-least-privilege capability
-system. Each Tauri command is gated behind a capability that's
-granted to a specific window context — there are no globally enabled
-APIs. The capability files live under `src-tauri/capabilities/`.
+system. Capability files live under `src-tauri/capabilities/` —
+today there are two: `default.json` and `desktop.json`.
 
 If you're reviewing the codebase for security:
 
-1. Start at `src-tauri/capabilities/*.json` to see what's allowed.
+1. Start at `src-tauri/capabilities/*.json` to see which Tauri
+   commands and plugins are reachable from each window.
 2. Trace each granted command to its handler in `rhema-api`.
 3. Audit the handler's input validation and side effects.
 
-The same review pass works on the OSC and HTTP control surfaces —
-they're rate-limited and bind to localhost by default; binding to
-a routable interface is an explicit operator opt-in.
+## Remote control defaults — read carefully
+
+The OSC and HTTP listeners are **not** locked down by default. The
+shipped defaults are:
+
+- **OSC**: bind host `0.0.0.0`, port `8000`.
+- **HTTP**: bind host `0.0.0.0`, port `8080`, with
+  `CorsLayer::permissive()` attached to the Axum router.
+
+That means any device on the local network can drive the app and
+read its status without authentication. This is intentional for the
+LAN-only use case (Stream Deck on your operator's laptop), but it is
+**unsafe** to leave on once the listener is reachable from a
+broader network.
+
+Before exposing Rhema beyond a trusted LAN:
+
+1. Bind both listeners to `127.0.0.1` from Settings → Remote.
+2. Or front them with a reverse proxy that adds authentication and
+   TLS.
+3. Or restrict ingress at your firewall.
+
+There is no built-in rate limit or auth on either protocol — the
+API is intentionally simple so it composes with whatever you
+already trust.
 
 ## Defaults that protect the operator
 
-- **Localhost-only listeners** — OSC and HTTP control surfaces bind
-  to `127.0.0.1` until you explicitly choose a routable interface.
 - **No telemetry** — Rhema does not phone home. There's no
   analytics, no crash reporter, no usage tracking.
 - **Local-first by default** — Whisper runs locally, the database
   lives on disk, and Deepgram is opt-in. No keys, no internet, no
   problem.
+- **Bundled SQLite** — `rusqlite` with the `bundled` feature, so
+  the binary doesn't link against a system SQLite that could be
+  swapped out.

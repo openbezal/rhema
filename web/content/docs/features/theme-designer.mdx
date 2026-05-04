@@ -12,8 +12,8 @@ NDI exactly as designed.
 
 ## What you can compose
 
-- **Backgrounds**: solid colors, multi-stop gradients, or a still image at
-  any opacity.
+- **Backgrounds**: solid colors, multi-stop gradients, still images, or
+  fully transparent (the four background types in `BroadcastTheme`).
 - **Typography**: choose any installed system font, set size, weight,
   letter-spacing, line-height, and alignment.
 - **Effects**: drop shadows, outlines/strokes, fills, and blur.
@@ -58,7 +58,8 @@ NDI frames natively.
 
 ## Saving and sharing
 
-Themes are JSON documents inside the app's data directory. They're
-self-contained — no external font files or absolute paths — so you can
-copy a theme between machines or commit them to a service template
-repository for your team.
+Themes are persisted to `broadcast-themes.json` in the app's data
+directory via `tauri-plugin-store` (see `src/stores/broadcast-store.ts`),
+so changes auto-save across restarts. The JSON is self-contained — no
+external font files or absolute paths — so you can copy a theme between
+machines or commit them to a service template repository for your team.

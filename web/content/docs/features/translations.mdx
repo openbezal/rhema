@@ -1,50 +1,58 @@
 ---
 title: Bible Translations
-description: Eleven translations across four languages, with FTS5 full-text search and BM25 ranking out of the box.
+description: Ten bundled translations across four languages, served from a single SQLite database with FTS5 full-text search.
 icon: BookOpen
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-Rhema ships with eleven Bible translations spanning English, Spanish,
-French, and Portuguese. They're stored in a single bundled SQLite database
-(`data/rhema.db`) with FTS5 indexes for sub-millisecond text search.
+Rhema ships with ten Bible translations spanning English, Spanish, French,
+and Portuguese. They're stored in a single SQLite database (`data/rhema.db`)
+with FTS5 virtual tables for fast text search.
 
 ## Bundled translations
 
-| Translation | Language | Source |
-| --- | --- | --- |
-| KJV | English | Public domain |
-| NIV | English | BibleGateway |
-| ESV | English | BibleGateway |
-| NASB | English | BibleGateway |
-| NKJV | English | BibleGateway |
-| NLT | English | BibleGateway |
-| AMP | English | BibleGateway |
-| Reina-Valera | Spanish | Public domain |
-| Louis Segond | French | Public domain |
-| João Ferreira de Almeida | Portuguese | Public domain |
+The list comes verbatim from `data/download-sources.ts` —
+`EXPECTED_TRANSLATIONS` enumerates the JSON files that `setup:all`
+expects under `data/sources/`:
 
-<Callout title="Copyrighted translations" type="warn">
-NIV, ESV, NASB, NKJV, NLT, and AMP are downloaded from BibleGateway during
-`setup:all` (phase 3). They aren't redistributed in the repo because of
-licensing — you fetch them locally on your own machine.
+| File | Translation | Language |
+| --- | --- | --- |
+| `KJV.json` | King James Version | English |
+| `NIV.json` | New International Version | English |
+| `ESV.json` | English Standard Version | English |
+| `NASB.json` | New American Standard Bible | English |
+| `NKJV.json` | New King James Version | English |
+| `NLT.json` | New Living Translation | English |
+| `AMP.json` | Amplified Bible | English |
+| `SpaRV.json` | Reina-Valera | Spanish |
+| `FreJND.json` | Darby (French) | French |
+| `PorBLivre.json` | Almeida Livre | Portuguese |
+
+<Callout title="How they're delivered" type="info">
+All ten translations come from a single bundled archive that
+`download-sources.ts` fetches during phase 2 of `setup:all`. There's
+no separate BibleGateway phase — earlier copy was wrong about that.
+The cross-reference dataset is fetched in the same phase from
+[openbible.info](https://openbible.info).
 </Callout>
 
 ## Cross-references
 
-Rhema imports **340,000+ cross-references** from
-[openbible.info](https://openbible.info) so every verse links to thematically
-related passages. The cross-reference panel shows them ranked by relevance,
-and you can click through to queue any of them for broadcast.
+Rhema imports **340k+ cross-references** (the bundled file currently has
+344,800 entries) from [openbible.info](https://openbible.info) so every
+verse links to thematically related passages. The cross-reference panel
+shows them ranked by relevance, and you can click through to queue any
+of them for broadcast.
 
 ## Switching translations during a sermon
 
 The active translation is the one rendered on the broadcast overlay. You
 can change it three ways:
 
-1. **Voice command** — "read in NIV", "switch to ESV", "let's hear it in
-   NLT". See [Voice control](/docs/features/voice-control).
+1. **Voice command** — "read in NIV", "switch to ESV", and so on. See
+   [Voice control](/docs/features/voice-control) for the full alias
+   table.
 2. **UI control** — the translation picker in the transport bar.
 3. **Remote control** — OSC, HTTP, or a Stream Deck button. See
    [Remote control](/docs/features/remote-control).
@@ -54,10 +62,11 @@ keeping the same verse reference.
 
 ## Search architecture
 
-Every translation has its own FTS5 virtual table backed by a porter
-tokenizer. Queries use BM25 ranking, which gives natural results when
-searching by phrase ("walk by faith", "fearfully and wonderfully").
+Every translation has its own FTS5 virtual table. SQLite's FTS5 ships
+with BM25 ranking by default, which gives natural results when searching
+by phrase ("walk by faith", "fearfully and wonderfully").
 
-The frontend layers Fuse.js on top for instant fuzzy search across the
-recent context — the kind of typing-while-searching experience you want
-when scrubbing for a verse during a service.
+The frontend layers **Fuse.js** (`src/lib/context-search.ts`) on top for
+instant fuzzy search across the recent transcript context — the kind of
+typing-while-searching experience you want when scrubbing for a verse
+during a service.

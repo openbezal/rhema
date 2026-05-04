@@ -1,6 +1,6 @@
 ---
 title: Verse Detection Pipeline
-description: Five complementary strategies that turn live sermon audio into matched Bible references — direct, semantic, quotation, ensemble, and reading mode.
+description: Four complementary strategies that turn live sermon audio into matched Bible references — direct, semantic, quotation, and reading mode — merged by an ensemble pass.
 icon: Search
 ---
 
@@ -10,21 +10,23 @@ import { Step, Steps } from "fumadocs-ui/components/steps";
 Rhema's detector doesn't bet on a single signal. Pastors cite scripture in
 many ways — exact references ("First Corinthians 13:4"), paraphrases, partial
 quotations, or by simply moving through a chapter — and a single technique
-misses too many of them. The detector instead runs five strategies in
-parallel and merges their outputs through an ensemble pass.
+misses too many of them. The detector runs four strategies in parallel and
+merges their outputs through an ensemble pass.
 
-## The five strategies
+## The four strategies
 
 <Steps>
   <Step>
 ### Direct reference parsing
 
-A precompiled **Aho-Corasick automaton** scans the transcript for canonical
-book names and abbreviations. When a hit is followed by a chapter/verse
-pattern, the detector emits a high-confidence reference.
+A precompiled **Aho-Corasick automaton** (`aho-corasick = "1"` in
+`rhema-detection`) scans the transcript for canonical book names and
+abbreviations. When a hit is followed by a chapter/verse pattern, the
+detector emits a high-confidence reference.
 
 Fuzzy matching catches misheard book names ("Galatian" → "Galatians",
-"Psalmon" → "Psalms") so transcription noise doesn't sink an obvious cite.
+"Psalmon" → "Psalms") so transcription noise doesn't sink an obvious
+cite.
 
   </Step>
   <Step>
@@ -32,69 +34,79 @@ Fuzzy matching catches misheard book names ("Galatian" → "Galatians",
 
 Verses that aren't named — paraphrases, lyrical references, applied
 teaching — are caught by a vector retrieval pipeline. The
-**Qwen3-Embedding-0.6B** model (exported to INT8 ONNX during `setup:all`)
-embeds every verse, and a **HNSW index** answers nearest-neighbor queries
-in well under a millisecond.
+**Qwen3-Embedding-0.6B** model (exported to INT8 ONNX during
+`setup:all` and run via the `ort` Rust crate) embeds every verse,
+and a **brute-force cosine-similarity scan** over ~31k vectors at
+1024 dims returns nearest neighbors in a few milliseconds on a
+modern CPU.
 
-The semantic strategy runs on a sliding window over the transcript so a
-phrase that lights up halfway through a sentence still triggers a match.
+The file is named `hnsw_index.rs` for historical reasons, but the
+implementation is currently brute-force — the dataset is small
+enough that an HNSW index isn't needed yet.
+
+The semantic strategy runs on a sliding window over the transcript
+so a phrase that lights up halfway through a sentence still triggers
+a match.
 
   </Step>
   <Step>
 ### Quotation matching
 
-When a pastor quotes scripture verbatim — even partial sentences — the
-quotation matcher checks the transcript window against the indexed verse
-text directly. This catches things the embedding model is too coarse for,
-like "the just shall live by faith".
-
-  </Step>
-  <Step>
-### Cloud booster (optional)
-
-For ambiguous cases, an optional cloud LLM (OpenAI or Claude) re-ranks
-candidates using sermon context. This is opt-in and rate-limited; the
-local pipeline runs at full speed without it.
+When a pastor quotes scripture verbatim — even partial sentences —
+the quotation matcher checks the transcript window against the
+indexed verse text directly. This catches things the embedding model
+is too coarse for, like "the just shall live by faith".
 
   </Step>
   <Step>
 ### Reading mode
 
-When a pastor announces a chapter and starts reading through it ("Let's
-turn to Romans 8"), reading mode locks the queue to that book/chapter
-and uses voice navigation ("next chapter", "chapter 5", "go back two
-verses") to advance.
+When a pastor announces a chapter and starts reading through it
+("Let's turn to Romans 8"), reading mode locks the queue to that
+book/chapter and uses voice navigation to advance — "next", "next
+verse", "previous verse", "go back", "next chapter", "previous
+chapter", "chapter N", "verse N", or "chapter N verse M".
 
-This eliminates false positives from common phrases that *sound* like
-references but aren't, while the pastor is in expository mode.
+This eliminates false positives from common phrases that *sound*
+like references but aren't, while the pastor is in expository mode.
 
   </Step>
 </Steps>
 
+<Callout title="No cloud booster yet" type="warn">
+Earlier copy described an optional OpenAI/Claude "cloud booster"
+that re-ranks ambiguous candidates. The settings store reserves
+fields for `openaiApiKey` / `claudeApiKey`, but the booster itself
+is not implemented in `rhema-detection` today. Detection runs
+entirely locally.
+</Callout>
+
 ## Ensemble merging
 
 Each strategy emits candidate detections with confidence scores. The
-**ensemble merger** deduplicates overlapping candidates, weights the
-sources, and applies time-based decay so older candidates don't compete
-with fresh ones. The output is a single ranked detection stream that
-feeds the queue.
+**ensemble merger** (`src-tauri/crates/detection/src/merger.rs`)
+deduplicates overlapping candidates, weights the sources, and applies
+time-based decay so older candidates don't compete with fresh ones.
+The output is a single ranked detection stream that feeds the queue.
 
 <Callout title="Sentence buffering" type="info">
-The detector buffers transcript output into sentences before passing them
-through the strategies. This dramatically reduces flicker — partial
-transcript fragments don't trigger and then unfire as more words arrive.
+The detector buffers transcript output into sentences (`sentence_buffer.rs`)
+before passing them through the strategies. This reduces flicker —
+partial transcript fragments don't trigger and then unfire as more
+words arrive.
 </Callout>
 
 ## Sermon context tracking
 
 Pastors quote across a sermon's arc. Rhema keeps a rolling **sermon
-context** of recent topics, books, and themes that the semantic and cloud
-strategies use to disambiguate. If you've spent the last ten minutes in
-Romans 8, a passing reference to "by faith" is more likely Romans 8 than
-Hebrews 11.
+context** of recent books and themes that the semantic strategy uses
+to disambiguate. If you've spent the last ten minutes in Romans 8, a
+passing reference to "by faith" is more likely Romans 8 than Hebrews
+11.
 
 ## Threshold tuning
 
 The confidence threshold is exposed as a UI control and via the remote
-control API (`/rhema/confidence`). Bumping it up reduces false positives on
-noisy services; lowering it surfaces more candidates for manual queueing.
+control API (`/rhema/confidence`). Bumping it up reduces false positives
+on noisy services; lowering it surfaces more candidates for manual
+queueing.

@@ -15,20 +15,19 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 - **Voice-controlled translation switching** — say "read in NIV" or "switch to ESV" to change translations instantly during a sermon
 - **Multi-strategy verse detection**
   - Direct reference parsing (Aho-Corasick automaton + fuzzy matching)
-  - Semantic search (Qwen3-0.6B ONNX embeddings + HNSW vector index)
+  - Semantic search — Qwen3-0.6B ONNX embeddings, brute-force cosine similarity over ~31k verse vectors (the `hnsw_index.rs` file is named after a future plan; today it scans linearly)
   - Quotation matching against known verse text
-  - Cloud booster (optional, OpenAI/Claude)
   - Reading mode — locks to book/chapter as soon as it's mentioned, with voice navigation ("next chapter", "chapter 5")
   - Sermon context tracking and sentence buffering
-- **SQLite Bible database** with FTS5 full-text search and BM25 ranking
-- **Multiple translations** — KJV, NIV, ESV, NASB, NKJV, NLT, AMP + Spanish, French, Portuguese
-- **Cross-reference lookup** (340k+ refs from openbible.info)
-- **NDI broadcast output** for live production integration
-- **Theme designer** — visual canvas editor for verse overlays with backgrounds (solid, gradient, image), text styling, positioning, shadows, and outlines
-- **Verse queue** with drag-and-drop ordering and duplicate prevention (flash-highlight on duplicates)
+- **SQLite Bible database** with FTS5 full-text search (BM25 ranking by default)
+- **10 bundled translations** — KJV, NIV, ESV, NASB, NKJV, NLT, AMP, plus SpaRV (Spanish), FreJND (French), and PorBLivre (Portuguese)
+- **Cross-reference lookup** (340k+ refs from openbible.info; the bundled file ships with 344,800 entries)
+- **NDI broadcast output** for live production integration — configurable resolution, 24/30/60 fps, and three alpha modes (none, straight, premultiplied)
+- **Theme designer** — visual canvas editor for verse overlays with backgrounds (solid, gradient, image, transparent), text styling, positioning, shadows, and outlines
+- **Verse queue** with drag-and-drop ordering (`@dnd-kit/react`) and duplicate prevention (flash-highlight on duplicates)
 - **Quick navigation** — keyboard-driven verse entry with autocomplete (e.g., type "J" → Joshua, Tab through book → chapter → verse)
 - **Fuzzy contextual search** (Fuse.js client-side)
-- **Audio level metering**, live indicator, and session timer
+- **Audio level metering** and on-air indicator
 - **Interactive onboarding tutorial** — 11-step guided tour covering all panels, auto-launches on first startup
 - **Light/dark mode** with system theme detection (light, dark, or follow OS)
 - **Settings persistence** — all preferences auto-saved to disk across restarts
@@ -45,14 +44,14 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 | **AI/ML** | ONNX Runtime (Qwen3-0.6B embeddings), Aho-Corasick, Fuse.js |
 | **Database** | SQLite via rusqlite (bundled) with FTS5 |
 | **Broadcast** | NDI 6 SDK via dynamic loading (libloading FFI) |
-| **STT** | Deepgram WebSocket + REST (tokio-tungstenite) |
+| **STT** | Local Whisper via `whisper-rs`; Deepgram WebSocket + REST (`tokio-tungstenite`) |
 
 ### Rust Crates
 
 | Crate | Purpose |
 |---|---|
 | `rhema-audio` | Audio device enumeration, capture, VAD (cpal) |
-| `rhema-stt` | Deepgram STT streaming + REST fallback |
+| `rhema-stt` | Local Whisper (gated behind `whisper` Cargo feature) and Deepgram STT streaming + REST fallback |
 | `rhema-bible` | SQLite Bible DB, FTS5 search, cross-references |
 | `rhema-detection` | Verse detection pipeline: direct, semantic, quotation, ensemble merger, sentence buffer, sermon context, reading mode |
 | `rhema-broadcast` | NDI video frame output via FFI |
@@ -114,7 +113,7 @@ bun install
 
 ### Quick Setup (recommended)
 
-One command sets up everything — Python virtual environment, Bible data, copyrighted translations, database, ONNX model, and precomputed embeddings:
+One command sets up everything — Python virtual environment, Bible data, database, ONNX model, precomputed embeddings, and the local Whisper model:
 
 > **Windows:** run `bun run setup:windows` *before* `setup:all` and restart your terminal. See [Platform-specific setup](#platform-specific-setup) above.
 
@@ -122,15 +121,15 @@ One command sets up everything — Python virtual environment, Bible data, copyr
 bun run setup:all
 ```
 
-This runs 7 phases in sequence, skipping any that are already complete:
+This runs 7 idempotent phases in sequence, skipping any whose output artifacts already exist (pass `--force` to re-run all):
 
-1. Python environment setup (`.venv` + all pip dependencies)
-2. Download open-source Bible data (KJV, Spanish, French, Portuguese + cross-references)
-3. Download copyrighted translations from BibleGateway (NIV, ESV, NASB, NKJV, NLT, AMP)
-4. Build SQLite Bible database (`data/rhema.db` with FTS5 + cross-references)
-5. Download & export ONNX model (Qwen3-Embedding-0.6B) + INT8 quantization
-6. Export KJV verses to JSON for embedding
-7. Precompute verse embeddings (auto-selects GPU if available, falls back to ONNX CPU)
+1. Python environment (`.venv` + pip deps: `optimum-onnx[onnxruntime]`, `sentence-transformers`, `accelerate`, `tokenizers`, `numpy`, `torch`, `meaningless`)
+2. Download Bible source data — single bundled archive containing all 10 translations plus the openbible.info cross-references zip
+3. Build SQLite Bible database (`data/rhema.db` with FTS5 + cross-references)
+4. Download & export ONNX model (`Qwen3-Embedding-0.6B`) + INT8 quantization for ARM64
+5. Export KJV verses to JSON for embedding precomputation
+6. Precompute verse embeddings (GPU sentence-transformers when available, ONNX CPU fallback otherwise)
+7. Download Whisper model (`ggml-large-v3-turbo-q8_0.bin`) into `models/whisper/`
 
 ### Environment
 
@@ -139,9 +138,9 @@ This runs 7 phases in sequence, skipping any that are already complete:
 Rhema supports two speech-to-text engines:
 
 **Option 1: Whisper (Local, Free)**
-No setup required! Whisper runs locally on your machine with no API costs or internet dependency.
+Whisper runs locally on your machine with no API costs or per-minute billing.
 - Requires CMake + libclang — see [Platform-specific setup](#platform-specific-setup) above
-- Model downloads automatically on first use
+- The model (`ggml-large-v3-turbo-q8_0.bin`) is fetched as phase 7 of `setup:all`. Run `bun run download:whisper` to grab it on its own.
 
 **Option 2: Deepgram (Cloud, Paid)**
 Create a `.env` file in the project root:
@@ -165,12 +164,12 @@ bun run download:ndi-sdk
 Each phase can also be run independently:
 
 ```bash
-bun run download:bible-data          # Public domain translations + cross-refs
-python3 data/download-biblegateway.py  # Copyrighted translations (needs .venv)
+bun run download:bible-data          # Bundled translations + cross-refs
 bun run build:bible                  # Build SQLite database
 bun run download:model               # Download & export ONNX model
 bun run export:verses                # Export verses to JSON
-python3 data/precompute-embeddings.py  # Precompute embeddings (GPU or ONNX fallback)
+bun run precompute:embeddings        # Rust ONNX (recommended); see also -onnx and -py variants
+bun run download:whisper             # Whisper STT model
 ```
 
 ### Run in development
@@ -233,8 +232,9 @@ rhema/
 
 | Script | Description |
 |---|---|
-| `setup:all` | **Full setup** — runs all data/model/embedding phases (idempotent) |
-| `dev` | Start Vite dev server (port 3000) |
+| `setup:all` | **Full setup** — runs all 7 data/model/embedding/whisper phases (idempotent; pass `--force` to re-run) |
+| `setup:windows` | Windows bootstrap — installs LLVM + CMake via `winget` and persists `LIBCLANG_PATH` |
+| `dev` | Start Vite dev server |
 | `build` | TypeScript check + Vite production build |
 | `tauri` | Run Tauri CLI commands |
 | `test` | Run Vitest tests |
@@ -242,15 +242,17 @@ rhema/
 | `format` | Prettier formatting |
 | `typecheck` | TypeScript type checking |
 | `preview` | Preview production build |
-| `download:bible-data` | Download public domain Bible translations + cross-references |
+| `download:bible-data` | Download bundled Bible translation archive + cross-references |
 | `build:bible` | Build SQLite Bible database from JSON sources |
 | `download:model` | Export Qwen3-Embedding-0.6B to ONNX + quantize to INT8 |
 | `export:verses` | Export KJV verses to JSON for embedding precomputation |
-| `precompute:embeddings` | Precompute embeddings via Rust ONNX binary |
+| `precompute:embeddings` | Precompute embeddings via Rust ONNX binary (recommended) |
 | `precompute:embeddings-onnx` | Precompute embeddings via Python ONNX Runtime |
-| `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers |
+| `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers (GPU path) |
 | `quantize:model` | Quantize ONNX model to INT8 for ARM64 |
+| `download:whisper` | Download `ggml-large-v3-turbo-q8_0.bin` for local Whisper STT |
 | `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
+| `web:dev`, `web:build`, `web:start`, `web:lint` | Marketing + Fumadocs documentation site under `web/` |
 
 ## Security
 
