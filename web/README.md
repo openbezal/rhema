@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rhema marketing site
 
-## Getting Started
+Next.js 16 marketing site for [Rhema](https://openrhema.com). Static-only — no API routes, no server actions. Deployed to GitHub Pages on push to `main`.
 
-First, run the development server:
+## Develop
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd web
+bun install
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Opens [http://localhost:3029](http://localhost:3029).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+bun run build
+```
 
-## Learn More
+Outputs a static site to `web/out/`.
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Pushes to `main` that touch `web/**` trigger `.github/workflows/deploy-web.yml`, which builds the static export and publishes it to GitHub Pages at [https://openrhema.com](https://openrhema.com).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+To trigger a deploy without code changes (e.g., to refresh the GitHub stars count baked into the page), use the **Run workflow** button on the *Deploy web to GitHub Pages* action in the GitHub UI.
 
-## Deploy on Vercel
+PRs touching `web/**` run the build job only (no deploy) as a smoke test.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `output: "export"` in `next.config.ts` — static export is required for GitHub Pages. Anything that needs a Node server (route handlers, server actions, ISR, `next/image` optimization) will fail the build.
+- Self-hosted fonts under `public/fonts/`. Referenced from `app/globals.css` via absolute paths — do not introduce a `basePath`, it does not rewrite CSS `url()` values.
+- `getGitHubStars()` runs at build time. Authenticated via `GITHUB_TOKEN` in CI to avoid the 60/hr unauthenticated rate limit; falls back to a hardcoded count if the API call fails.
