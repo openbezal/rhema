@@ -1,9 +1,17 @@
 export const SITE = {
   name: "Rhema",
+  legalName: "openbezal",
   tagline: "Your Pastor speaks. Rhema finds the verse.",
+  shortDescription:
+    "Real-time AI Bible verse detection for live sermons. Free, open-source, broadcast-ready via NDI.",
   description:
     "Rhema listens to a live sermon audio feed, transcribes speech in real time, detects Bible verse references (both explicit citations and quoted passages), and renders them as broadcast-ready overlays via NDI for live production.",
   url: "https://openrhema.com",
+  locale: "en_US",
+  twitterHandle: "@openbezal",
+  founded: "2025",
+  category: "ChurchSoftware",
+  operatingSystems: ["Windows", "macOS"],
   repo: {
     owner: "openbezal",
     name: "rhema",
