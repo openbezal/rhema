@@ -105,6 +105,11 @@ export default function RootLayout({
             forcedTheme: "dark",
             enableSystem: false,
           }}
+          search={{
+            options: {
+              type: "static",
+            },
+          }}
         >
           {children}
         </RootProvider>
