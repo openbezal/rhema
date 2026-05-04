@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:no-open": "next dev -p 3029",
-    "build": "next build",
+    "build": "next build && node scripts/postbuild-og.mjs",
     "start": "next start -p 3029",
     "lint": "eslint"
   },
