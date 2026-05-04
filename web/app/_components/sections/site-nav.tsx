@@ -8,7 +8,9 @@ import { RhemaLogo } from "../ui/rhema-logo";
 import { SITE } from "../../_lib/site";
 import { cn } from "../../_lib/utils";
 
-const LINKS = [
+type NavLink = { href: string; label: string; external?: boolean };
+
+const LINKS: ReadonlyArray<NavLink> = [
   { href: "#features", label: "Features" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#pricing", label: "Pricing" },
