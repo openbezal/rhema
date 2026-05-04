@@ -7,12 +7,17 @@
     "dev:no-open": "next dev -p 3029",
     "build": "next build && node scripts/postbuild-og.mjs",
     "start": "next start -p 3029",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.41.1",
     "clsx": "^2.1.1",
+    "fumadocs-core": "16.8.7",
+    "fumadocs-mdx": "14.3.2",
+    "fumadocs-ui": "16.8.7",
     "lenis": "^1.3.23",
+    "lucide-react": "^1.7.0",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -20,6 +25,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mdx": "^2.0.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
