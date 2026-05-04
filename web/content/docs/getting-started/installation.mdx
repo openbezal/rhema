@@ -1,0 +1,134 @@
+---
+title: Installation
+description: Clone, install dependencies, and run the seven-phase data setup so Rhema is ready for development.
+icon: Download
+---
+
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Callout } from "fumadocs-ui/components/callout";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+Once your toolchain is in place — see [Prerequisites](/docs/getting-started/prerequisites) —
+you can clone the repo and run a single setup command.
+
+<Callout title="Windows users" type="warn">
+Run `bun run setup:windows` *before* `setup:all` and restart your terminal.
+The Windows bootstrap installs LLVM and CMake via `winget` and persists
+`LIBCLANG_PATH` for `bindgen`. See [Platform setup](/docs/getting-started/platform-setup#windows).
+</Callout>
+
+## Quick setup
+
+<Steps>
+  <Step>
+### Clone the repository
+
+```bash
+git clone https://github.com/openbezal/rhema.git
+cd rhema
+```
+
+  </Step>
+  <Step>
+### Install JavaScript dependencies
+
+```bash
+bun install
+```
+
+This pulls in the React frontend, the build orchestrator, and the data-prep
+scripts.
+
+  </Step>
+  <Step>
+### Run the unified setup pipeline
+
+```bash
+bun run setup:all
+```
+
+`setup:all` is **idempotent** — re-running it skips phases that have already
+completed, so it's safe to invoke after `git pull` or when something changed
+in `data/`. Behind the scenes it executes seven phases in order:
+
+1. **Python environment** — creates `.venv` and installs every pip dependency.
+2. **Open-source Bibles** — downloads KJV, Spanish, French, and Portuguese
+   translations plus 340k+ cross-references from openbible.info.
+3. **Copyrighted translations** — pulls NIV, ESV, NASB, NKJV, NLT, and AMP
+   from BibleGateway.
+4. **SQLite database** — assembles `data/rhema.db` with FTS5 full-text
+   indexes and cross-reference tables.
+5. **ONNX model** — downloads `Qwen3-Embedding-0.6B`, exports it to ONNX,
+   and quantizes to INT8 for ARM64.
+6. **Verse export** — emits the KJV verses to JSON for embedding.
+7. **Embedding precomputation** — runs the embeddings (auto-selects GPU if
+   available, falls back to ONNX CPU otherwise).
+
+  </Step>
+  <Step>
+### Run in development
+
+```bash
+bun run tauri dev
+```
+
+The Tauri shell opens with hot-reload for the React frontend at port 3000
+and live-reloads the Rust backend on file changes.
+
+  </Step>
+</Steps>
+
+## Build for production
+
+When you're ready to ship a native installer:
+
+```bash
+bun run tauri build
+```
+
+The output lands in `src-tauri/target/release/bundle/` — `.dmg` on macOS,
+`.msi` and `.exe` on Windows, `.AppImage` and `.deb` on Linux.
+
+## NDI SDK (optional)
+
+The NDI SDK isn't bundled because of NDI's redistribution policy. If you
+want broadcast output, fetch it once:
+
+```bash
+bun run download:ndi-sdk
+```
+
+This drops the platform-specific NDI 6 headers and shared libraries under
+`sdk/ndi/`, where the `rhema-broadcast` crate finds them via dynamic
+loading.
+
+## Running individual phases
+
+Sometimes you want to re-run a single phase without nuking the whole
+pipeline. Each phase has its own script:
+
+<Tabs items={["Bun scripts", "Direct Python"]}>
+  <Tab value="Bun scripts">
+
+```bash
+bun run download:bible-data        # Public domain translations + cross-refs
+bun run build:bible                # Build SQLite database
+bun run download:model             # Download & export ONNX model
+bun run export:verses              # Export verses to JSON
+bun run precompute:embeddings      # Rust ONNX binary
+bun run precompute:embeddings-py   # Python sentence-transformers
+```
+
+  </Tab>
+  <Tab value="Direct Python">
+
+```bash
+python3 data/download-biblegateway.py     # Copyrighted translations (needs .venv)
+python3 data/precompute-embeddings.py     # Embeddings (GPU or ONNX fallback)
+```
+
+  </Tab>
+</Tabs>
+
+See the [scripts reference](/docs/reference/scripts) for the full list and
+when to reach for each one.

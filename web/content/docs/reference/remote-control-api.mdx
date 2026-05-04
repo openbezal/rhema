@@ -1,0 +1,123 @@
+---
+title: Remote Control API
+description: Wire-level reference for the OSC addresses and HTTP endpoints that drive Rhema from external controllers.
+icon: Webhook
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+This page is the protocol-level reference. For setup, examples, and
+controller-specific tips, see [Remote control](/docs/features/remote-control).
+
+## Command catalog
+
+Eight commands are supported by both protocols:
+
+| Command | Effect |
+| --- | --- |
+| `next` | Advance the verse queue by one |
+| `prev` | Move back one in the queue |
+| `show` | Bring the overlay on-air |
+| `hide` | Take the overlay off-air |
+| `theme <name>` | Switch the active theme |
+| `opacity <0..1>` | Set overlay opacity |
+| `confidence <0..1>` | Set the detector's confidence threshold |
+| `on_air <0\|1>` | Force the on-air toggle to the given value |
+
+## OSC
+
+OSC runs over UDP on a configurable port (default `9000`). Type
+coercion is permissive — `int`, `float`, and `bool` argument types
+are coerced to the target command variant without error, so any
+controller's idea of how to send a number works.
+
+| Address | Argument | Example |
+| --- | --- | --- |
+| `/pew/next` | none | `oscsend localhost 9000 /pew/next` |
+| `/pew/prev` | none | `oscsend localhost 9000 /pew/prev` |
+| `/pew/show` | none | `oscsend localhost 9000 /pew/show` |
+| `/pew/hide` | none | `oscsend localhost 9000 /pew/hide` |
+| `/pew/theme` | string | `oscsend localhost 9000 /pew/theme s lower-third` |
+| `/pew/opacity` | float | `oscsend localhost 9000 /pew/opacity f 0.85` |
+| `/pew/confidence` | float | `oscsend localhost 9000 /pew/confidence f 0.65` |
+| `/pew/on_air` | int (0/1) | `oscsend localhost 9000 /pew/on_air i 1` |
+
+## HTTP API
+
+The HTTP server listens on a configurable port (default `8910`) under
+the `/api/v1/` prefix.
+
+### `GET /api/v1/health`
+
+```bash
+curl http://localhost:8910/api/v1/health
+```
+
+```json
+{ "status": "ok", "version": "1.2.0" }
+```
+
+Returns 200 when the server is running; useful for liveness checks.
+
+### `POST /api/v1/control`
+
+Dispatch any command from the catalog. The body is JSON with a
+`command` key and any additional parameters:
+
+```bash
+curl -sX POST http://localhost:8910/api/v1/control \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"theme","name":"lower-third"}'
+```
+
+```json
+{ "ok": true }
+```
+
+Failures return a structured error:
+
+```json
+{ "ok": false, "error": "unknown_theme" }
+```
+
+### `GET /api/v1/status`
+
+```bash
+curl http://localhost:8910/api/v1/status
+```
+
+Returns a state snapshot from a Rust-side cache (no Tauri-frontend
+round-trip needed):
+
+```json
+{
+  "live_verse": { "ref": "John 3:16", "translation": "NIV" },
+  "queue": ["John 3:16", "John 3:17"],
+  "theme": "lower-third",
+  "on_air": true,
+  "confidence": 0.65
+}
+```
+
+<Callout title="CORS" type="info">
+The HTTP API ships with permissive CORS so a phone's browser, a
+staff laptop, or a Node-RED workflow on the local network can drive
+Rhema directly. Bind to `127.0.0.1` (the default) if you don't want
+that.
+</Callout>
+
+## Persistence and shutdown semantics
+
+Both listeners can be started and stopped at runtime without
+restarting Rhema. Port-bind failures surface as visible errors in
+the Settings panel rather than silent listener crashes. Both
+listeners shut down cleanly on app exit — no zombie threads, no
+orphaned ports.
+
+## Authentication
+
+By default both protocols are unauthenticated and bound to localhost.
+For multi-machine deployments, route them through your network's
+existing auth (a reverse proxy with mTLS, a Tailscale ACL, etc.) —
+the API is intentionally simple and protocol-only so it composes
+with whatever you already trust.

@@ -1,0 +1,47 @@
+---
+title: Environment Variables
+description: The .env keys Rhema reads and what they unlock.
+icon: KeyRound
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Rhema runs without any environment variables — Whisper-based STT, the
+bundled translations, and the entire detection pipeline all work
+out of the box. The `.env` file only matters when you want to plug in
+optional cloud services.
+
+## Reference
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DEEPGRAM_API_KEY` | Optional | API key for [Deepgram](https://deepgram.com) speech-to-text. Not needed when running Whisper locally. |
+| `GITHUB_TOKEN` | Optional | Used by the marketing site to fetch up-to-date star counts at build time without hitting the unauthenticated rate limit. |
+
+## Where to put them
+
+Create a file called `.env` in the project root (the same folder as
+`package.json`):
+
+```bash
+DEEPGRAM_API_KEY=dg_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Restart the dev server after editing `.env` so the new value is
+picked up.
+
+<Callout title=".env files are gitignored" type="info">
+The repo's `.gitignore` excludes any file matching `.env*` to keep
+keys out of source control. Don't commit a `.env.example` with a
+real key — use a placeholder like `your_key_here`.
+</Callout>
+
+## Build-time vs runtime
+
+- **Tauri / Rust code** reads environment variables at runtime from
+  the host process. There's no compile-time embedding of secrets.
+- **Bun-driven build scripts** under `data/` read variables from the
+  shell environment as you'd expect.
+- **The marketing/docs site** in `web/` is statically exported, so
+  any variable read during build (`GITHUB_TOKEN`) is consumed once at
+  build time and not embedded in the output.

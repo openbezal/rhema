@@ -1,0 +1,50 @@
+---
+title: Prerequisites
+description: System requirements and toolchain you'll need before installing Rhema.
+icon: ListChecks
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Rhema is a Tauri v2 desktop app, so you'll need the standard Tauri toolchain
+plus a Python interpreter for the data-prep pipeline. The complete list:
+
+| Tool | Why you need it |
+| --- | --- |
+| [Bun](https://bun.sh) | JavaScript runtime + package manager for `web/`, build scripts, and the orchestrator |
+| [Rust](https://rustup.rs) (stable, 1.77.2+) | Compiles the Tauri backend and the seven workspace crates |
+| [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) | Platform-specific system libraries (WebView2 on Windows, WebKit on Linux) |
+| [Python 3](https://www.python.org/) | Downloads copyrighted translations and exports the embedding model to ONNX |
+| CMake + LLVM/libclang | Required for local Whisper STT — `whisper.cpp` is built from source via `bindgen` |
+| [Deepgram API key](https://deepgram.com/) (optional) | Cloud speech-to-text, only if you don't want to run Whisper locally |
+
+<Callout title="Whisper vs Deepgram" type="info">
+You only need **one** speech-to-text engine. Whisper runs locally with no API
+costs but compiles `whisper.cpp` from source on first build. Deepgram streams
+via WebSocket and bypasses the local build but needs a paid API key. See
+[Speech-to-text](/docs/getting-started/speech-to-text) for tradeoffs.
+</Callout>
+
+## Hardware
+
+Rhema runs comfortably on modern laptops:
+
+- **CPU:** anything from the last five years; a recent Apple Silicon or
+  Ryzen/Intel laptop will keep the audio capture, STT, and detection
+  pipeline well under a single core.
+- **RAM:** 8 GB minimum, 16 GB recommended if you precompute embeddings on
+  CPU (the GPU path uses far less memory).
+- **GPU:** optional. The setup script auto-detects CUDA/MPS for embedding
+  precomputation and falls back to ONNX CPU otherwise.
+- **Disk:** ~3 GB after `setup:all` finishes (Bible data, embeddings, ONNX
+  models).
+
+## Operating system
+
+| OS | Status |
+| --- | --- |
+| macOS 13+ (Apple Silicon and Intel) | First-class support |
+| Windows 10/11 (x86_64) | First-class support — see [Platform setup](/docs/getting-started/platform-setup#windows) for the LLVM bootstrap |
+| Linux (Debian/Ubuntu/Arch) | First-class support — needs the WebKitGTK and libclang packages |
+
+Once these are installed, head to the [installation guide](/docs/getting-started/installation).

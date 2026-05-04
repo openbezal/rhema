@@ -1,0 +1,5 @@
+{
+  "title": "Architecture",
+  "icon": "Cpu",
+  "pages": ["tech-stack", "rust-crates", "project-structure"]
+}

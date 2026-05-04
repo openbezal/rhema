@@ -1,0 +1,63 @@
+---
+title: Theme Designer
+description: A visual canvas editor that produces broadcast-ready verse overlays — backgrounds, typography, shadows, outlines, and exact pixel positioning.
+icon: Palette
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+The theme designer lets you build verse overlays the same way a graphic
+designer would — by composing on a canvas — and then sends the result to
+NDI exactly as designed.
+
+## What you can compose
+
+- **Backgrounds**: solid colors, multi-stop gradients, or a still image at
+  any opacity.
+- **Typography**: choose any installed system font, set size, weight,
+  letter-spacing, line-height, and alignment.
+- **Effects**: drop shadows, outlines/strokes, fills, and blur.
+- **Layout**: drag elements to position them with pixel precision; the
+  canvas reflects the exact NDI output dimensions.
+- **Tokens**: place the verse text, the reference, the translation tag,
+  and the verse number as separate elements so they can be styled
+  independently.
+
+## Built-in starters
+
+Rhema ships with a small set of opinionated starter themes that you can
+clone and modify:
+
+- **Lower-third** — a minimal bottom strip suitable for talking-head
+  layouts.
+- **Full-frame** — a centered overlay for cut-aways and IMAG.
+- **Side-card** — an offset card that doesn't obscure the speaker's
+  face.
+
+Each starter is a regular project file you can save, version, and
+re-export.
+
+## Switching themes live
+
+Themes can be activated from:
+
+- The theme picker in the transport bar.
+- A Stream Deck or other OSC controller (`/pew/theme`).
+- The HTTP control endpoint (`POST /api/v1/control` with `{ "theme": "lower-third" }`).
+
+The currently active theme is reflected in the **preview** panel before
+it goes on-air, and committed to NDI when you toggle the on-air switch.
+
+<Callout title="Resolution and color space" type="info">
+NDI output is composited at the exact pixel dimensions of the canvas. If
+your downstream switcher (vMix, OBS, Resolume) expects 1920×1080 with
+straight alpha, set the canvas to that and Rhema sends straight alpha
+NDI frames natively.
+</Callout>
+
+## Saving and sharing
+
+Themes are JSON documents inside the app's data directory. They're
+self-contained — no external font files or absolute paths — so you can
+copy a theme between machines or commit them to a service template
+repository for your team.

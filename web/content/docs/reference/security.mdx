@@ -1,0 +1,68 @@
+---
+title: Security
+description: Content Security Policy, threat model, and how to report a vulnerability responsibly.
+icon: Shield
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Rhema runs as a Tauri v2 desktop app, which means a Chromium-derived
+WebView with elevated privileges (filesystem, IPC, network).
+Compromising the WebView would compromise the host. We treat that
+seriously.
+
+## Content Security Policy
+
+The Tauri WebView ships with a **restrictive CSP** to prevent script
+injection and unauthorized data exfiltration. The policy is defined
+in `src-tauri/tauri.conf.json` and locks down:
+
+- `script-src` to `'self'` plus a hashed inline-bootstrap, so no
+  third-party scripts execute.
+- `connect-src` to `'self'`, the Tauri IPC channel, and the
+  explicitly allow-listed Deepgram WebSocket endpoint when the cloud
+  STT engine is active.
+- `img-src` to `'self'` and `data:` for the canvas-rendered overlays.
+- `style-src` to `'self'` plus `'unsafe-inline'` (required by the
+  shadcn animation tokens).
+- `frame-ancestors` to `'none'` so the WebView can't be embedded.
+
+The full directive-by-directive rationale and threat model lives in
+[**SECURITY.md**](https://github.com/openbezal/rhema/blob/main/.github/SECURITY.md)
+in the repo.
+
+## Reporting a vulnerability
+
+<Callout title="Please report privately first" type="warn">
+If you find a security issue, **do not open a public GitHub issue.**
+Send a private report by following the instructions in
+[SECURITY.md](https://github.com/openbezal/rhema/blob/main/.github/SECURITY.md).
+We aim to acknowledge within two business days.
+</Callout>
+
+## Tauri capabilities
+
+Rhema follows Tauri v2's principle-of-least-privilege capability
+system. Each Tauri command is gated behind a capability that's
+granted to a specific window context — there are no globally enabled
+APIs. The capability files live under `src-tauri/capabilities/`.
+
+If you're reviewing the codebase for security:
+
+1. Start at `src-tauri/capabilities/*.json` to see what's allowed.
+2. Trace each granted command to its handler in `rhema-api`.
+3. Audit the handler's input validation and side effects.
+
+The same review pass works on the OSC and HTTP control surfaces —
+they're rate-limited and bind to localhost by default; binding to
+a routable interface is an explicit operator opt-in.
+
+## Defaults that protect the operator
+
+- **Localhost-only listeners** — OSC and HTTP control surfaces bind
+  to `127.0.0.1` until you explicitly choose a routable interface.
+- **No telemetry** — Rhema does not phone home. There's no
+  analytics, no crash reporter, no usage tracking.
+- **Local-first by default** — Whisper runs locally, the database
+  lives on disk, and Deepgram is opt-in. No keys, no internet, no
+  problem.

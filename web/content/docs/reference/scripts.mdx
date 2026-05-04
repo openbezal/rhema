@@ -1,0 +1,79 @@
+---
+title: Scripts
+description: Every Bun script in package.json, what it does, and when you'd run it.
+icon: Terminal
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Most day-to-day work happens through `bun run setup:all` and `bun run
+tauri dev`. The full table below covers every script in the repository's
+top-level `package.json`.
+
+## Top-level scripts
+
+| Script | Description |
+| --- | --- |
+| `setup:all` | **Full setup** — runs all data/model/embedding phases (idempotent) |
+| `dev` | Start Vite dev server (port 3000) |
+| `build` | TypeScript check + Vite production build |
+| `tauri` | Run Tauri CLI commands |
+| `test` | Run Vitest tests |
+| `lint` | ESLint |
+| `format` | Prettier formatting |
+| `typecheck` | TypeScript type checking |
+| `preview` | Preview production build |
+
+## Data pipeline scripts
+
+| Script | Description |
+| --- | --- |
+| `download:bible-data` | Download public domain Bible translations + cross-references |
+| `build:bible` | Build SQLite Bible database from JSON sources |
+| `download:model` | Export Qwen3-Embedding-0.6B to ONNX + quantize to INT8 |
+| `export:verses` | Export KJV verses to JSON for embedding precomputation |
+| `precompute:embeddings` | Precompute embeddings via Rust ONNX binary |
+| `precompute:embeddings-onnx` | Precompute embeddings via Python ONNX Runtime |
+| `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers |
+| `quantize:model` | Quantize ONNX model to INT8 for ARM64 |
+| `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
+
+<Callout title="Three flavors of precompute" type="info">
+The three `precompute:embeddings*` scripts trade off speed, dependency
+weight, and accuracy:
+
+- **`precompute:embeddings`** — fastest (Rust ONNX binary, no Python).
+- **`precompute:embeddings-onnx`** — Python ONNX Runtime, useful when
+  you want to debug embeddings or iterate on the export.
+- **`precompute:embeddings-py`** — sentence-transformers, full
+  fidelity baseline.
+
+`setup:all` picks the best one for your machine automatically (GPU →
+Python sentence-transformers, otherwise Rust ONNX).
+</Callout>
+
+## When to run what
+
+| Scenario | Script |
+| --- | --- |
+| First clone | `bun install && bun run setup:all` |
+| Translation source changed | `bun run download:bible-data && bun run build:bible` |
+| Embedding model bumped | `bun run download:model && bun run precompute:embeddings` |
+| Adding a new translation | `bun run download:biblegateway && bun run build:bible` |
+| Need NDI broadcast | `bun run download:ndi-sdk` |
+| Just want to see the UI | `bun run tauri dev` |
+| Cutting a release | `bun run tauri build` |
+
+## CI usage
+
+The setup pipeline is designed to be CI-safe — every script is
+idempotent and exits non-zero on real failure (rather than silently
+skipping). A typical CI job is:
+
+```bash
+bun install --frozen-lockfile
+bun run setup:all
+cargo test --workspace
+bun run test
+bun run typecheck
+```

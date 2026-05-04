@@ -1,0 +1,84 @@
+---
+title: NDI Broadcast Output
+description: Send Rhema's verse overlays into your live production switcher as a first-class NDI source.
+icon: Radio
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Rhema doesn't replace your live production tooling — it plugs into it.
+The broadcast pipeline emits verse overlays as a standard
+[NDI](https://ndi.video/) source, the same way a camera or a graphics
+machine would, so any NDI-aware switcher can consume it.
+
+## How it's wired
+
+The `rhema-broadcast` Rust crate dynamically loads the
+[NDI 6 SDK](https://ndi.video/tools/) at runtime via `libloading`. We
+load the SDK dynamically (rather than linking it) for two reasons:
+
+1. **Licensing** — NDI's redistribution terms don't allow shipping the
+   SDK alongside arbitrary apps. Loading it from the user's install
+   keeps Rhema clean of NDI binaries.
+2. **Optionality** — the app runs perfectly without NDI; the broadcast
+   surface just doesn't appear on the network.
+
+## Setup
+
+After the main `setup:all`, run the optional NDI download step:
+
+```bash
+bun run download:ndi-sdk
+```
+
+This places platform-specific NDI 6 headers and shared libraries under
+`sdk/ndi/`. On macOS that's `libndi.dylib`, on Windows `Processing.NDI.Lib.x64.dll`,
+on Linux `libndi.so`. The crate finds them automatically.
+
+## Discoverable as a source
+
+Once an NDI source is sending, any tool on the network can pick it up.
+Common consumers:
+
+- **vMix** — Add → NDI / Desktop Capture → "Rhema".
+- **OBS** with [obs-ndi plugin](https://github.com/obs-ndi/obs-ndi) —
+  Sources → NDI Source.
+- **Resolume**, **TriCaster**, **Wirecast**, **Tessera** — all
+  NDI-native.
+
+The source name and identifier are configurable in Settings → Broadcast,
+so multi-room churches can run an instance per stage with stable names.
+
+## Frame format
+
+Rhema sends:
+
+- **Resolution**: matches the active theme canvas (typically 1920×1080).
+- **Color space**: BGRA, straight alpha (so transparent regions
+  composite correctly behind your camera feeds).
+- **Frame rate**: locked to your switcher's expected rate; the default
+  is 60 fps progressive.
+- **Audio**: not transmitted — Rhema is a graphics source only.
+
+<Callout title="Why straight alpha?" type="info">
+Premultiplied alpha looks darker over bright backgrounds because color
+channels are pre-blended with the alpha value. Straight alpha keeps the
+verse readable over white robes, stage lights, and projected
+backgrounds, which is the worst-case scenario for live broadcast
+overlays.
+</Callout>
+
+## Latency
+
+The Rhema → NDI hop is sub-frame on a wired network. End-to-end latency
+from "pastor speaks the verse" to "overlay on the screen" is dominated
+by:
+
+1. STT processing (50–400 ms depending on engine).
+2. Detection pipeline (~5 ms).
+3. NDI hop (<1 frame).
+4. Switcher buffering (1–2 frames).
+
+For services that prefer to keep overlays one beat behind the speaker —
+the standard live-graphics convention — this is exactly the right
+profile.

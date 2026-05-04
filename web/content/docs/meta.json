@@ -1,4 +1,15 @@
 {
   "title": "Documentation",
-  "pages": ["index"]
+  "root": true,
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "...getting-started",
+    "---Features---",
+    "...features",
+    "---Architecture---",
+    "...architecture",
+    "---Reference---",
+    "...reference"
+  ]
 }

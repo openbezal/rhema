@@ -1,0 +1,13 @@
+{
+  "title": "Features",
+  "icon": "Sparkles",
+  "pages": [
+    "verse-detection",
+    "translations",
+    "voice-control",
+    "theme-designer",
+    "ndi-broadcast",
+    "remote-control",
+    "queue-and-navigation"
+  ]
+}

@@ -1,0 +1,84 @@
+---
+title: Rust Crates
+description: Seven workspace crates, each with one job — audio, STT, Bible, detection, broadcast, API, and notes.
+icon: Boxes
+---
+
+The backend is split into focused crates so each layer can be tested
+in isolation and replaced without rewiring the rest. Inter-crate
+dependencies follow a strict downward fan-out from the API layer.
+
+## Crate overview
+
+| Crate | Responsibility |
+| --- | --- |
+| `rhema-audio` | Audio device enumeration, capture, voice activity detection (cpal) |
+| `rhema-stt` | Deepgram STT WebSocket + REST fallback; Whisper local engine |
+| `rhema-bible` | SQLite Bible database, FTS5 search, cross-references |
+| `rhema-detection` | Verse detection pipeline: direct, semantic, quotation, ensemble merger, sentence buffer, sermon context, reading mode |
+| `rhema-broadcast` | NDI video frame output via FFI |
+| `rhema-api` | Tauri command API layer — the only crate that touches Tauri |
+| `rhema-notes` | (placeholder for upcoming sermon notes feature) |
+
+## Why split this way
+
+Each crate maps to a clear external responsibility:
+
+- **`rhema-audio`** owns the operating system. Anything device-specific —
+  enumeration, capture buffers, sample-rate conversion, VAD — lives
+  here so the rest of the workspace can pretend audio is just bytes.
+
+- **`rhema-stt`** owns network and local STT. Both Whisper and Deepgram
+  emit the same transcript event type, so the consumer doesn't know
+  (or care) which engine is wired in.
+
+- **`rhema-bible`** owns the database. FTS5 query construction,
+  cross-reference joins, BM25 ranking — all of it is encapsulated
+  behind a small set of typed read paths.
+
+- **`rhema-detection`** owns the pipeline. It depends on `rhema-bible`
+  for verse text and reference lookup, but otherwise it's self-
+  contained and testable with synthetic transcripts.
+
+- **`rhema-broadcast`** owns NDI. It loads the SDK dynamically and
+  exposes a `start_sender`/`send_frame`/`stop_sender` API. Other
+  crates don't include the FFI surface at all.
+
+- **`rhema-api`** owns Tauri. Every Tauri command lives here. Other
+  crates don't depend on Tauri, which means the workspace can be
+  built and tested as plain Rust without the Tauri shell.
+
+- **`rhema-notes`** is a placeholder for an upcoming sermon-notes
+  feature.
+
+## Dependency graph
+
+```
+rhema-api
+├── rhema-audio
+├── rhema-stt        ───→  rhema-audio
+├── rhema-bible
+├── rhema-detection  ───→  rhema-bible
+├── rhema-broadcast
+└── rhema-notes
+```
+
+The graph is strictly downward — no cycles, no horizontal
+dependencies. This is enforced by the workspace `Cargo.toml` and is
+the property that keeps incremental builds fast and individual crates
+testable.
+
+## Testing
+
+Each crate has its own `tests/` folder. The pipeline crates
+(`rhema-detection` especially) are tested with curated transcript
+fixtures so we can assert exact detection behavior on known sermons.
+
+Run the workspace test suite from the repo root:
+
+```bash
+cargo test --workspace
+```
+
+The Tauri command surface is integration-tested through the Vitest
+suite in `src/`.

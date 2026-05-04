@@ -1,0 +1,90 @@
+---
+title: Speech-to-Text Engines
+description: Choose between local Whisper and cloud Deepgram, and configure either with the right environment variables.
+icon: Mic
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Card, Cards } from "fumadocs-ui/components/card";
+
+Rhema supports two STT engines, and you can swap between them at runtime
+from the settings dialog. They map cleanly to two different operating
+modes: zero-marginal-cost local inference, or offload-to-the-cloud
+streaming.
+
+<Cards>
+  <Card
+    title="Whisper (local, free)"
+    description="Runs whisper.cpp on your machine — no API key, no internet, no per-minute billing. Higher first-build cost since whisper.cpp compiles from source."
+  />
+  <Card
+    title="Deepgram (cloud, paid)"
+    description="Streams audio to Deepgram's WebSocket endpoint with a REST fallback. Lower latency and higher accuracy on long-form sermons; needs a paid API key."
+  />
+</Cards>
+
+## Option 1: Whisper (recommended for most installs)
+
+No setup is required at the runtime level — Whisper downloads its model on
+first use. You just need the build dependencies covered in
+[Platform setup](/docs/getting-started/platform-setup).
+
+The Whisper integration uses [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp)
+via `bindgen`, so the first `cargo build` compiles the C++ source. After
+that, model files cache locally.
+
+<Callout title="Build dependencies" type="info">
+You need **CMake** and **libclang** on your `PATH`. macOS gets these from
+Homebrew (`brew install cmake`) plus the Xcode CLT. Linux gets them from
+your package manager. Windows installs them via `bun run setup:windows`.
+See [Platform setup](/docs/getting-started/platform-setup) for the exact
+commands.
+</Callout>
+
+## Option 2: Deepgram
+
+Deepgram is a cloud speech-to-text service that streams audio over a
+WebSocket. Rhema also has a REST fallback that re-uploads short windows if
+the WebSocket disconnects.
+
+### 1. Get an API key
+
+Sign up at [deepgram.com](https://deepgram.com/) and copy your API key.
+
+### 2. Add it to `.env`
+
+Create a `.env` file in the project root:
+
+```bash
+DEEPGRAM_API_KEY=dg_your_key_here
+```
+
+Restart `bun run tauri dev` so the new key is picked up.
+
+### 3. Switch to Deepgram in the app
+
+Open Settings → STT and choose **Deepgram**. The status indicator shows
+WebSocket health in real time; if it falls back to REST, you'll see that
+labeled too.
+
+## Switching engines at runtime
+
+Both engines are wired into the same transcript stream, so you can switch
+without restarting the session. The active translation, sermon context,
+and queue state are preserved across the swap.
+
+## Comparing the two
+
+| | Whisper (local) | Deepgram (cloud) |
+| --- | --- | --- |
+| API cost | Free | Per-minute billing |
+| Internet required | No | Yes (WebSocket) |
+| First-build time | ~3–5 min (compiles `whisper.cpp`) | Instant |
+| Latency on a steady connection | ~250–400 ms | ~150–250 ms |
+| Long-form accuracy | Good | Excellent |
+| Punctuation | Decent | Excellent |
+| Works offline | Yes | No |
+
+Both are good defaults — Whisper for the no-cost path, Deepgram when you
+want the lowest possible latency and best transcription quality on a
+reliable network.

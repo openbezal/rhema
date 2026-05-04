@@ -1,0 +1,80 @@
+---
+title: Tech Stack
+description: Frontend, backend, ML, database, broadcast, and STT layers — the libraries Rhema is built on and the reasons we picked them.
+icon: Layers
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
+
+| Layer | Technologies |
+| --- | --- |
+| **Frontend** | React 19, TypeScript, Tailwind CSS v4, shadcn/ui, Zustand, Vite 7 |
+| **Backend** | Tauri v2, Rust workspace with seven crates |
+| **AI / ML** | ONNX Runtime (Qwen3-0.6B embeddings), Aho-Corasick, Fuse.js |
+| **Database** | SQLite via `rusqlite` (bundled) with FTS5 |
+| **Broadcast** | NDI 6 SDK via dynamic loading (`libloading` FFI) |
+| **STT** | Local Whisper via `whisper.cpp`, or Deepgram WebSocket + REST (`tokio-tungstenite`) |
+
+## Frontend
+
+<Cards>
+  <Card
+    title="React 19 + Vite 7"
+    description="Modern React with concurrent features. Vite 7's dev server hot-reloads in under a frame."
+  />
+  <Card
+    title="Tailwind CSS v4 + shadcn/ui"
+    description="Utility-first styling with shadcn primitives layered on Radix. Custom components live in src/components/ui."
+  />
+  <Card
+    title="Zustand stores"
+    description="Audio, transcript, Bible, queue, detection, broadcast, and settings each have their own slice — no Redux ceremony."
+  />
+</Cards>
+
+## Backend
+
+The Rust side is a Cargo workspace of seven crates, each with a single
+clear responsibility. See the [Rust crates](/docs/architecture/rust-crates)
+page for the breakdown.
+
+Tauri v2 wires Rust commands to React via a typed IPC surface. The
+webview is locked down with a restrictive [CSP](/docs/reference/security)
+to prevent script injection and unauthorized data exfiltration.
+
+## ML / detection
+
+The detection pipeline is intentionally heterogeneous:
+
+- **Aho-Corasick** for direct reference parsing — compiled once, scans in
+  linear time with negligible memory.
+- **Qwen3-Embedding-0.6B** for semantic search, exported to ONNX and
+  quantized to INT8 so a normal CPU keeps up.
+- **HNSW** index for nearest-neighbor recall in well under a millisecond.
+- **Fuse.js** on the frontend for instant fuzzy search over the recent
+  transcript.
+
+## Database
+
+A single SQLite database with FTS5 holds every translation, cross-
+reference, and metadata table. We use `rusqlite` with the `bundled`
+feature so the binary is self-contained — no system SQLite required.
+
+## Broadcast
+
+The NDI 6 SDK is loaded **dynamically** via `libloading` so the binary
+doesn't depend on the SDK at link time. This keeps the app legally
+distributable and lets it run fine without NDI installed (the broadcast
+surface just doesn't appear).
+
+## STT
+
+Two engines, one transport:
+
+- **Whisper** runs locally via `whisper.cpp`, compiled by `bindgen`
+  during the first build.
+- **Deepgram** streams over a WebSocket using `tokio-tungstenite`, with
+  a REST fallback that uploads short windows when the socket drops.
+
+Both feed a unified transcript stream so the rest of the pipeline
+doesn't care which engine is active.

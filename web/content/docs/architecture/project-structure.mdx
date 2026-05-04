@@ -1,0 +1,107 @@
+---
+title: Project Structure
+description: How the repo is laid out and where to look for what.
+icon: FolderTree
+---
+
+import { File, Files, Folder } from "fumadocs-ui/components/files";
+
+The repo is a polyglot monorepo with a React frontend, a Rust workspace
+backend, a Bun-driven data pipeline, and a Next.js marketing/docs site.
+
+<Files>
+  <Folder name="rhema" defaultOpen>
+    <Folder name="src" defaultOpen>
+      <Folder name="components">
+        <File name="broadcast/    — Theme designer, NDI settings" />
+        <File name="controls/     — Transport bar" />
+        <File name="layout/       — Dashboard layout" />
+        <File name="panels/       — Transcript, preview, live, queue, search, detections" />
+        <File name="ui/           — shadcn/ui + custom components" />
+      </Folder>
+      <Folder name="hooks">
+        <File name="useAudio, useTranscription, useDetection, useBible, useBroadcast" />
+      </Folder>
+      <Folder name="stores">
+        <File name="Zustand: audio, transcript, bible, queue, detection, broadcast, settings" />
+      </Folder>
+      <File name="types/   — TypeScript type definitions" />
+      <File name="lib/     — Context search (Fuse.js), verse renderer (Canvas 2D), themes" />
+    </Folder>
+
+    <Folder name="src-tauri">
+      <Folder name="crates" defaultOpen>
+        <File name="audio/       — Audio capture & metering (cpal)" />
+        <File name="stt/         — Deepgram STT (WebSocket + REST), Whisper local" />
+        <File name="bible/       — SQLite Bible DB, search, cross-references" />
+        <Folder name="detection">
+          <File name="direct/    — Aho-Corasick + fuzzy reference parsing" />
+          <File name="semantic/  — ONNX embeddings, HNSW index, ensemble" />
+        </Folder>
+        <File name="broadcast/   — NDI output (FFI via libloading)" />
+        <File name="api/         — Tauri command layer" />
+        <File name="notes/       — (placeholder)" />
+      </Folder>
+      <File name="tauri.conf.json" />
+    </Folder>
+
+    <Folder name="data">
+      <File name="prepare-embeddings.ts     — Unified setup orchestrator" />
+      <File name="lib/python-env.ts         — Shared Python venv utilities" />
+      <File name="download-sources.ts       — Public domain translations + cross-refs" />
+      <File name="download-biblegateway.py  — Copyrighted translations (NIV, ESV, ...)" />
+      <File name="build-bible-db.ts         — Build SQLite DB from JSON sources" />
+      <File name="compute-embeddings.ts     — Export verses to JSON for embedding" />
+      <File name="precompute-embeddings.py  — Embeddings (GPU auto-detect, ONNX fallback)" />
+      <File name="download-model.ts         — Export & quantize Qwen3 ONNX model" />
+      <File name="download-ndi-sdk.ts       — Download NDI SDK libraries" />
+      <File name="schema.sql                — Database schema" />
+    </Folder>
+
+    <Folder name="web">
+      <File name="Next.js marketing site + this Fumadocs docs site" />
+    </Folder>
+
+    <Folder name="models">
+      <File name="ML models (gitignored — populated by setup:all)" />
+    </Folder>
+    <Folder name="embeddings">
+      <File name="Precomputed vectors (gitignored)" />
+    </Folder>
+    <Folder name="sdk">
+      <File name="ndi/    — NDI SDK files (downloaded by download:ndi-sdk)" />
+    </Folder>
+    <Folder name="build">
+      <File name="Vite build output" />
+    </Folder>
+  </Folder>
+</Files>
+
+## Frontend conventions
+
+- **Components** are organized by domain (`broadcast/`, `panels/`,
+  `controls/`) rather than by atomic level (`atoms/`, `molecules/`),
+  which makes it easier to find the place where the verse-overlay
+  rendering lives or where the queue actually mutates.
+- **Hooks** are thin and only own subscription/cleanup logic — the
+  business logic lives in stores.
+- **Stores** are Zustand slices, one per domain. Cross-store
+  coordination happens through small, named helpers rather than
+  global selectors, so a refactor stays local.
+
+## Backend conventions
+
+- Each crate has a single owner concept (audio, STT, Bible, detection,
+  broadcast, API). Adding a new sense — say, a transcription engine —
+  means a new module in the existing crate, not a new crate.
+- Tauri command handlers live in `rhema-api`. Other crates expose
+  pure Rust surfaces and never import `tauri::`.
+
+## Data pipeline conventions
+
+- **Idempotent**: every script in `data/` checks for existing output
+  and skips if it's already done. `setup:all` is the orchestrator
+  that runs them in order.
+- **Reproducible**: model versions and translation sources are pinned
+  in script constants, not environment variables, so two operators
+  running `setup:all` produce identical artifacts.

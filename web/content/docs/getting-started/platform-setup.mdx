@@ -1,0 +1,89 @@
+---
+title: Platform Setup
+description: System packages and build tools required by whisper.cpp on macOS, Linux, and Windows.
+icon: Settings2
+---
+
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+import { Callout } from "fumadocs-ui/components/callout";
+
+The local Whisper STT engine compiles `whisper.cpp` from source. That means
+`bindgen` runs on every clean build and needs CMake plus `libclang`. Pick
+the block for your operating system below.
+
+## macOS
+
+```bash
+brew install cmake
+```
+
+Apple ships LLVM with the Xcode Command Line Tools, so `libclang` is
+already on your machine. Run `xcode-select --install` if you haven't.
+
+## Linux
+
+<Tabs items={["Debian / Ubuntu", "Arch / Manjaro"]}>
+  <Tab value="Debian / Ubuntu">
+
+```bash
+sudo apt install cmake clang libclang-dev
+```
+
+  </Tab>
+  <Tab value="Arch / Manjaro">
+
+```bash
+sudo pacman -S llvm clang cmake
+```
+
+  </Tab>
+</Tabs>
+
+You also need the [Tauri v2 Linux prerequisites](https://v2.tauri.app/start/prerequisites/?utm_source=rhema-docs#linux)
+(WebKitGTK, libssl, etc.). Tauri's installer prints exact `apt`/`pacman`
+commands for your distribution.
+
+## Windows
+
+Windows needs an extra build-tools bootstrap before the shared setup
+pipeline — LLVM/libclang and CMake aren't available out of the box.
+
+<Callout title="Restart the terminal" type="warn">
+After `setup:windows` runs, you **must** close the terminal and open a new
+one so `LIBCLANG_PATH` is inherited. Skipping this step is the most common
+build failure on Windows.
+</Callout>
+
+1. Install [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)
+   with the **Desktop development with C++** workload (provides MSVC).
+2. From the repo root in PowerShell:
+
+   ```powershell
+   bun install
+   bun run setup:windows
+   ```
+
+   This installs LLVM + CMake via `winget` and persists `LIBCLANG_PATH` to
+   your user environment.
+3. **Close the terminal and open a new one.**
+4. Continue with the [installation guide](/docs/getting-started/installation):
+
+   ```powershell
+   bun run setup:all
+   bun run tauri dev
+   ```
+
+## Verifying the toolchain
+
+A quick way to confirm everything is wired before kicking off `setup:all`:
+
+```bash
+bun --version
+rustc --version
+python3 --version
+cmake --version
+clang --version
+```
+
+If any command isn't found, jump back to [Prerequisites](/docs/getting-started/prerequisites)
+and reinstall.

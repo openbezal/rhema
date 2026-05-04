@@ -1,0 +1,86 @@
+---
+title: Remote Control
+description: Drive Rhema from Stream Deck, TouchOSC, or any HTTP client via OSC and a REST API.
+icon: Gamepad2
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Live operators rarely have a free hand on a keyboard. Rhema exposes its
+controls over **OSC** and an **HTTP API** so you can wire them into
+hardware controllers, automation scripts, and stage-management
+software.
+
+<Callout title="In-depth guide" type="info">
+This page is a high-level overview. The full protocol reference,
+authentication notes, and example payloads live in the
+[remote control guide](https://github.com/openbezal/rhema/blob/main/documentation/remote-control.md)
+in the repository.
+</Callout>
+
+## What you can do remotely
+
+| Action | OSC address | HTTP body |
+| --- | --- | --- |
+| Next verse in queue | `/pew/next` | `{ "command": "next" }` |
+| Previous verse | `/pew/prev` | `{ "command": "prev" }` |
+| Show / hide overlay | `/pew/show`, `/pew/hide` | `{ "command": "show" }` |
+| Switch theme | `/pew/theme <name>` | `{ "command": "theme", "name": "lower-third" }` |
+| Set opacity | `/pew/opacity <0-1>` | `{ "command": "opacity", "value": 0.85 }` |
+| Set confidence threshold | `/pew/confidence <0-1>` | `{ "command": "confidence", "value": 0.65 }` |
+| Toggle on-air | `/pew/on_air <0\|1>` | `{ "command": "on_air", "value": true }` |
+
+All eight commands work identically across both protocols, so any
+controller you already own (or build) talks the same dialect.
+
+## OSC
+
+OSC runs on UDP. Configure the listening port in Settings → Remote, and
+send messages from your favorite controller:
+
+- **TouchOSC** templates with verse-show/hide pads, opacity sliders,
+  and theme buttons drop right onto a tablet.
+- **Stream Deck** + an OSC plugin maps each pad to one of the
+  addresses above.
+- **A simple test from the command line**:
+
+  ```bash
+  oscsend localhost 9000 /pew/next
+  ```
+
+The Settings panel shows a **live command log** with timestamps so you
+can debug controller setups without leaving the app.
+
+## HTTP API
+
+For scripts and web automations, the HTTP API exposes the same
+controls under `/api/v1/`:
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/api/v1/health` | GET | 200 OK + server info when listening |
+| `/api/v1/control` | POST | Dispatch a command (table above) |
+| `/api/v1/status` | GET | Current state snapshot — live verse, queue, theme, on-air |
+
+CORS is permissive on the local network so a phone's browser, a staff
+laptop, or a Node-RED workflow can drive Rhema directly.
+
+```bash
+curl -sX POST http://rhema.local:8910/api/v1/control \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"theme","name":"lower-third"}'
+```
+
+The status endpoint returns an authoritative view from a Rust-side
+state cache, so no Tauri-frontend round-trip is needed:
+
+```bash
+curl http://rhema.local:8910/api/v1/status
+```
+
+## Persistence and shutdown
+
+OSC and HTTP listeners can be started and stopped without restarting
+the app. Port-bind failures surface as visible errors in the Settings
+panel rather than as silent listener crashes, and both listeners shut
+down cleanly on app exit (no zombie threads, no orphaned ports).

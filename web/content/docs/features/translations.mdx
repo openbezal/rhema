@@ -1,0 +1,63 @@
+---
+title: Bible Translations
+description: Eleven translations across four languages, with FTS5 full-text search and BM25 ranking out of the box.
+icon: BookOpen
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Rhema ships with eleven Bible translations spanning English, Spanish,
+French, and Portuguese. They're stored in a single bundled SQLite database
+(`data/rhema.db`) with FTS5 indexes for sub-millisecond text search.
+
+## Bundled translations
+
+| Translation | Language | Source |
+| --- | --- | --- |
+| KJV | English | Public domain |
+| NIV | English | BibleGateway |
+| ESV | English | BibleGateway |
+| NASB | English | BibleGateway |
+| NKJV | English | BibleGateway |
+| NLT | English | BibleGateway |
+| AMP | English | BibleGateway |
+| Reina-Valera | Spanish | Public domain |
+| Louis Segond | French | Public domain |
+| João Ferreira de Almeida | Portuguese | Public domain |
+
+<Callout title="Copyrighted translations" type="warn">
+NIV, ESV, NASB, NKJV, NLT, and AMP are downloaded from BibleGateway during
+`setup:all` (phase 3). They aren't redistributed in the repo because of
+licensing — you fetch them locally on your own machine.
+</Callout>
+
+## Cross-references
+
+Rhema imports **340,000+ cross-references** from
+[openbible.info](https://openbible.info) so every verse links to thematically
+related passages. The cross-reference panel shows them ranked by relevance,
+and you can click through to queue any of them for broadcast.
+
+## Switching translations during a sermon
+
+The active translation is the one rendered on the broadcast overlay. You
+can change it three ways:
+
+1. **Voice command** — "read in NIV", "switch to ESV", "let's hear it in
+   NLT". See [Voice control](/docs/features/voice-control).
+2. **UI control** — the translation picker in the transport bar.
+3. **Remote control** — OSC, HTTP, or a Stream Deck button. See
+   [Remote control](/docs/features/remote-control).
+
+When you swap, the live overlay reflows with the new translation while
+keeping the same verse reference.
+
+## Search architecture
+
+Every translation has its own FTS5 virtual table backed by a porter
+tokenizer. Queries use BM25 ranking, which gives natural results when
+searching by phrase ("walk by faith", "fearfully and wonderfully").
+
+The frontend layers Fuse.js on top for instant fuzzy search across the
+recent context — the kind of typing-while-searching experience you want
+when scrubbing for a verse during a service.

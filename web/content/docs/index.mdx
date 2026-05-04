@@ -1,6 +1,116 @@
 ---
-title: Welcome to Rhema
-description: Real-time AI Bible verse detection for live sermons and broadcasts.
+title: Introduction
+description: Real-time AI Bible verse detection for live sermons and broadcasts — a Tauri v2 desktop app with a React frontend and Rust backend.
+icon: Sparkles
 ---
 
-Welcome to the Rhema documentation. This is a placeholder — content is added in subsequent commits.
+import { Card, Cards } from "fumadocs-ui/components/card";
+import { Callout } from "fumadocs-ui/components/callout";
+import {
+  Mic,
+  Radio,
+  Search,
+  Languages,
+  Palette,
+  Sliders,
+  Cpu,
+  Database,
+  Rocket,
+} from "lucide-react";
+
+Rhema listens to a live sermon audio feed, transcribes speech in real time,
+detects Bible verse references — both explicit citations and quoted
+passages — and renders them as broadcast-ready overlays via NDI for live
+production.
+
+## What you can do with Rhema
+
+<Cards>
+  <Card
+    icon={<Mic />}
+    title="Hear the sermon"
+    description="Capture audio from any input device and transcribe it locally with Whisper or via Deepgram's streaming WebSocket API."
+  />
+  <Card
+    icon={<Search />}
+    title="Find the verse"
+    description="A multi-strategy detector combines Aho-Corasick reference parsing, Qwen3 ONNX semantic search, and quotation matching."
+  />
+  <Card
+    icon={<Radio />}
+    title="Render broadcast overlays"
+    description="Send verse overlays to vMix, OBS, or any NDI consumer with the built-in theme designer for typography and backgrounds."
+  />
+  <Card
+    icon={<Languages />}
+    title="Switch translations on the fly"
+    description='Say "read in NIV" mid-sermon and Rhema swaps the active translation without breaking the queue.'
+  />
+</Cards>
+
+## Get started in two commands
+
+<Callout title="Prerequisites" type="info">
+You'll need [Bun](https://bun.sh), the [Rust toolchain](https://rustup.rs),
+[Python 3](https://www.python.org/), and your platform's
+[Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) installed
+first. See [Prerequisites](/docs/getting-started/prerequisites) for the full
+list.
+</Callout>
+
+```bash
+git clone https://github.com/openbezal/rhema.git && cd rhema
+bun install && bun run setup:all
+bun run tauri dev
+```
+
+That's it. `setup:all` runs seven idempotent phases — Python venv, Bible
+downloads, SQLite build, ONNX export, embeddings — and `tauri dev` boots the
+desktop app. See the [installation guide](/docs/getting-started/installation)
+for a guided walkthrough.
+
+## How it's built
+
+<Cards>
+  <Card
+    icon={<Cpu />}
+    title="Rust workspace, 7 crates"
+    description="Audio capture, STT streaming, Bible DB, detection pipeline, NDI broadcast, Tauri command layer."
+    href="/docs/architecture/rust-crates"
+  />
+  <Card
+    icon={<Database />}
+    title="SQLite + FTS5"
+    description="Bundled rusqlite database with full-text search, BM25 ranking, and 340k+ cross-references."
+    href="/docs/architecture/tech-stack"
+  />
+  <Card
+    icon={<Sliders />}
+    title="React 19 + Tauri v2"
+    description="Tailwind v4, shadcn/ui, and Zustand on the frontend; Tauri v2 with a restrictive CSP on the backend."
+    href="/docs/architecture/tech-stack"
+  />
+  <Card
+    icon={<Palette />}
+    title="ONNX-quantized embeddings"
+    description="Qwen3-Embedding-0.6B exported to INT8 ONNX, indexed with HNSW for sub-second semantic recall."
+    href="/docs/features/verse-detection"
+  />
+</Cards>
+
+## Where to go next
+
+<Cards>
+  <Card
+    icon={<Rocket />}
+    title="Install Rhema"
+    description="Step-by-step guide from clone through first run — including platform-specific build tools."
+    href="/docs/getting-started/installation"
+  />
+  <Card
+    icon={<Search />}
+    title="How verse detection works"
+    description="Read about the multi-strategy detection pipeline: direct, semantic, quotation, and ensemble merging."
+    href="/docs/features/verse-detection"
+  />
+</Cards>
