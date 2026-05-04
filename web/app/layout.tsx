@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { RootProvider } from "fumadocs-ui/provider/next";
 import "./globals.css";
-import { SmoothScrollProvider } from "./_components/ui/smooth-scroll-provider";
 import { SITE } from "./_lib/site";
 import { StructuredData } from "./_components/seo/structured-data";
 
@@ -90,7 +90,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="h-full antialiased"
+      className="dark h-full antialiased"
       data-theme="dark"
       suppressHydrationWarning
     >
@@ -99,7 +99,15 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <StructuredData />
-        <SmoothScrollProvider>{children}</SmoothScrollProvider>
+        <RootProvider
+          theme={{
+            defaultTheme: "dark",
+            forcedTheme: "dark",
+            enableSystem: false,
+          }}
+        >
+          {children}
+        </RootProvider>
       </body>
     </html>
   );

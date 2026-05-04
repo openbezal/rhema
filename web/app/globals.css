@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@source "../node_modules/fumadocs-ui/dist/**/*.js";
 
 @font-face {
   font-family: "GT Walsheim Pro";
@@ -130,4 +133,45 @@ html.lenis body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * Fumadocs theme: align the docs surface with the Rhema brand.
+ * Uses HSL channel triplets for the fumadocs preset; map to rhema accent
+ * (#0099ff) and the same near-black surface as the marketing site.
+ */
+.dark {
+  --color-fd-background: 0 0% 0%;
+  --color-fd-foreground: 0 0% 100%;
+  --color-fd-muted: 0 0% 6%;
+  --color-fd-muted-foreground: 0 0% 60%;
+  --color-fd-popover: 0 0% 4%;
+  --color-fd-popover-foreground: 0 0% 96%;
+  --color-fd-card: 0 0% 4%;
+  --color-fd-card-foreground: 0 0% 96%;
+  --color-fd-border: 0 0% 12%;
+  --color-fd-primary: 204 100% 50%;
+  --color-fd-primary-foreground: 0 0% 0%;
+  --color-fd-secondary: 0 0% 6%;
+  --color-fd-secondary-foreground: 0 0% 96%;
+  --color-fd-accent: 0 0% 8%;
+  --color-fd-accent-foreground: 0 0% 96%;
+  --color-fd-ring: 204 100% 50%;
+}
+
+/* Slightly soften the docs surface against the pure-black marketing site */
+#nd-docs-layout,
+#nd-page {
+  --color-fd-background: 0 0% 3%;
+}
+
+/* Use the same brand sans-serif for docs content */
+.prose,
+[data-fumadocs] {
+  font-family: var(--font-sans);
+}
+
+/* Anchor offset for non-Lenis pages (docs) */
+:where(html:not(.lenis)) {
+  scroll-padding-top: 5rem;
 }
