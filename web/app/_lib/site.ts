@@ -3,7 +3,7 @@ export const SITE = {
   tagline: "Your Pastor speaks. Rhema finds the verse.",
   description:
     "Rhema listens to a live sermon audio feed, transcribes speech in real time, detects Bible verse references (both explicit citations and quoted passages), and renders them as broadcast-ready overlays via NDI for live production.",
-  url: "https://rhema.app",
+  url: "https://openrhema.com",
   repo: {
     owner: "openbezal",
     name: "rhema",
@@ -26,12 +26,15 @@ export const SITE = {
 
 export async function getGitHubStars(): Promise<number> {
   try {
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github+json",
+    };
+    const token = process.env.GITHUB_TOKEN;
+    if (token) headers.Authorization = `Bearer ${token}`;
+
     const res = await fetch(
       `https://api.github.com/repos/${SITE.repo.owner}/${SITE.repo.name}`,
-      {
-        next: { revalidate: 3600 },
-        headers: { Accept: "application/vnd.github+json" },
-      }
+      { headers }
     );
     if (!res.ok) return SITE.repo.stars.fallback;
     const data = (await res.json()) as { stargazers_count?: number };

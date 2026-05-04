@@ -13,8 +13,6 @@ import { FinalCtaSection } from "./_components/sections/final-cta-section";
 import { SiteFooter } from "./_components/sections/site-footer";
 import { getGitHubStars } from "./_lib/site";
 
-export const revalidate = 3600;
-
 export default async function Home() {
   const stars = await getGitHubStars();
 
