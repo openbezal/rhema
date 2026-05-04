@@ -25,14 +25,15 @@ NDI exactly as designed.
 
 ## Built-in starters
 
-Rhema ships with a small set of opinionated starter themes that you can
-clone and modify:
+Rhema ships with three opinionated starter themes (`src/lib/builtin-themes.ts`)
+that you can clone and modify:
 
-- **Lower-third** — a minimal bottom strip suitable for talking-head
-  layouts.
-- **Full-frame** — a centered overlay for cut-aways and IMAG.
-- **Side-card** — an offset card that doesn't obscure the speaker's
-  face.
+- **Classic Dark** — a high-contrast dark overlay tuned for typical
+  stage lighting.
+- **Modern Light** — a soft, light-on-dark variant for warmer venue
+  palettes.
+- **Broadcast Overlay** — a broadcast-safe layout designed for
+  composition over a live camera feed.
 
 Each starter is a regular project file you can save, version, and
 re-export.
@@ -42,8 +43,8 @@ re-export.
 Themes can be activated from:
 
 - The theme picker in the transport bar.
-- A Stream Deck or other OSC controller (`/pew/theme`).
-- The HTTP control endpoint (`POST /api/v1/control` with `{ "theme": "lower-third" }`).
+- A Stream Deck or other OSC controller (`/rhema/theme`).
+- The HTTP control endpoint (`POST /api/v1/control` with `{ "command": "theme", "value": "Classic Dark" }`).
 
 The currently active theme is reflected in the **preview** panel before
 it goes on-air, and committed to NDI when you toggle the on-air switch.

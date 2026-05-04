@@ -32,7 +32,7 @@ Settings → Remote for local-only access.
 
 ## What you can do remotely
 
-| Action | OSC address | HTTP body |
+| Action | OSC address | HTTP body (POST `/api/v1/control`) |
 | --- | --- | --- |
 | Next verse in queue | `/rhema/next` | `{ "command": "next" }` |
 | Previous verse | `/rhema/prev` | `{ "command": "prev" }` |
@@ -76,11 +76,12 @@ controls under `/api/v1/`:
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
-| `/api/v1/command` | POST | Dispatch a command (table above) |
+| `/api/v1/health` | GET | Liveness check — returns service name and version |
 | `/api/v1/status` | GET | Current state snapshot — on-air, active theme, live verse, queue length, confidence threshold |
+| `/api/v1/control` | POST | Dispatch a command (table above) |
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/command \
+curl -X POST http://localhost:8080/api/v1/control \
   -H 'Content-Type: application/json' \
   -d '{"command":"theme","value":"Classic Dark"}'
 ```
@@ -111,9 +112,10 @@ down cleanly on app exit (no zombie threads, no orphaned ports).
 
 ## Security
 
-By default, both protocols bind to `0.0.0.0` and HTTP runs **without
-CORS** for local use only. Before exposing Rhema beyond the local
-network, bind to `127.0.0.1` in Settings, or front it with a reverse
-proxy that adds authentication and TLS. The repo's
+By default, both protocols bind to `0.0.0.0` and the HTTP server
+attaches a **permissive CORS layer**, so any origin on the network can
+call the API. Before exposing Rhema beyond a trusted local network,
+bind to `127.0.0.1` in Settings, or front it with a reverse proxy that
+adds authentication and TLS. The repo's
 [remote control guide](https://github.com/openbezal/rhema/blob/main/documentation/remote-control.md#security-considerations)
 covers the threat model in more depth.

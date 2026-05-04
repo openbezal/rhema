@@ -49,25 +49,21 @@ works.
 
 ## HTTP API
 
-The HTTP server listens on port `8080` (configurable) under the
-`/api/v1/` prefix. Two endpoints are exposed.
+The HTTP server is built with Axum, listens on port `8080`
+(configurable), and exposes three endpoints under the `/api/v1/`
+prefix.
 
-### `POST /api/v1/command`
+### `GET /api/v1/health`
 
-Dispatch any command from the catalog. The body is JSON with a
-`command` key and (for commands that take a parameter) a `value` key:
+A liveness check that returns the service identity:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/command \
-  -H 'Content-Type: application/json' \
-  -d '{"command":"theme","value":"Classic Dark"}'
+curl http://localhost:8080/api/v1/health
 ```
 
 ```json
-{ "status": "ok" }
+{ "status": "ok", "service": "rhema", "version": "..." }
 ```
-
-Unknown commands and invalid JSON are rejected.
 
 ### `GET /api/v1/status`
 
@@ -88,12 +84,33 @@ refreshes once per second:
 }
 ```
 
-<Callout title="CORS is disabled by default" type="warn">
-The HTTP server is built with Axum and does **not** advertise CORS
-headers. Local-network and same-machine requests work fine; browser
-fetches from a different origin will be blocked by the browser. Front
-it with a reverse proxy if you need cross-origin access from a web
-dashboard.
+`active_theme` and `live_verse` are nullable — they're `null` until a
+theme is selected or a verse is sent live.
+
+### `POST /api/v1/control`
+
+Dispatch any command from the catalog. The body is JSON with a
+`command` key and (for commands that take a parameter) a `value` key:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/control \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"theme","value":"Classic Dark"}'
+```
+
+```json
+{ "success": true, "error": null }
+```
+
+Unknown commands and invalid JSON are rejected with `success: false`
+and a descriptive `error` string.
+
+<Callout title="CORS is permissive by default" type="warn">
+The Axum router attaches `CorsLayer::permissive()`, so any origin on
+the network can call the API from a browser. That's convenient for
+local dashboards but unsafe to leave on once the listener is reachable
+beyond a trusted LAN — pair binding to `127.0.0.1` with a reverse
+proxy when you expose it.
 </Callout>
 
 ## Persistence and shutdown semantics

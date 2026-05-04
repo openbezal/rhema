@@ -15,29 +15,39 @@ sermon transcript — there's no wake word and no separate listening mode.
 The translation switcher activates whenever the detector hears one of
 these patterns:
 
-- "read in **NIV**"
-- "read in the **NLT**"
-- "switch to **ESV**"
-- "let's hear it in **NASB**"
-- "in the **King James**"
+- "read in **NIV**" / "switch to **NIV**"
+- "read in **ESV**" / "switch to **ESV**"
+- "read in **NASB**" / "switch to **NASB**"
+- "read in **NKJV**" / "switch to **NKJV**"
+- "read in **NLT**" / "switch to **NLT**"
+- "read in **KJV**" / "switch to **KJV**"
+- "read in **Amplified**" / "switch to **Amplified**" → AMP
+- "read in **Spanish**" / "read in **Reina Valera**" → SpaRV
+- "read in **French**" → FreJND
+- "read in **Portuguese**" → PorAA
 
-Translation aliases are forgiving — "King James", "KJV", and "Authorized
-Version" all map to the same translation. Once recognized, the active
-translation flips immediately and the live overlay reflows.
+Patterns are case-insensitive. Once recognized, the active translation
+flips immediately and the live overlay reflows. The full alias table
+lives in `src-tauri/crates/detection/src/direct/detector.rs`.
 
 ## Chapter navigation in reading mode
 
 When the pastor announces a passage to read through ("Let's turn to
 **Romans 8**"), Rhema enters reading mode and the queue locks to that
-chapter. Voice commands then advance through the text:
+chapter. Voice commands then advance through the text — these are the
+exact patterns the detector matches in
+`src-tauri/crates/detection/src/reading_mode.rs`:
 
+- "**next**" / "**next verse**" — advance by one verse
+- "**previous verse**" / "**go back**" — back by one verse
 - "**next chapter**" / "**previous chapter**"
-- "**chapter 5**"
-- "**verse 12**"
-- "**back two verses**"
-- "**exit reading mode**"
+- "**chapter N**" — jump to chapter N
+- "**verse N**" — jump to verse N
+- "**chapter N verse M**" — jump directly to chapter N verse M
 
-This is much faster than fishing for verses in the queue while preaching.
+Reading mode exits automatically when detection drifts back into
+free-form citation territory — there's no explicit "exit reading mode"
+phrase to memorize.
 
 <Callout title="False-positive guard" type="info">
 Voice commands only fire when the detector is confident the words are a
