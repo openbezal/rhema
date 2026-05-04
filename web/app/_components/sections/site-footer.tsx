@@ -24,7 +24,8 @@ const GROUPS = [
   {
     heading: "Resources",
     links: [
-      { label: "Documentation", href: SITE.repo.url, external: true },
+      { label: "Documentation", href: "/docs" },
+      { label: "Getting started", href: "/docs/getting-started/installation" },
       { label: "Help center", href: SITE.repo.discussions, external: true },
     ],
   },

@@ -12,8 +12,8 @@ const LINKS = [
   { href: "#features", label: "Features" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#pricing", label: "Pricing" },
+  { href: "/docs", label: "Docs" },
   { href: "#download", label: "Download" },
-  { href: SITE.repo.url, label: "Docs", external: true },
   { href: "#faq", label: "FAQs" },
 ];
 
