@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -31,11 +33,23 @@ impl AudioCapture {
 ///
 /// Audio is converted to mono 16-bit PCM at 16 kHz, with the specified gain
 /// applied.
+///
+/// `device_lost` is an out-parameter the caller passes in: it is set to `true`
+/// when cpal's stream-error callback fires (typically because the OS device
+/// vanished). The caller's watchdog loop polls this to know when to drop the
+/// `AudioCapture` and rebuild it once the device returns.
+///
+/// When `config.device_id` names a device that isn't currently enumerable,
+/// this returns `AudioError::DeviceNotFound` rather than silently falling back
+/// to the system default — the watchdog should retry instead of switching to
+/// the laptop mic. With `device_id` unset (`None` or empty) the system default
+/// is used as before.
 #[expect(clippy::too_many_lines, reason = "audio setup is inherently sequential with many format branches")]
 #[expect(clippy::needless_pass_by_value, reason = "config fields are read and sender is cloned into closures")]
 pub fn start(
     config: AudioConfig,
     sender: Sender<AudioFrame>,
+    device_lost: Arc<AtomicBool>,
 ) -> Result<AudioCapture, AudioError> {
     let host = cpal::default_host();
 
@@ -62,9 +76,8 @@ pub fn start(
                 log::info!("[AUDIO] Using requested device: '{id}'");
                 d
             } else {
-                log::warn!("[AUDIO] Device '{id}' not found! Falling back to default.");
-                host.default_input_device()
-                    .ok_or(AudioError::NoInputDevices)?
+                log::warn!("[AUDIO] Device '{id}' not currently available — caller should wait or change selection.");
+                return Err(AudioError::DeviceNotFound(id.clone()));
             }
         }
         _ => {
@@ -89,8 +102,15 @@ pub fn start(
 
     let stream_config: StreamConfig = supported_config.into();
 
-    let err_fn = |err: cpal::StreamError| {
-        log::error!("Audio stream error: {err}");
+    // Build a fresh err callback per match arm. cpal takes the callback by
+    // value, and our closure captures `Arc<AtomicBool>` so each arm needs
+    // its own clone.
+    let make_err_fn = || {
+        let device_lost = device_lost.clone();
+        move |err: cpal::StreamError| {
+            log::error!("Audio stream error: {err}");
+            device_lost.store(true, Ordering::SeqCst);
+        }
     };
 
     let stream = match sample_format {
@@ -108,7 +128,7 @@ pub fn start(
                         &sender,
                     );
                 },
-                err_fn,
+                make_err_fn(),
                 None,
             )
         }
@@ -135,7 +155,7 @@ pub fn start(
                         &sender,
                     );
                 },
-                err_fn,
+                make_err_fn(),
                 None,
             )
         }
@@ -159,7 +179,7 @@ pub fn start(
                         &sender,
                     );
                 },
-                err_fn,
+                make_err_fn(),
                 None,
             )
         }

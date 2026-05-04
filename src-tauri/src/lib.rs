@@ -1,5 +1,6 @@
 mod commands;
 mod events;
+mod memstats;
 mod state;
 
 use std::sync::Mutex;
@@ -65,6 +66,8 @@ pub fn run() {
         ])
         .setup(|app| {
             use tauri::Manager;
+
+            memstats::spawn();
 
             // Try resource dir first (production), then dev fallback
             let db_path = app

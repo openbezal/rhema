@@ -109,6 +109,10 @@ impl Vad {
                         frames.push(frame.clone());
                         self.utterance_frames += frames.len();
 
+                        log::debug!(
+                            "[VAD] Silence -> Speech (flushed {} pre-buffer frames)",
+                            frames.len() - 1,
+                        );
                         return VadResult {
                             frames,
                             transition: Some(VadTransition::SpeechStarted),
@@ -135,6 +139,10 @@ impl Vad {
 
                 // Force-flush on max utterance length
                 if self.utterance_frames >= self.config.max_utterance_frames {
+                    log::debug!(
+                        "[VAD] Speech -> Silence FORCED (max_utterance={} frames)",
+                        self.utterance_frames,
+                    );
                     self.state = VadState::Silence;
                     self.voice_count = 0;
                     self.silence_count = 0;
@@ -150,6 +158,11 @@ impl Vad {
                 } else {
                     self.silence_count += 1;
                     if self.silence_count >= self.config.silence_frame_count {
+                        log::debug!(
+                            "[VAD] Speech -> Silence (utterance={} frames, pre_buf={})",
+                            self.utterance_frames,
+                            self.pre_buffer.len(),
+                        );
                         // Transition to Silence (skip Trailing for simplicity)
                         self.state = VadState::Silence;
                         self.voice_count = 0;

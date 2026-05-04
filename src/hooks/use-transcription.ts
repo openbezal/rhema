@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
+import { useAudioStore } from "@/stores/audio-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useTauriEvent } from "./use-tauri-event"
@@ -81,6 +82,24 @@ export function useTranscription(options?: UseTranscriptionOptions) {
   useTauriEvent<string>("stt_error", (msg) => {
     useTranscriptStore.getState().setConnectionStatus("error")
     toast.error("Transcription error", { description: msg })
+  })
+
+  // Audio source lifecycle: when the OS device disappears (mic unplugged,
+  // headset disconnects, app loses access) the watchdog in the Rust fanout
+  // thread emits `audio_source_lost`, then `audio_source_recovered` once it
+  // sees the device return. The STT provider stays alive across the gap.
+  useTauriEvent("audio_source_lost", () => {
+    useAudioStore.getState().setSourceLost(true)
+    toast.warning("Audio source disconnected", {
+      description: "Waiting for the device to come back…",
+      id: "audio-source-status",
+    })
+  })
+  useTauriEvent("audio_source_recovered", () => {
+    useAudioStore.getState().setSourceLost(false)
+    toast.success("Audio source reconnected", {
+      id: "audio-source-status",
+    })
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_partial", (payload) => {

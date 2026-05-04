@@ -1,15 +1,22 @@
 #![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
 
-use std::sync::atomic::Ordering;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::events::{
-    AudioLevelPayload, TranscriptPayload, EVENT_AUDIO_LEVEL, EVENT_TRANSCRIPT_FINAL,
-    EVENT_TRANSCRIPT_PARTIAL,
+    AudioLevelPayload, TranscriptPayload, EVENT_AUDIO_LEVEL, EVENT_AUDIO_SOURCE_LOST,
+    EVENT_AUDIO_SOURCE_RECOVERED, EVENT_TRANSCRIPT_FINAL, EVENT_TRANSCRIPT_PARTIAL,
 };
 use crate::state::AppState;
+
+/// [DIAG] Running totals for AppState mutex contention on the direct-detection
+/// hot path. Direct-mode detection runs on every Final transcript fragment
+/// inside spawn_blocking, so high contention here means workers are stalling.
+static DIRECT_LOCK_OK: AtomicU64 = AtomicU64::new(0);
+static DIRECT_LOCK_CONTENDED: AtomicU64 = AtomicU64::new(0);
 
 /// Truncate a string to at most `max_bytes`, snapping to a valid UTF-8 char boundary.
 fn truncate_safe(s: &str, max_bytes: usize) -> &str {
@@ -161,60 +168,127 @@ pub async fn start_transcription(
     std::thread::Builder::new()
         .name("audio-fanout".into())
         .spawn(move || {
-            let config = AudioConfig {
-                device_id,
-                sample_rate: 16_000,
-                gain: gain_val,
-            };
-
-            let (audio_tx, audio_rx) = crossbeam_channel::bounded::<AudioFrame>(64);
-
-            // Start capture on THIS thread — AudioCapture stays here.
-            let capture = match rhema_audio::capture::start(config, audio_tx) {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("Failed to start audio capture: {e}");
-                    fan_active.store(false, Ordering::SeqCst);
-                    return;
-                }
-            };
-
-            log::info!("Audio capture started on fanout thread");
-
+            // Watchdog flag — set by cpal's stream-error callback when the OS
+            // device vanishes. The outer loop polls this (and frame silence)
+            // to detect loss and rebuild the capture once the device returns.
+            let device_lost = Arc::new(AtomicBool::new(false));
             let mut frame_count: u64 = 0;
+            let mut announced_lost = false;
 
-            loop {
+            // Outer loop: rebuild `AudioCapture` whenever the device is lost
+            // and reappears. Exits only when `fan_active` is cleared by
+            // `stop_transcription`.
+            'outer: loop {
                 if !fan_active.load(Ordering::SeqCst) {
-                    break;
+                    break 'outer;
                 }
 
-                match audio_rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok(frame) => {
-                        frame_count += 1;
+                let config = AudioConfig {
+                    device_id: device_id.clone(),
+                    sample_rate: 16_000,
+                    gain: gain_val,
+                };
 
-                        // (a) Compute audio levels at ~15 Hz
-                        //     At 16 kHz with ~1024-sample frames, every 4th frame is ~15 Hz.
-                        if frame_count % 4 == 0 {
-                            let level = rhema_audio::meter::compute_level(&frame.samples);
+                let (audio_tx, audio_rx) = crossbeam_channel::bounded::<AudioFrame>(64);
+                device_lost.store(false, Ordering::SeqCst);
+
+                let capture = match rhema_audio::capture::start(
+                    config,
+                    audio_tx,
+                    device_lost.clone(),
+                ) {
+                    Ok(c) => {
+                        if announced_lost {
+                            log::info!("[AUDIO] Source recovered — capture rebuilt");
+                            let _ = fan_app.emit(EVENT_AUDIO_SOURCE_RECOVERED, ());
+                            announced_lost = false;
+                        }
+                        c
+                    }
+                    Err(e) => {
+                        if !announced_lost {
+                            log::warn!(
+                                "[AUDIO] Source unavailable: {e} — waiting for reconnect"
+                            );
+                            let _ = fan_app.emit(EVENT_AUDIO_SOURCE_LOST, ());
+                            announced_lost = true;
+                            // Drop level meter to zero so UI reflects the gap.
                             let _ = fan_app.emit(
                                 EVENT_AUDIO_LEVEL,
-                                AudioLevelPayload {
-                                    rms: level.rms,
-                                    peak: level.peak,
-                                },
+                                AudioLevelPayload { rms: 0.0, peak: 0.0 },
                             );
                         }
-
-                        // (b) Forward all audio to STT provider
-                        let _ = audio_send_tx.try_send(frame.samples);
+                        std::thread::sleep(Duration::from_millis(750));
+                        continue 'outer;
                     }
-                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => {},
-                    Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+                };
+
+                log::info!("Audio capture started on fanout thread");
+
+                let mut last_frame_at = Instant::now();
+
+                // Inner loop: pump frames until loss is detected or stop is requested.
+                loop {
+                    if !fan_active.load(Ordering::SeqCst) {
+                        capture.stop();
+                        break 'outer;
+                    }
+
+                    // Loss signal #1: cpal's err_fn fired.
+                    // Loss signal #2: no frames for >2s (some platforms silently
+                    // stop delivering rather than calling err_fn).
+                    if device_lost.load(Ordering::SeqCst)
+                        || last_frame_at.elapsed() > Duration::from_secs(2)
+                    {
+                        log::warn!(
+                            "[AUDIO] Source lost (err_flag={}, silent_for={:?}) — dropping capture",
+                            device_lost.load(Ordering::SeqCst),
+                            last_frame_at.elapsed()
+                        );
+                        if !announced_lost {
+                            let _ = fan_app.emit(EVENT_AUDIO_SOURCE_LOST, ());
+                            let _ = fan_app.emit(
+                                EVENT_AUDIO_LEVEL,
+                                AudioLevelPayload { rms: 0.0, peak: 0.0 },
+                            );
+                            announced_lost = true;
+                        }
+                        break; // drop `capture`, outer loop rebuilds
+                    }
+
+                    match audio_rx.recv_timeout(Duration::from_millis(100)) {
+                        Ok(frame) => {
+                            last_frame_at = Instant::now();
+                            frame_count += 1;
+
+                            // (a) Compute audio levels at ~15 Hz
+                            //     At 16 kHz with ~1024-sample frames, every 4th frame is ~15 Hz.
+                            if frame_count % 4 == 0 {
+                                let level = rhema_audio::meter::compute_level(&frame.samples);
+                                let _ = fan_app.emit(
+                                    EVENT_AUDIO_LEVEL,
+                                    AudioLevelPayload {
+                                        rms: level.rms,
+                                        peak: level.peak,
+                                    },
+                                );
+                            }
+
+                            // (b) Forward all audio to STT provider
+                            let _ = audio_send_tx.try_send(frame.samples);
+                        }
+                        Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
+                        Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                            // Capture's sender was dropped — fall through to rebuild.
+                            break;
+                        }
+                    }
                 }
+
+                // Dropping `capture` stops the cpal stream.
+                capture.stop();
             }
 
-            // Dropping `capture` stops the cpal stream.
-            capture.stop();
             log::info!("Audio capture stopped on fanout thread");
         })
         .map_err(|e| {
@@ -249,6 +323,14 @@ pub async fn start_transcription(
     // Background detection channel — direct + reading mode, non-blocking
     let (detect_tx, mut detect_rx) = tokio::sync::mpsc::channel::<String>(16);
 
+    // [DIAG] Counters so we can see whether transcripts are being dropped
+    // because the detection workers can't keep up. Logged every 25 sends
+    // alongside current queue depth.
+    let detect_sent = Arc::new(AtomicU64::new(0));
+    let detect_dropped = Arc::new(AtomicU64::new(0));
+    let semantic_sent = Arc::new(AtomicU64::new(0));
+    let semantic_dropped = Arc::new(AtomicU64::new(0));
+
     // Spawn semantic detection worker (runs ONNX inference without blocking transcript).
     // Uses spawn_blocking so ONNX doesn't starve the tokio async runtime
     // (WebSocket readers, event emitters, etc.).
@@ -277,6 +359,11 @@ pub async fn start_transcription(
             .await;
         }
     });
+
+    let detect_sent_evt = detect_sent.clone();
+    let detect_dropped_evt = detect_dropped.clone();
+    let semantic_sent_evt = semantic_sent.clone();
+    let semantic_dropped_evt = semantic_dropped.clone();
 
     tauri::async_runtime::spawn(async move {
         while let Some(event) = event_rx.recv().await {
@@ -327,12 +414,50 @@ pub async fn start_transcription(
 
                         // Fire-and-forget: detection runs in background thread pool.
                         // Event consumer proceeds immediately to next transcript.
-                        let _ = detect_tx.try_send(transcript.clone());
+                        match detect_tx.try_send(transcript.clone()) {
+                            Ok(()) => {
+                                let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                if n % 25 == 0 {
+                                    let depth = detect_tx.max_capacity() - detect_tx.capacity();
+                                    let dropped = detect_dropped_evt.load(Ordering::Relaxed);
+                                    log::info!(
+                                        "[QUEUE] detect_tx sent={n} dropped={dropped} depth={depth}/{}",
+                                        detect_tx.max_capacity()
+                                    );
+                                }
+                            }
+                            Err(_) => {
+                                let d = detect_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                let sent = detect_sent_evt.load(Ordering::Relaxed);
+                                log::warn!(
+                                    "[QUEUE] detect_tx DROPPED (consumer behind) sent={sent} dropped={d}"
+                                );
+                            }
+                        }
 
                         // Send every is_final fragment to FTS5 immediately.
                         // No sentence buffer — FTS5 is fast enough (~20-50ms)
                         // to run on every fragment without waiting for pauses.
-                        let _ = semantic_tx.try_send(transcript.clone());
+                        match semantic_tx.try_send(transcript.clone()) {
+                            Ok(()) => {
+                                let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                if n % 25 == 0 {
+                                    let depth = semantic_tx.max_capacity() - semantic_tx.capacity();
+                                    let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
+                                    log::info!(
+                                        "[QUEUE] semantic_tx sent={n} dropped={dropped} depth={depth}/{}",
+                                        semantic_tx.max_capacity()
+                                    );
+                                }
+                            }
+                            Err(_) => {
+                                let d = semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                let sent = semantic_sent_evt.load(Ordering::Relaxed);
+                                log::warn!(
+                                    "[QUEUE] semantic_tx DROPPED (consumer behind) sent={sent} dropped={d}"
+                                );
+                            }
+                        }
 
                         log::debug!("[EVT] Final processed in {:?} ({:?})", t0.elapsed(), truncate_safe(&transcript, 40));
                     }
@@ -408,7 +533,11 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
     // Resolve verse info from DB (needs AppState, but only briefly for DB lookup)
     let app_managed: State<'_, Mutex<AppState>> = app.state();
     let Ok(app_state) = app_managed.try_lock() else {
-        log::warn!("[DET-DIRECT] AppState try_lock FAILED (contention) — emitting without verse text");
+        let bad = DIRECT_LOCK_CONTENDED.fetch_add(1, Ordering::Relaxed) + 1;
+        let good = DIRECT_LOCK_OK.load(Ordering::Relaxed);
+        log::warn!(
+            "[DET-DIRECT] AppState try_lock FAILED (contention) ok={good} contended={bad} — emitting without verse text"
+        );
         // AppState locked — emit results without verse text
         let results: Vec<super::detection::DetectionResult> = merged
             .iter()
@@ -435,6 +564,11 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
         let _ = app.emit("verse_detections", &results);
         return has_high_confidence;
     };
+    let ok = DIRECT_LOCK_OK.fetch_add(1, Ordering::Relaxed) + 1;
+    if ok % 50 == 0 {
+        let bad = DIRECT_LOCK_CONTENDED.load(Ordering::Relaxed);
+        log::info!("[DET-DIRECT] AppState lock stats ok={ok} contended={bad}");
+    }
     let results: Vec<super::detection::DetectionResult> = merged
         .iter()
         .map(|m| super::detection::to_result(&app_state, m))

@@ -378,6 +378,15 @@ impl ReadingMode {
         }
         self.accumulated_text.push_str(text);
 
+        // [DIAG] Watch accumulated_text growth — only cleared on advance_to,
+        // so if matches never trigger, this grows until timeout pauses us.
+        if self.accumulated_text.len() > 4096 {
+            log::warn!(
+                "[READING] accumulated_text large: {} bytes (no advance since last clear)",
+                self.accumulated_text.len(),
+            );
+        }
+
         let transcript_words = text_to_word_set(&self.accumulated_text);
 
         // Check current verse
