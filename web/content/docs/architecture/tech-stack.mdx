@@ -38,21 +38,28 @@ The Rust side is a Cargo workspace of seven crates, each with a single
 clear responsibility. See the [Rust crates](/docs/architecture/rust-crates)
 page for the breakdown.
 
-Tauri v2 wires Rust commands to React via a typed IPC surface. The
-webview is locked down with a restrictive [CSP](/docs/reference/security)
-to prevent script injection and unauthorized data exfiltration.
+`tauri = "2.10.3"` wires Rust commands to React via a typed IPC
+surface. Workspace MSRV is `rust-version = "1.77.2"`. The webview is
+locked down with a restrictive [CSP](/docs/reference/security) to
+prevent script injection and unauthorized data exfiltration.
 
 ## ML / detection
 
 The detection pipeline is intentionally heterogeneous:
 
-- **Aho-Corasick** for direct reference parsing — compiled once, scans in
-  linear time with negligible memory.
+- **Aho-Corasick** (`aho-corasick = "1"`) for direct reference parsing
+  — compiled once, scans in linear time with negligible memory.
 - **Qwen3-Embedding-0.6B** for semantic search, exported to ONNX and
-  quantized to INT8 so a normal CPU keeps up.
-- **HNSW** index for nearest-neighbor recall in well under a millisecond.
+  quantized to INT8 (via `optimum-cli onnxruntime quantize --arm64`)
+  so a normal CPU keeps up.
+- **ONNX Runtime** through the `ort = "2.0.0-rc.12"` Rust crate for
+  inference (gated behind the `onnx` feature on `rhema-detection`).
+- **Brute-force cosine similarity** over the embedded verses
+  (~31k × 1024 dims). The file `semantic/hnsw_index.rs` is named after
+  a future plan; today it scans linearly because the dataset is small
+  enough that the simpler approach wins.
 - **Fuse.js** on the frontend for instant fuzzy search over the recent
-  transcript.
+  transcript context (`src/lib/context-search.ts`).
 
 ## Database
 

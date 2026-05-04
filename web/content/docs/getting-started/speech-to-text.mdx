@@ -25,20 +25,26 @@ streaming.
 
 ## Option 1: Whisper (recommended for most installs)
 
-No setup is required at the runtime level — Whisper downloads its model on
-first use. You just need the build dependencies covered in
-[Platform setup](/docs/getting-started/platform-setup).
-
 The Whisper integration uses [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp)
-via `bindgen`, so the first `cargo build` compiles the C++ source. After
-that, model files cache locally.
+through the `whisper-rs = "0.16"` Rust crate (gated behind the
+`whisper` feature on `rhema-stt`). The first `cargo build` compiles
+the C++ source via `bindgen`.
+
+The model file (`ggml-large-v3-turbo-q8_0.bin`) is downloaded once
+into `models/whisper/` as **phase 7** of `setup:all`. If you skipped
+or interrupted that phase, run it on its own:
+
+```bash
+bun run download:whisper
+```
 
 <Callout title="Build dependencies" type="info">
-You need **CMake** and **libclang** on your `PATH`. macOS gets these from
-Homebrew (`brew install cmake`) plus the Xcode CLT. Linux gets them from
-your package manager. Windows installs them via `bun run setup:windows`.
-See [Platform setup](/docs/getting-started/platform-setup) for the exact
-commands.
+You need **CMake** and **libclang** on your `PATH` for the Rust
+build to succeed. macOS gets these from Homebrew
+(`brew install cmake`) plus the Xcode CLT. Linux gets them from your
+package manager. Windows installs them via `bun run setup:windows`.
+See [Platform setup](/docs/getting-started/platform-setup) for the
+exact commands.
 </Callout>
 
 ## Option 2: Deepgram
@@ -78,13 +84,15 @@ and queue state are preserved across the swap.
 | | Whisper (local) | Deepgram (cloud) |
 | --- | --- | --- |
 | API cost | Free | Per-minute billing |
-| Internet required | No | Yes (WebSocket) |
-| First-build time | ~3–5 min (compiles `whisper.cpp`) | Instant |
-| Latency on a steady connection | ~250–400 ms | ~150–250 ms |
+| Internet required | No, after the model is downloaded | Yes (WebSocket) |
+| First-build time | Several minutes — `whisper.cpp` compiles via `bindgen` | Instant |
 | Long-form accuracy | Good | Excellent |
 | Punctuation | Decent | Excellent |
 | Works offline | Yes | No |
 
-Both are good defaults — Whisper for the no-cost path, Deepgram when you
-want the lowest possible latency and best transcription quality on a
-reliable network.
+Latency depends heavily on hardware and network conditions, so we
+don't publish a single number — Whisper benefits from any GPU/Metal
+acceleration `whisper-rs` can pick up, and Deepgram is bounded by the
+round-trip to its nearest region. Pick whichever fits your install:
+Whisper for the no-cost local path, Deepgram for the lowest latency
+and best transcription quality on a reliable network.

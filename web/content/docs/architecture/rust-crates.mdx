@@ -48,8 +48,9 @@ Each crate maps to a clear external responsibility:
   crates don't depend on Tauri, which means the workspace can be
   built and tested as plain Rust without the Tauri shell.
 
-- **`rhema-notes`** is a placeholder for an upcoming sermon-notes
-  feature.
+- **`rhema-notes`** is a placeholder. Its `lib.rs` reads
+  *"Planned: Claude API integration, sermon note generation, and
+  PDF/Markdown export"* — none of that is implemented yet.
 
 ## Dependency graph
 
@@ -68,11 +69,25 @@ dependencies. This is enforced by the workspace `Cargo.toml` and is
 the property that keeps incremental builds fast and individual crates
 testable.
 
+## Feature flags
+
+Two crates are gated behind Cargo features so the workspace stays
+buildable on minimal toolchains:
+
+- `rhema-stt` exposes a `whisper` feature (`whisper-rs = "0.16"`,
+  `optional = true`). The Deepgram path is always available.
+- `rhema-detection` exposes `onnx` (turns on `ort = "2.0.0-rc.12"`)
+  and `vector-search` features.
+
+The default crate features in `src-tauri/Cargo.toml` enable both ONNX
+and vector search, so the standard `tauri dev` workflow gets the full
+detection pipeline.
+
 ## Testing
 
-Each crate has its own `tests/` folder. The pipeline crates
-(`rhema-detection` especially) are tested with curated transcript
-fixtures so we can assert exact detection behavior on known sermons.
+Pipeline crates have inline `#[cfg(test)]` modules with curated
+transcript fixtures so detection behavior is asserted on known
+inputs.
 
 Run the workspace test suite from the repo root:
 
@@ -80,5 +95,4 @@ Run the workspace test suite from the repo root:
 cargo test --workspace
 ```
 
-The Tauri command surface is integration-tested through the Vitest
-suite in `src/`.
+The frontend test surface uses Vitest (`bun run test`).

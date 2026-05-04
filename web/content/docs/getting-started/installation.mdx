@@ -47,22 +47,33 @@ scripts.
 bun run setup:all
 ```
 
-`setup:all` is **idempotent** — re-running it skips phases that have already
-completed, so it's safe to invoke after `git pull` or when something changed
-in `data/`. Behind the scenes it executes seven phases in order:
+`setup:all` is **idempotent** — re-running it skips phases whose
+output artifacts already exist, so it's safe to invoke after
+`git pull` or when something changed in `data/`. Pass `--force` to
+re-run every phase. The orchestrator (`data/prepare-embeddings.ts`)
+runs seven phases in this exact order:
 
-1. **Python environment** — creates `.venv` and installs every pip dependency.
-2. **Open-source Bibles** — downloads KJV, Spanish, French, and Portuguese
-   translations plus 340k+ cross-references from openbible.info.
-3. **Copyrighted translations** — pulls NIV, ESV, NASB, NKJV, NLT, and AMP
-   from BibleGateway.
-4. **SQLite database** — assembles `data/rhema.db` with FTS5 full-text
-   indexes and cross-reference tables.
-5. **ONNX model** — downloads `Qwen3-Embedding-0.6B`, exports it to ONNX,
-   and quantizes to INT8 for ARM64.
-6. **Verse export** — emits the KJV verses to JSON for embedding.
-7. **Embedding precomputation** — runs the embeddings (auto-selects GPU if
-   available, falls back to ONNX CPU otherwise).
+1. **Python environment** — creates `.venv` and installs the pip
+   dependencies (`optimum-onnx[onnxruntime]`,
+   `sentence-transformers`, `accelerate`, `tokenizers`, `numpy`,
+   `torch`, `meaningless`).
+2. **Bible source data** — downloads a single bundled archive that
+   contains all ten translations (KJV, NIV, ESV, NASB, NKJV, NLT,
+   AMP, SpaRV, FreJND, PorBLivre) plus the cross-reference dataset
+   from openbible.info.
+3. **SQLite database** — assembles `data/rhema.db` with FTS5
+   virtual tables and cross-reference tables.
+4. **ONNX model** — downloads `Qwen3/Qwen3-Embedding-0.6B`, exports
+   it via `optimum-cli export onnx`, and quantizes to INT8 for
+   ARM64 with `optimum-cli onnxruntime quantize`.
+5. **Verse export** — emits the KJV verses to JSON for the
+   embedding step.
+6. **Embedding precomputation** — runs the embeddings (auto-selects
+   GPU via PyTorch if available; falls back to ONNX Runtime on
+   CPU).
+7. **Whisper model** — downloads `ggml-large-v3-turbo-q8_0.bin`
+   into `models/whisper/` so the local STT engine works without an
+   internet round-trip.
 
   </Step>
   <Step>
@@ -111,20 +122,22 @@ pipeline. Each phase has its own script:
   <Tab value="Bun scripts">
 
 ```bash
-bun run download:bible-data        # Public domain translations + cross-refs
+bun run download:bible-data        # Bundled translations + cross-refs
 bun run build:bible                # Build SQLite database
 bun run download:model             # Download & export ONNX model
 bun run export:verses              # Export verses to JSON
-bun run precompute:embeddings      # Rust ONNX binary
-bun run precompute:embeddings-py   # Python sentence-transformers
+bun run precompute:embeddings      # Rust ONNX binary (recommended)
+bun run precompute:embeddings-onnx # Python ONNX Runtime path
+bun run precompute:embeddings-py   # Python sentence-transformers (GPU)
+bun run download:whisper           # Whisper model (ggml turbo q8_0)
 ```
 
   </Tab>
   <Tab value="Direct Python">
 
 ```bash
-python3 data/download-biblegateway.py     # Copyrighted translations (needs .venv)
-python3 data/precompute-embeddings.py     # Embeddings (GPU or ONNX fallback)
+python3 data/precompute-embeddings.py      # GPU sentence-transformers
+python3 data/precompute-embeddings-onnx.py # CPU ONNX Runtime fallback
 ```
 
   </Tab>
