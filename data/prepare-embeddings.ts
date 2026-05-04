@@ -2,13 +2,12 @@
  * Unified pipeline: sets up everything needed for Rhema from scratch.
  *
  *   Phase 1 – Python environment (.venv + all pip deps)
- *   Phase 2 – Download open-source Bible data (scrollmapper + cross-refs)
- *   Phase 3 – Download copyrighted translations from BibleGateway
- *   Phase 4 – Build rhema.db (SQLite + FTS5)
- *   Phase 5 – Download & export ONNX model + INT8 quantization
- *   Phase 6 – Export KJV verses to JSON
- *   Phase 7 – Pre-compute verse embeddings
- *   Phase 8 – Download Whisper model for local STT
+ *   Phase 2 – Download Bible data (pre-built zip + cross-refs)
+ *   Phase 3 – Build rhema.db (SQLite + FTS5)
+ *   Phase 4 – Download & export ONNX model + INT8 quantization
+ *   Phase 5 – Export KJV verses to JSON
+ *   Phase 6 – Pre-compute verse embeddings
+ *   Phase 7 – Download Whisper model for local STT
  *
  * Every phase is idempotent: if its output artifacts already exist it is
  * skipped. Pass --force to re-run everything regardless.
@@ -36,6 +35,8 @@ const MODELS_DIR_INT8 = join(
 
 const KJV_SOURCE = join(DATA_DIR, "sources", "KJV.json")
 const NIV_SOURCE = join(DATA_DIR, "sources", "NIV.json")
+const ESV_SOURCE = join(DATA_DIR, "sources", "ESV.json")
+const CROSS_REFS = join(DATA_DIR, "cross-refs", "cross_references.txt")
 const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
 const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b.bin")
@@ -81,7 +82,7 @@ async function main() {
   if (force) console.log("  (--force: re-running all phases)\n")
 
   // ── Phase 1: Python environment ────────────────────────────────
-  console.log("\n━━━ Phase 1/8: Python environment ━━━")
+  console.log("\n━━━ Phase 1/7: Python environment ━━━")
   await ensurePythonEnv([
     "optimum-onnx[onnxruntime]",
     "sentence-transformers",
@@ -92,33 +93,28 @@ async function main() {
     "meaningless",
   ])
 
-  // ── Phase 2: Open-source Bible data ────────────────────────────
-  console.log("\n━━━ Phase 2/8: Download open-source Bible data ━━━")
-  if (!shouldSkip("open-source Bible data", KJV_SOURCE)) {
+  // ── Phase 2: Bible source data (pre-built zip + cross-refs) ────
+  console.log("\n━━━ Phase 2/7: Download Bible source data ━━━")
+  if (
+    !shouldSkip(
+      "Bible source data",
+      KJV_SOURCE,
+      NIV_SOURCE,
+      ESV_SOURCE,
+      CROSS_REFS
+    )
+  ) {
     await run(["bun", "run", join(DATA_DIR, "download-sources.ts")])
   }
 
-  // ── Phase 3: BibleGateway copyrighted translations ─────────────
-  console.log("\n━━━ Phase 3/8: Download BibleGateway translations ━━━")
-  if (!shouldSkip("BibleGateway translations", NIV_SOURCE)) {
-    const venvPython = getVenvBin(
-      process.platform === "win32" ? "python" : "python3"
-    )
-    await run(
-      [venvPython, join(DATA_DIR, "download-biblegateway.py")],
-      undefined,
-      { PYTHONUTF8: "1" }
-    )
-  }
-
-  // ── Phase 4: Build Bible database ──────────────────────────────
-  console.log("\n━━━ Phase 4/8: Build Bible database ━━━")
+  // ── Phase 3: Build Bible database ──────────────────────────────
+  console.log("\n━━━ Phase 3/7: Build Bible database ━━━")
   if (!shouldSkip("Bible database", DB_PATH)) {
     await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
   }
 
-  // ── Phase 5: ONNX model download + quantize ────────────────────
-  console.log("\n━━━ Phase 5/8: ONNX model download & quantize ━━━")
+  // ── Phase 4: ONNX model download + quantize ────────────────────
+  console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")
   if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
     const optimumCli = getVenvBin("optimum-cli")
 
@@ -164,20 +160,20 @@ async function main() {
     }
   }
 
-  // ── Phase 6: Export verses to JSON ─────────────────────────────
-  console.log("\n━━━ Phase 6/8: Export verses to JSON ━━━")
+  // ── Phase 5: Export verses to JSON ─────────────────────────────
+  console.log("\n━━━ Phase 5/7: Export verses to JSON ━━━")
   if (!shouldSkip("verses JSON", VERSES_JSON)) {
     if (!existsSync(DB_PATH)) {
       console.error(
-        "  ❌ rhema.db not found. Run phases 2-4 first (or remove --force skip)."
+        "  ❌ rhema.db not found. Run phases 2-3 first (or remove --force skip)."
       )
       process.exit(1)
     }
     await run(["bun", "run", join(DATA_DIR, "compute-embeddings.ts")])
   }
 
-  // ── Phase 7: Pre-compute embeddings ────────────────────────────
-  console.log("\n━━━ Phase 7/8: Pre-compute verse embeddings ━━━")
+  // ── Phase 6: Pre-compute embeddings ────────────────────────────
+  console.log("\n━━━ Phase 6/7: Pre-compute verse embeddings ━━━")
   if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
     const venvPython = getVenvBin(
       process.platform === "win32" ? "python" : "python3"
@@ -190,8 +186,8 @@ async function main() {
     )
   }
 
-  // ── Phase 8: Whisper model ────────────────────────────────────
-  console.log("\n━━━ Phase 8/8: Download Whisper model ━━━")
+  // ── Phase 7: Whisper model ────────────────────────────────────
+  console.log("\n━━━ Phase 7/7: Download Whisper model ━━━")
   if (!shouldSkip("Whisper model", WHISPER_MODEL)) {
     await run(["bun", "run", join(DATA_DIR, "download-whisper-model.ts")])
   }
