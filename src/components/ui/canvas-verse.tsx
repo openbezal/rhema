@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, memo } from "react"
+import { useRef, useEffect, useState, useCallback, memo } from "react"
 import { renderVerse } from "@/lib/verse-renderer"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,7 @@ export const CanvasVerse = memo(function CanvasVerse({
 }: CanvasVerseProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [containerWidth, setContainerWidth] = useState(0)
 
   // Measure container width with ResizeObserver
@@ -31,8 +32,7 @@ export const CanvasVerse = memo(function CanvasVerse({
     return () => observer.disconnect()
   }, [])
 
-  // Render to canvas at display size
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas || containerWidth === 0) return
     const ctx = canvas.getContext("2d")
@@ -50,8 +50,37 @@ export const CanvasVerse = memo(function CanvasVerse({
 
     ctx.scale(dpr, dpr)
     const scale = displayW / theme.resolution.width
-    renderVerse(ctx, theme, verse, { scale })
+    renderVerse(ctx, theme, verse, {
+      scale,
+      imageCache: imageCacheRef.current,
+    })
   }, [theme, verse, containerWidth])
+
+  // Preload background image so the renderer can find it in the cache.
+  useEffect(() => {
+    const bg = theme.background
+    if (bg.type !== "image" || !bg.image?.url) return
+    const url = bg.image.url
+    const cache = imageCacheRef.current
+    if (cache.has(url)) return
+
+    const img = new Image()
+    img.onload = () => {
+      cache.set(url, img)
+      draw()
+    }
+    img.onerror = () => {
+      console.warn("[canvas-verse] failed to load background image", {
+        url: url.slice(0, 100),
+      })
+    }
+    img.src = url
+  }, [theme.background, draw])
+
+  // Redraw whenever theme, verse, or container size changes.
+  useEffect(() => {
+    draw()
+  }, [draw])
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>

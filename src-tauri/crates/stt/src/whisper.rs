@@ -150,6 +150,7 @@ impl SttProvider for WhisperProvider {
             };
             let mut vad = Vad::new(vad_config);
             let mut audio_buffer: Vec<i16> = Vec::new();
+            let mut frames_seen: u64 = 0;
 
             loop {
                 if vad_cancelled.load(Ordering::SeqCst) {
@@ -171,6 +172,11 @@ impl SttProvider for WhisperProvider {
                                         .blocking_send(TranscriptEvent::SpeechStarted);
                                 }
                                 VadTransition::SpeechEnded => {
+                                    log::info!(
+                                        "[WHISPER] flush on SpeechEnded: audio_buffer={} samples ({:.1}s)",
+                                        audio_buffer.len(),
+                                        audio_buffer.len() as f64 / 16_000.0,
+                                    );
                                     if audio_buffer.len() >= MIN_BUFFER_SAMPLES {
                                         let _ = inference_tx
                                             .blocking_send(std::mem::take(&mut audio_buffer));
@@ -183,9 +189,23 @@ impl SttProvider for WhisperProvider {
 
                         for frame in result.frames {
                             audio_buffer.extend_from_slice(&frame.samples);
+                            frames_seen += 1;
+                        }
+
+                        if frames_seen.is_multiple_of(50) && !audio_buffer.is_empty() {
+                            log::debug!(
+                                "[WHISPER] audio_buffer={} samples ({:.1}s) frames_seen={frames_seen}",
+                                audio_buffer.len(),
+                                audio_buffer.len() as f64 / 16_000.0,
+                            );
                         }
 
                         if audio_buffer.len() >= MAX_BUFFER_SAMPLES {
+                            log::warn!(
+                                "[WHISPER] flush on MAX_BUFFER ({} samples / {:.1}s) — VAD never closed",
+                                audio_buffer.len(),
+                                audio_buffer.len() as f64 / 16_000.0,
+                            );
                             let _ = inference_tx.blocking_send(std::mem::take(&mut audio_buffer));
                         }
                     }
