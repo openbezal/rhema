@@ -185,9 +185,9 @@ html.lenis body {
  * it lands after globals.css in the cascade).
  */
 [data-rmiz-modal-overlay="visible"] {
-  background-color: rgba(0, 0, 0, 0.82) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 @media (prefers-reduced-motion: reduce) {
