@@ -179,11 +179,13 @@ html.lenis body {
 /*
  * ImageZoom modal backdrop: lift the zoomed image off the page with
  * a translucent dark overlay and a subtle blur instead of the default
- * opaque background. The zoomed image stays fully readable while the
- * docs underneath fade out of focus.
+ * opaque background. The default fumadocs preset paints the overlay
+ * with --color-fd-background — using !important to win over the
+ * component's side-effect-imported stylesheet (loaded at runtime, so
+ * it lands after globals.css in the cascade).
  */
 [data-rmiz-modal-overlay="visible"] {
-  background-color: rgba(0, 0, 0, 0.82);
+  background-color: rgba(0, 0, 0, 0.82) !important;
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
 }
