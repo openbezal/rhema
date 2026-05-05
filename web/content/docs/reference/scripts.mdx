@@ -81,6 +81,11 @@ dependency weight:
 
 ## CI usage
 
+![Terminal output of a CI job running setup:all, cargo test, and bun run test in sequence with green checkmarks](/docs/screenshots/terminal-ci-success.png)
+
+*A successful CI run on a fresh checkout: `setup:all` walks the seven phases, `cargo test --workspace` exercises the Rust crates, then `bun run test` runs the frontend Vitest suite. Idempotent skip lines appear when artifacts already exist, so subsequent runs are much faster. **Click to expand.***
+
+
 The setup pipeline is designed to be CI-safe — every script is
 idempotent and exits non-zero on real failure (rather than silently
 skipping). A typical CI job is:

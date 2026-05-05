@@ -73,6 +73,11 @@ If you're reviewing the codebase for security:
 
 ## Remote control defaults — read carefully
 
+![Settings → Remote tab with bind-host fields highlighted, port-bind error states, and the live command log](/docs/screenshots/settings-remote-binding.png)
+
+*Settings → Remote is where you'd swap the listener bind hosts from `0.0.0.0` to `127.0.0.1` when you don't want LAN-wide reachability. Port-bind failures show inline so you can spot a misconfigured port without leaving the dialog. **Click to expand.***
+
+
 The OSC and HTTP listeners are **not** locked down by default. The
 shipped defaults are:
 

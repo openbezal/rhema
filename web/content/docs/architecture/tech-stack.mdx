@@ -15,6 +15,10 @@ import { Card, Cards } from "fumadocs-ui/components/card";
 | **Broadcast** | NDI 6 SDK via dynamic loading (`libloading` FFI) |
 | **STT** | Local Whisper via `whisper.cpp`, or Deepgram WebSocket + REST (`tokio-tungstenite`) |
 
+![Layered architecture diagram — React frontend over Tauri IPC, Rust workspace below, with NDI / STT / SQLite as external surfaces](/docs/diagrams/diagram-stack-layers.svg)
+
+*Layer-by-layer view of the stack: React + Tailwind on top, Tauri IPC bridge in the middle, the Rust workspace below, and the external surfaces (NDI sender, STT engines, SQLite-on-disk) at the edges. **Click to expand.***
+
 ## Frontend
 
 <Cards>
