@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Ensemble merger: four detection strategies feed into a merger that emits a single ranked stream to the queue">
+  <defs>
+    <pattern id="em-dots" patternUnits="userSpaceOnUse" width="24" height="24">
+      <rect width="24" height="24" fill="#070709"/>
+      <circle cx="12" cy="12" r="1.2" fill="#1a2330"/>
+    </pattern>
+    <linearGradient id="em-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1015"/>
+      <stop offset="1" stop-color="#060709"/>
+    </linearGradient>
+    <linearGradient id="em-strategy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#181c25"/>
+      <stop offset="1" stop-color="#0e1218"/>
+    </linearGradient>
+    <linearGradient id="em-merger" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e3654"/>
+      <stop offset="1" stop-color="#08243d"/>
+    </linearGradient>
+    <marker id="em-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0099ff"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#em-bg)"/>
+  <rect x="40" y="40" width="1520" height="820" rx="20" fill="url(#em-dots)" opacity="0.55"/>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <!-- Title -->
+    <text x="100" y="130" font-size="34" font-weight="600" letter-spacing="-0.5" fill="#ffffff">Ensemble merger</text>
+    <text x="100" y="166" font-size="18" fill="#9aa4b2">Four detection strategies in parallel, one ranked stream out.</text>
+
+    <!-- Column labels -->
+    <text x="180" y="248" font-size="13" fill="#5a6b7d" letter-spacing="2" font-weight="600">STRATEGIES</text>
+    <text x="700" y="248" font-size="13" fill="#5a6b7d" letter-spacing="2" font-weight="600">MERGER</text>
+    <text x="1240" y="248" font-size="13" fill="#5a6b7d" letter-spacing="2" font-weight="600">OUTPUT</text>
+
+    <!-- Strategy boxes -->
+    <g>
+      <!-- Direct -->
+      <g transform="translate(120 290)">
+        <rect width="320" height="100" rx="12" fill="url(#em-strategy)" stroke="#1f2734" stroke-width="1.5"/>
+        <circle cx="22" cy="50" r="6" fill="#22c55e"/>
+        <text x="42" y="42" font-size="18" font-weight="600" fill="#ffffff">Direct reference</text>
+        <text x="42" y="66" font-size="13" fill="#9aa4b2">Aho-Corasick + fuzzy book names</text>
+        <text x="42" y="84" font-size="13" fill="#5a6b7d">"John 3:16" · "First Cor. 13:4"</text>
+      </g>
+      <!-- Semantic -->
+      <g transform="translate(120 410)">
+        <rect width="320" height="100" rx="12" fill="url(#em-strategy)" stroke="#1f2734" stroke-width="1.5"/>
+        <circle cx="22" cy="50" r="6" fill="#818cf8"/>
+        <text x="42" y="42" font-size="18" font-weight="600" fill="#ffffff">Semantic search</text>
+        <text x="42" y="66" font-size="13" fill="#9aa4b2">Qwen3-0.6B INT8 + cosine scan</text>
+        <text x="42" y="84" font-size="13" fill="#5a6b7d">paraphrase · applied teaching</text>
+      </g>
+      <!-- Quotation -->
+      <g transform="translate(120 530)">
+        <rect width="320" height="100" rx="12" fill="url(#em-strategy)" stroke="#1f2734" stroke-width="1.5"/>
+        <circle cx="22" cy="50" r="6" fill="#fbbf24"/>
+        <text x="42" y="42" font-size="18" font-weight="600" fill="#ffffff">Quotation matcher</text>
+        <text x="42" y="66" font-size="13" fill="#9aa4b2">verbatim windows vs. verse text</text>
+        <text x="42" y="84" font-size="13" fill="#5a6b7d">"the just shall live by faith"</text>
+      </g>
+      <!-- Reading mode -->
+      <g transform="translate(120 650)">
+        <rect width="320" height="100" rx="12" fill="url(#em-strategy)" stroke="#1f2734" stroke-width="1.5"/>
+        <circle cx="22" cy="50" r="6" fill="#f472b6"/>
+        <text x="42" y="42" font-size="18" font-weight="600" fill="#ffffff">Reading mode</text>
+        <text x="42" y="66" font-size="13" fill="#9aa4b2">chapter-locked, voice-navigated</text>
+        <text x="42" y="84" font-size="13" fill="#5a6b7d">"Let's turn to Romans 8"</text>
+      </g>
+    </g>
+
+    <!-- Merger box -->
+    <g transform="translate(640 290)">
+      <rect width="320" height="460" rx="16" fill="url(#em-merger)" stroke="#0099ff" stroke-width="2"/>
+      <text x="160" y="60" text-anchor="middle" font-size="22" font-weight="600" fill="#ffffff">Ensemble merger</text>
+      <line x1="40" y1="84" x2="280" y2="84" stroke="#0099ff" stroke-width="1" opacity="0.35"/>
+      <g font-size="14" fill="#cfe6f8">
+        <text x="40" y="120" font-weight="600" fill="#9bd6ff" font-size="12" letter-spacing="2">DEDUPE</text>
+        <text x="40" y="142">overlapping candidates</text>
+        <text x="40" y="160">collapse to a single card</text>
+
+        <text x="40" y="208" font-weight="600" fill="#9bd6ff" font-size="12" letter-spacing="2">WEIGHT</text>
+        <text x="40" y="230">source-aware confidence</text>
+        <text x="40" y="248">scoring across strategies</text>
+
+        <text x="40" y="296" font-weight="600" fill="#9bd6ff" font-size="12" letter-spacing="2">DECAY</text>
+        <text x="40" y="318">time-based score reduction</text>
+        <text x="40" y="336">so stale candidates fade</text>
+
+        <text x="40" y="384" font-weight="600" fill="#9bd6ff" font-size="12" letter-spacing="2">BUFFER</text>
+        <text x="40" y="406">sentence boundaries reduce</text>
+        <text x="40" y="424">flicker on partial hits</text>
+      </g>
+    </g>
+
+    <!-- Output: ranked stream -->
+    <g transform="translate(1160 410)">
+      <rect width="320" height="220" rx="14" fill="url(#em-strategy)" stroke="#1f2734" stroke-width="1.5"/>
+      <text x="160" y="46" text-anchor="middle" font-size="20" font-weight="600" fill="#ffffff">Ranked stream</text>
+      <line x1="40" y1="62" x2="280" y2="62" stroke="#1f2734"/>
+      <g font-size="13" fill="#9aa4b2">
+        <text x="22" y="88">› single, deduplicated stream</text>
+        <text x="22" y="112">› confidence-ordered</text>
+        <text x="22" y="136">› feeds the verse queue</text>
+        <text x="22" y="160">› drives the live preview</text>
+      </g>
+      <text x="22" y="200" font-size="12" fill="#0099ff" letter-spacing="1">→ rhema-detection ▸ merger.rs</text>
+    </g>
+
+    <!-- Connectors: strategies → merger -->
+    <g stroke="#0099ff" stroke-width="1.8" fill="none" opacity="0.85">
+      <path d="M 440 340 C 540 340 540 440 640 440" marker-end="url(#em-arrow)"/>
+      <path d="M 440 460 C 540 460 540 480 640 480" marker-end="url(#em-arrow)"/>
+      <path d="M 440 580 C 540 580 540 540 640 540" marker-end="url(#em-arrow)"/>
+      <path d="M 440 700 C 540 700 540 600 640 600" marker-end="url(#em-arrow)"/>
+    </g>
+
+    <!-- Connector: merger → output -->
+    <line x1="960" y1="520" x2="1160" y2="520" stroke="#0099ff" stroke-width="2" marker-end="url(#em-arrow)"/>
+  </g>
+</svg>

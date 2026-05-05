@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Rhema pipeline: audio capture flows through speech-to-text, detection, queue, and NDI broadcast">
+  <defs>
+    <pattern id="pf-dots" patternUnits="userSpaceOnUse" width="24" height="24">
+      <rect width="24" height="24" fill="#070709"/>
+      <circle cx="12" cy="12" r="1.2" fill="#1a2330"/>
+    </pattern>
+    <linearGradient id="pf-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1015"/>
+      <stop offset="1" stop-color="#060709"/>
+    </linearGradient>
+    <linearGradient id="pf-box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#181c25"/>
+      <stop offset="1" stop-color="#0e1218"/>
+    </linearGradient>
+    <linearGradient id="pf-box-accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e3654"/>
+      <stop offset="1" stop-color="#08243d"/>
+    </linearGradient>
+    <marker id="pf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0099ff"/>
+    </marker>
+  </defs>
+
+  <!-- Canvas -->
+  <rect width="1600" height="900" fill="url(#pf-bg)"/>
+  <rect x="40" y="40" width="1520" height="820" rx="20" fill="url(#pf-dots)" opacity="0.55"/>
+
+  <!-- Title -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fill="#ffffff">
+    <text x="100" y="130" font-size="34" font-weight="600" letter-spacing="-0.5">Rhema pipeline</text>
+    <text x="100" y="166" font-size="18" fill="#9aa4b2" font-weight="400">From microphone capture to broadcast-ready overlay.</text>
+  </g>
+
+  <!-- Five stages -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+
+    <!-- Stage 1: Audio -->
+    <g transform="translate(80 360)">
+      <rect width="260" height="220" rx="14" fill="url(#pf-box)" stroke="#1f2734" stroke-width="1.5"/>
+      <rect x="0" y="0" width="260" height="44" rx="14" fill="#0e1622"/>
+      <rect x="0" y="30" width="260" height="14" fill="#0e1622"/>
+      <text x="20" y="29" font-size="13" fill="#0099ff" font-weight="600" letter-spacing="2">01 · CAPTURE</text>
+      <text x="20" y="92" font-size="22" fill="#ffffff" font-weight="600">Audio capture</text>
+      <text x="20" y="124" font-size="14" fill="#9aa4b2">cpal device enumeration</text>
+      <text x="20" y="146" font-size="14" fill="#9aa4b2">PCM buffer + voice-activity</text>
+      <text x="20" y="168" font-size="14" fill="#9aa4b2">crate: rhema-audio</text>
+    </g>
+
+    <!-- Stage 2: STT -->
+    <g transform="translate(370 360)">
+      <rect width="260" height="220" rx="14" fill="url(#pf-box)" stroke="#1f2734" stroke-width="1.5"/>
+      <rect x="0" y="0" width="260" height="44" rx="14" fill="#0e1622"/>
+      <rect x="0" y="30" width="260" height="14" fill="#0e1622"/>
+      <text x="20" y="29" font-size="13" fill="#0099ff" font-weight="600" letter-spacing="2">02 · TRANSCRIBE</text>
+      <text x="20" y="92" font-size="22" fill="#ffffff" font-weight="600">Speech-to-text</text>
+      <text x="20" y="124" font-size="14" fill="#9aa4b2">Whisper (whisper.cpp)</text>
+      <text x="20" y="146" font-size="14" fill="#9aa4b2">or Deepgram WebSocket</text>
+      <text x="20" y="168" font-size="14" fill="#9aa4b2">crate: rhema-stt</text>
+    </g>
+
+    <!-- Stage 3: Detection (highlighted as the heart of the pipeline) -->
+    <g transform="translate(660 320)">
+      <rect width="280" height="300" rx="14" fill="url(#pf-box-accent)" stroke="#0099ff" stroke-width="2"/>
+      <rect x="0" y="0" width="280" height="44" rx="14" fill="#082742"/>
+      <rect x="0" y="30" width="280" height="14" fill="#082742"/>
+      <text x="20" y="29" font-size="13" fill="#9bd6ff" font-weight="600" letter-spacing="2">03 · DETECT</text>
+      <text x="20" y="92" font-size="22" fill="#ffffff" font-weight="600">Detection pipeline</text>
+      <g font-size="14" fill="#cfe6f8">
+        <text x="20" y="130">› Direct (Aho-Corasick)</text>
+        <text x="20" y="155">› Semantic (Qwen3 ONNX)</text>
+        <text x="20" y="180">› Quotation matcher</text>
+        <text x="20" y="205">› Reading mode</text>
+      </g>
+      <line x1="20" y1="225" x2="260" y2="225" stroke="#0099ff" stroke-width="1" opacity="0.4"/>
+      <text x="20" y="252" font-size="14" fill="#9aa4b2">Ensemble merger:</text>
+      <text x="20" y="272" font-size="14" fill="#9aa4b2">dedup + time-decay</text>
+    </g>
+
+    <!-- Stage 4: Queue -->
+    <g transform="translate(970 360)">
+      <rect width="260" height="220" rx="14" fill="url(#pf-box)" stroke="#1f2734" stroke-width="1.5"/>
+      <rect x="0" y="0" width="260" height="44" rx="14" fill="#0e1622"/>
+      <rect x="0" y="30" width="260" height="14" fill="#0e1622"/>
+      <text x="20" y="29" font-size="13" fill="#0099ff" font-weight="600" letter-spacing="2">04 · CURATE</text>
+      <text x="20" y="92" font-size="22" fill="#ffffff" font-weight="600">Verse queue</text>
+      <text x="20" y="124" font-size="14" fill="#9aa4b2">Operator-curated</text>
+      <text x="20" y="146" font-size="14" fill="#9aa4b2">Drag-and-drop reorder</text>
+      <text x="20" y="168" font-size="14" fill="#9aa4b2">Duplicate suppression</text>
+    </g>
+
+    <!-- Stage 5: Broadcast -->
+    <g transform="translate(1260 360)">
+      <rect width="260" height="220" rx="14" fill="url(#pf-box)" stroke="#1f2734" stroke-width="1.5"/>
+      <rect x="0" y="0" width="260" height="44" rx="14" fill="#0e1622"/>
+      <rect x="0" y="30" width="260" height="14" fill="#0e1622"/>
+      <text x="20" y="29" font-size="13" fill="#0099ff" font-weight="600" letter-spacing="2">05 · BROADCAST</text>
+      <text x="20" y="92" font-size="22" fill="#ffffff" font-weight="600">NDI sender</text>
+      <text x="20" y="124" font-size="14" fill="#9aa4b2">BGRA frames, 24/30/60 fps</text>
+      <text x="20" y="146" font-size="14" fill="#9aa4b2">Three alpha modes</text>
+      <text x="20" y="168" font-size="14" fill="#9aa4b2">crate: rhema-broadcast</text>
+    </g>
+
+    <!-- Connectors -->
+    <g stroke="#0099ff" stroke-width="2" fill="none">
+      <line x1="340" y1="470" x2="370" y2="470" marker-end="url(#pf-arrow)"/>
+      <line x1="630" y1="470" x2="660" y2="470" marker-end="url(#pf-arrow)"/>
+      <line x1="940" y1="470" x2="970" y2="470" marker-end="url(#pf-arrow)"/>
+      <line x1="1230" y1="470" x2="1260" y2="470" marker-end="url(#pf-arrow)"/>
+    </g>
+
+    <!-- Downstream consumer hint -->
+    <g transform="translate(1260 660)">
+      <rect width="260" height="100" rx="12" fill="none" stroke="#1f2734" stroke-width="1.5" stroke-dasharray="6 6"/>
+      <text x="20" y="40" font-size="14" fill="#9aa4b2" font-weight="600" letter-spacing="1">DOWNSTREAM</text>
+      <text x="20" y="68" font-size="16" fill="#ffffff">vMix · OBS · Resolume</text>
+      <text x="20" y="88" font-size="13" fill="#5a6b7d">any NDI-aware switcher</text>
+    </g>
+    <line x1="1390" y1="580" x2="1390" y2="660" stroke="#1f2734" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+  </g>
+</svg>

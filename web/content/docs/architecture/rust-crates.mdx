@@ -54,6 +54,11 @@ Each crate maps to a clear external responsibility:
 
 ## Dependency graph
 
+![Dependency graph of the seven Rust crates fanning out from rhema-api with two internal cross-deps](/docs/diagrams/diagram-crate-dependencies.svg)
+
+*The fan-out from `rhema-api` down through audio, stt, bible, detection, broadcast, and notes. Edges are strictly downward; no cycles. **Click to expand.***
+
+
 ```
 rhema-api
 ├── rhema-audio

@@ -23,6 +23,10 @@ detects Bible verse references — both explicit citations and quoted
 passages — and renders them as broadcast-ready overlays via NDI for live
 production.
 
+![Rhema desktop app — live transcript on the left, detections in the centre, queue and live preview on the right](/docs/screenshots/dashboard-overview.png)
+
+*The Rhema dashboard during a service: live transcript on the left, detected verses in the centre column, and the verse queue plus broadcast preview on the right. **Click to expand.***
+
 ## What you can do with Rhema
 
 <Cards>
@@ -70,6 +74,11 @@ desktop app. See the [installation guide](/docs/getting-started/installation)
 for a guided walkthrough.
 
 ## How it's built
+
+![Rhema pipeline — audio capture flows through speech-to-text, the detection pipeline, the queue, and finally the NDI sender that downstream switchers consume](/docs/diagrams/diagram-pipeline-flow.svg)
+
+*The five stages, in order: capture → transcribe → detect → curate → broadcast. The detection stage is the one that runs all four strategies in parallel and merges them. **Click to expand.***
+
 
 <Cards>
   <Card

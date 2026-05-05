@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Cargo workspace dependency graph: rhema-api fans out to six crates, with rhema-stt depending on rhema-audio and rhema-detection depending on rhema-bible">
+  <defs>
+    <pattern id="cd-dots" patternUnits="userSpaceOnUse" width="24" height="24">
+      <rect width="24" height="24" fill="#070709"/>
+      <circle cx="12" cy="12" r="1.2" fill="#1a2330"/>
+    </pattern>
+    <linearGradient id="cd-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1015"/>
+      <stop offset="1" stop-color="#060709"/>
+    </linearGradient>
+    <linearGradient id="cd-api" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e3654"/>
+      <stop offset="1" stop-color="#082742"/>
+    </linearGradient>
+    <linearGradient id="cd-crate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#181c25"/>
+      <stop offset="1" stop-color="#0e1218"/>
+    </linearGradient>
+    <linearGradient id="cd-placeholder" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#13161e"/>
+      <stop offset="1" stop-color="#0a0c11"/>
+    </linearGradient>
+    <marker id="cd-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0099ff"/>
+    </marker>
+    <marker id="cd-arrow-cross" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#cd-bg)"/>
+  <rect x="40" y="40" width="1520" height="820" rx="20" fill="url(#cd-dots)" opacity="0.55"/>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <!-- Title -->
+    <text x="100" y="120" font-size="34" font-weight="600" letter-spacing="-0.5" fill="#ffffff">Workspace dependencies</text>
+    <text x="100" y="156" font-size="18" fill="#9aa4b2">Strict downward fan-out from rhema-api · no cycles, no horizontal deps.</text>
+
+    <!-- API node (top) -->
+    <g transform="translate(620 230)">
+      <rect width="360" height="120" rx="14" fill="url(#cd-api)" stroke="#0099ff" stroke-width="2"/>
+      <text x="180" y="44" text-anchor="middle" font-size="13" fill="#9bd6ff" letter-spacing="2" font-weight="600">TAURI COMMAND LAYER</text>
+      <text x="180" y="78" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">rhema-api</text>
+      <text x="180" y="102" text-anchor="middle" font-size="13" fill="#9aa4b2">the only crate that touches Tauri</text>
+    </g>
+
+    <!-- Edges from rhema-api to each child (drawn behind boxes) -->
+    <g stroke="#0099ff" stroke-width="1.8" fill="none" opacity="0.75">
+      <path d="M 800 350 C 800 410 175 440 175 510" marker-end="url(#cd-arrow)"/>
+      <path d="M 800 350 C 800 410 405 440 405 510" marker-end="url(#cd-arrow)"/>
+      <path d="M 800 350 C 800 400 635 440 635 510" marker-end="url(#cd-arrow)"/>
+      <path d="M 800 350 C 800 400 865 440 865 510" marker-end="url(#cd-arrow)"/>
+      <path d="M 800 350 C 800 410 1095 440 1095 510" marker-end="url(#cd-arrow)"/>
+      <path d="M 800 350 C 800 410 1325 440 1325 510" marker-end="url(#cd-arrow)"/>
+    </g>
+
+    <!-- Six crate nodes -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+
+      <!-- rhema-audio -->
+      <g transform="translate(85 510)">
+        <rect width="180" height="120" rx="12" fill="url(#cd-crate)" stroke="#1f2734" stroke-width="1.5"/>
+        <rect x="0" y="0" width="6" height="120" rx="3" fill="#34d399"/>
+        <text x="90" y="40" text-anchor="middle" font-size="16" font-weight="600" fill="#ffffff">rhema-audio</text>
+        <text x="90" y="62" text-anchor="middle" font-size="11" fill="#9aa4b2" font-family="ui-sans-serif, system-ui, sans-serif">capture · VAD</text>
+        <text x="90" y="80" text-anchor="middle" font-size="11" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif">cpal</text>
+        <text x="90" y="106" text-anchor="middle" font-size="10" fill="#34d399" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1.5">LEAF</text>
+      </g>
+
+      <!-- rhema-stt -->
+      <g transform="translate(315 510)">
+        <rect width="180" height="120" rx="12" fill="url(#cd-crate)" stroke="#1f2734" stroke-width="1.5"/>
+        <rect x="0" y="0" width="6" height="120" rx="3" fill="#a78bfa"/>
+        <text x="90" y="40" text-anchor="middle" font-size="16" font-weight="600" fill="#ffffff">rhema-stt</text>
+        <text x="90" y="62" text-anchor="middle" font-size="11" fill="#9aa4b2" font-family="ui-sans-serif, system-ui, sans-serif">Whisper · Deepgram</text>
+        <text x="90" y="80" text-anchor="middle" font-size="11" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif">whisper-rs · tokio-tungstenite</text>
+        <text x="90" y="106" text-anchor="middle" font-size="10" fill="#a78bfa" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1.5">→ rhema-audio</text>
+      </g>
+
+      <!-- rhema-bible -->
+      <g transform="translate(545 510)">
+        <rect width="180" height="120" rx="12" fill="url(#cd-crate)" stroke="#1f2734" stroke-width="1.5"/>
+        <rect x="0" y="0" width="6" height="120" rx="3" fill="#34d399"/>
+        <text x="90" y="40" text-anchor="middle" font-size="16" font-weight="600" fill="#ffffff">rhema-bible</text>
+        <text x="90" y="62" text-anchor="middle" font-size="11" fill="#9aa4b2" font-family="ui-sans-serif, system-ui, sans-serif">SQLite · FTS5</text>
+        <text x="90" y="80" text-anchor="middle" font-size="11" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif">rusqlite (bundled)</text>
+        <text x="90" y="106" text-anchor="middle" font-size="10" fill="#34d399" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1.5">LEAF</text>
+      </g>
+
+      <!-- rhema-detection -->
+      <g transform="translate(775 510)">
+        <rect width="180" height="120" rx="12" fill="url(#cd-crate)" stroke="#1f2734" stroke-width="1.5"/>
+        <rect x="0" y="0" width="6" height="120" rx="3" fill="#a78bfa"/>
+        <text x="90" y="40" text-anchor="middle" font-size="16" font-weight="600" fill="#ffffff">rhema-detection</text>
+        <text x="90" y="62" text-anchor="middle" font-size="11" fill="#9aa4b2" font-family="ui-sans-serif, system-ui, sans-serif">verse pipeline</text>
+        <text x="90" y="80" text-anchor="middle" font-size="11" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif">aho-corasick · ort · ensemble</text>
+        <text x="90" y="106" text-anchor="middle" font-size="10" fill="#a78bfa" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1.5">→ rhema-bible</text>
+      </g>
+
+      <!-- rhema-broadcast -->
+      <g transform="translate(1005 510)">
+        <rect width="180" height="120" rx="12" fill="url(#cd-crate)" stroke="#1f2734" stroke-width="1.5"/>
+        <rect x="0" y="0" width="6" height="120" rx="3" fill="#34d399"/>
+        <text x="90" y="40" text-anchor="middle" font-size="16" font-weight="600" fill="#ffffff">rhema-broadcast</text>
+        <text x="90" y="62" text-anchor="middle" font-size="11" fill="#9aa4b2" font-family="ui-sans-serif, system-ui, sans-serif">NDI 6 sender (FFI)</text>
+        <text x="90" y="80" text-anchor="middle" font-size="11" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif">libloading 0.8</text>
+        <text x="90" y="106" text-anchor="middle" font-size="10" fill="#34d399" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1.5">LEAF</text>
+      </g>
+
+      <!-- rhema-notes (placeholder) -->
+      <g transform="translate(1235 510)">
+        <rect width="180" height="120" rx="12" fill="url(#cd-placeholder)" stroke="#1f2734" stroke-width="1.5" stroke-dasharray="6 5"/>
+        <rect x="0" y="0" width="6" height="120" rx="3" fill="#5a6b7d"/>
+        <text x="90" y="40" text-anchor="middle" font-size="16" font-weight="600" fill="#ffffff">rhema-notes</text>
+        <text x="90" y="62" text-anchor="middle" font-size="11" fill="#9aa4b2" font-family="ui-sans-serif, system-ui, sans-serif">sermon notes</text>
+        <text x="90" y="80" text-anchor="middle" font-size="11" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif">(planned)</text>
+        <text x="90" y="106" text-anchor="middle" font-size="10" fill="#5a6b7d" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1.5">PLACEHOLDER</text>
+      </g>
+    </g>
+
+    <!-- Cross-deps: stt → audio, detection → bible (curved arrows below the row) -->
+    <g stroke="#a78bfa" stroke-width="1.6" fill="none" stroke-dasharray="6 5">
+      <path d="M 405 638 C 405 700 175 700 175 638" marker-end="url(#cd-arrow-cross)"/>
+      <path d="M 865 638 C 865 700 635 700 635 638" marker-end="url(#cd-arrow-cross)"/>
+    </g>
+    <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="#a78bfa" text-anchor="middle">
+      <text x="290" y="730">internal dep</text>
+      <text x="750" y="730">internal dep</text>
+    </g>
+
+    <!-- Legend -->
+    <g transform="translate(100 760)" font-family="ui-sans-serif, system-ui, sans-serif">
+      <rect width="900" height="80" rx="10" fill="#0a0d12" stroke="#1f2734"/>
+      <text x="20" y="32" font-size="12" fill="#5a6b7d" letter-spacing="2" font-weight="600">LEGEND</text>
+
+      <g transform="translate(20 46)">
+        <line x1="0" y1="10" x2="40" y2="10" stroke="#0099ff" stroke-width="2" marker-end="url(#cd-arrow)"/>
+        <text x="50" y="14" font-size="13" fill="#cfe6f8">rhema-api → child crate</text>
+      </g>
+      <g transform="translate(280 46)">
+        <line x1="0" y1="10" x2="40" y2="10" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#cd-arrow-cross)"/>
+        <text x="50" y="14" font-size="13" fill="#cfe6f8">internal cross-dep</text>
+      </g>
+      <g transform="translate(540 46)">
+        <rect x="0" y="0" width="20" height="20" rx="4" fill="#0a0d12" stroke="#1f2734" stroke-dasharray="6 5"/>
+        <text x="30" y="14" font-size="13" fill="#cfe6f8">placeholder crate (no impl)</text>
+      </g>
+    </g>
+  </g>
+</svg>

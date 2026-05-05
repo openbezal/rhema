@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="Rhema stack layers: React frontend over Tauri IPC, the Rust workspace below, with NDI, STT, and SQLite as external surfaces">
+  <defs>
+    <pattern id="sl-dots" patternUnits="userSpaceOnUse" width="24" height="24">
+      <rect width="24" height="24" fill="#070709"/>
+      <circle cx="12" cy="12" r="1.2" fill="#1a2330"/>
+    </pattern>
+    <linearGradient id="sl-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1015"/>
+      <stop offset="1" stop-color="#060709"/>
+    </linearGradient>
+    <linearGradient id="sl-frontend" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2230"/>
+      <stop offset="1" stop-color="#0e131c"/>
+    </linearGradient>
+    <linearGradient id="sl-bridge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e3654"/>
+      <stop offset="1" stop-color="#082742"/>
+    </linearGradient>
+    <linearGradient id="sl-rust" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a1a14"/>
+      <stop offset="1" stop-color="#1a100c"/>
+    </linearGradient>
+    <linearGradient id="sl-external" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101820"/>
+      <stop offset="1" stop-color="#080d12"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sl-bg)"/>
+  <rect x="40" y="40" width="1520" height="820" rx="20" fill="url(#sl-dots)" opacity="0.55"/>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <!-- Title -->
+    <text x="100" y="120" font-size="34" font-weight="600" letter-spacing="-0.5" fill="#ffffff">Rhema stack</text>
+    <text x="100" y="156" font-size="18" fill="#9aa4b2">Frontend, IPC, Rust workspace, and the external surfaces it talks to.</text>
+
+    <!-- Layer 1: Frontend -->
+    <g transform="translate(100 200)">
+      <rect width="1400" height="130" rx="14" fill="url(#sl-frontend)" stroke="#243044" stroke-width="1.5"/>
+      <rect x="0" y="0" width="6" height="130" rx="3" fill="#60a5fa"/>
+      <text x="32" y="38" font-size="13" fill="#60a5fa" letter-spacing="2" font-weight="600">FRONTEND</text>
+      <text x="32" y="72" font-size="22" font-weight="600" fill="#ffffff">React 19 · Vite 7</text>
+      <text x="32" y="100" font-size="14" fill="#9aa4b2">TypeScript · Tailwind CSS v4 · shadcn/ui (Radix) · Zustand stores · Fuse.js</text>
+
+      <!-- Sub-pills -->
+      <g font-size="12" fill="#cfe6f8">
+        <rect x="780" y="45" width="100" height="26" rx="13" fill="#0e3654" opacity="0.6"/>
+        <text x="830" y="62" text-anchor="middle">React 19</text>
+        <rect x="888" y="45" width="100" height="26" rx="13" fill="#0e3654" opacity="0.6"/>
+        <text x="938" y="62" text-anchor="middle">Vite 7</text>
+        <rect x="996" y="45" width="120" height="26" rx="13" fill="#0e3654" opacity="0.6"/>
+        <text x="1056" y="62" text-anchor="middle">Tailwind v4</text>
+        <rect x="1124" y="45" width="120" height="26" rx="13" fill="#0e3654" opacity="0.6"/>
+        <text x="1184" y="62" text-anchor="middle">shadcn/ui</text>
+        <rect x="1252" y="45" width="100" height="26" rx="13" fill="#0e3654" opacity="0.6"/>
+        <text x="1302" y="62" text-anchor="middle">Zustand</text>
+      </g>
+    </g>
+
+    <!-- Layer 2: IPC bridge -->
+    <g transform="translate(100 350)">
+      <rect width="1400" height="80" rx="14" fill="url(#sl-bridge)" stroke="#0099ff" stroke-width="1.5"/>
+      <rect x="0" y="0" width="6" height="80" rx="3" fill="#0099ff"/>
+      <text x="32" y="38" font-size="13" fill="#9bd6ff" letter-spacing="2" font-weight="600">IPC BRIDGE</text>
+      <text x="32" y="64" font-size="18" font-weight="600" fill="#ffffff">Tauri 2.10.3 · typed command surface · capability-gated</text>
+    </g>
+
+    <!-- Layer 3: Rust workspace -->
+    <g transform="translate(100 450)">
+      <rect width="1400" height="180" rx="14" fill="url(#sl-rust)" stroke="#3d2a22" stroke-width="1.5"/>
+      <rect x="0" y="0" width="6" height="180" rx="3" fill="#f97316"/>
+      <text x="32" y="38" font-size="13" fill="#fb923c" letter-spacing="2" font-weight="600">RUST WORKSPACE · MSRV 1.77.2</text>
+      <text x="32" y="68" font-size="20" font-weight="600" fill="#ffffff">Seven crates, strict downward fan-out</text>
+
+      <!-- Crate pills -->
+      <g font-size="13" fill="#fed7aa" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">
+        <g transform="translate(32 96)">
+          <rect width="158" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="79" y="22" text-anchor="middle">rhema-api</text>
+        </g>
+        <g transform="translate(206 96)">
+          <rect width="158" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="79" y="22" text-anchor="middle">rhema-audio</text>
+        </g>
+        <g transform="translate(380 96)">
+          <rect width="158" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="79" y="22" text-anchor="middle">rhema-stt</text>
+        </g>
+        <g transform="translate(554 96)">
+          <rect width="158" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="79" y="22" text-anchor="middle">rhema-bible</text>
+        </g>
+        <g transform="translate(728 96)">
+          <rect width="180" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="90" y="22" text-anchor="middle">rhema-detection</text>
+        </g>
+        <g transform="translate(924 96)">
+          <rect width="180" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="90" y="22" text-anchor="middle">rhema-broadcast</text>
+        </g>
+        <g transform="translate(1120 96)">
+          <rect width="158" height="32" rx="6" fill="#1f130c" stroke="#3d2a22"/>
+          <text x="79" y="22" text-anchor="middle">rhema-notes</text>
+        </g>
+      </g>
+
+      <text x="32" y="158" font-size="13" fill="#9aa4b2">ort 2.0.0-rc.12 · whisper-rs 0.16 · libloading 0.8 · rusqlite (bundled) · aho-corasick 1</text>
+    </g>
+
+    <!-- Layer 4: External surfaces -->
+    <g transform="translate(100 650)">
+      <rect width="1400" height="160" rx="14" fill="url(#sl-external)" stroke="#1d2733" stroke-width="1.5"/>
+      <rect x="0" y="0" width="6" height="160" rx="3" fill="#a78bfa"/>
+      <text x="32" y="38" font-size="13" fill="#c4b5fd" letter-spacing="2" font-weight="600">EXTERNAL SURFACES</text>
+      <text x="32" y="68" font-size="18" font-weight="600" fill="#ffffff">Where Rhema reaches outside the process</text>
+
+      <!-- Three columns -->
+      <g transform="translate(32 88)">
+        <rect width="430" height="56" rx="10" fill="#0f1521" stroke="#1f2734"/>
+        <text x="20" y="24" font-size="14" font-weight="600" fill="#ffffff">NDI 6 SDK</text>
+        <text x="20" y="44" font-size="12" fill="#9aa4b2">dynamic load via libloading · BGRA frames to vMix / OBS</text>
+      </g>
+      <g transform="translate(486 88)">
+        <rect width="430" height="56" rx="10" fill="#0f1521" stroke="#1f2734"/>
+        <text x="20" y="24" font-size="14" font-weight="600" fill="#ffffff">STT engines</text>
+        <text x="20" y="44" font-size="12" fill="#9aa4b2">whisper.cpp on disk · Deepgram WebSocket (tokio-tungstenite)</text>
+      </g>
+      <g transform="translate(940 88)">
+        <rect width="428" height="56" rx="10" fill="#0f1521" stroke="#1f2734"/>
+        <text x="20" y="24" font-size="14" font-weight="600" fill="#ffffff">SQLite + ONNX models</text>
+        <text x="20" y="44" font-size="12" fill="#9aa4b2">data/rhema.db (FTS5) · Qwen3-Embedding-0.6B INT8 ONNX</text>
+      </g>
+    </g>
+
+    <!-- Vertical connecting accent -->
+    <line x1="80" y1="200" x2="80" y2="810" stroke="#0099ff" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.35"/>
+  </g>
+</svg>
