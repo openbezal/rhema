@@ -175,3 +175,22 @@ html.lenis body {
 :where(html:not(.lenis)) {
   scroll-padding-top: 5rem;
 }
+
+/*
+ * ImageZoom modal backdrop: lift the zoomed image off the page with
+ * a translucent dark overlay and a subtle blur instead of the default
+ * opaque background. The zoomed image stays fully readable while the
+ * docs underneath fade out of focus.
+ */
+[data-rmiz-modal-overlay="visible"] {
+  background-color: rgba(0, 0, 0, 0.82);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-rmiz-modal-overlay="visible"] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
