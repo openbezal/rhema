@@ -16,37 +16,141 @@ const CROSS_REFS_PATH = join(DATA_DIR, "cross-refs", "cross_references.txt")
 
 // OSIS book abbreviation → book number mapping
 const OSIS_TO_NUM: Record<string, number> = {
-  Gen: 1, Exod: 2, Lev: 3, Num: 4, Deut: 5, Josh: 6, Judg: 7, Ruth: 8,
-  "1Sam": 9, "2Sam": 10, "1Kgs": 11, "2Kgs": 12, "1Chr": 13, "2Chr": 14,
-  Ezra: 15, Neh: 16, Esth: 17, Job: 18, Ps: 19, Prov: 20, Eccl: 21,
-  Song: 22, Isa: 23, Jer: 24, Lam: 25, Ezek: 26, Dan: 27, Hos: 28,
-  Joel: 29, Amos: 30, Obad: 31, Jonah: 32, Mic: 33, Nah: 34, Hab: 35,
-  Zeph: 36, Hag: 37, Zech: 38, Mal: 39, Matt: 40, Mark: 41, Luke: 42,
-  John: 43, Acts: 44, Rom: 45, "1Cor": 46, "2Cor": 47, Gal: 48, Eph: 49,
-  Phil: 50, Col: 51, "1Thess": 52, "2Thess": 53, "1Tim": 54, "2Tim": 55,
-  Titus: 56, Phlm: 57, Heb: 58, Jas: 59, "1Pet": 60, "2Pet": 61,
-  "1John": 62, "2John": 63, "3John": 64, Jude: 65, Rev: 66,
+  Gen: 1,
+  Exod: 2,
+  Lev: 3,
+  Num: 4,
+  Deut: 5,
+  Josh: 6,
+  Judg: 7,
+  Ruth: 8,
+  "1Sam": 9,
+  "2Sam": 10,
+  "1Kgs": 11,
+  "2Kgs": 12,
+  "1Chr": 13,
+  "2Chr": 14,
+  Ezra: 15,
+  Neh: 16,
+  Esth: 17,
+  Job: 18,
+  Ps: 19,
+  Prov: 20,
+  Eccl: 21,
+  Song: 22,
+  Isa: 23,
+  Jer: 24,
+  Lam: 25,
+  Ezek: 26,
+  Dan: 27,
+  Hos: 28,
+  Joel: 29,
+  Amos: 30,
+  Obad: 31,
+  Jonah: 32,
+  Mic: 33,
+  Nah: 34,
+  Hab: 35,
+  Zeph: 36,
+  Hag: 37,
+  Zech: 38,
+  Mal: 39,
+  Matt: 40,
+  Mark: 41,
+  Luke: 42,
+  John: 43,
+  Acts: 44,
+  Rom: 45,
+  "1Cor": 46,
+  "2Cor": 47,
+  Gal: 48,
+  Eph: 49,
+  Phil: 50,
+  Col: 51,
+  "1Thess": 52,
+  "2Thess": 53,
+  "1Tim": 54,
+  "2Tim": 55,
+  Titus: 56,
+  Phlm: 57,
+  Heb: 58,
+  Jas: 59,
+  "1Pet": 60,
+  "2Pet": 61,
+  "1John": 62,
+  "2John": 63,
+  "3John": 64,
+  Jude: 65,
+  Rev: 66,
 }
 
 // Standard book abbreviations for our DB
 const BOOK_ABBREVS: Record<string, string> = {
-  Genesis: "Gen", Exodus: "Exod", Leviticus: "Lev", Numbers: "Num",
-  Deuteronomy: "Deut", Joshua: "Josh", Judges: "Judg", Ruth: "Ruth",
-  "1 Samuel": "1Sam", "2 Samuel": "2Sam", "1 Kings": "1Kgs", "2 Kings": "2Kgs",
-  "1 Chronicles": "1Chr", "2 Chronicles": "2Chr", Ezra: "Ezra", Nehemiah: "Neh",
-  Esther: "Esth", Job: "Job", Psalms: "Ps", Proverbs: "Prov",
-  Ecclesiastes: "Eccl", "Song of Solomon": "Song", Isaiah: "Isa", Jeremiah: "Jer",
-  Lamentations: "Lam", Ezekiel: "Ezek", Daniel: "Dan", Hosea: "Hos",
-  Joel: "Joel", Amos: "Amos", Obadiah: "Obad", Jonah: "Jonah",
-  Micah: "Mic", Nahum: "Nah", Habakkuk: "Hab", Zephaniah: "Zeph",
-  Haggai: "Hag", Zechariah: "Zech", Malachi: "Mal", Matthew: "Matt",
-  Mark: "Mark", Luke: "Luke", John: "John", Acts: "Acts", Romans: "Rom",
-  "1 Corinthians": "1Cor", "2 Corinthians": "2Cor", Galatians: "Gal",
-  Ephesians: "Eph", Philippians: "Phil", Colossians: "Col",
-  "1 Thessalonians": "1Thess", "2 Thessalonians": "2Thess",
-  "1 Timothy": "1Tim", "2 Timothy": "2Tim", Titus: "Titus", Philemon: "Phlm",
-  Hebrews: "Heb", James: "Jas", "1 Peter": "1Pet", "2 Peter": "2Pet",
-  "1 John": "1John", "2 John": "2John", "3 John": "3John", Jude: "Jude",
+  Genesis: "Gen",
+  Exodus: "Exod",
+  Leviticus: "Lev",
+  Numbers: "Num",
+  Deuteronomy: "Deut",
+  Joshua: "Josh",
+  Judges: "Judg",
+  Ruth: "Ruth",
+  "1 Samuel": "1Sam",
+  "2 Samuel": "2Sam",
+  "1 Kings": "1Kgs",
+  "2 Kings": "2Kgs",
+  "1 Chronicles": "1Chr",
+  "2 Chronicles": "2Chr",
+  Ezra: "Ezra",
+  Nehemiah: "Neh",
+  Esther: "Esth",
+  Job: "Job",
+  Psalms: "Ps",
+  Proverbs: "Prov",
+  Ecclesiastes: "Eccl",
+  "Song of Solomon": "Song",
+  Isaiah: "Isa",
+  Jeremiah: "Jer",
+  Lamentations: "Lam",
+  Ezekiel: "Ezek",
+  Daniel: "Dan",
+  Hosea: "Hos",
+  Joel: "Joel",
+  Amos: "Amos",
+  Obadiah: "Obad",
+  Jonah: "Jonah",
+  Micah: "Mic",
+  Nahum: "Nah",
+  Habakkuk: "Hab",
+  Zephaniah: "Zeph",
+  Haggai: "Hag",
+  Zechariah: "Zech",
+  Malachi: "Mal",
+  Matthew: "Matt",
+  Mark: "Mark",
+  Luke: "Luke",
+  John: "John",
+  Acts: "Acts",
+  Romans: "Rom",
+  "1 Corinthians": "1Cor",
+  "2 Corinthians": "2Cor",
+  Galatians: "Gal",
+  Ephesians: "Eph",
+  Philippians: "Phil",
+  Colossians: "Col",
+  "1 Thessalonians": "1Thess",
+  "2 Thessalonians": "2Thess",
+  "1 Timothy": "1Tim",
+  "2 Timothy": "2Tim",
+  Titus: "Titus",
+  Philemon: "Phlm",
+  Hebrews: "Heb",
+  James: "Jas",
+  "1 Peter": "1Pet",
+  "2 Peter": "2Pet",
+  "1 John": "1John",
+  "2 John": "2John",
+  "3 John": "3John",
+  Jude: "Jude",
   Revelation: "Rev",
 }
 
@@ -69,30 +173,347 @@ const TRANSLATIONS_META: Array<{
   license: string
 }> = [
   // English
-  { file: "KJV.json", abbreviation: "KJV", title: "King James Version", language: "en", license: "Public Domain" },
-  { file: "NIV.json", abbreviation: "NIV", title: "New International Version", language: "en", license: "Biblica" },
-  { file: "ESV.json", abbreviation: "ESV", title: "English Standard Version", language: "en", license: "Crossway" },
-  { file: "NASB.json", abbreviation: "NASB", title: "New American Standard Bible", language: "en", license: "Lockman Foundation" },
-  { file: "NKJV.json", abbreviation: "NKJV", title: "New King James Version", language: "en", license: "Thomas Nelson" },
-  { file: "NLT.json", abbreviation: "NLT", title: "New Living Translation", language: "en", license: "Tyndale House" },
-  { file: "AMP.json", abbreviation: "AMP", title: "Amplified Bible", language: "en", license: "Lockman Foundation" },
-  // Non-English
-  { file: "SpaRV.json", abbreviation: "SpaRV", title: "Reina-Valera 1909", language: "es", license: "Public Domain" },
-  { file: "FreJND.json", abbreviation: "FreJND", title: "J.N. Darby French 1885", language: "fr", license: "Public Domain" },
-  { file: "PorBLivre.json", abbreviation: "PorBLivre", title: "Biblia Livre", language: "pt", license: "Public Domain" },
+  {
+    file: "AA.json",
+    abbreviation: "AA",
+    title: "Afar Bible",
+    language: "aa",
+    license: "Unknown",
+  },
+  {
+    file: "AKJV.json",
+    abbreviation: "AKJV",
+    title: "American King James Version",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "AMP.json",
+    abbreviation: "AMP",
+    title: "Amplified Bible",
+    language: "en",
+    license: "Lockman Foundation",
+  },
+  {
+    file: "ASV.json",
+    abbreviation: "ASV",
+    title: "American Standard Version (1901)",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "BRG.json",
+    abbreviation: "BRG",
+    title: "Blue Red and Gold Letter Edition",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "CSB.json",
+    abbreviation: "CSB",
+    title: "Christian Standard Bible",
+    language: "en",
+    license: "Holman Bible Publishers",
+  },
+  {
+    file: "EHV.json",
+    abbreviation: "EHV",
+    title: "Evangelical Heritage Version",
+    language: "en",
+    license: "Wartburg Project",
+  },
+  {
+    file: "ESV.json",
+    abbreviation: "ESV",
+    title: "English Standard Version",
+    language: "en",
+    license: "Crossway",
+  },
+  {
+    file: "ESVUK.json",
+    abbreviation: "ESVUK",
+    title: "English Standard Version (UK)",
+    language: "en",
+    license: "Crossway",
+  },
+  {
+    file: "GNT.json",
+    abbreviation: "GNT",
+    title: "Good News Translation",
+    language: "en",
+    license: "American Bible Society",
+  },
+  {
+    file: "GNV.json",
+    abbreviation: "GNV",
+    title: "Geneva Bible (1599)",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "GW.json",
+    abbreviation: "GW",
+    title: "GOD'S WORD Translation",
+    language: "en",
+    license: "God's Word to the Nations",
+  },
+  {
+    file: "ISV.json",
+    abbreviation: "ISV",
+    title: "International Standard Version",
+    language: "en",
+    license: "ISV Foundation",
+  },
+  {
+    file: "JUB.json",
+    abbreviation: "JUB",
+    title: "Jubilee Bible 2000",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "KJ21.json",
+    abbreviation: "KJ21",
+    title: "21st Century King James Version",
+    language: "en",
+    license: "Deuel Enterprises",
+  },
+  {
+    file: "KJV.json",
+    abbreviation: "KJV",
+    title: "King James Version",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "LEB.json",
+    abbreviation: "LEB",
+    title: "Lexham English Bible",
+    language: "en",
+    license: "Lexham Press",
+  },
+  {
+    file: "LSB.json",
+    abbreviation: "LSB",
+    title: "Legacy Standard Bible",
+    language: "en",
+    license: "Three Sixteen Publishing",
+  },
+  {
+    file: "MEV.json",
+    abbreviation: "MEV",
+    title: "Modern English Version",
+    language: "en",
+    license: "Passio",
+  },
+  {
+    file: "MSG.json",
+    abbreviation: "MSG",
+    title: "The Message",
+    language: "en",
+    license: "NavPress",
+  },
+  {
+    file: "NASB.json",
+    abbreviation: "NASB",
+    title: "New American Standard Bible",
+    language: "en",
+    license: "Lockman Foundation",
+  },
+  {
+    file: "NASB1995.json",
+    abbreviation: "NASB1995",
+    title: "New American Standard Bible (1995)",
+    language: "en",
+    license: "Lockman Foundation",
+  },
+  {
+    file: "NBLH.json",
+    abbreviation: "NBLH",
+    title: "New Berkeley Version in Modern English",
+    language: "en",
+    license: "Unknown",
+  },
+  {
+    file: "NCV.json",
+    abbreviation: "NCV",
+    title: "New Century Version",
+    language: "en",
+    license: "Thomas Nelson",
+  },
+  {
+    file: "NET.json",
+    abbreviation: "NET",
+    title: "NET Bible",
+    language: "en",
+    license: "Biblical Studies Press",
+  },
+  {
+    file: "NIV.json",
+    abbreviation: "NIV",
+    title: "New International Version",
+    language: "en",
+    license: "Biblica",
+  },
+  {
+    file: "NIV1984.json",
+    abbreviation: "NIV1984",
+    title: "New International Version (1984)",
+    language: "en",
+    license: "Biblica",
+  },
+  {
+    file: "NIVUK.json",
+    abbreviation: "NIVUK",
+    title: "New International Version (UK)",
+    language: "en",
+    license: "Biblica",
+  },
+  {
+    file: "NKJV.json",
+    abbreviation: "NKJV",
+    title: "New King James Version",
+    language: "en",
+    license: "Thomas Nelson",
+  },
+  {
+    file: "NLT.json",
+    abbreviation: "NLT",
+    title: "New Living Translation",
+    language: "en",
+    license: "Tyndale House",
+  },
+  {
+    file: "NLV.json",
+    abbreviation: "NLV",
+    title: "New Life Version",
+    language: "en",
+    license: "Christian Literature International",
+  },
+  {
+    file: "NOG.json",
+    abbreviation: "NOG",
+    title: "Names of God Bible",
+    language: "en",
+    license: "Baker Publishing Group",
+  },
+  {
+    file: "NRSV.json",
+    abbreviation: "NRSV",
+    title: "New Revised Standard Version",
+    language: "en",
+    license: "National Council of Churches",
+  },
+  {
+    file: "NRSVUE.json",
+    abbreviation: "NRSVUE",
+    title: "New Revised Standard Version Updated Edition",
+    language: "en",
+    license: "National Council of Churches",
+  },
+  {
+    file: "RSV.json",
+    abbreviation: "RSV",
+    title: "Revised Standard Version",
+    language: "en",
+    license: "National Council of Churches",
+  },
+  {
+    file: "TPT.json",
+    abbreviation: "TPT",
+    title: "The Passion Translation",
+    language: "en",
+    license: "BroadStreet Publishing",
+  },
+  {
+    file: "WEB.json",
+    abbreviation: "WEB",
+    title: "World English Bible",
+    language: "en",
+    license: "Public Domain",
+  },
+  {
+    file: "YLT.json",
+    abbreviation: "YLT",
+    title: "Young's Literal Translation",
+    language: "en",
+    license: "Public Domain",
+  },
+
+  // Spanish
+  {
+    file: "SpaRV.json",
+    abbreviation: "SpaRV",
+    title: "Reina-Valera 1909",
+    language: "es",
+    license: "Public Domain",
+  },
+  {
+    file: "NVI-S.json",
+    abbreviation: "NVI-S",
+    title: "Nueva Versión Internacional",
+    language: "es",
+    license: "Biblica",
+  },
+  {
+    file: "NVI-P.json",
+    abbreviation: "NVI-P",
+    title: "Nova Versão Internacional",
+    language: "pt",
+    license: "Biblica",
+  },
+  {
+    file: "NTV.json",
+    abbreviation: "NTV",
+    title: "Nueva Traducción Viviente",
+    language: "es",
+    license: "Tyndale House",
+  },
+
+  // French
+  {
+    file: "FreJND.json",
+    abbreviation: "FreJND",
+    title: "J.N. Darby French 1885",
+    language: "fr",
+    license: "Public Domain",
+  },
+
+  // Portuguese
+  {
+    file: "PorBLivre.json",
+    abbreviation: "PorBLivre",
+    title: "Bíblia Livre",
+    language: "pt",
+    license: "Public Domain",
+  },
+
+  // Afrikaans
+  {
+    file: "AFR53.json",
+    abbreviation: "AFR53",
+    title: "Afrikaanse Bybel 1953",
+    language: "af",
+    license: "Unknown",
+  },
 ]
 
 function main() {
   console.log("\n🔨 Building rhema.db...\n")
 
   // Remove existing DB
-  try { require("node:fs").unlinkSync(DB_PATH) } catch {}
+  try {
+    require("node:fs").unlinkSync(DB_PATH)
+  } catch {}
 
   const db = new Database(DB_PATH, { create: true })
 
   // Create schema — execute each statement individually for FTS5 compatibility
   const schema = readFileSync(SCHEMA_PATH, "utf-8")
-  const statements = schema.split(";").map((s) => s.trim()).filter(Boolean)
+  const statements = schema
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
   for (const stmt of statements) {
     try {
       db.exec(stmt + ";")
@@ -131,8 +552,15 @@ function main() {
     db.exec("BEGIN TRANSACTION")
 
     // Insert translation
-    insertTranslation.run(meta.abbreviation, meta.title, meta.language, meta.license)
-    const translationId = db.query("SELECT last_insert_rowid() as id").get() as { id: number }
+    insertTranslation.run(
+      meta.abbreviation,
+      meta.title,
+      meta.language,
+      meta.license
+    )
+    const translationId = db
+      .query("SELECT last_insert_rowid() as id")
+      .get() as { id: number }
     const tId = translationId.id
 
     let verseCount = 0
@@ -145,24 +573,39 @@ function main() {
       const testament = bookNumber <= 39 ? "OT" : "NT"
 
       insertBook.run(tId, bookNumber, book.name, abbrev, testament)
-      const bookResult = db.query("SELECT last_insert_rowid() as id").get() as { id: number }
+      const bookResult = db.query("SELECT last_insert_rowid() as id").get() as {
+        id: number
+      }
       const bookId = bookResult.id
 
       for (const chapter of book.chapters) {
         for (const verse of chapter.verses) {
-          insertVerse.run(tId, bookId, bookNumber, book.name, abbrev, chapter.chapter, verse.verse, verse.text)
+          insertVerse.run(
+            tId,
+            bookId,
+            bookNumber,
+            book.name,
+            abbrev,
+            chapter.chapter,
+            verse.verse,
+            verse.text
+          )
           verseCount++
         }
       }
     }
 
     db.exec("COMMIT")
-    console.log(`  ✓ ${meta.abbreviation}: ${data.books.length} books, ${verseCount} verses`)
+    console.log(
+      `  ✓ ${meta.abbreviation}: ${data.books.length} books, ${verseCount} verses`
+    )
   }
 
   // Build FTS5 index
   console.log("\n  🔍 Building FTS5 search index...")
-  db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS verses_fts USING fts5(text, content='verses', content_rowid='id', tokenize='unicode61');")
+  db.exec(
+    "CREATE VIRTUAL TABLE IF NOT EXISTS verses_fts USING fts5(text, content='verses', content_rowid='id', tokenize='unicode61');"
+  )
   db.exec("INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses;")
   console.log("  ✓ FTS5 index built")
 
@@ -181,7 +624,9 @@ function main() {
       "INSERT INTO cross_references (from_book, from_chapter, from_verse, to_book, to_chapter, to_verse_start, to_verse_end, votes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
 
-    function parseOsis(ref: string): { book: number; chapter: number; verse: number } | null {
+    function parseOsis(
+      ref: string
+    ): { book: number; chapter: number; verse: number } | null {
       // Format: "Gen.1.1" or "1John.3.16"
       const parts = ref.split(".")
       if (parts.length < 3) return null
@@ -198,7 +643,8 @@ function main() {
 
     let crossRefCount = 0
     for (const line of lines) {
-      if (line.startsWith("From") || line.startsWith("#") || !line.trim()) continue
+      if (line.startsWith("From") || line.startsWith("#") || !line.trim())
+        continue
       const [fromStr, toStr, votesStr] = line.split("\t")
       const from = parseOsis(fromStr)
       const to = parseOsis(toStr)
@@ -206,15 +652,22 @@ function main() {
 
       const votes = parseInt(votesStr) || 0
       insertCrossRef.run(
-        from.book, from.chapter, from.verse,
-        to.book, to.chapter, to.verse, to.verse,
+        from.book,
+        from.chapter,
+        from.verse,
+        to.book,
+        to.chapter,
+        to.verse,
+        to.verse,
         votes
       )
       crossRefCount++
     }
 
     db.exec("COMMIT")
-    console.log(`  ✓ ${crossRefCount.toLocaleString()} cross-references imported`)
+    console.log(
+      `  ✓ ${crossRefCount.toLocaleString()} cross-references imported`
+    )
   }
 
   // Optimize
@@ -223,9 +676,15 @@ function main() {
   db.exec("ANALYZE;")
 
   // Stats
-  const verseTotal = db.query("SELECT COUNT(*) as c FROM verses").get() as { c: number }
-  const transTotal = db.query("SELECT COUNT(*) as c FROM translations").get() as { c: number }
-  const crossTotal = db.query("SELECT COUNT(*) as c FROM cross_references").get() as { c: number }
+  const verseTotal = db.query("SELECT COUNT(*) as c FROM verses").get() as {
+    c: number
+  }
+  const transTotal = db
+    .query("SELECT COUNT(*) as c FROM translations")
+    .get() as { c: number }
+  const crossTotal = db
+    .query("SELECT COUNT(*) as c FROM cross_references")
+    .get() as { c: number }
 
   console.log(`\n✅ rhema.db built successfully!`)
   console.log(`   ${transTotal.c} translations`)
