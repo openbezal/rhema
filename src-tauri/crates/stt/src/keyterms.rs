@@ -75,15 +75,79 @@ pub fn bible_keyterms() -> Vec<String> {
     ];
     terms.extend(books.iter().map(ToString::to_string));
 
-    // Common abbreviations
-    let abbreviations = [
-        "Gen", "Exod", "Lev", "Num", "Deut", "Josh", "Judg", "Sam", "Kgs", "Chr", "Neh",
-        "Esth", "Ps", "Prov", "Eccl", "Isa", "Jer", "Lam", "Ezek", "Dan", "Hos", "Obad",
-        "Mic", "Nah", "Hab", "Zeph", "Hag", "Zech", "Mal", "Matt", "Mk", "Lk", "Jn", "Rom",
-        "Cor", "Gal", "Eph", "Phil", "Col", "Thess", "Tim", "Tit", "Phlm", "Heb", "Jas",
-        "Pet", "Rev",
+    // Nobody ever says "Open to 1 Cor"
+    // Spoken reference cues and sermon language.
+    // These improve recognition of Bible references in live speech.
+    let reference_terms = [
+        // Reference structure
+        "chapter",
+        "verse",
+        "verses",
+        "scripture",
+        "scriptures",
+        "passage",
+        "text",
+        "reading",
+        "book",
+        "open to",
+        "turn to",
+        "reading from",
+        "next verse",
+        // Spoken numbering
+        "first",
+        "second",
+        "third",
+        // Reference transitions
+        "chapter one",
+        "chapter two",
+        "chapter three",
+        "verse one",
+        "verse two",
+        "verse three",
+        // Common sermon phrases
+        "the Bible says",
+        "the scripture says",
+        "thus says the Lord",
+        "let us read",
+        "our text",
+        "the word of God",
+        // Bible-specific nouns
+        "psalm",
+        "psalms",
+        "gospel",
+        "epistle",
+        "prophecy",
+        // numerals
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+        "twenty",
+        "thirty",
+        "forty",
+        "fifty",
+        "sixty",
+        "seventy",
+        "eighty",
+        "ninety",
+        "hundred"
     ];
-    terms.extend(abbreviations.iter().map(ToString::to_string));
+    terms.extend(reference_terms.iter().map(ToString::to_string));
 
     // Spoken forms
     let spoken = [
@@ -108,41 +172,42 @@ pub fn bible_keyterms() -> Vec<String> {
     ];
     terms.extend(spoken.iter().map(ToString::to_string));
 
+    // These do no aid detection
     // Theological terms
-    let theological = [
-        "justification",
-        "sanctification",
-        "propitiation",
-        "eschatology",
-        "atonement",
-        "redemption",
-        "righteousness",
-        "covenant",
-        "baptism",
-        "resurrection",
-        "crucifixion",
-        "salvation",
-        "repentance",
-        "grace",
-        "mercy",
-        "forgiveness",
-        "reconciliation",
-        "glorification",
-        "predestination",
-        "sovereignty",
-        "omniscience",
-        "omnipotence",
-        "trinity",
-        "incarnation",
-        "ascension",
-        "transfiguration",
-        "beatitudes",
-        "tabernacle",
-        "ark of the covenant",
-        "Melchizedek",
-        "Nebuchadnezzar",
-    ];
-    terms.extend(theological.iter().map(ToString::to_string));
+    // let theological = [
+    //     "justification",
+    //     "sanctification",
+    //     "propitiation",
+    //     "eschatology",
+    //     "atonement",
+    //     "redemption",
+    //     "righteousness",
+    //     "covenant",
+    //     "baptism",
+    //     "resurrection",
+    //     "crucifixion",
+    //     "salvation",
+    //     "repentance",
+    //     "grace",
+    //     "mercy",
+    //     "forgiveness",
+    //     "reconciliation",
+    //     "glorification",
+    //     "predestination",
+    //     "sovereignty",
+    //     "omniscience",
+    //     "omnipotence",
+    //     "trinity",
+    //     "incarnation",
+    //     "ascension",
+    //     "transfiguration",
+    //     "beatitudes",
+    //     "tabernacle",
+    //     "ark of the covenant",
+    //     "Melchizedek",
+    //     "Nebuchadnezzar",
+    // ];
+    // terms.extend(theological.iter().map(ToString::to_string));
 
     terms
 }

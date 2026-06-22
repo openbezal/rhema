@@ -52,6 +52,7 @@ impl DeepgramClient {
             q.append_pair("encoding", &self.config.encoding);
             q.append_pair("sample_rate", &self.config.sample_rate.to_string());
             q.append_pair("channels", "1");
+            q.append_pair("numerals", "true");
             q.append_pair("punctuate", "true");
             q.append_pair("smart_format", "true");
             q.append_pair("interim_results", "true");
