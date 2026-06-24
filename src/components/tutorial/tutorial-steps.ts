@@ -1,7 +1,6 @@
 import type { Step } from "react-joyride"
 
 const STEP_DEFAULTS = {
-  disableBeacon: true,
   skipBeacon: true,
 } as const satisfies Partial<Step>
 

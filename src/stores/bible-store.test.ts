@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockGet = vi.fn()
 const mockSet = vi.fn()
@@ -37,7 +37,10 @@ describe("bible store persistence", () => {
 
       await hydrateBibleStore()
 
-      expect(mockLoad).toHaveBeenCalledWith("bible.json", { autoSave: false })
+      expect(mockLoad).toHaveBeenCalledWith("bible.json", {
+        autoSave: false,
+        defaults: {},
+      })
       expect(mockGet).toHaveBeenCalledWith("activeTranslationId")
       expect(useBibleStore.getState().activeTranslationId).toBe(5)
     })
