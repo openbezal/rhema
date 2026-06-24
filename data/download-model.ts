@@ -58,6 +58,8 @@ async function main() {
       "Qwen/Qwen3-Embedding-0.6B",
       "--task",
       "feature-extraction",
+      "--library-name",
+      "transformers",
       MODELS_DIR,
     ],
     {

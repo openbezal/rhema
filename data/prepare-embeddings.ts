@@ -116,24 +116,48 @@ async function main() {
   // ── Phase 4: ONNX model download + quantize ────────────────────
   console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")
   if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
+    const venvPython = getVenvBin(
+      process.platform === "win32" ? "python" : "python3"
+    )
     const optimumCli = getVenvBin("optimum-cli")
+    const hfEnv = {
+      HF_HUB_DOWNLOAD_TIMEOUT: "60",
+      HF_HUB_DISABLE_XET: "1",
+      HF_XET_DISABLE: "1",
+    }
 
     // Export FP32
     if (force || !existsSync(MODEL_ONNX)) {
       console.log(
+        "\n  📥 Pre-downloading Qwen3-Embedding-0.6B model files (robust mode)..."
+      )
+      await run(
+        [venvPython, join(DATA_DIR, "download-model-robust.py")],
+        undefined,
+        hfEnv
+      )
+      console.log("  ✓ Model files downloaded to HuggingFace cache")
+
+      console.log(
         "\n  🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)..."
       )
       console.log("     This may take a few minutes on first run.\n")
-      await run([
-        optimumCli,
-        "export",
-        "onnx",
-        "--model",
-        "Qwen/Qwen3-Embedding-0.6B",
-        "--task",
-        "feature-extraction",
-        MODELS_DIR,
-      ])
+      await run(
+        [
+          optimumCli,
+          "export",
+          "onnx",
+          "--model",
+          "Qwen/Qwen3-Embedding-0.6B",
+          "--task",
+          "feature-extraction",
+          "--library-name",
+          "transformers",
+          MODELS_DIR,
+        ],
+        undefined,
+        hfEnv
+      )
       console.log(`  ✓ Model exported to ${MODELS_DIR}`)
     }
 

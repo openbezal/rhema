@@ -27,44 +27,29 @@ async function main() {
   console.log(`Downloading Whisper model from ${MODEL_URL}`)
   console.log(`Destination: ${MODEL_PATH}`)
 
-  const response = await fetch(MODEL_URL, { redirect: "follow" })
-  if (!response.ok) {
-    throw new Error(`Download failed: ${response.status} ${response.statusText}`)
-  }
-
-  const totalBytes = Number(response.headers.get("content-length") ?? 0)
-  const totalMB = (totalBytes / 1_000_000).toFixed(0)
-  console.log(`Size: ${totalMB} MB`)
-
-  const writer = createWriteStream(MODEL_PATH + ".tmp")
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error("No response body")
-
-  let downloaded = 0
-  let lastPercent = -1
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    writer.write(Buffer.from(value))
-    downloaded += value.byteLength
-
-    const percent = totalBytes > 0 ? Math.floor((downloaded / totalBytes) * 100) : 0
-    if (percent !== lastPercent && percent % 5 === 0) {
-      process.stdout.write(`\r  ${percent}% (${(downloaded / 1_000_000).toFixed(0)}/${totalMB} MB)`)
-      lastPercent = percent
-    }
-  }
-
-  writer.end()
-  await new Promise<void>((resolve, reject) => {
-    writer.on("finish", resolve)
-    writer.on("error", reject)
+  const tempPath = MODEL_PATH + ".tmp"
+  
+  const proc = Bun.spawn([
+    "curl",
+    "-L",
+    "-C", "-",
+    "--retry", "10",
+    "--retry-delay", "5",
+    "-o", tempPath,
+    MODEL_URL
+  ], {
+    stdout: "inherit",
+    stderr: "inherit",
   })
+
+  const exitCode = await proc.exited
+  if (exitCode !== 0) {
+    throw new Error(`Download failed with exit code ${exitCode}`)
+  }
 
   // Atomic rename
   const { renameSync } = await import("node:fs")
-  renameSync(MODEL_PATH + ".tmp", MODEL_PATH)
+  renameSync(tempPath, MODEL_PATH)
 
   console.log(`\nWhisper model downloaded: ${MODEL_PATH}`)
 }
