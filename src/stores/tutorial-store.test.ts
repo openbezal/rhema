@@ -46,6 +46,7 @@ describe("tutorial store", () => {
     await persistOnboardingComplete()
     expect(mockLoad).toHaveBeenCalledWith("settings.json", {
       autoSave: false,
+      defaults: {},
     })
     expect(mockSet).toHaveBeenCalledWith("onboardingComplete", true)
     expect(mockSave).toHaveBeenCalled()

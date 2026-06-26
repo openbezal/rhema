@@ -57,7 +57,7 @@ export const useBibleStore = create<BibleState>((set) => ({
 /** Load persisted activeTranslationId from disk into Zustand, then sync to Rust backend. */
 export async function hydrateBibleStore(): Promise<void> {
   try {
-    const store = await load("bible.json", { autoSave: false })
+    const store = await load("bible.json", { autoSave: false, defaults: {} })
     const value = await store.get<number>("activeTranslationId")
     if (typeof value === "number") {
       useBibleStore.getState().setActiveTranslation(value)
@@ -73,7 +73,7 @@ export async function hydrateBibleStore(): Promise<void> {
 /** Subscribe to activeTranslationId changes and persist to disk with debounce. */
 export async function initBiblePersistence(): Promise<void> {
   try {
-    const store = await load("bible.json", { autoSave: false })
+    const store = await load("bible.json", { autoSave: false, defaults: {} })
     let timer: ReturnType<typeof setTimeout> | null = null
     let prev = useBibleStore.getState().activeTranslationId
 
