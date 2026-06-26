@@ -14,6 +14,7 @@ thiserror.workspace = true
 aho-corasick = "1"
 lru = "0.12"
 rhema-bible = { path = "../bible" }
+regex = "1"
 
 # Optional heavy dependencies for real embedding / vector search
 ort = { version = "2.0.0-rc.12", optional = true }
