@@ -81,6 +81,10 @@ jobs:
       #     bun run build:bible
       #     bun run download:models
 
+      - name: Pre-build Rust (workaround for whisper-rs-sys env issue)
+        run: cargo build --release --target ${{ matrix.target }}
+        working-directory: src-tauri
+
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0
         env:
