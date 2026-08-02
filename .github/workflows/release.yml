@@ -60,6 +60,8 @@ jobs:
             libgtk-3-dev \
             librsvg2-dev \
             libssl-dev \
+            libasound2-dev \
+            libudev-dev \
             patchelf
 
       - name: Cache Rust dependencies
