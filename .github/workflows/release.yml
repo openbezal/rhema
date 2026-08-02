@@ -1,0 +1,101 @@
+name: Release
+
+# Triggers on pushing a version tag, e.g. `git tag v0.1.0 && git push --tags`
+# You can also trigger manually from the Actions tab.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# Needed so tauri-action can create/update the GitHub Release and upload assets
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest" # Apple Silicon (arm64)
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest" # Intel (x86_64)
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04" # Linux x86_64 (22.04 for older glibc = wider compat)
+            args: ""
+          - platform: "windows-latest" # Windows x86_64
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # --- Toolchains ---
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # --- Linux system dependencies for Tauri v2 ---
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      # --- Rust build cache (big speedup on repeat runs) ---
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      # --- JS dependencies ---
+      - name: Install frontend dependencies
+        run: bun install
+
+      # If your `tauri build` step needs bundled data (bible DB, embeddings,
+      # ONNX model, whisper model) to already be present in the repo/output,
+      # add the relevant `bun run download:*` / `bun run build:bible` steps
+      # here BEFORE the tauri-action step below. Left out for now since it's
+      # unclear which of these are required at build time vs. runtime.
+
+      - name: Build and release Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: macOS code signing / notarization (uncomment + add secrets if you have an Apple dev account)
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Optional: Tauri updater signing key (if you use the built-in auto-updater)
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Rhema ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
