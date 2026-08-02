@@ -4,8 +4,8 @@ name: Release
 # You can also trigger manually from the Actions tab.
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - chore/cicd-release-pipeline
   workflow_dispatch:
 
 # Needed so tauri-action can create/update the GitHub Release and upload assets
@@ -30,7 +30,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository 
         uses: actions/checkout@v4
 
       # --- Toolchains ---
