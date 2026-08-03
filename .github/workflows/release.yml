@@ -1,4 +1,4 @@
-name: Release
+name: Build, Bundle & Release
 
 on:
   push:
@@ -23,9 +23,6 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
-
-          - os: macos-latest
-            target: x86_64-apple-darwin
 
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
@@ -72,14 +69,10 @@ jobs:
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
-
-      # Uncomment if your project requires downloading models,
-      # generating databases, embeddings, etc.
-      #
-      # - name: Prepare application assets
-      #   run: |
-      #     bun run build:bible
-      #     bun run download:models
+      
+      - name: Prepare application assets
+        run: |
+          bun run setup:all
 
       - name: Pre-build Rust (workaround for whisper-rs-sys env issue)
         run: cargo build --release --target ${{ matrix.target }}
