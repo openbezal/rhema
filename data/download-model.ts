@@ -31,7 +31,7 @@ async function main() {
   // --- Phase 1: Python environment setup ---
   await ensurePythonEnv([
     "optimum-onnx[onnxruntime]",
-    "sentence-transformers",
+    "sentence-transformers<5.0.0",
     "accelerate",
   ])
 

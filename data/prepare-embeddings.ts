@@ -85,7 +85,7 @@ async function main() {
   console.log("\n━━━ Phase 1/7: Python environment ━━━")
   await ensurePythonEnv([
     "optimum-onnx[onnxruntime]",
-    "sentence-transformers",
+    "sentence-transformers<5.0.0",
     "accelerate",
     "tokenizers",
     "numpy",
