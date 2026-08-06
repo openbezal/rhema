@@ -66,3 +66,12 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          # A Pages deployment is keyed by commit SHA, and on timeout this
+          # action cancels the deployment it created. That combination is
+          # unrecoverable: once a SHA's deployment is cancelled, re-running the
+          # job recreates the same id, reads back the cancelled state, and fails
+          # instantly — only a new commit can deploy. A queue stall on
+          # 2026-08-06 burned a SHA that way, so give the queue more room than
+          # the 10-minute default before aborting.
+          timeout: 1800000
