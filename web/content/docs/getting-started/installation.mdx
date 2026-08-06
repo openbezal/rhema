@@ -8,6 +8,28 @@ import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Callout } from "fumadocs-ui/components/callout";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
+## Prebuilt installer (Windows)
+
+If you just want to run Rhema and don't need to change it,
+[**download the latest Windows installer**](https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe).
+It's rebuilt from `main` on every merge, and it needs no toolchain — no Bun, no
+Rust, no Python.
+
+<Callout title="What the installer leaves out" type="warn">
+The Bible database, embedding model, and Whisper model are **not bundled** —
+together they run to well over a gigabyte. Without them the app starts, but
+verse detection and local speech-to-text stay inactive. Build from source below
+to get the full pipeline.
+
+The installer is also unsigned, so Windows SmartScreen warns the first time you
+run it (*More info → Run anyway*).
+</Callout>
+
+There's no prebuilt macOS or Linux binary yet — build from source on those
+platforms.
+
+## Build from source
+
 Once your toolchain is in place — see [Prerequisites](/docs/getting-started/prerequisites) —
 you can clone the repo and run a single setup command.
 
