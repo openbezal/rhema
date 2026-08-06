@@ -69,10 +69,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
-      
-      - name: Prepare application assets
-        run: |
-          bun run setup:all
+
+      # TODO: Figure out the problem when running `precompute-embeddings`      
+      #   The problem has to do with an incompatible version of `sentence-transformers`
+      # - name: Prepare application assets
+      #   run: |
+      #     bun run setup:all
 
       - name: Pre-build Rust (workaround for whisper-rs-sys env issue)
         run: cargo build --release --target ${{ matrix.target }}
