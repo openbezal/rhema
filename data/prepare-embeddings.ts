@@ -18,11 +18,7 @@
 
 import { join } from "node:path"
 import { existsSync } from "node:fs"
-import {
-  ensurePythonEnv,
-  getVenvBin,
-  PROJECT_ROOT,
-} from "./lib/python-env"
+import { ensurePythonEnv, getVenvBin, PROJECT_ROOT } from "./lib/python-env"
 
 // ── Paths ────────────────────────────────────────────────────────────
 const DATA_DIR = join(PROJECT_ROOT, "data")
@@ -41,7 +37,12 @@ const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
 const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b.bin")
 const IDS_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b-ids.bin")
-const WHISPER_MODEL = join(PROJECT_ROOT, "models", "whisper", "ggml-large-v3-turbo-q8_0.bin")
+const WHISPER_MODEL = join(
+  PROJECT_ROOT,
+  "models",
+  "whisper",
+  "ggml-large-v3-turbo-q8_0.bin"
+)
 const MODEL_ONNX = join(MODELS_DIR, "model.onnx")
 const MODEL_INT8 = join(MODELS_DIR_INT8, "model_quantized.onnx")
 
@@ -133,6 +134,8 @@ async function main() {
         "--task",
         "feature-extraction",
         MODELS_DIR,
+        "--library-name",
+        "transformers",
       ])
       console.log(`  ✓ Model exported to ${MODELS_DIR}`)
     }
@@ -150,6 +153,8 @@ async function main() {
           "--arm64",
           "-o",
           MODELS_DIR_INT8,
+          "--library-name",
+          "transformers",
         ])
         console.log(`  ✓ INT8 model saved to ${MODELS_DIR_INT8}`)
       } catch {
