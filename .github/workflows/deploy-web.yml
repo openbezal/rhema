@@ -27,14 +27,14 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Cache Next.js build
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: web/.next/cache
           key: nextjs-${{ runner.os }}-${{ hashFiles('web/bun.lock') }}-${{ hashFiles('web/**/*.ts', 'web/**/*.tsx') }}
@@ -64,5 +64,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Do not try to raise `timeout` here: the action clamps it to 600000 ms
+      # and logs "timeout value is greater than the allowed maximum". Waiting
+      # longer is not an option this workflow controls.
+      #
+      # A Pages deployment is also keyed by commit SHA, and on timeout the
+      # action cancels the deployment it created — so a timed-out SHA can never
+      # deploy again. Re-running the job recreates the same id, reads back the
+      # cancelled state, and fails in seconds. Only a new commit can deploy.
       - id: deployment
         uses: actions/deploy-pages@v5

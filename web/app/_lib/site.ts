@@ -16,7 +16,13 @@ export const SITE = {
     owner: "openbezal",
     name: "rhema",
     url: "https://github.com/openbezal/rhema",
-    releasesLatest: "https://github.com/openbezal/rhema/releases/latest",
+    releases: "https://github.com/openbezal/rhema/releases",
+    // Rolling prerelease published by .github/workflows/release-windows.yml on
+    // every merge to main. The tag and filename are set by RELEASE_TAG and
+    // ASSET_NAME in that workflow — change them together or this link breaks.
+    // `/releases/latest` cannot be used here: GitHub excludes prereleases from it.
+    downloadWindows:
+      "https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe",
     discussions: "https://github.com/openbezal/rhema/discussions",
     stars: { fallback: 221 },
   },
@@ -31,6 +37,17 @@ export const SITE = {
     translations: "6+",
   },
 } as const;
+
+/**
+ * Where a "Download" CTA should point. Windows is the only platform with a
+ * prebuilt installer, so it gets the file directly; everyone else lands on the
+ * releases page instead of being handed a .exe they can't run.
+ */
+export function downloadHref(platform: string | null | undefined): string {
+  return platform === "windows"
+    ? SITE.repo.downloadWindows
+    : SITE.repo.releases;
+}
 
 export async function getGitHubStars(): Promise<number> {
   try {

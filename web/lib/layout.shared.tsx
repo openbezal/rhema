@@ -22,7 +22,7 @@ export function baseOptions(): BaseLayoutProps {
       },
       {
         text: "Releases",
-        url: SITE.repo.releasesLatest,
+        url: SITE.repo.releases,
         external: true,
       },
     ],

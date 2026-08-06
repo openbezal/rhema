@@ -8,13 +8,16 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "./button";
 import { usePlatform } from "../../_lib/use-platform";
-import { SITE } from "../../_lib/site";
+import { downloadHref } from "../../_lib/site";
 
 const COPY: Record<
   "mac" | "windows" | "linux" | "other" | "default",
   { label: string; icon: TablerIcon }
 > = {
-  mac: { label: "Download for macOS", icon: IconBrandApple },
+  // Windows is the only platform with a prebuilt installer today, so it is the
+  // only one that links straight to a file. Everyone else lands on the releases
+  // page rather than being handed a .exe they can't run.
+  mac: { label: "Download", icon: IconBrandApple },
   windows: { label: "Download for Windows", icon: IconBrandWindows },
   linux: { label: "Download", icon: IconDownload },
   other: { label: "Download", icon: IconDownload },
@@ -34,7 +37,7 @@ export function DownloadButton({
 
   return (
     <Button
-      href={SITE.repo.releasesLatest}
+      href={downloadHref(platform)}
       variant="primary"
       size={size}
       className={className}

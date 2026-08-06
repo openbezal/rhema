@@ -41,7 +41,10 @@ common.get_page = _get_page_with_timeout
 BOOK_DELAY = 2  # seconds
 MAX_RETRIES = 3  # retries per book
 
-TRANSLATIONS = ["NIV", "ESV", "NASB", "NKJV", "NLT", "AMP"]
+# TRANSLATIONS = ["NIV", "ESV", "NASB", "NKJV", "NLT", "AMP"]
+TRANSLATIONS = list(common.BIBLE_TRANSLATIONS.keys())
+TRANSLATIONS.remove("NMB")
+TRANSLATIONS.remove("RVA")
 
 BOOKS = [
     "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",

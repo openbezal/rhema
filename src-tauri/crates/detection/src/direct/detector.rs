@@ -1,5 +1,8 @@
 use std::collections::VecDeque;
+use std::sync::LazyLock;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+use regex::Regex;
 
 use super::automaton::{BookMatch, BookMatcher};
 use super::context::ReferenceContext;
@@ -229,73 +232,73 @@ const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
 /// Maximum chapter count per book (`book_number` 1-66).
 /// Used to reject impossible references like "Mark 30:1" (Mark has 16 chapters).
 const MAX_CHAPTERS: [i32; 67] = [
-    0,  // index 0 unused
-    50, // 1  Genesis
-    40, // 2  Exodus
-    27, // 3  Leviticus
-    36, // 4  Numbers
-    34, // 5  Deuteronomy
-    24, // 6  Joshua
-    21, // 7  Judges
-    4,  // 8  Ruth
-    31, // 9  1 Samuel
-    24, // 10 2 Samuel
-    22, // 11 1 Kings
-    25, // 12 2 Kings
-    29, // 13 1 Chronicles
-    36, // 14 2 Chronicles
-    10, // 15 Ezra
-    13, // 16 Nehemiah
-    10, // 17 Esther
-    42, // 18 Job
-    150,// 19 Psalms
-    31, // 20 Proverbs
-    12, // 21 Ecclesiastes
-    8,  // 22 Song of Solomon
-    66, // 23 Isaiah
-    52, // 24 Jeremiah
-    5,  // 25 Lamentations
-    48, // 26 Ezekiel
-    12, // 27 Daniel
-    14, // 28 Hosea
-    3,  // 29 Joel
-    9,  // 30 Amos
-    1,  // 31 Obadiah
-    4,  // 32 Jonah
-    7,  // 33 Micah
-    3,  // 34 Nahum
-    3,  // 35 Habakkuk
-    3,  // 36 Zephaniah
-    2,  // 37 Haggai
-    14, // 38 Zechariah
-    4,  // 39 Malachi
-    28, // 40 Matthew
-    16, // 41 Mark
-    24, // 42 Luke
-    21, // 43 John
-    28, // 44 Acts
-    16, // 45 Romans
-    16, // 46 1 Corinthians
-    13, // 47 2 Corinthians
-    6,  // 48 Galatians
-    6,  // 49 Ephesians
-    4,  // 50 Philippians
-    4,  // 51 Colossians
-    5,  // 52 1 Thessalonians
-    3,  // 53 2 Thessalonians
-    6,  // 54 1 Timothy
-    4,  // 55 2 Timothy
-    3,  // 56 Titus
-    1,  // 57 Philemon
-    13, // 58 Hebrews
-    5,  // 59 James
-    5,  // 60 1 Peter
-    3,  // 61 2 Peter
-    5,  // 62 1 John
-    1,  // 63 2 John
-    1,  // 64 3 John
-    1,  // 65 Jude
-    22, // 66 Revelation
+    0,   // index 0 unused
+    50,  // 1  Genesis
+    40,  // 2  Exodus
+    27,  // 3  Leviticus
+    36,  // 4  Numbers
+    34,  // 5  Deuteronomy
+    24,  // 6  Joshua
+    21,  // 7  Judges
+    4,   // 8  Ruth
+    31,  // 9  1 Samuel
+    24,  // 10 2 Samuel
+    22,  // 11 1 Kings
+    25,  // 12 2 Kings
+    29,  // 13 1 Chronicles
+    36,  // 14 2 Chronicles
+    10,  // 15 Ezra
+    13,  // 16 Nehemiah
+    10,  // 17 Esther
+    42,  // 18 Job
+    150, // 19 Psalms
+    31,  // 20 Proverbs
+    12,  // 21 Ecclesiastes
+    8,   // 22 Song of Solomon
+    66,  // 23 Isaiah
+    52,  // 24 Jeremiah
+    5,   // 25 Lamentations
+    48,  // 26 Ezekiel
+    12,  // 27 Daniel
+    14,  // 28 Hosea
+    3,   // 29 Joel
+    9,   // 30 Amos
+    1,   // 31 Obadiah
+    4,   // 32 Jonah
+    7,   // 33 Micah
+    3,   // 34 Nahum
+    3,   // 35 Habakkuk
+    3,   // 36 Zephaniah
+    2,   // 37 Haggai
+    14,  // 38 Zechariah
+    4,   // 39 Malachi
+    28,  // 40 Matthew
+    16,  // 41 Mark
+    24,  // 42 Luke
+    21,  // 43 John
+    28,  // 44 Acts
+    16,  // 45 Romans
+    16,  // 46 1 Corinthians
+    13,  // 47 2 Corinthians
+    6,   // 48 Galatians
+    6,   // 49 Ephesians
+    4,   // 50 Philippians
+    4,   // 51 Colossians
+    5,   // 52 1 Thessalonians
+    3,   // 53 2 Thessalonians
+    6,   // 54 1 Timothy
+    4,   // 55 2 Timothy
+    3,   // 56 Titus
+    1,   // 57 Philemon
+    13,  // 58 Hebrews
+    5,   // 59 James
+    5,   // 60 1 Peter
+    3,   // 61 2 Peter
+    5,   // 62 1 John
+    1,   // 63 2 John
+    1,   // 64 3 John
+    1,   // 65 Jude
+    22,  // 66 Revelation
 ];
 
 /// Check if a book/chapter combination is valid.
@@ -330,6 +333,22 @@ const FILLER_PHRASES: &[&str] = &[
     "turn in your bible to",
 ];
 
+/// Joins runs of three or more space-separated digits into one number, so a
+/// spelled-out chapter ("psalm 1 1 2") becomes "psalm 112".
+///
+/// Two-token runs are left alone: they are nearly always a chapter/verse pair,
+/// and collapsing "Galatians 5 1" into chapter 51 is unrecoverable. Three-token
+/// runs stay ambiguous ("romans 8 2 8" could be 8:28), but are rare enough that
+/// collapsing them is the better default.
+static SPACED_DIGITS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(?:\d\s+){2,}\d\b").expect("literal pattern is valid"));
+
+fn collapse_spaced_digits(text: &str) -> String {
+    SPACED_DIGITS
+        .replace_all(text, |caps: &regex::Captures| caps[0].replace(' ', ""))
+        .to_string()
+}
+
 /// Strip common sermon filler phrases from transcript text so they do not
 /// confuse the Aho-Corasick automaton or the parser.
 ///
@@ -337,7 +356,7 @@ const FILLER_PHRASES: &[&str] = &[
 /// plus a special pattern for "look at" when followed by what looks like a book name
 /// (starts with an uppercase letter).
 fn clean_transcript(text: &str) -> String {
-    let mut result = text.to_string();
+    let mut result = collapse_spaced_digits(text);
 
     // Remove fixed filler phrases (case-insensitive)
     for phrase in FILLER_PHRASES {
@@ -468,7 +487,8 @@ impl DirectDetector {
 
         // Then check bare abbreviations as standalone words
         // Split into words and check each against known abbreviations
-        let words: Vec<&str> = lower.split_whitespace()
+        let words: Vec<&str> = lower
+            .split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
             .collect();
 
@@ -614,7 +634,9 @@ impl DirectDetector {
                 }
 
                 // Skip impossible references (e.g., "Mark 30:1" — Mark has 16 chapters)
-                if resolved.chapter > 0 && !is_valid_reference(resolved.book_number, resolved.chapter) {
+                if resolved.chapter > 0
+                    && !is_valid_reference(resolved.book_number, resolved.chapter)
+                {
                     continue;
                 }
 
@@ -624,9 +646,8 @@ impl DirectDetector {
                 if resolved.verse_start == 0 {
                     // Detect if chapter was explicitly spoken or defaulted.
                     let after_book = text[book_match.end..].trim();
-                    let has_explicit_chapter =
-                        after_book.starts_with(|c: char| c.is_ascii_digit())
-                            || after_book.to_lowercase().starts_with("chapter");
+                    let has_explicit_chapter = after_book.starts_with(|c: char| c.is_ascii_digit())
+                        || after_book.to_lowercase().starts_with("chapter");
                     self.incomplete = Some(IncompleteRef {
                         verse_ref: resolved.clone(),
                         timestamp: Instant::now(),
@@ -642,7 +663,10 @@ impl DirectDetector {
                 let confidence = compute_confidence(&resolved, &verse_ref);
                 let snippet = extract_snippet(text, book_match.start, book_match.end);
 
-                #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "timestamp millis won't exceed u64 for centuries"
+                )]
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap_or_default()
@@ -675,7 +699,10 @@ impl DirectDetector {
         for phrase in PREVIOUS_VERSE_PHRASES {
             if lower.contains(phrase) {
                 if let Some(prev_ref) = self.recent_detections.front() {
-                    #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "timestamp millis won't exceed u64 for centuries"
+                    )]
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .unwrap_or_default()
@@ -713,7 +740,10 @@ impl DirectDetector {
     }
 
     /// Build a Detection from a resolved `VerseRef`.
-    #[expect(clippy::unused_self, reason = "method kept on self for future extensibility")]
+    #[expect(
+        clippy::unused_self,
+        reason = "method kept on self for future extensibility"
+    )]
     fn make_direct_detection(
         &self,
         verse_ref: &VerseRef,
@@ -723,7 +753,10 @@ impl DirectDetector {
         end: usize,
     ) -> Detection {
         let snippet = extract_snippet(text, start, end.min(text.len()));
-        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "timestamp millis won't exceed u64 for centuries"
+        )]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -745,7 +778,6 @@ impl Default for DirectDetector {
         Self::new()
     }
 }
-
 
 /// Compute a confidence score for the detection.
 /// Full explicit references (book + chapter + verse) get 1.0.
@@ -785,15 +817,13 @@ fn extract_snippet(text: &str, start: usize, end: usize) -> String {
         .rfind(' ')
         .map_or(snippet_start, |p| snippet_start + p + 1);
 
-    let snippet_end = text[end..snippet_end]
-        .find(' ')
-        .map_or(snippet_end, |p| {
-            // Find the end of the relevant portion (after a few more words)
-            let after_space = end + p + 1;
-            text[after_space..snippet_end]
-                .find(' ')
-                .map_or(snippet_end, |p2| after_space + p2)
-        });
+    let snippet_end = text[end..snippet_end].find(' ').map_or(snippet_end, |p| {
+        // Find the end of the relevant portion (after a few more words)
+        let after_space = end + p + 1;
+        text[after_space..snippet_end]
+            .find(' ')
+            .map_or(snippet_end, |p2| after_space + p2)
+    });
 
     text[snippet_start..snippet_end].to_string()
 }
@@ -810,6 +840,128 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "John");
         assert_eq!(results[0].verse_ref.chapter, 3);
         assert_eq!(results[0].verse_ref.verse_start, 16);
+    }
+
+    #[test]
+    fn test_detect_collapsed_fixed() {
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("open to Galatians 5 12");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name, "Galatians");
+        assert_eq!(results[0].verse_ref.chapter, 5);
+        assert_eq!(results[0].verse_ref.verse_start, 12);
+    }
+
+    #[test]
+    fn test_detect_collapsed_fixed2() {
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("open to Galatians 5 1");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name, "Galatians");
+        assert_eq!(results[0].verse_ref.chapter, 5);
+        assert_eq!(results[0].verse_ref.verse_start, 1);
+    }
+
+    #[test]
+    fn test_detect_collapsed_basic_digits() {
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("David in Psalm 1 1 2 verse one now says");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name, "Psalms");
+        assert_eq!(results[0].verse_ref.chapter, 112);
+        assert_eq!(results[0].verse_ref.verse_start, 1);
+    }
+
+    #[test]
+    fn test_single_digit_chapter_and_verse_survive_collapsing() {
+        for (text, book, chapter, verse) in [
+            ("open to Galatians 5 1", "Galatians", 5, 1),
+            ("turn to John 3 5", "John", 3, 5),
+            ("let's read Genesis 1 1", "Genesis", 1, 1),
+            ("Romans 8 1 is our text", "Romans", 8, 1),
+        ] {
+            let mut detector = DirectDetector::new();
+            let results = detector.detect(text);
+            assert!(!results.is_empty(), "no detection for {text:?}");
+            assert_eq!(results[0].verse_ref.book_name, book, "book for {text:?}");
+            assert_eq!(
+                results[0].verse_ref.chapter, chapter,
+                "chapter for {text:?}"
+            );
+            assert_eq!(
+                results[0].verse_ref.verse_start, verse,
+                "verse for {text:?}"
+            );
+        }
+    }
+
+    /// Collapsing "Genesis 1 1" to chapter 11 used to leave a chapter-only
+    /// pending reference, which the next segment ("verse 5") completed into
+    /// Genesis 11:5 — a wrong verse emitted with full confidence.
+    #[test]
+    fn test_collapsing_does_not_poison_pending_chapter() {
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("let's turn to Genesis 1 1");
+        assert!(!results.is_empty());
+        assert_eq!(results[0].verse_ref.book_name, "Genesis");
+        assert_eq!(results[0].verse_ref.chapter, 1);
+        assert_eq!(results[0].verse_ref.verse_start, 1);
+        assert!(detector.incomplete.is_none());
+    }
+
+    #[test]
+    fn test_collapses_basic_digits() {
+        assert_eq!(collapse_spaced_digits("john 1 1 2"), "john 112");
+    }
+
+    #[test]
+    fn test_does_not_collapse_single_digit() {
+        assert_eq!(collapse_spaced_digits("john 1"), "john 1");
+    }
+
+    #[test]
+    fn test_does_not_collapse_chapter_verse_pair() {
+        assert_eq!(collapse_spaced_digits("john 1 6"), "john 1 6");
+        assert_eq!(collapse_spaced_digits("galatians 5 1"), "galatians 5 1");
+    }
+
+    #[test]
+    fn test_collapses_only_runs_of_three_or_more() {
+        assert_eq!(
+            collapse_spaced_digits("john 1 1 romans 8 2 8"),
+            "john 1 1 romans 828"
+        );
+    }
+
+    #[test]
+    fn test_collapses_digits_with_multiple_spaces() {
+        assert_eq!(collapse_spaced_digits("john 1   1   2"), "john 112");
+    }
+
+    #[test]
+    fn test_collapses_digits_with_surrounding_spaces() {
+        assert_eq!(collapse_spaced_digits(" john 1 1 2 "), " john 112 ");
+    }
+
+    #[test]
+    fn test_punctuation_breaks_a_digit_run() {
+        assert_eq!(collapse_spaced_digits("john 1, 1 2"), "john 1, 1 2");
+        assert_eq!(collapse_spaced_digits("john 1, 1 2 3"), "john 1, 123");
+    }
+
+    #[test]
+    fn test_does_not_collapse_existing_verse_format() {
+        assert_eq!(collapse_spaced_digits("john 3:16"), "john 3:16");
+    }
+
+    #[test]
+    fn test_does_not_collapse_decimal_numbers() {
+        assert_eq!(collapse_spaced_digits("value 1.2"), "value 1.2");
+    }
+
+    #[test]
+    fn test_does_not_collapse_alphanumeric_sequences() {
+        assert_eq!(collapse_spaced_digits("a1 2b"), "a1 2b");
     }
 
     #[test]
@@ -899,7 +1051,7 @@ mod tests {
         // Different book — supersedes Genesis 3
         let results = detector.detect("let's look at John 1");
         assert!(results.is_empty()); // also chapter-only, not emitted
-        // Incomplete now tracks John 1, not Genesis 3
+                                     // Incomplete now tracks John 1, not Genesis 3
         let inc = detector.incomplete.as_ref().unwrap();
         assert_eq!(inc.verse_ref.book_name, "John");
     }
@@ -1044,9 +1196,18 @@ mod tests {
     #[test]
     fn test_translation_command_basic_niv() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("give me niv"), Some("NIV".to_string()));
-        assert_eq!(detector.detect_translation_command("read in niv"), Some("NIV".to_string()));
-        assert_eq!(detector.detect_translation_command("switch to niv"), Some("NIV".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me niv"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("read in niv"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("switch to niv"),
+            Some("NIV".to_string())
+        );
     }
 
     #[test]
@@ -1094,13 +1255,34 @@ mod tests {
     #[test]
     fn test_translation_command_bare_abbreviations() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("niv"), Some("NIV".to_string()));
-        assert_eq!(detector.detect_translation_command("esv"), Some("ESV".to_string()));
-        assert_eq!(detector.detect_translation_command("kjv"), Some("KJV".to_string()));
-        assert_eq!(detector.detect_translation_command("amp"), Some("AMP".to_string()));
-        assert_eq!(detector.detect_translation_command("nasb"), Some("NASB".to_string()));
-        assert_eq!(detector.detect_translation_command("nkjv"), Some("NKJV".to_string()));
-        assert_eq!(detector.detect_translation_command("nlt"), Some("NLT".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("niv"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("esv"),
+            Some("ESV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("kjv"),
+            Some("KJV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("amp"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("nasb"),
+            Some("NASB".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("nkjv"),
+            Some("NKJV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("nlt"),
+            Some("NLT".to_string())
+        );
     }
 
     #[test]
@@ -1123,90 +1305,207 @@ mod tests {
     #[test]
     fn test_translation_command_message_bible() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("give me the message"), Some("MSG".to_string()));
-        assert_eq!(detector.detect_translation_command("read in the message"), Some("MSG".to_string()));
-        assert_eq!(detector.detect_translation_command("switch to message"), Some("MSG".to_string()));
-        assert_eq!(detector.detect_translation_command("message version"), Some("MSG".to_string()));
-        assert_eq!(detector.detect_translation_command("message bible"), Some("MSG".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me the message"),
+            Some("MSG".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("read in the message"),
+            Some("MSG".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("switch to message"),
+            Some("MSG".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("message version"),
+            Some("MSG".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("message bible"),
+            Some("MSG".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_csb_hcsb() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("give me csb"), Some("CSB".to_string()));
-        assert_eq!(detector.detect_translation_command("christian standard bible"), Some("CSB".to_string()));
-        assert_eq!(detector.detect_translation_command("give me hcsb"), Some("HCSB".to_string()));
-        assert_eq!(detector.detect_translation_command("holman christian standard"), Some("HCSB".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me csb"),
+            Some("CSB".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("christian standard bible"),
+            Some("CSB".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("give me hcsb"),
+            Some("HCSB".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("holman christian standard"),
+            Some("HCSB".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_revised_standard() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("give me rsv"), Some("RSV".to_string()));
-        assert_eq!(detector.detect_translation_command("revised standard version"), Some("RSV".to_string()));
-        assert_eq!(detector.detect_translation_command("give me nrsv"), Some("NRSV".to_string()));
-        assert_eq!(detector.detect_translation_command("new revised standard"), Some("NRSV".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me rsv"),
+            Some("RSV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("revised standard version"),
+            Some("RSV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("give me nrsv"),
+            Some("NRSV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("new revised standard"),
+            Some("NRSV".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_good_news() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("give me gnt"), Some("GNT".to_string()));
-        assert_eq!(detector.detect_translation_command("give me gnb"), Some("GNT".to_string()));
-        assert_eq!(detector.detect_translation_command("good news translation"), Some("GNT".to_string()));
-        assert_eq!(detector.detect_translation_command("good news bible"), Some("GNT".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me gnt"),
+            Some("GNT".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("give me gnb"),
+            Some("GNT".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("good news translation"),
+            Some("GNT".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("good news bible"),
+            Some("GNT".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_net_cev() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("give me net"), Some("NET".to_string()));
-        assert_eq!(detector.detect_translation_command("new english translation"), Some("NET".to_string()));
-        assert_eq!(detector.detect_translation_command("give me cev"), Some("CEV".to_string()));
-        assert_eq!(detector.detect_translation_command("contemporary english version"), Some("CEV".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me net"),
+            Some("NET".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("new english translation"),
+            Some("NET".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("give me cev"),
+            Some("CEV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("contemporary english version"),
+            Some("CEV".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_non_english() {
         let detector = DirectDetector::new();
         // Spanish
-        assert_eq!(detector.detect_translation_command("give me spanish"), Some("SpaRV".to_string()));
-        assert_eq!(detector.detect_translation_command("read in reina valera"), Some("SpaRV".to_string()));
-        assert_eq!(detector.detect_translation_command("in spanish"), Some("SpaRV".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me spanish"),
+            Some("SpaRV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("read in reina valera"),
+            Some("SpaRV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("in spanish"),
+            Some("SpaRV".to_string())
+        );
 
         // French
-        assert_eq!(detector.detect_translation_command("give me french"), Some("FreJND".to_string()));
-        assert_eq!(detector.detect_translation_command("read in french"), Some("FreJND".to_string()));
-        assert_eq!(detector.detect_translation_command("darby french"), Some("FreJND".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me french"),
+            Some("FreJND".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("read in french"),
+            Some("FreJND".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("darby french"),
+            Some("FreJND".to_string())
+        );
 
         // Portuguese
-        assert_eq!(detector.detect_translation_command("give me portuguese"), Some("PorBLivre".to_string()));
-        assert_eq!(detector.detect_translation_command("biblia livre"), Some("PorBLivre".to_string()));
-        assert_eq!(detector.detect_translation_command("in portuguese"), Some("PorBLivre".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("give me portuguese"),
+            Some("PorBLivre".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("biblia livre"),
+            Some("PorBLivre".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("in portuguese"),
+            Some("PorBLivre".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_case_insensitive() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("GIVE ME NIV"), Some("NIV".to_string()));
-        assert_eq!(detector.detect_translation_command("Give Me Amplified"), Some("AMP".to_string()));
-        assert_eq!(detector.detect_translation_command("CAN I HAVE IT IN ESV"), Some("ESV".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("GIVE ME NIV"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("Give Me Amplified"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("CAN I HAVE IT IN ESV"),
+            Some("ESV".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_show_me_variations() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("show me niv"), Some("NIV".to_string()));
-        assert_eq!(detector.detect_translation_command("show me amplified"), Some("AMP".to_string()));
-        assert_eq!(detector.detect_translation_command("show me the message"), Some("MSG".to_string()));
+        assert_eq!(
+            detector.detect_translation_command("show me niv"),
+            Some("NIV".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("show me amplified"),
+            Some("AMP".to_string())
+        );
+        assert_eq!(
+            detector.detect_translation_command("show me the message"),
+            Some("MSG".to_string())
+        );
     }
 
     #[test]
     fn test_translation_command_no_match() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.detect_translation_command("genesis 3 verse 16"), None);
-        assert_eq!(detector.detect_translation_command("the weather is nice"), None);
-        assert_eq!(detector.detect_translation_command("tell me about the bible"), None);
+        assert_eq!(
+            detector.detect_translation_command("genesis 3 verse 16"),
+            None
+        );
+        assert_eq!(
+            detector.detect_translation_command("the weather is nice"),
+            None
+        );
+        assert_eq!(
+            detector.detect_translation_command("tell me about the bible"),
+            None
+        );
     }
 
     #[test]
@@ -1214,11 +1513,14 @@ mod tests {
         let detector = DirectDetector::new();
         // Should match even with extra words
         assert_eq!(
-            detector.detect_translation_command("i would like to read that in amplified version please"),
+            detector.detect_translation_command(
+                "i would like to read that in amplified version please"
+            ),
             Some("AMP".to_string())
         );
         assert_eq!(
-            detector.detect_translation_command("could you show me that verse in the niv translation"),
+            detector
+                .detect_translation_command("could you show me that verse in the niv translation"),
             Some("NIV".to_string())
         );
     }

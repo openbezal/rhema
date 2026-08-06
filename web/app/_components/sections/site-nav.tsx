@@ -5,7 +5,8 @@ import Link from "next/link";
 import { IconBrandGithub, IconMenu2, IconX } from "@tabler/icons-react";
 import { Button } from "../ui/button";
 import { RhemaLogo } from "../ui/rhema-logo";
-import { SITE } from "../../_lib/site";
+import { SITE, downloadHref } from "../../_lib/site";
+import { usePlatform } from "../../_lib/use-platform";
 import { cn } from "../../_lib/utils";
 
 type NavLink = { href: string; label: string; external?: boolean };
@@ -22,6 +23,7 @@ const LINKS: ReadonlyArray<NavLink> = [
 export function SiteNav({ stars }: { stars: number }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const platform = usePlatform();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -83,7 +85,7 @@ export function SiteNav({ stars }: { stars: number }) {
               </span>
             </span>
           </Button>
-          <Button href={SITE.repo.releasesLatest} variant="primary" size="md">
+          <Button href={downloadHref(platform)} variant="primary" size="md">
             Download
           </Button>
         </div>
@@ -132,7 +134,7 @@ export function SiteNav({ stars }: { stars: number }) {
               GitHub <span className="text-muted-foreground">• {formatStars(stars)}</span>
             </Button>
             <Button
-              href={SITE.repo.releasesLatest}
+              href={downloadHref(platform)}
               variant="primary"
               size="md"
               className="justify-center"

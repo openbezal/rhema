@@ -1,0 +1,163 @@
+name: Release Windows binary
+
+# Builds the Tauri desktop app on every merge to main and publishes the NSIS
+# installer to a rolling `nightly` prerelease, so the newest main always has a
+# stable download URL:
+#   https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe
+#
+# The release is deleted and recreated each run, so the tag follows the newest
+# commit and stale assets from earlier versions never accumulate.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'web/**'
+      - 'documentation/**'
+      - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-windows
+  cancel-in-progress: true
+
+env:
+  RELEASE_TAG: nightly
+  ASSET_NAME: Rhema-windows-x64-setup.exe
+
+jobs:
+  build:
+    runs-on: windows-latest
+    # A cold-cache release build compiles the whole Rust workspace plus
+    # whisper.cpp and ONNX Runtime — budget generously.
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # `whisper` is a default Cargo feature, so whisper-rs-sys builds
+      # whisper.cpp from source: bindgen needs libclang and whisper.cpp needs
+      # CMake. Both normally ship in the runner image; install only if missing.
+      - name: Ensure LLVM and CMake
+        shell: pwsh
+        run: |
+          $llvmBin = Join-Path $env:ProgramFiles 'LLVM\bin'
+          if (-not (Test-Path (Join-Path $llvmBin 'libclang.dll'))) {
+            Write-Host 'libclang.dll not present in the runner image - installing LLVM'
+            choco install llvm -y --no-progress
+          }
+          if (-not (Test-Path (Join-Path $llvmBin 'libclang.dll'))) {
+            throw "libclang.dll still not found at $llvmBin after install"
+          }
+          "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "LIBCLANG_PATH=$llvmBin"
+
+          if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
+            Write-Host 'cmake not on PATH - installing CMake'
+            choco install cmake -y --no-progress --installargs 'ADD_CMAKE_TO_PATH=System'
+            $cmakeBin = Join-Path $env:ProgramFiles 'CMake\bin'
+            $env:PATH = "$env:PATH;$cmakeBin"
+            $cmakeBin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          }
+          cmake --version
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      # `beforeBuildCommand` runs `tsc -b && vite build`, so this step also
+      # gates on the frontend typechecking clean.
+      - name: Build Windows installer
+        run: bun run tauri build --bundles nsis
+
+      - name: Stage installer
+        id: stage
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $setup = Get-ChildItem -Path 'src-tauri/target/release/bundle/nsis' -Filter '*-setup.exe' -ErrorAction SilentlyContinue |
+                   Select-Object -First 1
+          if (-not $setup) {
+            Write-Host 'Contents of src-tauri/target/release/bundle:'
+            Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host "  $($_.FullName)" }
+            throw 'No NSIS installer found under src-tauri/target/release/bundle/nsis'
+          }
+
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $staged = Join-Path 'dist' $env:ASSET_NAME
+          Copy-Item $setup.FullName $staged
+
+          $sha256 = (Get-FileHash $staged -Algorithm SHA256).Hash.ToLower()
+          $sizeMb = [math]::Round($setup.Length / 1MB, 1)
+
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "sha256=$sha256"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "size_mb=$sizeMb"  | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Staged $($setup.Name) as $env:ASSET_NAME ($sizeMb MB, sha256 $sha256)"
+
+      # Kept regardless of the release outcome, and the only output for
+      # workflow_dispatch runs on a non-main ref.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rhema-windows-x64-setup
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish rolling prerelease
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.stage.outputs.version }}
+          SHA256: ${{ steps.stage.outputs.sha256 }}
+          SIZE_MB: ${{ steps.stage.outputs.size_mb }}
+        run: |
+          $shortSha = $env:GITHUB_SHA.Substring(0, 7)
+          $commitUrl = "https://github.com/$env:GITHUB_REPOSITORY/commit/$env:GITHUB_SHA"
+          $notes = @"
+          Automated Windows build of the latest ``main``.
+
+          | | |
+          |---|---|
+          | Version | ``$env:VERSION`` |
+          | Commit | [``$shortSha``]($commitUrl) |
+          | Size | $env:SIZE_MB MB |
+          | SHA-256 | ``$env:SHA256`` |
+
+          This installer is **unsigned**, so Windows SmartScreen warns on first run
+          (More info -> Run anyway).
+
+          The Bible database, embedding model and Whisper model are **not bundled**.
+          Run the setup pipeline from source (``bun run setup:all``) for verse
+          detection and local speech-to-text — see the README.
+          "@
+          $notes | Out-File -FilePath release-notes.md -Encoding utf8
+
+          # Drop the previous rolling release and its tag so the new one points at
+          # this commit and no stale assets survive a version bump. A missing
+          # release is the expected state on the very first run.
+          gh release delete $env:RELEASE_TAG --yes --cleanup-tag
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "No existing '$env:RELEASE_TAG' release to delete - continuing"
+          }
+          $global:LASTEXITCODE = 0
+
+          $asset = Join-Path 'dist' $env:ASSET_NAME
+          gh release create $env:RELEASE_TAG $asset --target $env:GITHUB_SHA --title "Rhema v$env:VERSION (nightly)" --notes-file release-notes.md --prerelease

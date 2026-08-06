@@ -35,7 +35,7 @@ impl DeepgramRestClient {
         }
 
         let url = format!(
-            "https://api.deepgram.com/v1/listen?model={}&encoding={}&sample_rate={}&channels=1&punctuate=true&smart_format=true",
+            "https://api.deepgram.com/v1/listen?model={}&encoding={}&sample_rate={}&channels=1&punctuate=true&smart_format=true&numerals=true",
             self.config.model,
             self.config.encoding,
             self.config.sample_rate,

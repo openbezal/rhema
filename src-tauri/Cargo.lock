@@ -3846,6 +3846,7 @@ dependencies = [
  "lru",
  "ndarray 0.16.1",
  "ort",
+ "regex",
  "rhema-bible",
  "serde",
  "serde_json",

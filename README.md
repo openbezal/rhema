@@ -8,6 +8,21 @@
 
 Rhema listens to a live sermon audio feed, transcribes speech in real time, detects Bible verse references (both explicit citations and quoted passages), and renders them as broadcast-ready overlays via NDI for live production.
 
+## Download
+
+| Platform | |
+|---|---|
+| **Windows** | [**Rhema-windows-x64-setup.exe**](https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe) — rebuilt from `main` on every merge |
+| macOS, Linux | No prebuilt binary yet — [build from source](#getting-started) |
+
+The installer is unsigned, so Windows SmartScreen warns on first run (*More info → Run anyway*).
+
+It also does **not** bundle the Bible database, embedding model, or Whisper
+model — together they exceed a gigabyte. The app starts without them, but verse
+detection and local speech-to-text stay inactive until you build from source and
+run `bun run setup:all`. All releases are listed at
+[github.com/openbezal/rhema/releases](https://github.com/openbezal/rhema/releases).
+
 ## Features
 
 - **Real-time speech-to-text** via local Whisper or cloud Deepgram (WebSocket streaming + REST fallback)
