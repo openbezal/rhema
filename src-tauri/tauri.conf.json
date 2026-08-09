@@ -27,6 +27,7 @@
     }
   },
   "bundle": {
+    "resources": { "../data/rhema.db": "rhema.db" },
     "active": true,
     "targets": "all",
     "icon": [
