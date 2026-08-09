@@ -98,9 +98,32 @@ jobs:
 
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: Rhema ${{ github.ref_name }}
+          releaseName: Rhema ${{ steps.stage.outputs.version }} (nightly)
           releaseBody: |
-            See the assets below to download and install.
+            releaseBody: |
+            Automated ${{ matrix.target }} build of Rhema.
+
+            | | |
+            |---|---|
+            | Version | `${{ steps.stage.outputs.version }}` |
+            | Platform | `${{ matrix.target }}` |
+            | Commit | [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |
+            | Size | ${{ steps.stage.outputs.size_mb }} MB |
+            | SHA-256 | `${{ steps.stage.outputs.sha256 }}` |
+
+            ### Installation
+
+            Download the installer for your platform from the assets below.
+
+            The installer is currently **unsigned**, so your operating system may display a security warning on first launch.
+
+            ### Included
+
+            - Bible database
+            - Bible verse detection
+            - Desktop application
+
+            See the README for setup and usage instructions.
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
