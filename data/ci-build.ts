@@ -83,7 +83,7 @@ async function main() {
   if (force) console.log("  (--force: re-running all phases)\n")
 
   // ── Phase 1: Python environment ────────────────────────────────
-  console.log("\n━━━ Phase 1/5: Python environment ━━━")
+  console.log("\n━━━ Phase 1/4: Python environment ━━━")
   await ensurePythonEnv([
     "optimum-onnx[onnxruntime]",
     "sentence-transformers<5.0.0",
@@ -95,7 +95,7 @@ async function main() {
   ])
 
   // ── Phase 2: Bible source data (pre-built zip + cross-refs) ────
-  console.log("\n━━━ Phase 2/5: Download Bible source data ━━━")
+  console.log("\n━━━ Phase 2/4: Download Bible source data ━━━")
   if (
     !shouldSkip(
       "Bible source data",
@@ -109,64 +109,64 @@ async function main() {
   }
 
   // ── Phase 3: Build Bible database ──────────────────────────────
-  console.log("\n━━━ Phase 3/5: Build Bible database ━━━")
+  console.log("\n━━━ Phase 3/4: Build Bible database ━━━")
   if (!shouldSkip("Bible database", DB_PATH)) {
     await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
   }
 
-  // ── Phase 4: ONNX model download + quantize ────────────────────
-  console.log("\n━━━ Phase 4/5: ONNX model download & quantize ━━━")
-  if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
-    const optimumCli = getVenvBin("optimum-cli")
+//   // ── Phase 4: ONNX model download + quantize ────────────────────
+//   console.log("\n━━━ Phase 4/4: ONNX model download & quantize ━━━")
+//   if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
+//     const optimumCli = getVenvBin("optimum-cli")
 
-    // Export FP32
-    if (force || !existsSync(MODEL_ONNX)) {
-      console.log(
-        "\n  🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)..."
-      )
-      console.log("     This may take a few minutes on first run.\n")
-      await run([
-        optimumCli,
-        "export",
-        "onnx",
-        "--model",
-        "Qwen/Qwen3-Embedding-0.6B",
-        "--task",
-        "feature-extraction",
-        MODELS_DIR,
-        "--library-name",
-        "transformers",
-      ])
-      console.log(`  ✓ Model exported to ${MODELS_DIR}`)
-    }
+//     // Export FP32
+//     if (force || !existsSync(MODEL_ONNX)) {
+//       console.log(
+//         "\n  🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)..."
+//       )
+//       console.log("     This may take a few minutes on first run.\n")
+//       await run([
+//         optimumCli,
+//         "export",
+//         "onnx",
+//         "--model",
+//         "Qwen/Qwen3-Embedding-0.6B",
+//         "--task",
+//         "feature-extraction",
+//         MODELS_DIR,
+//         "--library-name",
+//         "transformers",
+//       ])
+//       console.log(`  ✓ Model exported to ${MODELS_DIR}`)
+//     }
 
-    // Quantize to INT8
-    if (force || !existsSync(MODEL_INT8)) {
-      console.log("\n  ⚡ Quantizing to INT8 (ARM64)...")
-      try {
-        await run([
-          optimumCli,
-          "onnxruntime",
-          "quantize",
-          "--onnx_model",
-          MODELS_DIR,
-          "--arm64",
-          "-o",
-          MODELS_DIR_INT8,
-          "--library-name",
-          "transformers",
-        ])
-        console.log(`  ✓ INT8 model saved to ${MODELS_DIR_INT8}`)
-      } catch {
-        console.error(
-          "  ⚠️  Quantization failed. The FP32 model is still usable."
-        )
-      }
-    }
-  }
+//     // Quantize to INT8
+//     if (force || !existsSync(MODEL_INT8)) {
+//       console.log("\n  ⚡ Quantizing to INT8 (ARM64)...")
+//       try {
+//         await run([
+//           optimumCli,
+//           "onnxruntime",
+//           "quantize",
+//           "--onnx_model",
+//           MODELS_DIR,
+//           "--arm64",
+//           "-o",
+//           MODELS_DIR_INT8,
+//           "--library-name",
+//           "transformers",
+//         ])
+//         console.log(`  ✓ INT8 model saved to ${MODELS_DIR_INT8}`)
+//       } catch {
+//         console.error(
+//           "  ⚠️  Quantization failed. The FP32 model is still usable."
+//         )
+//       }
+//     }
+//   }
 
   // ── Phase 5: Export verses to JSON ─────────────────────────────
-  console.log("\n━━━ Phase 5/5: Export verses to JSON ━━━")
+  console.log("\n━━━ Phase 4/4: Export verses to JSON ━━━")
   if (!shouldSkip("verses JSON", VERSES_JSON)) {
     if (!existsSync(DB_PATH)) {
       console.error(
@@ -178,7 +178,7 @@ async function main() {
   }
 
 //   // ── Phase 6: Pre-compute embeddings ────────────────────────────
-//   console.log("\n━━━ Phase 6/5: Pre-compute verse embeddings ━━━")
+//   console.log("\n━━━ Phase 6/4: Pre-compute verse embeddings ━━━")
 //   if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
 //     const venvPython = getVenvBin(
 //       process.platform === "win32" ? "python" : "python3"
@@ -192,7 +192,7 @@ async function main() {
 //   }
 
 //   // ── Phase 7: Whisper model ────────────────────────────────────
-//   console.log("\n━━━ Phase 7/5: Download Whisper model ━━━")
+//   console.log("\n━━━ Phase 7/4: Download Whisper model ━━━")
 //   if (!shouldSkip("Whisper model", WHISPER_MODEL)) {
 //     await run(["bun", "run", join(DATA_DIR, "download-whisper-model.ts")])
 //   }
