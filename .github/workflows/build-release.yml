@@ -2,8 +2,8 @@ name: Build, Bundle and Release
 
 on:
   push:
-    branches:
-      - chore/cicd-release-pipeline
+    tags:
+      - v*
   workflow_dispatch:
 
 permissions:
