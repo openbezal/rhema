@@ -42,7 +42,10 @@ import {
   GraduationCapIcon,
   BrainCircuitIcon,
 } from "lucide-react"
+import { LevelMeter } from "@/components/ui/level-meter"
+import { useAudioTest } from "@/hooks/use-audio-test"
 import { useSettingsStore } from "@/stores"
+import { useTranscriptStore } from "@/stores/transcript-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
@@ -94,6 +97,40 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
 /* -------------------------------------------------------------------------- */
 /*  Section: Audio                                                            */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Isolated leaf so the ~15 Hz `audio_level` ticks during a test re-render
+ * only this row, not the whole settings dialog (same pattern as the
+ * transcript panel's meter).
+ */
+function AudioTestRow() {
+  const { isTesting, level, toggle } = useAudioTest()
+  const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Test Input
+      </label>
+      <div className="flex items-center gap-3">
+        <LevelMeter level={level} bars={6} className="h-5 flex-1" />
+        <Button
+          size="sm"
+          variant={isTesting ? "destructive" : "outline"}
+          disabled={isTranscribing}
+          onClick={() => void toggle()}
+        >
+          {isTesting ? "Stop" : "Test"}
+        </Button>
+      </div>
+      <p className="text-[0.625rem] text-muted-foreground">
+        {isTranscribing
+          ? "Testing is unavailable while transcription is running."
+          : "Captures from the selected device to verify it works. Gain changes apply on the next test. Stops automatically after 60 seconds."}
+      </p>
+    </div>
+  )
+}
 
 function AudioSection() {
   const {
@@ -158,6 +195,9 @@ function AudioSection() {
           follow OS audio routing.
         </p>
       </div>
+
+      {/* Test input */}
+      <AudioTestRow />
 
       {/* Input gain */}
       <div className="flex flex-col gap-2">

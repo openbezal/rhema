@@ -1,8 +1,86 @@
+import { clearCache } from "@chenglou/pretext"
+import {
+  materializeRichInlineLineRange,
+  measureRichInlineStats,
+  prepareRichInline,
+  walkRichInlineLineRanges,
+  type PreparedRichInline,
+  type RichInlineItem,
+  type RichInlineLine,
+} from "@chenglou/pretext/rich-inline"
 import type {
   BroadcastTheme,
   VerseRenderData,
   RenderOptions,
 } from "@/types/broadcast"
+
+// Pretext lazily creates one internal measurement context, preferring
+// OffscreenCanvas. Force that creation with a DOM canvas instead — older
+// WebKit versions don't expose document webfonts to OffscreenCanvas, and a
+// DOM canvas behaves identically everywhere.
+function primePretextMeasureContext(): void {
+  if (typeof document === "undefined") return
+  const g = globalThis as { OffscreenCanvas?: typeof OffscreenCanvas }
+  const original = g.OffscreenCanvas
+  try {
+    g.OffscreenCanvas = undefined
+    prepareRichInline([{ text: "prime", font: "16px serif" }])
+  } finally {
+    g.OffscreenCanvas = original
+  }
+  // Widths measured before a webfont finished loading came from the fallback
+  // font and are cached per font string — drop them whenever loading settles.
+  // (Consumers redraw on this same event.)
+  document.fonts?.addEventListener("loadingdone", () => clearCache())
+}
+primePretextMeasureContext()
+
+const requestedFontSpecs = new Set<string>()
+const fontListeners = new Set<() => void>()
+
+/**
+ * Subscribe to "a theme font just finished loading" so consumers can redraw.
+ * Driven by the FontFaceSet.load() promise rather than the "loadingdone"
+ * event: WebKit's canvas can still measure the fallback font when the event
+ * fires, but is reliably up to date once the load promise resolves.
+ */
+export function onThemeFontsLoaded(listener: () => void): () => void {
+  fontListeners.add(listener)
+  return () => fontListeners.delete(listener)
+}
+
+/**
+ * Canvas `ctx.font` never triggers a webfont download: a registered
+ * `@font-face` stays unloaded — and canvas silently draws the fallback font —
+ * until DOM text or an explicit `FontFaceSet.load()` requests it. If the font
+ * later loads for an unrelated reason (e.g. a DOM element uses it), drawing
+ * switches to the real font while cached measurements still hold fallback
+ * widths, so text overflows its measured layout box. Request every font a
+ * theme uses up front; when a face actually arrives, invalidate pretext's
+ * cache (redraws ride the resulting "loadingdone" event).
+ */
+function ensureThemeFontsLoaded(theme: BroadcastTheme): void {
+  if (typeof document === "undefined" || !document.fonts?.load) return
+  const specs = [
+    `${theme.verseText.fontWeight} 16px "${theme.verseText.fontFamily}"`,
+    `${theme.reference.fontWeight} 16px "${theme.reference.fontFamily}"`,
+  ]
+  for (const spec of specs) {
+    if (requestedFontSpecs.has(spec)) continue
+    requestedFontSpecs.add(spec)
+    void document.fonts
+      .load(spec)
+      .then((faces) => {
+        if (faces.length > 0) {
+          clearCache()
+          for (const listener of fontListeners) listener()
+        }
+      })
+      .catch(() => {
+        requestedFontSpecs.delete(spec)
+      })
+  }
+}
 
 export interface VerseLayoutRect {
   x: number
@@ -17,6 +95,11 @@ export interface VerseLayoutMetrics {
   textRect: VerseLayoutRect
   referenceRect: VerseLayoutRect | null
   verseRect: VerseLayoutRect | null
+  /** Auto-fitted verse font size (scaled px). Absent when there is no verse. */
+  fittedVerseFontSize?: number
+  /** Free-mode element boxes in canvas px. Only set when layout.mode === "free". */
+  referenceBoxRect?: VerseLayoutRect | null
+  verseBoxRect?: VerseLayoutRect | null
 }
 
 export function wrapText(
@@ -44,6 +127,70 @@ export function wrapText(
     lines.push(currentLine)
   }
 
+  return lines
+}
+
+export interface VerseInlineHandle {
+  prepared: PreparedRichInline
+  /** Per-item kind, indexed by RichInlineFragment.itemIndex. */
+  kinds: ("word" | "verseNum")[]
+  wordFont: string
+  verseNumFont: string
+}
+
+/**
+ * Compile verse segments into a pretext rich-inline flow: verse numbers are
+ * their own atomic items so they wrap, measure, and draw with their own font
+ * size. Numbers scale proportionally with the auto-fitted verse size; when
+ * superscript is off they render at the full verse size (colour still applies).
+ */
+export function prepareVerseInline(
+  theme: BroadcastTheme,
+  verse: VerseRenderData,
+  effectiveFontSize: number
+): VerseInlineHandle | null {
+  const vt = theme.verseText
+  const vn = theme.verseNumbers
+  const transform = resolveTextTransform(vt.textTransform)
+  const ratio = vt.fontSize > 0 ? effectiveFontSize / vt.fontSize : 1
+  const verseNumFontSize = vn.superscript
+    ? Math.max(1, vn.fontSize * ratio)
+    : effectiveFontSize
+  const wordFont = `${vt.fontWeight} ${effectiveFontSize}px "${vt.fontFamily}", serif`
+  const verseNumFont = `${vt.fontWeight} ${verseNumFontSize}px "${vt.fontFamily}", serif`
+  const letterSpacing = vt.letterSpacing > 0 ? vt.letterSpacing : undefined
+
+  const items: RichInlineItem[] = []
+  const kinds: ("word" | "verseNum")[] = []
+  for (const segment of verse.segments) {
+    if (vn.visible && segment.verseNumber !== undefined) {
+      items.push({
+        text: `${segment.verseNumber} `,
+        font: verseNumFont,
+        letterSpacing,
+        break: "never",
+      })
+      kinds.push("verseNum")
+    }
+    const text = applyTextTransform(segment.text, transform).trim()
+    if (text) {
+      items.push({ text: `${text} `, font: wordFont, letterSpacing })
+      kinds.push("word")
+    }
+  }
+  if (!items.length) return null
+
+  return { prepared: prepareRichInline(items), kinds, wordFont, verseNumFont }
+}
+
+function layoutVerseLines(
+  handle: VerseInlineHandle,
+  maxWidth: number
+): RichInlineLine[] {
+  const lines: RichInlineLine[] = []
+  walkRichInlineLineRanges(handle.prepared, Math.max(1, maxWidth), (range) => {
+    lines.push(materializeRichInlineLineRange(handle.prepared, range))
+  })
   return lines
 }
 
@@ -435,10 +582,8 @@ function drawVerseText(
   const lineHeightPx = actualFontSize * vt.lineHeight
 
   ctx.save()
-  ctx.font = `${vt.fontWeight} ${actualFontSize}px "${vt.fontFamily}", serif`
-  ctx.fillStyle = vt.color
   ctx.textBaseline = "top"
-  ctx.textAlign = verseAlign === "justify" ? "left" : verseAlign
+  ctx.textAlign = "left"
 
   if (vt.letterSpacing > 0) {
     try {
@@ -448,36 +593,29 @@ function drawVerseText(
     }
   }
 
-  // Build full text with verse numbers inline
-  let fullText = ""
-  for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined) {
-      fullText += `${segment.verseNumber} `
-    }
-    fullText += segment.text + " "
+  const handle = prepareVerseInline(theme, verse, actualFontSize)
+  if (!handle) {
+    ctx.restore()
+    return 0
   }
-  fullText = applyTextTransform(
-    fullText.trim(),
-    resolveTextTransform(vt.textTransform)
-  )
+  const lines = layoutVerseLines(handle, textRectWidth)
 
-  const wrappedLines = wrapText(ctx, fullText, textRectWidth)
+  const drawFragment = (
+    text: string,
+    kind: "word" | "verseNum",
+    drawX: number,
+    drawY: number
+  ) => {
+    ctx.font = kind === "verseNum" ? handle.verseNumFont : handle.wordFont
+    ctx.fillStyle = kind === "verseNum" ? vn.color : vt.color
 
-  let currentY = startY
-  const x = alignX(
-    verseAlign === "justify" ? "left" : verseAlign,
-    textRectX,
-    textRectWidth
-  )
-
-  const drawStyledLine = (line: string, drawX: number, drawY: number) => {
     if (vt.shadow) {
       ctx.save()
       ctx.shadowColor = vt.shadow.color
       ctx.shadowBlur = vt.shadow.blur
       ctx.shadowOffsetX = vt.shadow.x
       ctx.shadowOffsetY = vt.shadow.y
-      ctx.fillText(line, drawX, drawY)
+      ctx.fillText(text, drawX, drawY)
       ctx.restore()
     }
 
@@ -485,65 +623,56 @@ function drawVerseText(
       ctx.save()
       ctx.strokeStyle = vt.outline.color
       ctx.lineWidth = vt.outline.width
-      ctx.strokeText(line, drawX, drawY)
+      ctx.strokeText(text, drawX, drawY)
       ctx.restore()
     }
 
     if (!vt.shadow) {
-      ctx.fillText(line, drawX, drawY)
+      ctx.fillText(text, drawX, drawY)
     }
   }
 
-  for (const [index, line] of wrappedLines.entries()) {
+  let currentY = startY
+  for (const [index, line] of lines.entries()) {
     const isJustifiedLine =
       verseAlign === "justify" &&
-      index < wrappedLines.length - 1 &&
-      /\s+/.test(line)
+      index < lines.length - 1 &&
+      line.fragments.length > 1
+
+    let extraGap = 0
+    let lineStartX = textRectX
+    let lineWidth = line.width
     if (isJustifiedLine) {
-      const words = line.trim().split(/\s+/).filter(Boolean)
-      if (words.length > 1) {
-        const wordsWidth = words.reduce(
-          (sum, word) => sum + ctx.measureText(word).width,
-          0
-        )
-        const gap = (textRectWidth - wordsWidth) / (words.length - 1)
-        let cursorX = textRectX
-        for (const word of words) {
-          drawStyledLine(word, cursorX, currentY)
-          cursorX += ctx.measureText(word).width + gap
-        }
-      } else {
-        drawStyledLine(line, textRectX, currentY)
-      }
-      drawTextDecorationLine(
-        ctx,
-        verseDecoration,
-        vt.color,
-        "left",
-        textRectX,
-        currentY,
-        textRectWidth,
-        vt.fontSize,
-        textRectX
-      )
-    } else {
-      drawStyledLine(line, x, currentY)
-      const lineWidth = Math.min(
-        textRectWidth,
-        Math.max(1, ctx.measureText(line).width)
-      )
-      drawTextDecorationLine(
-        ctx,
-        verseDecoration,
-        vt.color,
-        verseAlign,
-        x,
-        currentY,
-        lineWidth,
-        vt.fontSize,
-        textRectX
-      )
+      extraGap = (textRectWidth - line.width) / (line.fragments.length - 1)
+      lineWidth = textRectWidth
+    } else if (verseAlign === "center") {
+      lineStartX = textRectX + (textRectWidth - line.width) / 2
+    } else if (verseAlign === "right") {
+      lineStartX = textRectX + textRectWidth - line.width
     }
+
+    let cursorX = lineStartX
+    for (const [i, fragment] of line.fragments.entries()) {
+      cursorX += fragment.gapBefore + (i > 0 ? extraGap : 0)
+      drawFragment(
+        fragment.text,
+        handle.kinds[fragment.itemIndex],
+        cursorX,
+        currentY
+      )
+      cursorX += fragment.occupiedWidth
+    }
+    drawTextDecorationLine(
+      ctx,
+      verseDecoration,
+      vt.color,
+      "left",
+      lineStartX,
+      currentY,
+      Math.min(textRectWidth, Math.max(1, lineWidth)),
+      actualFontSize,
+      textRectX
+    )
     currentY += lineHeightPx
   }
 
@@ -668,17 +797,8 @@ function calculateScaledFontSize(
   while (low <= high) {
     const mid = Math.floor((low + high) / 2)
 
-    // Simulate a temporary theme with the test font size
-    const testTheme = {
-      ...theme,
-      verseText: {
-        ...theme.verseText,
-        fontSize: mid,
-      },
-    }
-
     // If I use this font size, how tall will the verse be?
-    const metrics = measureVerseHeight(ctx, testTheme, verse, textRectWidth)
+    const metrics = measureVerseHeight(ctx, theme, verse, textRectWidth, mid)
 
     // Check if the rendered verse is still too big to fit
     if (metrics.height <= maxHeight) {
@@ -694,51 +814,48 @@ function calculateScaledFontSize(
   return bestFit
 }
 
-function measureVerseHeight(
-  ctx: CanvasRenderingContext2D,
+// The ctx parameter is kept for call-site symmetry with the draw path, but
+// measurement now happens inside pretext's own canvas context.
+export function measureVerseHeight(
+  _ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
   verse: VerseRenderData,
-  textRectWidth: number
+  textRectWidth: number,
+  fontSizeOverride?: number
 ): { height: number; maxLineWidth: number } {
   const vt = theme.verseText
-  const vn = theme.verseNumbers
   const verseAlign = resolveHorizontalAlign(
     vt.horizontalAlign,
     theme.layout.textAlign,
     true
   )
-  const lineHeightPx = vt.fontSize * vt.lineHeight
-  ctx.save()
-  ctx.font = `${vt.fontWeight} ${vt.fontSize}px "${vt.fontFamily}", serif`
-  if (vt.letterSpacing > 0) {
-    try {
-      ctx.letterSpacing = `${vt.letterSpacing}px`
-    } catch {
-      /* unsupported in some WebViews */
-    }
+  const effectiveFontSize = fontSizeOverride ?? vt.fontSize
+  const lineHeightPx = effectiveFontSize * vt.lineHeight
+  const handle = prepareVerseInline(theme, verse, effectiveFontSize)
+  if (!handle) {
+    return { height: lineHeightPx, maxLineWidth: 1 }
   }
-  let fullText = ""
-  for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined)
-      fullText += `${segment.verseNumber} `
-    fullText += `${segment.text} `
-  }
-  const transformed = applyTextTransform(
-    fullText.trim(),
-    resolveTextTransform(vt.textTransform)
-  )
-  const lines = wrapText(ctx, transformed, textRectWidth)
-  let maxLineWidth = 0
-  for (const [index, line] of lines.entries()) {
-    const isJustifiedLine =
-      verseAlign === "justify" && index < lines.length - 1 && /\s+/.test(line)
-    const width = isJustifiedLine ? textRectWidth : ctx.measureText(line).width
-    if (width > maxLineWidth) maxLineWidth = width
-  }
-  ctx.restore()
+  const stats = measureRichInlineStats(handle.prepared, Math.max(1, textRectWidth))
+  const maxLineWidth =
+    verseAlign === "justify" && stats.lineCount > 1
+      ? textRectWidth
+      : stats.maxLineWidth
   return {
-    height: Math.max(lineHeightPx, lines.length * lineHeightPx),
+    height: Math.max(1, stats.lineCount) * lineHeightPx,
     maxLineWidth: Math.max(1, maxLineWidth),
+  }
+}
+
+function pctBoxToPx(
+  box: { x: number; y: number; width: number; height: number },
+  canvasW: number,
+  canvasH: number
+): VerseLayoutRect {
+  return {
+    x: (box.x / 100) * canvasW,
+    y: (box.y / 100) * canvasH,
+    width: Math.max(1, (box.width / 100) * canvasW),
+    height: Math.max(1, (box.height / 100) * canvasH),
   }
 }
 
@@ -772,6 +889,7 @@ export function computeVerseLayoutMetrics(
   verse: VerseRenderData | null,
   options?: RenderOptions
 ): VerseLayoutMetrics {
+  ensureThemeFontsLoaded(theme)
   const scale = options?.scale ?? 1
   const scaledTheme = buildScaledTheme(theme, scale)
   const canvasW = scaledTheme.resolution.width
@@ -812,13 +930,26 @@ export function computeVerseLayoutMetrics(
     height: textRectH,
   }
 
+  const freeMode =
+    layout.mode === "free" &&
+    layout.referenceBox !== undefined &&
+    layout.verseBox !== undefined
+  const referenceBoxRect: VerseLayoutRect | null = freeMode
+    ? pctBoxToPx(layout.referenceBox!, canvasW, canvasH)
+    : null
+  const verseBoxRect: VerseLayoutRect | null = freeMode
+    ? pctBoxToPx(layout.verseBox!, canvasW, canvasH)
+    : null
+
   if (!verse) {
     return {
       scaledTheme,
-      textAreaRect,
-      textRect,
+      textAreaRect: verseBoxRect ?? textAreaRect,
+      textRect: verseBoxRect ?? textRect,
       referenceRect: null,
       verseRect: null,
+      referenceBoxRect,
+      verseBoxRect,
     }
   }
 
@@ -833,6 +964,90 @@ export function computeVerseLayoutMetrics(
     scaledTheme.layout.textAlign,
     false
   )
+
+  const refText = applyTextTransform(
+    scaledTheme.reference.uppercase
+      ? verse.reference.toUpperCase()
+      : verse.reference,
+    resolveTextTransform(scaledTheme.reference.textTransform)
+  )
+  const measureReferenceWidth = (maxWidth: number) => {
+    ctx.save()
+    ctx.font = `${scaledTheme.reference.fontWeight} ${scaledTheme.reference.fontSize}px "${scaledTheme.reference.fontFamily}", sans-serif`
+    const width = Math.max(
+      1,
+      Math.min(maxWidth, ctx.measureText(refText).width)
+    )
+    ctx.restore()
+    return width
+  }
+
+  if (freeMode && referenceBoxRect && verseBoxRect) {
+    const fittedVerseFontSize = calculateScaledFontSize(
+      ctx,
+      scaledTheme,
+      verse,
+      verseBoxRect.width,
+      verseBoxRect.height
+    )
+    const verseMetrics = measureVerseHeight(
+      ctx,
+      scaledTheme,
+      verse,
+      verseBoxRect.width,
+      fittedVerseFontSize
+    )
+    const verseY = alignY(
+      resolveVerticalAlign(scaledTheme.verseText.verticalAlign),
+      verseBoxRect.y,
+      verseBoxRect.height,
+      verseMetrics.height
+    )
+    const verseRect = rectForAlignedText(
+      verseAlign === "justify" ? "left" : verseAlign,
+      alignX(
+        verseAlign === "justify" ? "left" : verseAlign,
+        verseBoxRect.x,
+        verseBoxRect.width
+      ),
+      verseY,
+      verseMetrics.maxLineWidth,
+      verseMetrics.height,
+      verseBoxRect
+    )
+
+    const referenceWidth = measureReferenceWidth(referenceBoxRect.width)
+    const refY = alignY(
+      resolveVerticalAlign(scaledTheme.reference.verticalAlign),
+      referenceBoxRect.y,
+      referenceBoxRect.height,
+      referenceHeight
+    )
+    const referenceRect = rectForAlignedText(
+      referenceAlign === "justify" ? "left" : referenceAlign,
+      alignX(
+        referenceAlign === "justify" ? "left" : referenceAlign,
+        referenceBoxRect.x,
+        referenceBoxRect.width
+      ),
+      refY,
+      referenceWidth,
+      referenceHeight,
+      referenceBoxRect
+    )
+
+    return {
+      scaledTheme,
+      textAreaRect: verseBoxRect,
+      textRect: verseBoxRect,
+      referenceRect,
+      verseRect,
+      fittedVerseFontSize,
+      referenceBoxRect,
+      verseBoxRect,
+    }
+  }
+
   const blockVerticalAlign = resolveVerticalAlign(
     scaledTheme.reference.position === "above"
       ? (scaledTheme.reference.verticalAlign ??
@@ -844,7 +1059,20 @@ export function computeVerseLayoutMetrics(
     0,
     scaledTheme.layout.referenceGap ?? scaledTheme.reference.fontSize * 0.5
   )
-  const verseMetrics = measureVerseHeight(ctx, scaledTheme, verse, textRectW)
+  const fittedVerseFontSize = calculateScaledFontSize(
+    ctx,
+    scaledTheme,
+    verse,
+    textRectW,
+    calculateMaxAvailableVerseHeight(scaledTheme, textRect, referenceHeight)
+  )
+  const verseMetrics = measureVerseHeight(
+    ctx,
+    scaledTheme,
+    verse,
+    textRectW,
+    fittedVerseFontSize
+  )
   const verseHeight = verseMetrics.height
   const verseDrawX = alignX(
     verseAlign === "justify" ? "left" : verseAlign,
@@ -856,20 +1084,7 @@ export function computeVerseLayoutMetrics(
     textRectX,
     textRectW
   )
-
-  const refText = applyTextTransform(
-    scaledTheme.reference.uppercase
-      ? verse.reference.toUpperCase()
-      : verse.reference,
-    resolveTextTransform(scaledTheme.reference.textTransform)
-  )
-  ctx.save()
-  ctx.font = `${scaledTheme.reference.fontWeight} ${scaledTheme.reference.fontSize}px "${scaledTheme.reference.fontFamily}", sans-serif`
-  const referenceWidth = Math.max(
-    1,
-    Math.min(textRectW, ctx.measureText(refText).width)
-  )
-  ctx.restore()
+  const referenceWidth = measureReferenceWidth(textRectW)
 
   const blockHeight =
     scaledTheme.reference.position === "above"
@@ -945,7 +1160,16 @@ export function computeVerseLayoutMetrics(
     )
   }
 
-  return { scaledTheme, textAreaRect, textRect, referenceRect, verseRect }
+  return {
+    scaledTheme,
+    textAreaRect,
+    textRect,
+    referenceRect,
+    verseRect,
+    fittedVerseFontSize,
+    referenceBoxRect: null,
+    verseBoxRect: null,
+  }
 }
 
 export function renderVerse(
@@ -1006,29 +1230,17 @@ function renderVerseImpl(
 
   const referenceRect = metrics.referenceRect
   const verseRect = metrics.verseRect
+  const verseArea = metrics.verseBoxRect ?? metrics.textRect
+  const referenceArea = metrics.referenceBoxRect ?? metrics.textRect
   if (verseRect) {
-    const maxAvailableVerseHeight = calculateMaxAvailableVerseHeight(
-      scaledTheme,
-      metrics.textRect,
-      referenceRect?.height ?? 0
-    )
-
-    const scaledFontSize = calculateScaledFontSize(
-      ctx,
-      scaledTheme,
-      verse,
-      metrics.textAreaRect.width,
-      maxAvailableVerseHeight
-    )
-
     drawVerseText(
       ctx,
       scaledTheme,
       verse,
-      metrics.textRect.x,
-      metrics.textRect.width,
+      verseArea.x,
+      verseArea.width,
       verseRect.y,
-      scaledFontSize
+      metrics.fittedVerseFontSize
     )
   }
   if (referenceRect) {
@@ -1036,8 +1248,8 @@ function renderVerseImpl(
       ctx,
       scaledTheme,
       verse.reference,
-      metrics.textRect.x,
-      metrics.textRect.width,
+      referenceArea.x,
+      referenceArea.width,
       referenceRect.y
     )
   }

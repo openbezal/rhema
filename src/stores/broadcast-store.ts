@@ -3,6 +3,7 @@ import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import { normalizeTheme } from "@/lib/theme-migrations"
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -290,7 +291,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
 
       const patch: Partial<BroadcastState> = {}
       if (customThemes && Array.isArray(customThemes) && customThemes.length > 0) {
-        patch.themes = [...BUILTIN_THEMES, ...customThemes]
+        patch.themes = [...BUILTIN_THEMES, ...customThemes.map(normalizeTheme)]
       }
       if (activeId) patch.activeThemeId = activeId
       if (altActiveId) patch.altActiveThemeId = altActiveId

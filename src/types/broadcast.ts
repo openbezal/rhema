@@ -16,6 +16,14 @@ export interface RenderOptions {
   imageCache?: Map<string, HTMLImageElement>
 }
 
+/** A freely positioned element region, all values in % of canvas size (0-100), x/y = top-left. */
+export interface ElementBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 export type TextHorizontalAlign = "left" | "center" | "right" | "justify"
 export type TextVerticalAlign = "top" | "middle" | "bottom"
 export type TextTransform = "none" | "uppercase" | "lowercase" | "capitalize"
@@ -103,6 +111,10 @@ export interface BroadcastTheme {
     textAreaWidth: number
     textAreaHeight: number
     referenceGap?: number
+    /** "stacked" (default): reference + verse flow as one block. "free": each is positioned by its box. */
+    mode?: "stacked" | "free"
+    referenceBox?: ElementBox
+    verseBox?: ElementBox
   }
   transition: {
     type: "fade" | "slide" | "scale" | "none"
