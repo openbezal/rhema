@@ -22,14 +22,21 @@ NDI exactly as designed.
   letter-spacing, line-height, and alignment.
 - **Effects**: drop shadows, outlines/strokes, fills, and blur.
 - **Layout**: drag elements to position them with pixel precision; the
-  canvas reflects the exact NDI output dimensions.
+  canvas reflects the exact NDI output dimensions. Dragging the reference
+  or verse frame detaches them into **free positioning** mode, where each
+  block has its own X/Y/width/height (also editable as percentages in the
+  Layout tab). Keep them stacked and the classic above/below/inline flow
+  applies instead.
 - **Tokens**: place the verse text, the reference, the translation tag,
   and the verse number as separate elements so they can be styled
   independently.
+- **Verse numbers**: toggle visibility, render as superscript (with an
+  adjustable size relative to the verse text), and give them their own
+  colour — e.g. a yellow number in front of white verse text.
 
 ## Built-in starters
 
-Rhema ships with three opinionated starter themes (`src/lib/builtin-themes.ts`)
+Rhema ships with four opinionated starter themes (`src/lib/builtin-themes.ts`)
 that you can clone and modify:
 
 - **Classic Dark** — a high-contrast dark overlay tuned for typical
@@ -38,6 +45,8 @@ that you can clone and modify:
   palettes.
 - **Broadcast Overlay** — a broadcast-safe layout designed for
   composition over a live camera feed.
+- **Banner Split** — a free-positioning example with the reference in a
+  top-left banner and the verse block detached below it.
 
 Each starter is a regular project file you can save, version, and
 re-export.

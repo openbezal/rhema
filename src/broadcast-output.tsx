@@ -2,7 +2,9 @@ import { createRoot } from "react-dom/client"
 import { useRef, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { renderVerse } from "@/lib/verse-renderer"
+import { onThemeFontsLoaded, renderVerse } from "@/lib/verse-renderer"
+import { normalizeTheme } from "@/lib/theme-migrations"
+import "./broadcast-fonts.css"
 import type { BroadcastTheme, VerseRenderData } from "@/types/broadcast"
 import type { NdiConfigEventPayload, NdiFrameRequest } from "@/types"
 
@@ -173,7 +175,10 @@ function BroadcastCanvas() {
     const currentWindow = getCurrentWebviewWindow()
     logDebug("Listener registration started", { label: currentWindow.label })
     const unlisten = currentWindow.listen<BroadcastPayload>("broadcast:verse-update", (event) => {
-      latestData.current = event.payload
+      latestData.current = {
+        ...event.payload,
+        theme: normalizeTheme(event.payload.theme),
+      }
       preloadBackgroundImage(event.payload.theme)
       logDebug("Received broadcast:verse-update", {
         hasVerse: Boolean(event.payload.verse),
@@ -208,6 +213,13 @@ function BroadcastCanvas() {
         // Command may not exist yet
       })
 
+    // Redraw whenever a theme webfont finishes loading (the renderer requests
+    // them on demand) so frames drawn against fallback metrics are replaced.
+    const unsubscribeFonts = onThemeFontsLoaded(() => {
+      draw()
+      pushNdiBurst()
+    })
+
     void currentWindow.emitTo("main", "broadcast:output-ready").then(() => {
       logDebug("Sent broadcast:output-ready")
     }).catch(() => {
@@ -215,6 +227,7 @@ function BroadcastCanvas() {
     })
 
     return () => {
+      unsubscribeFonts()
       unlisten.then((fn) => fn())
       unlistenNdiConfig.then((fn) => fn())
     }

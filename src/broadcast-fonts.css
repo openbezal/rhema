@@ -1,0 +1,8 @@
+/* Bundled webfonts for the broadcast output window. This webview does not load
+   index.css (which would pull in all of Tailwind), so the fontsource faces are
+   imported here separately — without this, themes using bundled fonts silently
+   fall back to system serif/sans in the projected output. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/source-serif-4";
+@import "@fontsource/geist-mono";
+@import "@fontsource-variable/inter";

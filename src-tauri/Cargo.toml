@@ -68,6 +68,7 @@ base64 = "0.22"
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+fontdb = "0.24.0"
 
 [features]
 default = ["whisper"]

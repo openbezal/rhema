@@ -1,6 +1,11 @@
+import { useEffect, useState } from "react"
+import { ChevronsUpDownIcon, CheckIcon } from "lucide-react"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { parseColorOpacity, buildColorWithOpacity } from "@/lib/color-utils"
+import { listAllFonts } from "@/lib/fonts"
 import {
   Select,
   SelectContent,
@@ -8,16 +13,96 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
-const FONT_FAMILIES = [
-  "Geist Variable",
-  "Source Serif 4 Variable",
-  "Georgia",
-  "Arial",
-  "Helvetica",
-  "Times New Roman",
-  "Courier New",
-]
+function FontFamilyPicker({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (font: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [fonts, setFonts] = useState<{ bundled: string[]; system: string[] }>({
+    bundled: [],
+    system: [],
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    void listAllFonts().then((result) => {
+      if (!cancelled) setFonts(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const renderItem = (font: string) => (
+    <CommandItem
+      key={font}
+      value={font}
+      onSelect={() => {
+        onChange(font)
+        setOpen(false)
+      }}
+    >
+      <CheckIcon
+        className={`size-3.5 ${font === value ? "opacity-100" : "opacity-0"}`}
+      />
+      <span style={{ fontFamily: `"${font}"` }}>{font}</span>
+    </CommandItem>
+  )
+
+  return (
+    // modal: the designer lives in a Radix Dialog whose scroll lock swallows
+    // wheel events in portaled popover content — modal popovers manage their
+    // own lock, restoring wheel scrolling in the font list.
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate" style={{ fontFamily: `"${value}"` }}>
+            {value}
+          </span>
+          <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[260px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search fonts…" />
+          <CommandList className="max-h-64">
+            <CommandEmpty>No font found.</CommandEmpty>
+            <CommandGroup heading="Bundled">
+              {fonts.bundled.map(renderItem)}
+            </CommandGroup>
+            {fonts.system.length > 0 && (
+              <CommandGroup heading="System">
+                {fonts.system.map(renderItem)}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 const FONT_WEIGHTS = [
   { value: "100", label: "100 - Thin" },
@@ -57,26 +142,6 @@ const TEXT_DECORATION_OPTIONS = [
   { value: "line-through", label: "Line Through" },
 ] as const
 
-function parseColorOpacity(color: string): { hex: string; opacity: number } {
-  if (color.length === 9 && color.startsWith("#")) {
-    const alphaHex = color.slice(7, 9)
-    const alpha = parseInt(alphaHex, 16) / 255
-    return { hex: color.slice(0, 7), opacity: Math.round(alpha * 100) }
-  }
-  if (color.length === 7 && color.startsWith("#")) {
-    return { hex: color, opacity: 100 }
-  }
-  return { hex: color || "#ffffff", opacity: 100 }
-}
-
-function buildColorWithOpacity(hex: string, opacity: number): string {
-  if (opacity >= 100) return hex
-  const alphaHex = Math.round((opacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0")
-  return `${hex}${alphaHex}`
-}
-
 function SectionHeader({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex flex-col gap-0.5 pb-1">
@@ -104,21 +169,10 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
       {/* Font Family */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-medium text-muted-foreground">Font Family</label>
-        <Select
+        <FontFamilyPicker
           value={data.fontFamily}
-          onValueChange={(v) => update(`${prefix}.fontFamily`, v)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {FONT_FAMILIES.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(v) => update(`${prefix}.fontFamily`, v)}
+        />
       </div>
 
       {/* Font Weight */}
@@ -347,23 +401,25 @@ function ReferenceProperties() {
         />
       </div>
 
-      {/* Reference Position */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Reference Position</label>
-        <Select
-          value={draftTheme.reference.position}
-          onValueChange={(v) => update("reference.position", v)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="above">Above Verse</SelectItem>
-            <SelectItem value="below">Below Verse</SelectItem>
-            <SelectItem value="inline">Inline</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Reference Position (stacked mode only — free mode positions by box) */}
+      {draftTheme.layout.mode !== "free" && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Reference Position</label>
+          <Select
+            value={draftTheme.reference.position}
+            onValueChange={(v) => update("reference.position", v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="above">Above Verse</SelectItem>
+              <SelectItem value="below">Below Verse</SelectItem>
+              <SelectItem value="inline">Inline</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   )
 }
@@ -380,10 +436,108 @@ function VerseProperties() {
   const shadowColor = shadow ? parseColorOpacity(shadow.color) : { hex: "#000000", opacity: 100 }
   const outlineColor = outline ? parseColorOpacity(outline.color) : { hex: "#000000", opacity: 100 }
 
+  const verseNumbers = draftTheme.verseNumbers
+  const verseNumberColor = parseColorOpacity(verseNumbers.color)
+  const superscriptSizePct = Math.round(
+    (verseNumbers.fontSize / draftTheme.verseText.fontSize) * 100
+  )
+
   return (
     <div className="flex flex-col gap-3">
       <SectionHeader title="Verse Text" description="Customize how verse text appears" />
       <FontControls prefix="verseText" />
+
+      {/* Verse Numbers */}
+      <div className="flex flex-col gap-3 border-t pt-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold">Verse Numbers</label>
+          <input
+            type="checkbox"
+            checked={verseNumbers.visible}
+            onChange={(e) => update("verseNumbers.visible", e.target.checked)}
+            className="h-4 w-4 rounded border-input accent-primary"
+          />
+        </div>
+
+        {verseNumbers.visible && (
+          <div className="flex flex-col gap-3">
+            {/* Superscript */}
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">Superscript</label>
+              <input
+                type="checkbox"
+                checked={verseNumbers.superscript}
+                onChange={(e) => update("verseNumbers.superscript", e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-primary"
+              />
+            </div>
+
+            {/* Superscript Size */}
+            {verseNumbers.superscript && (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Size</label>
+                  <span className="text-xs tabular-nums text-muted-foreground">{superscriptSizePct}%</span>
+                </div>
+                <Slider
+                  min={20}
+                  max={100}
+                  step={1}
+                  value={[superscriptSizePct]}
+                  onValueChange={([v]) => {
+                    const newFontSize = Math.round((v / 100) * draftTheme.verseText.fontSize)
+                    update("verseNumbers.fontSize", newFontSize)
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Number Color */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Number Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={verseNumberColor.hex}
+                  onChange={(e) =>
+                    update(
+                      "verseNumbers.color",
+                      buildColorWithOpacity(e.target.value, verseNumberColor.opacity)
+                    )
+                  }
+                  className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
+                />
+                <Input
+                  value={verseNumberColor.hex}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                      update(
+                        "verseNumbers.color",
+                        buildColorWithOpacity(v, verseNumberColor.opacity)
+                      )
+                    }
+                  }}
+                  className="w-20 font-mono"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground">Opacity</label>
+                <span className="text-xs tabular-nums text-muted-foreground">{verseNumberColor.opacity}%</span>
+              </div>
+              <Slider
+                min={0}
+                max={100}
+                step={1}
+                value={[verseNumberColor.opacity]}
+                onValueChange={([v]) =>
+                  update("verseNumbers.color", buildColorWithOpacity(verseNumberColor.hex, v))
+                }
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Text Shadow */}
       <div className="flex flex-col gap-3 border-t pt-3">

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react"
-import { renderVerse } from "@/lib/verse-renderer"
+import { onThemeFontsLoaded, renderVerse } from "@/lib/verse-renderer"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { cn } from "@/lib/utils"
 
@@ -81,6 +81,10 @@ export const CanvasVerse = memo(function CanvasVerse({
   useEffect(() => {
     draw()
   }, [draw])
+
+  // Redraw once theme webfonts load so early frames drawn against fallback
+  // font metrics are corrected.
+  useEffect(() => onThemeFontsLoaded(() => draw()), [draw])
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>
