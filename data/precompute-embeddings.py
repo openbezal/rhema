@@ -60,7 +60,7 @@ def encode_with_sentence_transformers(texts):
 
     print(f"\nLoading model (may download on first run)...")
     model = SentenceTransformer(MODEL_NAME, device=device)
-    dim = model.get_sentence_embedding_dimension()
+    dim = model.get_embedding_dimension()
     print(f"  Embedding dimension: {dim}")
 
     print(f"\nEncoding {len(texts)} verses...")
