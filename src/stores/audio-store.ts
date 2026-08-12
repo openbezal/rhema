@@ -8,6 +8,8 @@ interface AudioState {
   gain: number
   level: AudioLevel
   sourceLost: boolean
+  /** True while the settings-dialog "Test" capture is running. */
+  isTesting: boolean
 
   setDevices: (devices: DeviceInfo[]) => void
   selectDevice: (id: string | null) => void
@@ -15,6 +17,7 @@ interface AudioState {
   setGain: (gain: number) => void
   setLevel: (level: AudioLevel) => void
   setSourceLost: (lost: boolean) => void
+  setTesting: (testing: boolean) => void
 }
 
 export const useAudioStore = create<AudioState>((set) => ({
@@ -24,6 +27,7 @@ export const useAudioStore = create<AudioState>((set) => ({
   gain: 1.0,
   level: { rms: 0, peak: 0 },
   sourceLost: false,
+  isTesting: false,
 
   setDevices: (devices) => set({ devices }),
   selectDevice: (selectedDeviceId) => set({ selectedDeviceId }),
@@ -31,4 +35,5 @@ export const useAudioStore = create<AudioState>((set) => ({
   setGain: (gain) => set({ gain }),
   setLevel: (level) => set({ level }),
   setSourceLost: (sourceLost) => set({ sourceLost }),
+  setTesting: (isTesting) => set({ isTesting }),
 }))

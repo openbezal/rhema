@@ -51,13 +51,25 @@ pub async fn start_transcription(
     provider: Option<String>,
 ) -> Result<(), String> {
     // ── 1. Guard: already running? ──────────────────────────────────────
-    let (stt_active, audio_active) = {
+    let (stt_active, audio_active, audio_test_active) = {
         let app_state = state.lock().map_err(|e| e.to_string())?;
         if app_state.stt_active.load(Ordering::Relaxed) {
             return Err("Transcription is already running".into());
         }
-        (app_state.stt_active.clone(), app_state.audio_active.clone())
+        (
+            app_state.stt_active.clone(),
+            app_state.audio_active.clone(),
+            app_state.audio_test_active.clone(),
+        )
     };
+
+    // Transcription preempts a running audio test — both would open the same
+    // capture device. Clearing the flag makes the test thread exit within
+    // ~100 ms; the short sleep lets its cpal stream drop first.
+    if audio_test_active.swap(false, Ordering::SeqCst) {
+        log::info!("Preempting running audio test for transcription");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
 
     let provider_name = provider.as_deref().unwrap_or("deepgram");
 
