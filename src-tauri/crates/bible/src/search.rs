@@ -22,16 +22,22 @@ pub struct Bm25Result {
 
 /// Common English stop words that match nearly every Bible verse.
 /// Filtering these keeps AND queries fast (~5-20ms instead of 200-1300ms).
+///
+/// Deliberately NOT filtered: negations ("not", "no"), quantifiers ("all"),
+/// question words ("who", "what", "which", "when", "how"), modals ("will",
+/// "shall", "should", "may", "might", "can", "could", "would"), and common
+/// scripture adverbs ("then", "now", "up", "out", "there", "here") — these
+/// carry meaning in verse text ("thou shalt NOT kill", "ALL have sinned",
+/// "WHO is my neighbour") and dropping them made AND/OR queries match the
+/// wrong verses.
 const STOP_WORDS: &[&str] = &[
     "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "is", "it", "not", "be", "are", "was",
-    "were", "been", "has", "have", "had", "do", "does", "did", "will",
-    "would", "shall", "should", "may", "might", "can", "could", "that",
+    "of", "with", "by", "from", "is", "it", "be", "are", "was",
+    "were", "been", "has", "have", "had", "do", "does", "did", "that",
     "this", "these", "those", "he", "she", "we", "they", "you", "i",
     "me", "him", "her", "us", "them", "my", "his", "its", "our", "your",
-    "their", "so", "if", "as", "no", "up", "all", "am", "about", "into",
-    "when", "what", "which", "who", "whom", "how", "than", "then", "now",
-    "just", "also", "very", "like", "even", "out", "there", "here",
+    "their", "so", "if", "as", "am", "about", "into", "than",
+    "just", "also", "very", "like", "even",
 ];
 
 static STOP_WORD_SET: LazyLock<HashSet<&str>> = LazyLock::new(|| {
@@ -101,6 +107,17 @@ fn build_or_query(input: &str) -> String {
 // ── SQL runner ──────────────────────────────────────────────────────
 
 /// Execute a BM25-ranked FTS5 query across all English translations.
+///
+/// Grouped by verse reference so the LIMIT applies to UNIQUE verses: without
+/// the grouping, one verse matched in all 7 English translations consumed 7
+/// result slots, collapsing recall. Each verse keeps its best (lowest) BM25
+/// rank across translations; SQLite guarantees the bare columns come from
+/// the row that produced the `MIN()` value.
+///
+/// The CTE must be MATERIALIZED: FTS5's `bm25()` auxiliary function cannot
+/// run in an aggregate context, and without materialization SQLite flattens
+/// the subquery into the outer aggregate ("unable to use function bm25 in
+/// the requested context").
 #[expect(
     clippy::cast_possible_wrap,
     reason = "limit is a small page-size value that fits in i64"
@@ -114,11 +131,16 @@ fn run_fts_query(
         return Ok(vec![]);
     }
     let mut stmt = conn.prepare(
-        "SELECT bm25(verses_fts) as rank, v.book_number, v.book_name, v.chapter, v.verse \
-         FROM verses_fts fts \
-         JOIN verses v ON v.rowid = fts.rowid \
-         JOIN translations t ON v.translation_id = t.id \
-         WHERE fts.text MATCH ?1 AND t.language = 'en' \
+        "WITH ranked AS MATERIALIZED ( \
+             SELECT bm25(verses_fts) as rank, v.book_number, v.book_name, v.chapter, v.verse \
+             FROM verses_fts fts \
+             JOIN verses v ON v.rowid = fts.rowid \
+             JOIN translations t ON v.translation_id = t.id \
+             WHERE fts.text MATCH ?1 AND t.language = 'en' \
+         ) \
+         SELECT MIN(rank) as rank, book_number, book_name, chapter, verse \
+         FROM ranked \
+         GROUP BY book_number, chapter, verse \
          ORDER BY rank \
          LIMIT ?2",
     )?;
@@ -339,5 +361,110 @@ mod tests {
     #[test]
     fn or_query_empty_on_all_stop_words() {
         assert_eq!(build_or_query("I am a the is"), String::new());
+    }
+
+    #[test]
+    fn and_query_keeps_negations() {
+        // "not" must survive filtering: "thou shalt not kill" loses all
+        // meaning without it.
+        assert_eq!(
+            build_and_query("do not be afraid"),
+            "not afraid"
+        );
+    }
+
+    #[test]
+    fn and_query_keeps_modals_and_quantifiers() {
+        assert_eq!(
+            build_and_query("thou shalt not kill"),
+            "thou shalt not kill"
+        );
+        assert_eq!(
+            build_and_query("for all have sinned"),
+            "all sinned"
+        );
+    }
+
+    #[test]
+    fn and_query_keeps_question_words() {
+        assert_eq!(
+            build_and_query("who is my neighbour"),
+            "who neighbour"
+        );
+    }
+
+    /// Build an in-memory-style test database with the production schema
+    /// subset (verses + FTS index + translations) and two English
+    /// translations containing the same verses.
+    fn test_db() -> BibleDb {
+        let path = std::env::temp_dir().join(format!(
+            "rhema-search-test-{}-{:?}.db",
+            std::process::id(),
+            std::thread::current().id(),
+        ));
+        let _ = std::fs::remove_file(&path);
+        let db = BibleDb::open(&path).unwrap();
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute_batch(
+                "CREATE TABLE translations (id INTEGER PRIMARY KEY, language TEXT);
+                 CREATE TABLE verses (
+                     id INTEGER PRIMARY KEY,
+                     translation_id INTEGER,
+                     book_number INTEGER,
+                     book_name TEXT,
+                     book_abbreviation TEXT,
+                     chapter INTEGER,
+                     verse INTEGER,
+                     text TEXT
+                 );
+                 CREATE VIRTUAL TABLE verses_fts USING fts5(
+                     text, content='verses', content_rowid='id', tokenize='unicode61'
+                 );
+                 INSERT INTO translations VALUES (1, 'en'), (2, 'en');
+                 INSERT INTO verses VALUES
+                   (1, 1, 43, 'John', 'Jhn', 3, 16, 'For God so loved the world, that he gave his only begotten Son'),
+                   (2, 2, 43, 'John', 'Jhn', 3, 16, 'For God so loved the world that he gave his one and only Son'),
+                   (3, 1, 43, 'John', 'Jhn', 3, 17, 'For God sent not his Son into the world to condemn the world'),
+                   (4, 2, 43, 'John', 'Jhn', 3, 17, 'For God did not send his Son into the world to condemn the world');
+                 INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses;",
+            )
+            .unwrap();
+        }
+        db
+    }
+
+    #[test]
+    fn bm25_search_dedups_across_translations() {
+        let db = test_db();
+        let results = db.search_verses_bm25("God so loved the world", 10).unwrap();
+        // Two translations of John 3:16 collapse into one result; 3:17 may
+        // follow from the AND/OR tiers. No verse reference appears twice.
+        assert!(!results.is_empty(), "FTS query returned no rows — SQL error?");
+        let mut seen = HashSet::new();
+        for r in &results {
+            assert!(
+                seen.insert((r.book_number, r.chapter, r.verse)),
+                "duplicate verse {} {}:{} in results",
+                r.book_number,
+                r.chapter,
+                r.verse
+            );
+        }
+        assert_eq!((results[0].book_number, results[0].chapter, results[0].verse), (43, 3, 16));
+    }
+
+    #[test]
+    fn bm25_search_limit_counts_unique_verses() {
+        let db = test_db();
+        let results = db.search_verses_bm25("world", 2).unwrap();
+        // "world" matches both verses in both translations; the limit must
+        // yield 2 UNIQUE verses, not one verse twice.
+        assert_eq!(results.len(), 2);
+        let keys: HashSet<(i32, i32, i32)> = results
+            .iter()
+            .map(|r| (r.book_number, r.chapter, r.verse))
+            .collect();
+        assert_eq!(keys.len(), 2);
     }
 }
