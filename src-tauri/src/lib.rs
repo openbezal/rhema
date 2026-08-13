@@ -160,7 +160,10 @@ pub fn run() {
                                 }
                             }
                         } else {
-                            log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                            log::info!(
+                                "Embedding re-ranking not installed (optional) — keyword + reference \
+                                 search fully functional. Opt in with 'bun run setup:all --with-embedding'."
+                            );
                         }
                     }
                     Err(e) => {
@@ -168,7 +171,10 @@ pub fn run() {
                     }
                 }
             } else {
-                log::info!("ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download.");
+                log::info!(
+                    "Embedding re-ranking not installed (optional) — keyword + reference \
+                     search fully functional. Opt in with 'bun run setup:all --with-embedding'."
+                );
             }
 
             Ok(())
@@ -184,16 +190,19 @@ pub fn run() {
 /// different model/prefix than the runtime.
 fn check_embedding_provenance(embeddings_path: &std::path::Path, model_path: &std::path::Path) {
     let meta_path = embeddings_path.with_extension("meta.json");
+    // Missing/unreadable sidecar is informational only (e.g. assets built
+    // before the sidecar existed). The loud warning is reserved for the one
+    // real hazard: an index provably built with a DIFFERENT model.
     let Ok(raw) = std::fs::read_to_string(&meta_path) else {
-        log::warn!(
+        log::info!(
             "No embeddings provenance sidecar at {} — cannot verify the index matches the model. \
-             Regenerate with 'bun run export:verses && bun run precompute:embeddings'.",
+             Regenerating refreshes it: 'bun run setup:all --with-embedding'.",
             meta_path.display()
         );
         return;
     };
     let Ok(meta) = serde_json::from_str::<serde_json::Value>(&raw) else {
-        log::warn!("Unreadable embeddings provenance sidecar at {}", meta_path.display());
+        log::info!("Unreadable embeddings provenance sidecar at {}", meta_path.display());
         return;
     };
     let index_model = meta.get("model_file").and_then(|v| v.as_str()).unwrap_or("");

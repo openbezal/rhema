@@ -165,12 +165,13 @@ pub fn semantic_search(
     // overlap to surface.
     let depth = (3 * k).max(30);
 
-    // Lock pipeline for vector search (may be slow if ONNX runs)
+    // Lock pipeline for vector search (may be slow if ONNX runs). The
+    // embedding model is OPTIONAL: without it the detector is a stub that
+    // returns no vector hits, and the search below degrades to FTS5 with
+    // phrase-priority ordering — full-quality keyword + reference search
+    // with zero model assets installed.
     let vector_results = {
         let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
-        if !pipeline.has_semantic() {
-            return Err("Semantic search not available — model or embeddings not loaded".into());
-        }
         pipeline.semantic_search(&query, depth)
     }; // Pipeline lock dropped
 

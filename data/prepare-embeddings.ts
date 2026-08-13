@@ -48,6 +48,12 @@ const MODEL_INT8 = join(MODELS_DIR_INT8, "model_quantized.onnx")
 
 const force = process.argv.includes("--force")
 
+// Embedding re-ranking assets (ONNX model + verse embeddings) are OPTIONAL
+// and expensive to build (~2.5h compute, ~3.3GB disk, Python toolchain).
+// Keyword + reference search works fully without them, so their phases only
+// run when explicitly requested.
+const withEmbedding = process.argv.includes("--with-embedding")
+
 // ── Helpers ──────────────────────────────────────────────────────────
 function shouldSkip(label: string, ...artifacts: string[]): boolean {
   if (force) return false
@@ -81,18 +87,32 @@ async function main() {
   console.log("║   Rhema – Full Setup Pipeline                ║")
   console.log("╚══════════════════════════════════════════════╝")
   if (force) console.log("  (--force: re-running all phases)\n")
+  if (!withEmbedding) {
+    console.log(
+      "  Embedding re-ranking assets will be SKIPPED (optional, ~2.5h to build)."
+    )
+    console.log(
+      "  Keyword + reference search works fully without them. To opt in:"
+    )
+    console.log("    bun run setup:all --with-embedding\n")
+  }
 
   // ── Phase 1: Python environment ────────────────────────────────
+  // Only the embedding phases (4-6) consume the Python toolchain.
   console.log("\n━━━ Phase 1/7: Python environment ━━━")
-  await ensurePythonEnv([
-    "optimum-onnx[onnxruntime]",
-    "sentence-transformers<5.0.0",
-    "accelerate",
-    "tokenizers",
-    "numpy",
-    "torch",
-    "meaningless",
-  ])
+  if (withEmbedding) {
+    await ensurePythonEnv([
+      "optimum-onnx[onnxruntime]",
+      "sentence-transformers<5.0.0",
+      "accelerate",
+      "tokenizers",
+      "numpy",
+      "torch",
+      "meaningless",
+    ])
+  } else {
+    console.log("  ⏭ Skip: only needed for --with-embedding")
+  }
 
   // ── Phase 2: Bible source data (pre-built zip + cross-refs) ────
   console.log("\n━━━ Phase 2/7: Download Bible source data ━━━")
@@ -116,7 +136,9 @@ async function main() {
 
   // ── Phase 4: ONNX model download + quantize ────────────────────
   console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")
-  if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
+  if (!withEmbedding) {
+    console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
+  } else if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
     const optimumCli = getVenvBin("optimum-cli")
 
     // Export FP32
@@ -167,7 +189,9 @@ async function main() {
 
   // ── Phase 5: Export verses to JSON ─────────────────────────────
   console.log("\n━━━ Phase 5/7: Export verses to JSON ━━━")
-  if (!shouldSkip("verses JSON", VERSES_JSON)) {
+  if (!withEmbedding) {
+    console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
+  } else if (!shouldSkip("verses JSON", VERSES_JSON)) {
     if (!existsSync(DB_PATH)) {
       console.error(
         "  ❌ rhema.db not found. Run phases 2-3 first (or remove --force skip)."
@@ -179,16 +203,15 @@ async function main() {
 
   // ── Phase 6: Pre-compute embeddings ────────────────────────────
   console.log("\n━━━ Phase 6/7: Pre-compute verse embeddings ━━━")
-  if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
-    const venvPython = getVenvBin(
-      process.platform === "win32" ? "python" : "python3"
-    )
-    // Use sentence-transformers + MPS GPU (much faster than ONNX CPU)
-    await run(
-      [venvPython, join(DATA_DIR, "precompute-embeddings.py")],
-      undefined,
-      { PYTHONUTF8: "1" }
-    )
+  if (!withEmbedding) {
+    console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
+  } else if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
+    // Use the Rust precompute binary — it embeds with the SAME ONNX model
+    // and pooling the app uses at runtime and writes the provenance sidecar.
+    // (The old sentence-transformers path produced vectors that did not
+    // match the runtime embedder — that mismatch crippled vector search
+    // until the 2026-08 regeneration.)
+    await run(["bun", "run", "precompute:embeddings"])
   }
 
   // ── Phase 7: Whisper model ────────────────────────────────────
@@ -200,7 +223,21 @@ async function main() {
   // ── Done ───────────────────────────────────────────────────────
   console.log("\n╔══════════════════════════════════════════════╗")
   console.log("║   ✅ Setup complete!                          ║")
-  console.log("╚══════════════════════════════════════════════╝\n")
+  console.log("╚══════════════════════════════════════════════╝")
+  if (!withEmbedding) {
+    console.log(
+      "  Note: embedding re-ranking assets were skipped (optional)."
+    )
+    console.log(
+      "  Gain: better paraphrase search in the Context tab. Cost: ~2.5h build,"
+    )
+    console.log(
+      "  ~3.3GB disk, ~600-900MB RAM at runtime. Opt in anytime with:"
+    )
+    console.log("    bun run setup:all --with-embedding\n")
+  } else {
+    console.log("")
+  }
 }
 
 main().catch((err) => {

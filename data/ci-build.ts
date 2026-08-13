@@ -18,16 +18,10 @@
 
 import { join } from "node:path"
 import { existsSync } from "node:fs"
-import { ensurePythonEnv, getVenvBin, PROJECT_ROOT } from "./lib/python-env"
+import { ensurePythonEnv, PROJECT_ROOT } from "./lib/python-env"
 
 // ── Paths ────────────────────────────────────────────────────────────
 const DATA_DIR = join(PROJECT_ROOT, "data")
-const MODELS_DIR = join(PROJECT_ROOT, "models", "qwen3-embedding-0.6b")
-const MODELS_DIR_INT8 = join(
-  PROJECT_ROOT,
-  "models",
-  "qwen3-embedding-0.6b-int8"
-)
 
 const KJV_SOURCE = join(DATA_DIR, "sources", "KJV.json")
 const NIV_SOURCE = join(DATA_DIR, "sources", "NIV.json")
@@ -35,16 +29,6 @@ const ESV_SOURCE = join(DATA_DIR, "sources", "ESV.json")
 const CROSS_REFS = join(DATA_DIR, "cross-refs", "cross_references.txt")
 const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
-const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b.bin")
-const IDS_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b-ids.bin")
-const WHISPER_MODEL = join(
-  PROJECT_ROOT,
-  "models",
-  "whisper",
-  "ggml-large-v3-turbo-q8_0.bin"
-)
-const MODEL_ONNX = join(MODELS_DIR, "model.onnx")
-const MODEL_INT8 = join(MODELS_DIR_INT8, "model_quantized.onnx")
 
 const force = process.argv.includes("--force")
 
@@ -114,58 +98,13 @@ async function main() {
     await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
   }
 
-//   // ── Phase 4: ONNX model download + quantize ────────────────────
-//   console.log("\n━━━ Phase 4/4: ONNX model download & quantize ━━━")
-//   if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
-//     const optimumCli = getVenvBin("optimum-cli")
+  // Embedding re-ranking assets (ONNX model + verse embeddings) are
+  // deliberately NOT built for release bundles: they are optional, cost
+  // ~2.5h of compute, and the app degrades to full-quality FTS + reference
+  // search without them. Users opt in locally with
+  // `bun run setup:all --with-embedding`.
 
-//     // Export FP32
-//     if (force || !existsSync(MODEL_ONNX)) {
-//       console.log(
-//         "\n  🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)..."
-//       )
-//       console.log("     This may take a few minutes on first run.\n")
-//       await run([
-//         optimumCli,
-//         "export",
-//         "onnx",
-//         "--model",
-//         "Qwen/Qwen3-Embedding-0.6B",
-//         "--task",
-//         "feature-extraction",
-//         MODELS_DIR,
-//         "--library-name",
-//         "transformers",
-//       ])
-//       console.log(`  ✓ Model exported to ${MODELS_DIR}`)
-//     }
-
-//     // Quantize to INT8
-//     if (force || !existsSync(MODEL_INT8)) {
-//       console.log("\n  ⚡ Quantizing to INT8 (ARM64)...")
-//       try {
-//         await run([
-//           optimumCli,
-//           "onnxruntime",
-//           "quantize",
-//           "--onnx_model",
-//           MODELS_DIR,
-//           "--arm64",
-//           "-o",
-//           MODELS_DIR_INT8,
-//           "--library-name",
-//           "transformers",
-//         ])
-//         console.log(`  ✓ INT8 model saved to ${MODELS_DIR_INT8}`)
-//       } catch {
-//         console.error(
-//           "  ⚠️  Quantization failed. The FP32 model is still usable."
-//         )
-//       }
-//     }
-//   }
-
-  // ── Phase 5: Export verses to JSON ─────────────────────────────
+  // ── Phase 4: Export verses to JSON ─────────────────────────────
   console.log("\n━━━ Phase 4/4: Export verses to JSON ━━━")
   if (!shouldSkip("verses JSON", VERSES_JSON)) {
     if (!existsSync(DB_PATH)) {
@@ -176,26 +115,6 @@ async function main() {
     }
     await run(["bun", "run", join(DATA_DIR, "compute-embeddings.ts")])
   }
-
-//   // ── Phase 6: Pre-compute embeddings ────────────────────────────
-//   console.log("\n━━━ Phase 6/4: Pre-compute verse embeddings ━━━")
-//   if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
-//     const venvPython = getVenvBin(
-//       process.platform === "win32" ? "python" : "python3"
-//     )
-//     // Use sentence-transformers + MPS GPU (much faster than ONNX CPU)
-//     await run(
-//       [venvPython, join(DATA_DIR, "precompute-embeddings.py")],
-//       undefined,
-//       { PYTHONUTF8: "1" }
-//     )
-//   }
-
-//   // ── Phase 7: Whisper model ────────────────────────────────────
-//   console.log("\n━━━ Phase 7/4: Download Whisper model ━━━")
-//   if (!shouldSkip("Whisper model", WHISPER_MODEL)) {
-//     await run(["bun", "run", join(DATA_DIR, "download-whisper-model.ts")])
-//   }
 
   // ── Done ───────────────────────────────────────────────────────
   console.log("\n╔══════════════════════════════════════════════╗")

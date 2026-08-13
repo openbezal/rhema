@@ -78,7 +78,7 @@ run `bun run setup:all`. All releases are listed at
 - [Bun](https://bun.sh/) (runtime for scripts + package manager)
 - [Rust](https://rustup.rs/) toolchain (stable, 1.77.2+)
 - [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (platform-specific system dependencies)
-- [Python 3](https://www.python.org/) (for downloading copyrighted translations and embedding model export)
+- [Python 3](https://www.python.org/) (only for the optional `--with-embedding` setup and downloading copyrighted translations)
 - CMake + LLVM/libclang (required for local Whisper STT) — see [Platform-specific setup](#platform-specific-setup) below
 - [Deepgram API key](https://deepgram.com/) (optional, for cloud speech-to-text instead of Whisper)
 
@@ -128,7 +128,7 @@ bun install
 
 ### Quick Setup (recommended)
 
-One command sets up everything — Python virtual environment, Bible data, database, ONNX model, precomputed embeddings, and the local Whisper model:
+One command sets up everything you need — Bible data, database, and the local Whisper model. It finishes in minutes and needs no Python:
 
 > **Windows:** run `bun run setup:windows` *before* `setup:all` and restart your terminal. See [Platform-specific setup](#platform-specific-setup) above.
 
@@ -136,15 +136,27 @@ One command sets up everything — Python virtual environment, Bible data, datab
 bun run setup:all
 ```
 
-This runs 7 idempotent phases in sequence, skipping any whose output artifacts already exist (pass `--force` to re-run all):
+This runs the required phases idempotently, skipping any whose output artifacts already exist (pass `--force` to re-run all):
 
-1. Python environment (`.venv` + pip deps: `optimum-onnx[onnxruntime]`, `sentence-transformers`, `accelerate`, `tokenizers`, `numpy`, `torch`, `meaningless`)
+1. ~~Python environment~~ — skipped by default (only needed for `--with-embedding` below)
 2. Download Bible source data — single bundled archive containing all 10 translations plus the openbible.info cross-references zip
 3. Build SQLite Bible database (`data/rhema.db` with FTS5 + cross-references)
-4. Download & export ONNX model (`Qwen3-Embedding-0.6B`) + INT8 quantization for ARM64
-5. Export KJV verses to JSON for embedding precomputation
-6. Precompute verse embeddings (GPU sentence-transformers when available, ONNX CPU fallback otherwise)
+4. –6. ~~ONNX model + verse embeddings~~ — skipped by default (see below)
 7. Download Whisper model (`ggml-large-v3-turbo-q8_0.bin`) into `models/whisper/`
+
+#### Optional: embedding re-ranking (`--with-embedding`)
+
+Everything above gives you the full search experience: live verse detection, exact/partial quote search, and typed references ("John 3:16") — benchmarked at recall@1 **0.836** across 152 queries. The embedding model adds semantic *paraphrase* matching in the Context search tab on top of that.
+
+```bash
+bun run setup:all --with-embedding
+```
+
+**What you gain:** better paraphrase queries in Context search — e.g. "God will never abandon you" finds Hebrews 13:5. Benchmark: paraphrase recall@5 goes from 0.800 to **1.000**; results gain Semantic badges with a real similarity %. Nothing else changes — exact quotes, verse fragments, typed references, and live detection are identical with or without it (overall recall@1 is 0.836 without vs 0.829 with).
+
+**What it costs:** a one-time ~2.5 hour build (Hugging Face model export, INT8 quantization, embedding all 31k verses with the same ONNX model the app runs), ~3.3 GB of disk (`models/` + `embeddings/`), the Python toolchain, and roughly 600–900 MB of extra memory while the app is running.
+
+You can opt in at any time later — the app detects the assets on next launch. Without them it logs a single info line and runs keyword + reference search at full quality.
 
 ### Environment
 
@@ -181,10 +193,12 @@ Each phase can also be run independently:
 ```bash
 bun run download:bible-data          # Bundled translations + cross-refs
 bun run build:bible                  # Build SQLite database
+bun run download:whisper             # Whisper STT model
+
+# Embedding re-ranking assets (optional — see above):
 bun run download:model               # Download & export ONNX model
 bun run export:verses                # Export verses to JSON
-bun run precompute:embeddings        # Rust ONNX (recommended); see also -onnx and -py variants
-bun run download:whisper             # Whisper STT model
+bun run precompute:embeddings        # Rust ONNX precompute (writes the provenance sidecar — always use this one)
 ```
 
 ### Run in development
