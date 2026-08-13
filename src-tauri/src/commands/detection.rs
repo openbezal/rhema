@@ -6,7 +6,8 @@ use serde::Serialize;
 use tauri::State;
 
 use rhema_detection::fusion::{
-    fuse_rrf, VerseKey, FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE, FTS5_RANK0_CONFIDENCE,
+    fuse_rrf, FtsCandidate, VerseKey, FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE,
+    FTS5_RANK0_CONFIDENCE,
 };
 use rhema_detection::{DetectionPipeline, MergedDetection, ReadingMode};
 
@@ -187,19 +188,24 @@ pub fn semantic_search(
         .collect();
 
     // FTS5 BM25 across all English translations
-    let fts_keys: Vec<VerseKey> = app_state
+    let fts_candidates: Vec<FtsCandidate> = app_state
         .bible_db
         .as_ref()
         .and_then(|db| db.search_verses_bm25(&query, depth).ok())
         .unwrap_or_default()
         .iter()
-        .map(|f| VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse })
+        .map(|f| {
+            (
+                VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse },
+                f.phrase_match,
+            )
+        })
         .collect();
 
-    // Rank by reciprocal rank fusion, then resolve each hit to the active
+    // Rank with verbatim-first fusion, then resolve each hit to the active
     // translation's text.
     #[expect(clippy::cast_precision_loss, reason = "rank is small")]
-    let results: Vec<SemanticSearchResult> = fuse_rrf(&vector_hits, &fts_keys, k)
+    let results: Vec<SemanticSearchResult> = fuse_rrf(&vector_hits, &fts_candidates, k)
         .into_iter()
         .enumerate()
         .filter_map(|(fts_rank, hit)| {

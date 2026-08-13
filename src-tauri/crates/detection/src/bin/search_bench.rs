@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rhema_bible::BibleDb;
-use rhema_detection::fusion::{fuse_rrf, VerseKey};
+use rhema_detection::fusion::{fuse_rrf, FtsCandidate, VerseKey};
 use rhema_detection::semantic::embedder::TextEmbedder;
 use rhema_detection::semantic::index::VectorIndex;
 use rhema_detection::{HnswVectorIndex, OnnxEmbedder};
@@ -231,7 +231,7 @@ fn run_benchmark(
         let accepts: Vec<VerseKey> = q.accept.iter().map(|a| a.key()).collect();
 
         let t0 = std::time::Instant::now();
-        let fts_keys = fts_search(db, &q.query);
+        let fts_candidates = fts_search(db, &q.query);
         let fts_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
         let t1 = std::time::Instant::now();
@@ -239,12 +239,13 @@ fn run_benchmark(
         let vector_ms = t1.elapsed().as_secs_f64() * 1000.0;
 
         let t2 = std::time::Instant::now();
-        let fused_keys: Vec<VerseKey> = fuse_rrf(&vector_hits, &fts_keys, K)
+        let fused_keys: Vec<VerseKey> = fuse_rrf(&vector_hits, &fts_candidates, K)
             .into_iter()
             .map(|h| h.key)
             .collect();
         let fused_ms = fts_ms + vector_ms + t2.elapsed().as_secs_f64() * 1000.0;
         let vector_keys: Vec<VerseKey> = vector_hits.iter().map(|&(k, _)| k).collect();
+        let fts_keys: Vec<VerseKey> = fts_candidates.iter().map(|&(k, _)| k).collect();
 
         for (mode, keys, latency_ms) in [
             ("fts", &fts_keys, fts_ms),
@@ -287,11 +288,16 @@ fn run_benchmark_vector_only(
     print_table(&tallies);
 }
 
-fn fts_search(db: &BibleDb, query: &str) -> Vec<VerseKey> {
+fn fts_search(db: &BibleDb, query: &str) -> Vec<FtsCandidate> {
     db.search_verses_bm25(query, K)
         .unwrap_or_default()
         .iter()
-        .map(|f| VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse })
+        .map(|f| {
+            (
+                VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse },
+                f.phrase_match,
+            )
+        })
         .collect()
 }
 

@@ -16,6 +16,10 @@ pub struct Bm25Result {
     pub book_name: String,
     pub chapter: i32,
     pub verse: i32,
+    /// True when the verse matched the exact-phrase tier — the query text
+    /// appears verbatim in the verse. Near-certain relevance for quoted
+    /// scripture; fusion gives these hits priority.
+    pub phrase_match: bool,
 }
 
 // ── Stop words ──────────────────────────────────────────────────────
@@ -170,6 +174,7 @@ fn run_fts_query(
                 book_name: row.get(2)?,
                 chapter: row.get(3)?,
                 verse: row.get(4)?,
+                phrase_match: false,
             })
         },
     )?;
@@ -258,6 +263,11 @@ impl BibleDb {
         let phrase = build_phrase_query(query);
         log::info!("[FTS5-BM25] Phrase: {phrase:?}");
         let mut all_results = run_fts_query(&conn, &phrase, fetch_limit)?;
+        for r in &mut all_results {
+            r.phrase_match = true;
+        }
+        // dedup_results keeps the FIRST occurrence per verse, so a verse
+        // found by both tier 1 and a later tier keeps phrase_match = true.
 
         // Tier 2: AND with stop words filtered (~5-20ms)
         if dedup_count(&all_results) < limit {

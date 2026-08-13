@@ -55,33 +55,67 @@ pub struct FusedHit {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RrfHit {
     pub key: VerseKey,
-    /// Reciprocal-rank-fusion score — used for ordering only, not display.
+    /// Fusion score — used for ordering only, not display.
     pub score: f64,
     /// Cosine similarity when the vector engine found this verse.
     pub cosine: Option<f64>,
     /// True when the FTS5/BM25 engine found this verse.
     pub from_fts: bool,
+    /// True when the query text appears verbatim in this verse (FTS5
+    /// exact-phrase tier).
+    pub phrase_match: bool,
 }
 
-/// Merge vector hits with BM25-ranked FTS5 verse keys using Reciprocal Rank
-/// Fusion: `score(v) = Σ 1/(RRF_K + rank)` over both ranked lists (1-based
-/// ranks), so a verse found by BOTH engines sums two contributions and
-/// naturally outranks single-engine hits at comparable ranks. Engine scores
-/// participate only through their ranks — cosine similarities and synthetic
-/// BM25 confidences are never compared on one axis (the legacy fusion did,
-/// which let mediocre keyword-only hits bury the verse both engines agreed
-/// on).
+/// One FTS5 candidate for fusion: verse key + whether it matched the
+/// exact-phrase tier.
+pub type FtsCandidate = (VerseKey, bool);
+
+/// Score offset that puts exact-phrase matches above every possible RRF sum
+/// while preserving their BM25 order among themselves.
+const PHRASE_PRIORITY_BASE: f64 = 10.0;
+
+/// Merge vector hits with BM25-ranked FTS5 candidates.
+///
+/// Two rules, in order:
+///
+/// 1. **Verbatim wins.** FTS5 exact-phrase matches contain the query text
+///    word for word — for quoted scripture that is definitionally the right
+///    answer, so they take the top slots in BM25 order. (Measured: without
+///    this rule, rank fusion dropped verbatim-fragment R@1 from 0.97 to
+///    0.2-0.5, because two mediocre "agreement" votes on a wrong verse beat
+///    one correct top-rank vote whenever the weaker engine missed the verse.)
+/// 2. **Everything else fuses by Reciprocal Rank:**
+///    `score(v) = Σ 1/(RRF_K + rank)` over both ranked lists (1-based
+///    ranks), so a verse found by BOTH engines sums two contributions and
+///    outranks single-engine hits at comparable ranks. Engine scores
+///    participate only through their ranks — cosines and BM25 values are
+///    never compared on one axis (the legacy fusion did exactly that, which
+///    let fabricated keyword confidences bury the verse both engines agreed
+///    on).
 ///
 /// Vector candidates below `VECTOR_SIMILARITY_FLOOR` are dropped first.
-/// The result is sorted by fused score descending and truncated to `limit`.
+/// The result is sorted by score descending and truncated to `limit`.
 #[expect(clippy::cast_precision_loss, reason = "rank is small")]
 pub fn fuse_rrf(
     vector_hits: &[(VerseKey, f64)],
-    fts_keys: &[VerseKey],
+    fts_candidates: &[FtsCandidate],
     limit: usize,
 ) -> Vec<RrfHit> {
     let mut combined: Vec<RrfHit> = Vec::new();
     let mut index_of: HashMap<VerseKey, usize> = HashMap::new();
+
+    let mut entry_for = |combined: &mut Vec<RrfHit>, key: VerseKey| -> usize {
+        *index_of.entry(key).or_insert_with(|| {
+            combined.push(RrfHit {
+                key,
+                score: 0.0,
+                cosine: None,
+                from_fts: false,
+                phrase_match: false,
+            });
+            combined.len() - 1
+        })
+    };
 
     for (rank, &(key, cosine)) in vector_hits
         .iter()
@@ -89,27 +123,29 @@ pub fn fuse_rrf(
         .enumerate()
     {
         let contribution = 1.0 / (RRF_K + rank as f64 + 1.0);
-        let entry_index = *index_of.entry(key).or_insert_with(|| {
-            combined.push(RrfHit { key, score: 0.0, cosine: None, from_fts: false });
-            combined.len() - 1
-        });
-        let entry = &mut combined[entry_index];
+        let idx = entry_for(&mut combined, key);
+        let entry = &mut combined[idx];
         entry.score += contribution;
         // Duplicate keys cannot occur within one engine's list in practice;
         // keep the best cosine if they ever do.
         entry.cosine = Some(entry.cosine.map_or(cosine, |c: f64| c.max(cosine)));
     }
 
-    for (rank, &key) in fts_keys.iter().enumerate() {
+    for (rank, &(key, phrase_match)) in fts_candidates.iter().enumerate() {
         let contribution = 1.0 / (RRF_K + rank as f64 + 1.0);
-        let entry_index = *index_of.entry(key).or_insert_with(|| {
-            combined.push(RrfHit { key, score: 0.0, cosine: None, from_fts: false });
-            combined.len() - 1
-        });
-        let entry = &mut combined[entry_index];
+        let idx = entry_for(&mut combined, key);
+        let entry = &mut combined[idx];
         if !entry.from_fts {
             entry.score += contribution;
             entry.from_fts = true;
+        }
+        if phrase_match && !entry.phrase_match {
+            entry.phrase_match = true;
+            // Lift verbatim matches above every possible RRF sum, keeping
+            // their BM25 order among themselves. The per-rank step (0.1)
+            // exceeds the largest possible RRF sum (2/(RRF_K+1) ≈ 0.033),
+            // so vector votes can never reorder phrase matches.
+            entry.score += PHRASE_PRIORITY_BASE - rank as f64 * 0.1;
         }
     }
 
@@ -224,6 +260,14 @@ mod tests {
 
     // ── fuse_rrf ────────────────────────────────────────────────────
 
+    fn fts(k: VerseKey) -> FtsCandidate {
+        (k, false)
+    }
+
+    fn phrase(k: VerseKey) -> FtsCandidate {
+        (k, true)
+    }
+
     #[test]
     fn rrf_both_found_outranks_single_found_at_equal_ranks() {
         let both = key(43, 3, 16);
@@ -232,27 +276,12 @@ mod tests {
         // `both` is rank 2 in each list; the single-engine hits are rank 1.
         let fused = fuse_rrf(
             &[(vector_only, 0.70), (both, 0.65)],
-            &[fts_only, both],
+            &[fts(fts_only), fts(both)],
             10,
         );
         assert_eq!(fused[0].key, both);
         assert!(fused[0].from_fts);
         assert_eq!(fused[0].cosine, Some(0.65));
-    }
-
-    #[test]
-    fn rrf_exact_phrase_fts_top_hit_stays_on_top() {
-        // FTS rank 1 with no vector agreement anywhere: 1/(60+1) beats every
-        // deeper single-engine rank.
-        let fused = fuse_rrf(
-            &[(key(45, 5, 8), 0.72), (key(19, 23, 1), 0.60)],
-            &[key(43, 3, 16), key(1, 1, 1)],
-            10,
-        );
-        // Vector rank 1 ties FTS rank 1; both precede all rank-2 hits.
-        let top_two: Vec<VerseKey> = fused[..2].iter().map(|h| h.key).collect();
-        assert!(top_two.contains(&key(43, 3, 16)));
-        assert!(top_two.contains(&key(45, 5, 8)));
     }
 
     #[test]
@@ -276,7 +305,7 @@ mod tests {
     #[test]
     fn rrf_dedups_two_directionally() {
         let both = key(43, 3, 16);
-        let fused = fuse_rrf(&[(both, 0.65)], &[both], 10);
+        let fused = fuse_rrf(&[(both, 0.65)], &[fts(both)], 10);
         assert_eq!(fused.len(), 1);
         assert!((fused[0].score - 2.0 / 61.0).abs() < 1e-12);
         assert!(fused[0].from_fts);
@@ -285,8 +314,8 @@ mod tests {
 
     #[test]
     fn rrf_truncates_to_limit() {
-        let keys: Vec<VerseKey> = (1..=10).map(|v| key(1, 1, v)).collect();
-        let fused = fuse_rrf(&[], &keys, 3);
+        let candidates: Vec<FtsCandidate> = (1..=10).map(|v| fts(key(1, 1, v))).collect();
+        let fused = fuse_rrf(&[], &candidates, 3);
         assert_eq!(fused.len(), 3);
         assert_eq!(fused[0].key, key(1, 1, 1));
     }
@@ -294,5 +323,48 @@ mod tests {
     #[test]
     fn rrf_empty_inputs() {
         assert!(fuse_rrf(&[], &[], 10).is_empty());
+    }
+
+    #[test]
+    fn phrase_match_outranks_any_agreement() {
+        let verbatim = key(43, 3, 16);
+        let agreed_wrong = key(1, 1, 1);
+        // The wrong verse is rank 1 in the vector list AND rank 1 among
+        // non-phrase FTS hits — maximum possible RRF agreement. The verbatim
+        // match sits at FTS rank 2 with no vector support and must still win.
+        let fused = fuse_rrf(
+            &[(agreed_wrong, 0.80)],
+            &[fts(agreed_wrong), phrase(verbatim)],
+            10,
+        );
+        assert_eq!(fused[0].key, verbatim);
+        assert!(fused[0].phrase_match);
+        assert_eq!(fused[1].key, agreed_wrong);
+    }
+
+    #[test]
+    fn phrase_matches_keep_bm25_order_among_themselves() {
+        let first = key(43, 3, 16);
+        let second = key(45, 5, 8);
+        let third = key(1, 1, 1);
+        let fused = fuse_rrf(
+            // Vector prefers the third phrase match; BM25 order must hold.
+            &[(third, 0.95)],
+            &[phrase(first), phrase(second), phrase(third)],
+            10,
+        );
+        assert_eq!(fused[0].key, first);
+        assert_eq!(fused[1].key, second);
+        assert_eq!(fused[2].key, third);
+    }
+
+    #[test]
+    fn phrase_match_carries_cosine_when_vector_agrees() {
+        let verbatim = key(43, 3, 16);
+        let fused = fuse_rrf(&[(verbatim, 0.97)], &[phrase(verbatim)], 10);
+        assert_eq!(fused.len(), 1);
+        assert!(fused[0].phrase_match);
+        assert!(fused[0].from_fts);
+        assert_eq!(fused[0].cosine, Some(0.97));
     }
 }
