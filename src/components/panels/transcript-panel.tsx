@@ -16,6 +16,7 @@ import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
 import { bibleActions } from "@/hooks/use-bible"
 import { presentVerse } from "@/hooks/use-broadcast"
+import { mark, observeLongTasks } from "@/lib/latency-marks"
 import type { DetectionResult, ReadingAdvance } from "@/types"
 
 /**
@@ -63,6 +64,9 @@ export function TranscriptPanel() {
   const hasPartial = useTranscriptStore((s) => s.currentPartial.length > 0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Latency debugging: surface main-thread stalls in the unified [LAT] log.
+  useEffect(() => observeLongTasks(), [])
+
   useTauriEvent<{ rms: number; peak: number }>("audio_level", (payload) => {
     useAudioStore.getState().setLevel(payload)
   })
@@ -78,7 +82,11 @@ export function TranscriptPanel() {
 
   // Listen for detection results from the backend (batch replaces previous detections)
   useTauriEvent<DetectionResult[]>("verse_detections", (detections) => {
+    mark(
+      `verse_detections received src=${detections[0]?.source ?? "?"} n=${detections.length} first=${detections[0]?.verse_ref ?? ""}`
+    )
     useDetectionStore.getState().addDetections(detections)
+    mark(`addDetections done src=${detections[0]?.source ?? "?"}`)
 
     // Auto-navigate book search + select verse for preview/live
     const directHit = detections.find(
@@ -181,6 +189,7 @@ export function TranscriptPanel() {
   // advances to a new verse (chapter commands, verse commands, text matching).
   // Does NOT add to queue — only direct/semantic feed the queue.
   useTauriEvent<ReadingAdvance>("reading_mode_verse", (advance) => {
+    mark(`reading_mode_verse received ${advance.reference ?? ""}`)
     if (advance.book_number > 0) {
       const advanceVerse = {
         id: 0,

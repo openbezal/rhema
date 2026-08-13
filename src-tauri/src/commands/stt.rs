@@ -12,6 +12,16 @@ use crate::events::{
 };
 use crate::state::AppState;
 
+/// Epoch milliseconds — the shared clock for `[LAT]` latency marks. The
+/// frontend logs `Date.now()` through the `ui_mark` command, so backend and
+/// webview timestamps interleave comparably in one log.
+pub(crate) fn epoch_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or_default()
+}
+
 /// Truncate a string to at most `max_bytes`, snapping to a valid UTF-8 char boundary.
 fn truncate_safe(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
@@ -346,6 +356,7 @@ pub async fn start_transcription(
         while let Some(transcript) = detect_rx.recv().await {
             let app_clone = det_app.clone();
             let _ = tokio::task::spawn_blocking(move || {
+                log::info!("[LAT] worker start t={} {:?}", epoch_ms(), truncate_safe(&transcript, 40));
                 let direct_found = run_direct_detection(&app_clone, &transcript);
                 check_reading_mode(&app_clone, &transcript, direct_found);
                 if direct_found {
@@ -371,6 +382,7 @@ pub async fn start_transcription(
                 TranscriptEvent::Partial { transcript, .. } => {
                     if !transcript.is_empty() {
                         let t0 = std::time::Instant::now();
+                        log::info!("[LAT] partial t={} {:?}", epoch_ms(), truncate_safe(&transcript, 60));
                         let _ = event_app.emit(
                             EVENT_TRANSCRIPT_PARTIAL,
                             TranscriptPayload {
@@ -394,6 +406,7 @@ pub async fn start_transcription(
                 } => {
                     if !transcript.is_empty() {
                         let t0 = std::time::Instant::now();
+                        log::info!("[LAT] final t={} {:?}", epoch_ms(), truncate_safe(&transcript, 60));
                         // Emit as permanent transcript segment IMMEDIATELY
                         // (never blocked by detection work)
                         let _ = event_app.emit(
@@ -523,6 +536,12 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
         log::info!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
     }
     drop(app_state);
+    log::info!(
+        "[LAT] emit verse_detections t={} src=direct n={} first={:?}",
+        epoch_ms(),
+        results.len(),
+        results.first().map(|r| r.verse_ref.as_str()).unwrap_or("")
+    );
     let _ = app.emit("verse_detections", &results);
     log::info!("[DET-DIRECT] Detection took {:?} for {:?}", t0.elapsed(), truncate_safe(transcript, 50));
     has_high_confidence
@@ -617,6 +636,12 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
         );
     }
     drop(app_state);
+    log::info!(
+        "[LAT] emit verse_detections t={} src=semantic n={} first={:?}",
+        epoch_ms(),
+        results.len(),
+        results.first().map(|r| r.verse_ref.as_str()).unwrap_or("")
+    );
     let _ = app.emit("verse_detections", &results);
     log::info!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
 }

@@ -41,6 +41,7 @@ pub fn run() {
             commands::bible::set_active_translation,
             commands::detection::detect_verses,
             commands::detection::detection_status,
+            commands::detection::ui_mark,
             commands::detection::semantic_search,
             commands::detection::reading_mode_status,
             commands::detection::stop_reading_mode,

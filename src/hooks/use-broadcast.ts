@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
+import { mark } from "@/lib/latency-marks"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useBibleStore } from "@/stores/bible-store"
 import type { VerseRenderData } from "@/types"
@@ -29,6 +30,7 @@ let presentSeq = 0
 export async function presentVerse(verse: Verse): Promise<void> {
   presentSeq += 1
   const ticket = presentSeq
+  mark(`presentVerse start ${verse.book_name} ${verse.chapter}:${verse.verse}`)
 
   let verseToPresent = verse
   try {
@@ -42,6 +44,7 @@ export async function presentVerse(verse: Verse): Promise<void> {
   } catch (e) {
     console.warn("[broadcast] get_verse refetch failed, using cached verse:", e)
   }
+  mark(`presentVerse get_verse done ${verse.book_name} ${verse.chapter}:${verse.verse}`)
 
   // A newer present started while we were refetching — let it win.
   if (ticket !== presentSeq) return
@@ -56,6 +59,7 @@ export async function presentVerse(verse: Verse): Promise<void> {
   useBroadcastStore
     .getState()
     .setLiveVerse(toVerseRenderData(verseToPresent, translation), verseToPresent)
+  mark(`presentVerse end ${verseToPresent.book_name} ${verseToPresent.chapter}:${verseToPresent.verse}`)
 }
 
 export const broadcastActions = {

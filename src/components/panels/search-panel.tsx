@@ -34,6 +34,7 @@ import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
+import { mark } from "@/lib/latency-marks"
 
 type SearchTab = "book" | "context"
 
@@ -206,7 +207,9 @@ export function SearchPanel() {
       applyNavigationSelection(book, navChapter)
 
       // Load chapter explicitly, then select + scroll to the verse.
+      mark(`nav loadChapter start ${bookNumber} ${navChapter}:${navVerse}`)
       bibleActions.loadChapter(bookNumber, navChapter).then((verses) => {
+        mark(`nav loadChapter done ${bookNumber} ${navChapter}:${navVerse} n=${verses.length}`)
         const target = verses.find((v) => v.verse === navVerse)
         if (target) {
           setSelectedVerseId(target.id)

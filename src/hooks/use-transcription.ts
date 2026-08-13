@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { useAudioStore } from "@/stores/audio-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
+import { mark } from "@/lib/latency-marks"
 import { useTauriEvent } from "./use-tauri-event"
 
 interface TranscriptPartialPayload {
@@ -103,10 +104,12 @@ export function useTranscription(options?: UseTranscriptionOptions) {
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_partial", (payload) => {
+    mark(`transcript_partial received "${payload.text.slice(0, 30)}"`)
     useTranscriptStore.getState().setPartial(payload.text)
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_final", (payload) => {
+    mark(`transcript_final received "${payload.text.slice(0, 30)}"`)
     useTranscriptStore.getState().addSegment({
       id: crypto.randomUUID(),
       text: payload.text,

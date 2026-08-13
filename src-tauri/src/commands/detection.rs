@@ -105,6 +105,15 @@ pub fn detect_verses(
     Ok(results)
 }
 
+/// Frontend latency mark — logs a webview-side timestamp into the unified
+/// backend log so `[LAT]` timelines can be read from one file. `epoch_ms`
+/// is the webview's `Date.now()`; same machine, same clock as the backend's
+/// marks.
+#[tauri::command]
+pub fn ui_mark(label: String, epoch_ms: f64) {
+    log::info!("[LAT] ui {label} t={epoch_ms:.0}");
+}
+
 /// Check if semantic search is available
 #[tauri::command]
 pub fn detection_status(
@@ -143,6 +152,13 @@ pub fn semantic_search(
     query: String,
     limit: Option<usize>,
 ) -> Result<Vec<SemanticSearchResult>, String> {
+    // ONNX inference pages the whole quantized model into memory — log every
+    // invocation so RSS spikes and CPU stalls can be correlated with a caller.
+    log::info!(
+        "[LAT] semantic_search invoked t={} query_len={}",
+        super::stt::epoch_ms(),
+        query.len()
+    );
     let k = limit.unwrap_or(10);
     // Fetch deeper candidate lists than the display limit: RRF rewards
     // agreement between engines, so both lists need enough depth for the

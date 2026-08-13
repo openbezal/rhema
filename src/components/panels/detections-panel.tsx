@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { bibleActions } from "@/hooks/use-bible"
 import { useQueueStore, useBibleStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
+import { mark } from "@/lib/latency-marks"
 import type { DetectionResult } from "@/types"
 
 const SOURCE_COLORS: Record<string, { text: string; label: string }> = {
@@ -130,6 +131,17 @@ function DetectionColumn({
 
 export function DetectionsPanel() {
   const { detections } = useDetection()
+
+  // Latency debugging: when the list changes, mark the React commit and the
+  // next animation frame (≈ actual pixels on screen).
+  useEffect(() => {
+    if (detections.length === 0) return
+    mark(
+      `detections-commit n=${detections.length} first=${detections[0]?.verse_ref ?? ""} src=${detections[0]?.source ?? "?"}`
+    )
+    const raf = requestAnimationFrame(() => mark("detections-paint"))
+    return () => cancelAnimationFrame(raf)
+  }, [detections])
 
   // Issue #104: direct (spoken references) and semantic (quoted text)
   // detections in separate columns, so a burst of direct hits doesn't push
