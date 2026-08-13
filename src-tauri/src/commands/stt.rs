@@ -333,8 +333,10 @@ pub async fn start_transcription(
     let evt_active = stt_active.clone();
     let event_app = app.clone();
 
-    // Background detection channel — direct + reading mode + FTS, non-blocking
-    let (detect_tx, mut detect_rx) = tokio::sync::mpsc::channel::<String>(16);
+    // Background detection channel — direct + reading mode + FTS, non-blocking.
+    // Carries (transcript, is_final): partials get instant direct-reference
+    // detection; finals get the full pipeline.
+    let (detect_tx, mut detect_rx) = tokio::sync::mpsc::channel::<(String, bool)>(16);
 
     // [DIAG] Counters so we can see whether transcripts are being dropped
     // because the detection worker can't keep up. Logged every 25 sends
@@ -349,15 +351,42 @@ pub async fn start_transcription(
     // skip the FTS pass entirely when the utterance IS a spoken reference:
     // text-searching "Revelation chapter 3 verse 4" only yields junk hits
     // that pollute (and now replace) the semantic detections column.
+    //
+    // PARTIALS run direct detection only. Measured with the [LAT] timeline:
+    // the complete reference text was legible in a Deepgram partial 2.8-5.4s
+    // before the final arrived (endpointing holds the segment open while the
+    // speaker keeps talking), and the entire post-final pipeline is ~50ms —
+    // so finals-only detection made spoken references feel 3-5s slow. Direct
+    // detection is ~1-3ms, cheap enough for every changed partial. Reading
+    // mode and the FTS pass stay finals-only. Identical repeated partials
+    // (Deepgram re-emits the same text ~1/s while audio continues) are
+    // skipped.
+    //
     // Uses spawn_blocking so mutex locks and DB I/O don't starve the tokio
     // runtime (WebSocket readers, event emitters, etc.).
     let det_app = app.clone();
     tauri::async_runtime::spawn(async move {
-        while let Some(transcript) = detect_rx.recv().await {
+        let mut last_partial = String::new();
+        while let Some((transcript, is_final)) = detect_rx.recv().await {
+            if is_final {
+                last_partial.clear();
+            } else {
+                if transcript == last_partial {
+                    continue;
+                }
+                last_partial = transcript.clone();
+            }
             let app_clone = det_app.clone();
             let _ = tokio::task::spawn_blocking(move || {
-                log::info!("[LAT] worker start t={} {:?}", epoch_ms(), truncate_safe(&transcript, 40));
+                log::info!(
+                    "[LAT] worker start t={} final={is_final} {:?}",
+                    epoch_ms(),
+                    truncate_safe(&transcript, 40)
+                );
                 let direct_found = run_direct_detection(&app_clone, &transcript);
+                if !is_final {
+                    return;
+                }
                 check_reading_mode(&app_clone, &transcript, direct_found);
                 if direct_found {
                     log::info!("[DET-SEMANTIC] Skipped — utterance is a spoken reference");
@@ -395,6 +424,12 @@ pub async fn start_transcription(
                         // Check for translation commands on partials too (cheap string matching)
                         // This makes translation switching feel instant without waiting for speech_final
                         check_translation_command(&event_app, &transcript);
+
+                        // Direct reference detection on partials too: the full
+                        // reference is legible seconds before Deepgram issues
+                        // the final. Dropped silently if the worker is busy —
+                        // the final always follows and re-runs detection.
+                        let _ = detect_tx.try_send((transcript.clone(), false));
                         log::debug!("[EVT] Partial processed in {:?}", t0.elapsed());
                     }
                 }
@@ -423,7 +458,7 @@ pub async fn start_transcription(
 
                         // Fire-and-forget: detection runs in background thread pool.
                         // Event consumer proceeds immediately to next transcript.
-                        match detect_tx.try_send(transcript.clone()) {
+                        match detect_tx.try_send((transcript.clone(), true)) {
                             Ok(()) => {
                                 let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
                                 if n % 25 == 0 {
@@ -540,7 +575,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
         "[LAT] emit verse_detections t={} src=direct n={} first={:?}",
         epoch_ms(),
         results.len(),
-        results.first().map(|r| r.verse_ref.as_str()).unwrap_or("")
+        results.first().map_or("", |r| r.verse_ref.as_str())
     );
     let _ = app.emit("verse_detections", &results);
     log::info!("[DET-DIRECT] Detection took {:?} for {:?}", t0.elapsed(), truncate_safe(transcript, 50));
@@ -640,7 +675,7 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
         "[LAT] emit verse_detections t={} src=semantic n={} first={:?}",
         epoch_ms(),
         results.len(),
-        results.first().map(|r| r.verse_ref.as_str()).unwrap_or("")
+        results.first().map_or("", |r| r.verse_ref.as_str())
     );
     let _ = app.emit("verse_detections", &results);
     log::info!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
