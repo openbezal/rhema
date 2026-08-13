@@ -2,10 +2,12 @@ import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
-import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import { BUILTIN_THEMES, BROADCAST_OVERLAY, CLASSIC_DARK } from "@/lib/builtin-themes"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
 type SelectedElement = "verse" | "reference" | null
+
+export type NewThemeLayoutKind = "fullscreen" | "lower-thirds"
 
 interface BroadcastState {
   themes: BroadcastTheme[]
@@ -26,7 +28,7 @@ interface BroadcastState {
   saveTheme: (theme: BroadcastTheme) => void
   deleteTheme: (id: string) => void
   duplicateTheme: (id: string) => void
-  createNewTheme: () => void
+  createNewTheme: (layoutKind?: NewThemeLayoutKind) => void
   renameTheme: (id: string, name: string) => void
   togglePinTheme: (id: string) => void
   setActiveTheme: (id: string) => void
@@ -133,8 +135,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     }
     set((s) => ({ themes: [...s.themes, newTheme] }))
   },
-  createNewTheme: () => {
-    const source = BUILTIN_THEMES[0]
+  createNewTheme: (layoutKind = "fullscreen") => {
+    // Lower thirds start from Broadcast Overlay (transparent background for
+    // NDI keying, text box band at the bottom); fullscreen from Classic Dark.
+    const source = layoutKind === "lower-thirds" ? BROADCAST_OVERLAY : CLASSIC_DARK
     const newTheme: BroadcastTheme = {
       ...source,
       id: crypto.randomUUID(),
@@ -143,12 +147,16 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       pinned: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      background: {
-        type: "solid",
-        color: "#000000",
-        gradient: null,
-        image: null,
-      },
+      ...(layoutKind === "fullscreen"
+        ? {
+            background: {
+              type: "solid" as const,
+              color: "#000000",
+              gradient: null,
+              image: null,
+            },
+          }
+        : {}),
     }
     set((s) => ({ themes: [...s.themes, newTheme] }))
     get().startEditing(newTheme.id)

@@ -116,7 +116,9 @@ export function DesignCanvas() {
     canvas.add(workspace)
     canvas.centerObject(workspace)
     workspace.setCoords()
-    canvas.clipPath = workspace
+    // Never assign the workspace itself as canvas.clipPath: Fabric shares one
+    // cache canvas per object, so the clip pass would mask the whole canvas
+    // with the theme bitmap's alpha (blanking transparent themes during drag).
     objectsRef.current.workspace = workspace
 
     const refRegion = new fabric.Rect({
@@ -554,6 +556,24 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
+/** Editor-only checkerboard so transparent backgrounds read as such (output stays truly transparent). */
+function drawTransparencyCheckerboard(ctx: CanvasRenderingContext2D): void {
+  const size = 40
+  ctx.save()
+  // Paint only behind already-rendered content: the theme render clears
+  // transparent regions, so fill them from underneath.
+  ctx.globalCompositeOperation = "destination-over"
+  ctx.fillStyle = "#2c2c30"
+  for (let y = 0; y < WS_HEIGHT; y += size) {
+    for (let x = (y / size) % 2 === 0 ? 0 : size; x < WS_WIDTH; x += size * 2) {
+      ctx.fillRect(x, y, size, size)
+    }
+  }
+  ctx.fillStyle = "#232326"
+  ctx.fillRect(0, 0, WS_WIDTH, WS_HEIGHT)
+  ctx.restore()
+}
+
 function renderThemeBitmap(
   theme: BroadcastTheme,
   imageCache: Map<string, HTMLImageElement>
@@ -565,5 +585,8 @@ function renderThemeBitmap(
   if (!ctx) return { bitmap: offscreen, metrics: null }
 
   const metrics = renderVerse(ctx, theme, SAMPLE_VERSE, { imageCache })
+  if (theme.background.type === "transparent") {
+    drawTransparencyCheckerboard(ctx)
+  }
   return { bitmap: offscreen, metrics }
 }

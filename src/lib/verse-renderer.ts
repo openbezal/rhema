@@ -91,6 +91,10 @@ export interface VerseLayoutRect {
 
 export interface VerseLayoutMetrics {
   scaledTheme: BroadcastTheme
+  /** Region the theme background is drawn in (anchored, sized by layout.backgroundWidth/Height). */
+  backgroundRect: VerseLayoutRect
+  /** Rect the text box backdrop is drawn at. Always the anchored text area; never follows free-mode boxes. */
+  textBoxRect: VerseLayoutRect
   textAreaRect: VerseLayoutRect
   textRect: VerseLayoutRect
   referenceRect: VerseLayoutRect | null
@@ -385,6 +389,7 @@ function roundRect(
 function drawBackground(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
+  rect: VerseLayoutRect,
   imageCache?: Map<string, HTMLImageElement>
 ): void {
   const { width, height } = theme.resolution
@@ -393,7 +398,7 @@ function drawBackground(
   switch (bg.type) {
     case "solid":
       ctx.fillStyle = bg.color
-      ctx.fillRect(0, 0, width, height)
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
       break
 
     case "gradient": {
@@ -402,9 +407,10 @@ function drawBackground(
 
       if (bg.gradient.type === "linear") {
         const angle = (bg.gradient.angle * Math.PI) / 180
-        const cx = width / 2
-        const cy = height / 2
-        const len = Math.sqrt(width * width + height * height) / 2
+        const cx = rect.x + rect.width / 2
+        const cy = rect.y + rect.height / 2
+        const len =
+          Math.sqrt(rect.width * rect.width + rect.height * rect.height) / 2
         grad = ctx.createLinearGradient(
           cx - Math.cos(angle) * len,
           cy - Math.sin(angle) * len,
@@ -413,12 +419,12 @@ function drawBackground(
         )
       } else {
         grad = ctx.createRadialGradient(
-          width / 2,
-          height / 2,
+          rect.x + rect.width / 2,
+          rect.y + rect.height / 2,
           0,
-          width / 2,
-          height / 2,
-          Math.max(width, height) / 2
+          rect.x + rect.width / 2,
+          rect.y + rect.height / 2,
+          Math.max(rect.width, rect.height) / 2
         )
       }
 
@@ -427,25 +433,28 @@ function drawBackground(
       }
 
       ctx.fillStyle = grad
-      ctx.fillRect(0, 0, width, height)
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
       break
     }
 
     case "image": {
       if (!bg.image) {
         ctx.fillStyle = "#000"
-        ctx.fillRect(0, 0, width, height)
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
         break
       }
       const img = imageCache?.get(bg.image.url)
       if (!img) {
         // Use a deterministic fallback while image is still loading.
         ctx.fillStyle = bg.image.tint ?? "#000"
-        ctx.fillRect(0, 0, width, height)
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
         break
       }
 
       ctx.save()
+      ctx.beginPath()
+      ctx.rect(rect.x, rect.y, rect.width, rect.height)
+      ctx.clip()
 
       if (bg.image.blur > 0) {
         ctx.filter = `blur(${bg.image.blur}px) brightness(${bg.image.brightness / 100})`
@@ -453,35 +462,35 @@ function drawBackground(
         ctx.filter = `brightness(${bg.image.brightness / 100})`
       }
 
-      let drawX = 0
-      let drawY = 0
-      let drawW = width
-      let drawH = height
+      let drawX = rect.x
+      let drawY = rect.y
+      let drawW = rect.width
+      let drawH = rect.height
 
       const imgRatio = img.naturalWidth / img.naturalHeight
-      const canvasRatio = width / height
+      const rectRatio = rect.width / rect.height
 
       switch (bg.image.fit) {
         case "cover":
-          if (imgRatio > canvasRatio) {
-            drawH = height
-            drawW = height * imgRatio
-            drawX = (width - drawW) / 2
+          if (imgRatio > rectRatio) {
+            drawH = rect.height
+            drawW = rect.height * imgRatio
+            drawX = rect.x + (rect.width - drawW) / 2
           } else {
-            drawW = width
-            drawH = width / imgRatio
-            drawY = (height - drawH) / 2
+            drawW = rect.width
+            drawH = rect.width / imgRatio
+            drawY = rect.y + (rect.height - drawH) / 2
           }
           break
         case "contain":
-          if (imgRatio > canvasRatio) {
-            drawW = width
-            drawH = width / imgRatio
-            drawY = (height - drawH) / 2
+          if (imgRatio > rectRatio) {
+            drawW = rect.width
+            drawH = rect.width / imgRatio
+            drawY = rect.y + (rect.height - drawH) / 2
           } else {
-            drawH = height
-            drawW = height * imgRatio
-            drawX = (width - drawW) / 2
+            drawH = rect.height
+            drawW = rect.height * imgRatio
+            drawX = rect.x + (rect.width - drawW) / 2
           }
           break
         case "stretch":
@@ -493,7 +502,7 @@ function drawBackground(
 
       if (bg.image.tint) {
         ctx.fillStyle = bg.image.tint
-        ctx.fillRect(0, 0, width, height)
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
       }
       break
     }
@@ -902,15 +911,26 @@ export function computeVerseLayoutMetrics(
   const textAreaH = (layout.textAreaHeight / 100) * bgH
   const globalOffsetX = (options?.offsetX ?? 0) + layout.offsetX
   const globalOffsetY = (options?.offsetY ?? 0) + layout.offsetY
-  const pos = anchorPosition(
+  const bgPos = anchorPosition(
     layout.anchor,
-    textAreaW,
-    textAreaH,
+    bgW,
+    bgH,
     canvasW,
     canvasH,
     globalOffsetX,
     globalOffsetY
   )
+  const backgroundRect: VerseLayoutRect = {
+    x: bgPos.x,
+    y: bgPos.y,
+    width: bgW,
+    height: bgH,
+  }
+  // Text area is anchored within the background region (offsets are already
+  // applied to the region itself). At 100% × 100% this matches anchoring to
+  // the canvas directly.
+  const innerPos = anchorPosition(layout.anchor, textAreaW, textAreaH, bgW, bgH, 0, 0)
+  const pos = { x: bgPos.x + innerPos.x, y: bgPos.y + innerPos.y }
 
   const pad = layout.padding
   const textRectX = pos.x + pad.left
@@ -944,6 +964,8 @@ export function computeVerseLayoutMetrics(
   if (!verse) {
     return {
       scaledTheme,
+      backgroundRect,
+      textBoxRect: textAreaRect,
       textAreaRect: verseBoxRect ?? textAreaRect,
       textRect: verseBoxRect ?? textRect,
       referenceRect: null,
@@ -1038,6 +1060,8 @@ export function computeVerseLayoutMetrics(
 
     return {
       scaledTheme,
+      backgroundRect,
+      textBoxRect: textAreaRect,
       textAreaRect: verseBoxRect,
       textRect: verseBoxRect,
       referenceRect,
@@ -1162,6 +1186,8 @@ export function computeVerseLayoutMetrics(
 
   return {
     scaledTheme,
+    backgroundRect,
+    textBoxRect: textAreaRect,
     textAreaRect,
     textRect,
     referenceRect,
@@ -1203,7 +1229,7 @@ function renderVerseImpl(
   }
 
   // Draw background
-  drawBackground(ctx, scaledTheme, options?.imageCache)
+  drawBackground(ctx, scaledTheme, metrics.backgroundRect, options?.imageCache)
 
   // Draw text box if enabled
   if (scaledTheme.textBox.enabled) {
@@ -1212,10 +1238,10 @@ function renderVerseImpl(
     ctx.fillStyle = scaledTheme.textBox.color
     roundRect(
       ctx,
-      metrics.textAreaRect.x,
-      metrics.textAreaRect.y,
-      metrics.textAreaRect.width,
-      metrics.textAreaRect.height,
+      metrics.textBoxRect.x,
+      metrics.textBoxRect.y,
+      metrics.textBoxRect.width,
+      metrics.textBoxRect.height,
       scaledTheme.textBox.borderRadius
     )
     ctx.fill()

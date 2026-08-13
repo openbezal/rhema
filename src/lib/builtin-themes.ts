@@ -311,3 +311,5 @@ export const BUILTIN_THEMES: BroadcastTheme[] = [
   BROADCAST_OVERLAY,
   BANNER_SPLIT,
 ]
+
+export { CLASSIC_DARK, BROADCAST_OVERLAY }

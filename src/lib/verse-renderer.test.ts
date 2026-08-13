@@ -57,7 +57,7 @@ vi.mock("@chenglou/pretext/rich-inline", () => {
   }
 })
 
-import { computeVerseLayoutMetrics } from "./verse-renderer"
+import { computeVerseLayoutMetrics, renderVerse } from "./verse-renderer"
 import { BUILTIN_THEMES } from "./builtin-themes"
 
 function stubCtx(): CanvasRenderingContext2D {
@@ -136,7 +136,7 @@ describe("computeVerseLayoutMetrics — free mode", () => {
     expect(within(metrics.verseRect!, metrics.verseBoxRect!)).toBe(true)
   })
 
-  it("uses the verse box as the text box backdrop area", () => {
+  it("uses the verse box as the verse draw area", () => {
     const metrics = computeVerseLayoutMetrics(stubCtx(), freeTheme(), VERSE)
     expect(metrics.textAreaRect).toEqual(metrics.verseBoxRect)
   })
@@ -194,5 +194,155 @@ describe("computeVerseLayoutMetrics — stacked mode", () => {
     expect(metrics.referenceRect).toBeNull()
     expect(metrics.verseRect).toBeNull()
     expect(metrics.fittedVerseFontSize).toBeUndefined()
+  })
+})
+
+/**
+ * Recording canvas context: no-ops every method, records each call, and
+ * keeps `font` + `measureText` behaving like stubCtx so layout math runs.
+ */
+function recordingCtx(): {
+  ctx: CanvasRenderingContext2D
+  calls: { method: string; args: unknown[] }[]
+} {
+  const calls: { method: string; args: unknown[] }[] = []
+  const props: Record<string | symbol, unknown> = { font: "16px test" }
+  const ctx = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === "measureText") {
+          return (text: string) => {
+            const size = Number(
+              /(\d+(?:\.\d+)?)px/.exec(String(props.font))?.[1] ?? 16
+            )
+            return { width: text.length * size * 0.6 } as TextMetrics
+          }
+        }
+        if (prop in props) return props[prop]
+        return (...args: unknown[]) => {
+          calls.push({ method: String(prop), args })
+        }
+      },
+      set(_target, prop, value) {
+        props[prop] = value
+        return true
+      },
+    }
+  ) as CanvasRenderingContext2D
+  return { ctx, calls }
+}
+
+function overlayFreeTheme(): BroadcastTheme {
+  const base = BUILTIN_THEMES[2] // Broadcast Overlay
+  return {
+    ...base,
+    layout: {
+      ...base.layout,
+      mode: "free",
+      referenceBox: { x: 5, y: 5, width: 50, height: 10 },
+      verseBox: { x: 10, y: 25, width: 60, height: 50 },
+    },
+  }
+}
+
+describe("computeVerseLayoutMetrics — text box backdrop", () => {
+  // Broadcast Overlay: textArea 90% × 40%, anchored bottom-center →
+  // {x: 96, y: 648, width: 1728, height: 432}.
+  const ANCHORED_BAND = { x: 96, y: 648, width: 1728, height: 432 }
+
+  it("equals the anchored text area in stacked mode", () => {
+    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[2], VERSE)
+    expect(metrics.textBoxRect).toEqual(metrics.textAreaRect)
+    expect(metrics.textBoxRect).toEqual(ANCHORED_BAND)
+  })
+
+  it("stays at the anchored text area in free mode", () => {
+    const metrics = computeVerseLayoutMetrics(stubCtx(), overlayFreeTheme(), VERSE)
+    expect(metrics.textBoxRect).toEqual(ANCHORED_BAND)
+  })
+
+  it("does not move when the free-mode boxes are dragged", () => {
+    const before = computeVerseLayoutMetrics(stubCtx(), overlayFreeTheme(), VERSE)
+    const theme = overlayFreeTheme()
+    theme.layout.referenceBox = { x: 30, y: 40, width: 50, height: 10 }
+    theme.layout.verseBox = { x: 35, y: 55, width: 60, height: 30 }
+    const after = computeVerseLayoutMetrics(stubCtx(), theme, VERSE)
+    expect(after.textBoxRect).toEqual(before.textBoxRect)
+  })
+
+  it("is present without a verse", () => {
+    const metrics = computeVerseLayoutMetrics(stubCtx(), overlayFreeTheme(), null)
+    expect(metrics.textBoxRect).toEqual(ANCHORED_BAND)
+  })
+
+  it("draws the backdrop at the anchored band, not the verse box", () => {
+    const { ctx, calls } = recordingCtx()
+    renderVerse(ctx, overlayFreeTheme(), VERSE)
+    // roundRect starts with moveTo(x + radius, y); Broadcast Overlay radius = 12.
+    const moveTos = calls.filter((c) => c.method === "moveTo")
+    expect(moveTos.some((c) => c.args[0] === 96 + 12 && c.args[1] === 648)).toBe(
+      true
+    )
+  })
+})
+
+describe("computeVerseLayoutMetrics — background region", () => {
+  it("covers the full canvas at 100% × 100%", () => {
+    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[0], VERSE)
+    expect(metrics.backgroundRect).toEqual({
+      x: 0,
+      y: 0,
+      width: 1920,
+      height: 1080,
+    })
+  })
+
+  it("bounds the background to its dimensions at the anchor", () => {
+    const base = BUILTIN_THEMES[2] // bottom-center
+    const theme: BroadcastTheme = {
+      ...base,
+      layout: { ...base.layout, backgroundWidth: 100, backgroundHeight: 30 },
+    }
+    const metrics = computeVerseLayoutMetrics(stubCtx(), theme, VERSE)
+    expect(metrics.backgroundRect).toEqual({
+      x: 0,
+      y: 756,
+      width: 1920,
+      height: 324,
+    })
+  })
+
+  it("keeps the text area inside the bounded background", () => {
+    const base = BUILTIN_THEMES[2]
+    const theme: BroadcastTheme = {
+      ...base,
+      layout: { ...base.layout, backgroundWidth: 80, backgroundHeight: 30 },
+    }
+    const metrics = computeVerseLayoutMetrics(stubCtx(), theme, VERSE)
+    expect(within(metrics.textAreaRect, metrics.backgroundRect)).toBe(true)
+  })
+
+  it("fills a solid background only within the background rect", () => {
+    const base = BUILTIN_THEMES[1] // Modern Light, solid background
+    const theme: BroadcastTheme = {
+      ...base,
+      layout: {
+        ...base.layout,
+        anchor: "bottom-center",
+        backgroundWidth: 100,
+        backgroundHeight: 30,
+      },
+    }
+    const { ctx, calls } = recordingCtx()
+    renderVerse(ctx, theme, VERSE)
+    const fills = calls.filter((c) => c.method === "fillRect")
+    expect(fills).toContainEqual({
+      method: "fillRect",
+      args: [0, 756, 1920, 324],
+    })
+    expect(
+      fills.some((c) => c.args[2] === 1920 && c.args[3] === 1080)
+    ).toBe(false)
   })
 })

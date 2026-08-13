@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { importTheme, exportTheme } from "@/lib/theme-designer-files"
+import { NewThemeDialog } from "./new-theme-dialog"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 
 type FilterTab = "all" | "pinned" | "custom"
@@ -210,6 +211,7 @@ export function ThemeLibrary() {
   const renamingThemeId = useBroadcastStore((s) => s.renamingThemeId)
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterTab>("all")
+  const [newThemeOpen, setNewThemeOpen] = useState(false)
 
   const filteredThemes = useMemo(() => {
     let result = themes
@@ -225,20 +227,18 @@ export function ThemeLibrary() {
   const builtinThemes = filteredThemes.filter((t) => t.builtin)
   const customThemes = filteredThemes.filter((t) => !t.builtin)
 
-  const handleNewTheme = () => {
-    useBroadcastStore.getState().createNewTheme()
-  }
-
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-border bg-card">
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-3">
         <span className="text-lg font-semibold text-foreground">Themes</span>
-        <Button onClick={handleNewTheme}>
+        <Button onClick={() => setNewThemeOpen(true)}>
           <PlusIcon className="size-4" />
           New
         </Button>
       </div>
+
+      <NewThemeDialog open={newThemeOpen} onOpenChange={setNewThemeOpen} />
 
       {/* Search */}
       <div className="px-3 pt-3 pb-4">
