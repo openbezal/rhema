@@ -158,6 +158,15 @@ bun run setup:all --with-embedding
 
 You can opt in at any time later — the app detects the assets on next launch. Without them it logs a single info line and runs keyword + reference search at full quality.
 
+**Fixing a provenance mismatch.** The app verifies at startup that the embedding index was built with the same ONNX model it loaded (`embeddings/*.meta.json` sidecar). If it warns about a mismatch — typically after the model was re-downloaded or updated while an old index stayed on disk — delete the stale index and rebuild:
+
+```bash
+rm -f embeddings/kjv-qwen3-0.6b*        # Windows: delete embeddings\kjv-qwen3-0.6b* files
+bun run setup:all --with-embedding
+```
+
+The delete matters: setup skips any artifact that already exists, so a stale index looks "done" until it's removed. A mismatched index silently wrecks semantic accuracy (this exact bug shipped once — correct matches scored ~0.65 cosine instead of ~1.0), which is why the app checks.
+
 ### Environment
 
 #### Speech-to-Text Options

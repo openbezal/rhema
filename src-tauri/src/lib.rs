@@ -215,7 +215,10 @@ fn check_embedding_provenance(embeddings_path: &std::path::Path, model_path: &st
     } else {
         log::warn!(
             "Embeddings index was built with model {index_model:?} but the runtime loaded \
-             {loaded_model:?} — vector search accuracy will suffer. Regenerate the index."
+             {loaded_model:?} — vector search accuracy will suffer. Fix: delete the stale \
+             index and rebuild it with the current model: \
+             `rm -f embeddings/kjv-qwen3-0.6b*` then `bun run setup:all --with-embedding` \
+             (the delete matters — setup skips artifacts that already exist)."
         );
     }
 }
