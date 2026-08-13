@@ -41,8 +41,9 @@ export function Dashboard() {
         <LiveOutputPanel />
         <QueuePanel />
       </div>
-      {/* Row 3: Search + Detections (own grid, independent of top row columns) */}
-      <div className="col-span-4 grid min-h-0 grid-cols-[2fr_1fr] gap-3 px-3 pb-3">
+      {/* Row 3: Search + Detections, split 50/50 so the two-column
+          detections panel has room to breathe */}
+      <div className="col-span-4 grid min-h-0 grid-cols-2 gap-3 px-3 pb-3">
         <SearchPanel />
         <DetectionsPanel />
       </div>
