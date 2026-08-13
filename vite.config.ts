@@ -9,6 +9,20 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
+    watch: {
+      // Keep the watcher out of multi-GB non-frontend dirs (Rust build
+      // artifacts, ONNX models, NDI SDK). Crawling them blocks the dev
+      // server's event loop for minutes on Windows, so the app windows
+      // load before Vite can respond and stay white.
+      ignored: [
+        "**/src-tauri/**",
+        "**/models/**",
+        "**/embeddings/**",
+        "**/sdk/**",
+        "**/data/**",
+        "**/build/**",
+      ],
+    },
   },
   build: {
     outDir: "build",
