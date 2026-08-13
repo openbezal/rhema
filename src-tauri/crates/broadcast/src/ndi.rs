@@ -281,6 +281,10 @@ impl ActiveNdiSession {
         let create_ptr = std::ptr::from_ref(&create);
         let sender = unsafe { send_create_fn(create_ptr) };
         if sender.is_null() {
+            let os_err = std::io::Error::last_os_error();
+            log::error!(
+                "NDI: NDIlib_send_create returned null for '{source_name}' (last OS error: {os_err})"
+            );
             // SAFETY: NDI was initialized successfully above, so ndi_destroy is safe to call
             unsafe { ndi_destroy_fn() };
             return Err(NdiError::SenderCreateFailed);

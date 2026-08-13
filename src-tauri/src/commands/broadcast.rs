@@ -39,7 +39,11 @@ pub struct NdiFrameRequest {
 
 #[tauri::command]
 pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> {
-    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let monitors = app.available_monitors().map_err(|e| {
+        log::error!("list_monitors: available_monitors failed: {e}");
+        e.to_string()
+    })?;
+    log::info!("list_monitors: {} monitor(s) detected", monitors.len());
     Ok(monitors
         .iter()
         .map(|m| {
@@ -87,14 +91,31 @@ pub async fn open_broadcast_window(
     output_id: String,
     monitor_index: usize,
 ) -> Result<(), String> {
+    log::info!("open_broadcast_window: output={output_id}, monitor_index={monitor_index}");
     let label = window_label(&output_id);
-    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
-    let monitor = monitors
-        .get(monitor_index)
-        .ok_or_else(|| format!("Monitor index {monitor_index} out of range"))?;
+    let monitors = app.available_monitors().map_err(|e| {
+        log::error!("open_broadcast_window: available_monitors failed: {e}");
+        e.to_string()
+    })?;
+    let monitor = monitors.get(monitor_index).ok_or_else(|| {
+        let msg = format!(
+            "Monitor index {monitor_index} out of range ({} available)",
+            monitors.len()
+        );
+        log::error!("open_broadcast_window: {msg}");
+        msg
+    })?;
 
     let pos = monitor.position();
     let size = monitor.size();
+    log::info!(
+        "open_broadcast_window: target monitor pos=({},{}) size={}x{} scale={}",
+        pos.x,
+        pos.y,
+        size.width,
+        size.height,
+        monitor.scale_factor()
+    );
 
     // Reuse the window if it already exists (e.g. hidden for NDI), otherwise
     // create it hidden and without geometry: the builder's position/inner_size
@@ -103,8 +124,10 @@ pub async fn open_broadcast_window(
     // runs 125-150%), pushing the window off the target monitor. Physical
     // setters after the fact are unambiguous on both paths.
     let window = if let Some(window) = app.get_webview_window(label) {
+        log::info!("open_broadcast_window: reusing existing window '{label}'");
         window
     } else {
+        log::info!("open_broadcast_window: creating window '{label}'");
         let title = if output_id == "alt" {
             "Projector - Alt"
         } else {
@@ -122,7 +145,10 @@ pub async fn open_broadcast_window(
         .skip_taskbar(false)
         .focused(false)
         .build()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| {
+            log::error!("open_broadcast_window: window build failed: {e}");
+            e.to_string()
+        })?
     };
 
     window
@@ -130,18 +156,28 @@ pub async fn open_broadcast_window(
             x: pos.x,
             y: pos.y,
         }))
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            log::error!("open_broadcast_window: set_position failed: {e}");
+            e.to_string()
+        })?;
     window
         .set_size(tauri::Size::Physical(tauri::PhysicalSize {
             width: size.width,
             height: size.height,
         }))
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            log::error!("open_broadcast_window: set_size failed: {e}");
+            e.to_string()
+        })?;
     // A window created hidden for NDI has skip_taskbar(true); make sure the
     // visible projector is reachable from the taskbar either way.
     let _ = window.set_skip_taskbar(false);
-    window.show().map_err(|e| e.to_string())?;
+    window.show().map_err(|e| {
+        log::error!("open_broadcast_window: show failed: {e}");
+        e.to_string()
+    })?;
     let _ = window.set_focus();
+    log::info!("open_broadcast_window: '{label}' shown at ({},{}) {}x{}", pos.x, pos.y, size.width, size.height);
 
     Ok(())
 }
@@ -161,10 +197,20 @@ pub async fn close_broadcast_window(
             .map_err(|e| e.to_string())?
             .is_active(&output_id);
         if ndi_active {
-            window.hide().map_err(|e| e.to_string())?;
+            log::info!("close_broadcast_window: NDI active for '{output_id}', hiding window instead of closing");
+            window.hide().map_err(|e| {
+                log::error!("close_broadcast_window: hide failed: {e}");
+                e.to_string()
+            })?;
         } else {
-            window.close().map_err(|e| e.to_string())?;
+            log::info!("close_broadcast_window: closing '{output_id}' window");
+            window.close().map_err(|e| {
+                log::error!("close_broadcast_window: close failed: {e}");
+                e.to_string()
+            })?;
         }
+    } else {
+        log::info!("close_broadcast_window: no '{output_id}' window to close");
     }
     Ok(())
 }
@@ -176,9 +222,10 @@ pub fn start_ndi(
     request: NdiStartRequest,
 ) -> Result<NdiSessionInfo, String> {
     let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime
-        .start(output_id, request)
-        .map_err(|e| e.to_string())
+    runtime.start(output_id, request).map_err(|e| {
+        log::error!("start_ndi failed: {e}");
+        e.to_string()
+    })
 }
 
 #[tauri::command]

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { info as logInfo, error as logError } from "@tauri-apps/plugin-log"
 import { invoke } from "@tauri-apps/api/core"
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { availableMonitors, getAllWindows, type Monitor } from '@tauri-apps/api/window'
@@ -146,12 +147,18 @@ export function BroadcastSettings({
     setRefreshing(true)
     try {
       const result = await availableMonitors()
+      void logInfo(
+        `[broadcast-ui] availableMonitors -> ${result.length}: ${result
+          .map((m) => `${m.name ?? "?"} ${m.size.width}x${m.size.height}`)
+          .join(", ")}`,
+      )
       setMonitors(result)
       if (result.length > 0 && selectedMonitor === "0") {
         setSelectedMonitor("0")
       }
-    } catch {
-      // Tauri command may not exist yet — use placeholder
+    } catch (error) {
+      void logError(`[broadcast-ui] availableMonitors FAILED: ${String(error)}`)
+      toast.error("Could not list monitors", { description: String(error) })
       setMonitors([])
     } finally {
       setRefreshing(false)
@@ -222,6 +229,9 @@ export function BroadcastSettings({
   }
 
   const handleTogglePreview = async () => {
+    void logInfo(
+      `[broadcast-ui] Open/Close Preview clicked: isPreviewOpen=${isPreviewOpen}, monitor=${selectedMonitor}, monitors=${monitors.length}`,
+    )
     try {
       if (isPreviewOpen) {
         await invoke("close_broadcast_window", { outputId: "main" })
@@ -232,6 +242,7 @@ export function BroadcastSettings({
           monitorIndex: Number(selectedMonitor),
         })
         const opened = await reconcilePreviewState("main")
+        void logInfo(`[broadcast-ui] open_broadcast_window ok, visible=${opened}`)
         setIsPreviewOpen(opened)
         if (!opened) return
         useBroadcastStore.getState().syncBroadcastOutputFor("main")
@@ -241,12 +252,14 @@ export function BroadcastSettings({
         }, 150)
       }
     } catch (error) {
+      void logError(`[broadcast-ui] toggle preview FAILED: ${String(error)}`)
       console.error("Failed to toggle preview window", error)
       toast.error("Could not toggle preview window", { description: String(error) })
     }
   }
 
   const handleToggleNdi = async () => {
+    void logInfo(`[broadcast-ui] Start/Stop NDI clicked: ndiActive=${ndiActive}, source=${ndiSourceName}`)
     try {
       if (ndiActive) {
         await invoke("stop_ndi", { outputId: "main" })
@@ -264,6 +277,9 @@ export function BroadcastSettings({
           alphaMode: ndiAlphaMode,
         }
         const session = await invoke<NdiSessionInfo>("start_ndi", { outputId: "main", request })
+        void logInfo(
+          `[broadcast-ui] start_ndi ok: ${session.sourceName} ${session.width}x${session.height}@${session.fps}`,
+        )
         setNdiActive(true)
         useBroadcastStore.getState().syncBroadcastOutputFor("main")
         void emitTo("broadcast", "broadcast:ndi-config", {
@@ -278,6 +294,7 @@ export function BroadcastSettings({
         }, 300)
       }
     } catch (error) {
+      void logError(`[broadcast-ui] toggle NDI FAILED: ${String(error)}`)
       console.error("Failed to toggle NDI", error)
       toast.error(ndiActive ? "Could not stop NDI" : "Could not start NDI", {
         description: String(error),
