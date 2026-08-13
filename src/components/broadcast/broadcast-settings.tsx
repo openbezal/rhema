@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { invoke } from "@tauri-apps/api/core"
 import { emitTo, listen } from "@tauri-apps/api/event"
 import { availableMonitors, getAllWindows, type Monitor } from '@tauri-apps/api/window'
@@ -225,8 +226,9 @@ export function BroadcastSettings({
           useBroadcastStore.getState().syncBroadcastOutputFor("main")
         }, 150)
       }
-    } catch {
-      // Command may not exist yet
+    } catch (error) {
+      console.error("Failed to toggle preview window", error)
+      toast.error("Could not toggle preview window", { description: String(error) })
     }
   }
 
@@ -261,8 +263,11 @@ export function BroadcastSettings({
           syncNdiConfigToOutput("main", true, ndiFrameRate, ndiResolution)
         }, 300)
       }
-    } catch {
-      // Command may not exist yet
+    } catch (error) {
+      console.error("Failed to toggle NDI", error)
+      toast.error(ndiActive ? "Could not stop NDI" : "Could not start NDI", {
+        description: String(error),
+      })
     }
   }
 
@@ -316,7 +321,8 @@ export function BroadcastSettings({
         }, 150)
       }
     } catch (error) {
-      console.warn("Failed to toggle alt preview window", error)
+      console.error("Failed to toggle alt preview window", error)
+      toast.error("Could not toggle alt preview window", { description: String(error) })
     }
   }
 
@@ -352,7 +358,10 @@ export function BroadcastSettings({
         }, 300)
       }
     } catch (error) {
-      console.warn("Failed to toggle alt NDI", error)
+      console.error("Failed to toggle alt NDI", error)
+      toast.error(altNdiActive ? "Could not stop alt NDI" : "Could not start alt NDI", {
+        description: String(error),
+      })
     }
   }
 
