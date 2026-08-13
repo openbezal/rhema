@@ -38,25 +38,33 @@ export const useDetectionStore = create<DetectionState>((set) => ({
     }),
   addDetections: (incoming) =>
     set((state) => {
-      const map = new Map<string, DetectionResult>()
-      // Incoming first — they take priority for recency/position
-      for (const d of incoming) {
-        const existing = map.get(d.verse_ref)
-        if (!existing || d.confidence > existing.confidence) {
-          map.set(d.verse_ref, d)
+      const incomingSemantic = incoming.filter((d) => d.source === "semantic")
+      const incomingDirect = incoming.filter((d) => d.source !== "semantic")
+
+      // Semantic detections are a fresh ranking for the LATEST utterance —
+      // a new batch replaces the previous one outright, in backend rank
+      // order. Accumulating batches let a stale hit sit above the newest
+      // ranking forever (same synthetic confidences, older entry wins).
+      const semantic =
+        incomingSemantic.length > 0
+          ? incomingSemantic.slice(0, 25)
+          : state.detections.filter((d) => d.source === "semantic")
+
+      // Direct detections are explicit spoken references — keep a recent
+      // history, deduped by reference, newest first.
+      const seen = new Set<string>()
+      const direct: DetectionResult[] = []
+      for (const d of [
+        ...incomingDirect,
+        ...state.detections.filter((x) => x.source !== "semantic"),
+      ]) {
+        if (!seen.has(d.verse_ref)) {
+          seen.add(d.verse_ref)
+          direct.push(d)
         }
       }
-      // Existing detections — keep if no duplicate, or if higher confidence than incoming
-      for (const d of state.detections) {
-        const existing = map.get(d.verse_ref)
-        if (!existing || d.confidence > existing.confidence) {
-          map.set(d.verse_ref, d)
-        }
-      }
-      // Sort by confidence so high-confidence direct detections appear above semantic
-      return { detections: [...map.values()]
-        .sort((a, b) => b.confidence - a.confidence)
-        .slice(0, 50) }
+
+      return { detections: [...direct.slice(0, 25), ...semantic] }
     }),
   setDetections: (detections) => set({ detections }),
   removeDetection: (verseRef) =>
