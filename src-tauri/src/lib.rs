@@ -132,6 +132,7 @@ pub fn run() {
                             match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
                                 Ok(index) => {
                                     log::info!("Verse embeddings loaded ({} vectors)", index.len());
+                                    check_embedding_provenance(&embeddings_path, &model_path);
                                     pipeline.set_semantic(
                                         rhema_detection::SemanticDetector::new(
                                             Box::new(embedder),
@@ -159,4 +160,38 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Compare the embeddings' provenance sidecar (written by the precompute
+/// bin) against the ONNX model actually loaded. A mismatched index silently
+/// wrecks vector-search accuracy — the shipped pre-2025 index scored
+/// cosine ~0.65 against its own verses because it was built with a
+/// different model/prefix than the runtime.
+fn check_embedding_provenance(embeddings_path: &std::path::Path, model_path: &std::path::Path) {
+    let meta_path = embeddings_path.with_extension("meta.json");
+    let Ok(raw) = std::fs::read_to_string(&meta_path) else {
+        log::warn!(
+            "No embeddings provenance sidecar at {} — cannot verify the index matches the model. \
+             Regenerate with 'bun run export:verses && bun run precompute:embeddings'.",
+            meta_path.display()
+        );
+        return;
+    };
+    let Ok(meta) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        log::warn!("Unreadable embeddings provenance sidecar at {}", meta_path.display());
+        return;
+    };
+    let index_model = meta.get("model_file").and_then(|v| v.as_str()).unwrap_or("");
+    let loaded_model = model_path
+        .file_name()
+        .map(|f| f.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if index_model == loaded_model {
+        log::info!("Embeddings provenance OK (model: {loaded_model})");
+    } else {
+        log::warn!(
+            "Embeddings index was built with model {index_model:?} but the runtime loaded \
+             {loaded_model:?} — vector search accuracy will suffer. Regenerate the index."
+        );
+    }
 }

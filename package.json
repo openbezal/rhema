@@ -19,7 +19,7 @@
     "quantize:model": "optimum-cli onnxruntime quantize --onnx_model models/qwen3-embedding-0.6b/ --arm64 -o models/qwen3-embedding-0.6b-int8/",
     "precompute:embeddings-onnx": "python3 data/precompute-embeddings-onnx.py",
     "precompute:embeddings-py": "python3 data/precompute-embeddings.py",
-    "precompute:embeddings": "cd src-tauri && cargo run -p rhema-detection --features precompute-bin --release --bin precompute -- --model ../models/qwen3-embedding-0.6b/model.onnx --tokenizer ../models/qwen3-embedding-0.6b/tokenizer.json --verses ../data/verses-for-embedding.json --output-embeddings ../embeddings/kjv-qwen3-0.6b.bin --output-ids ../embeddings/kjv-qwen3-0.6b-ids.bin",
+    "precompute:embeddings": "cd src-tauri && cargo run -p rhema-detection --features precompute-bin --release --bin precompute -- --model ../models/qwen3-embedding-0.6b-int8/model_quantized.onnx --tokenizer ../models/qwen3-embedding-0.6b/tokenizer.json --verses ../data/verses-for-embedding.json --output-embeddings ../embeddings/kjv-qwen3-0.6b.bin --output-ids ../embeddings/kjv-qwen3-0.6b-ids.bin",
     "bench:search": "cd src-tauri && cargo run -p rhema-detection --features bench-bin --release --bin search_bench",
     "download:whisper": "bun run data/download-whisper-model.ts",
     "download:ndi-sdk": "bun run data/download-ndi-sdk.ts",
