@@ -147,7 +147,14 @@ pub fn run() {
                             match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
                                 Ok(index) => {
                                     log::info!("Verse embeddings loaded ({} vectors)", index.len());
-                                    check_embedding_provenance(&embeddings_path, &model_path);
+                                    if let Some(warning) =
+                                        check_embedding_provenance(&embeddings_path, &model_path)
+                                    {
+                                        // Surface in the UI (warning banner via detection_status).
+                                        let managed_state = app.state::<Mutex<state::AppState>>();
+                                        managed_state.lock().unwrap().embedding_warning =
+                                            Some(warning);
+                                    }
                                     pipeline.set_semantic(
                                         rhema_detection::SemanticDetector::new(
                                             Box::new(embedder),
@@ -188,7 +195,13 @@ pub fn run() {
 /// wrecks vector-search accuracy — the shipped pre-2025 index scored
 /// cosine ~0.65 against its own verses because it was built with a
 /// different model/prefix than the runtime.
-fn check_embedding_provenance(embeddings_path: &std::path::Path, model_path: &std::path::Path) {
+///
+/// Returns a user-facing warning message when the index provably mismatches
+/// the loaded model (surfaced as a UI banner); `None` otherwise.
+fn check_embedding_provenance(
+    embeddings_path: &std::path::Path,
+    model_path: &std::path::Path,
+) -> Option<String> {
     let meta_path = embeddings_path.with_extension("meta.json");
     // Missing/unreadable sidecar is informational only (e.g. assets built
     // before the sidecar existed). The loud warning is reserved for the one
@@ -199,11 +212,11 @@ fn check_embedding_provenance(embeddings_path: &std::path::Path, model_path: &st
              Regenerating refreshes it: 'bun run setup:all --with-embedding'.",
             meta_path.display()
         );
-        return;
+        return None;
     };
     let Ok(meta) = serde_json::from_str::<serde_json::Value>(&raw) else {
         log::info!("Unreadable embeddings provenance sidecar at {}", meta_path.display());
-        return;
+        return None;
     };
     let index_model = meta.get("model_file").and_then(|v| v.as_str()).unwrap_or("");
     let loaded_model = model_path
@@ -212,13 +225,15 @@ fn check_embedding_provenance(embeddings_path: &std::path::Path, model_path: &st
         .unwrap_or_default();
     if index_model == loaded_model {
         log::info!("Embeddings provenance OK (model: {loaded_model})");
+        None
     } else {
-        log::warn!(
-            "Embeddings index was built with model {index_model:?} but the runtime loaded \
-             {loaded_model:?} — vector search accuracy will suffer. Fix: delete the stale \
-             index and rebuild it with the current model: \
-             `rm -f embeddings/kjv-qwen3-0.6b*` then `bun run setup:all --with-embedding` \
-             (the delete matters — setup skips artifacts that already exist)."
+        let warning = format!(
+            "Semantic search index mismatch: the verse embeddings were built with \
+             \"{index_model}\" but the app loaded \"{loaded_model}\", so semantic results \
+             will be unreliable. Fix: delete embeddings/kjv-qwen3-0.6b* and run \
+             `bun run setup:all --with-embedding`."
         );
+        log::warn!("{warning}");
+        Some(warning)
     }
 }
