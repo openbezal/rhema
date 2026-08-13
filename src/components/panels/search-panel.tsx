@@ -35,7 +35,46 @@ import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
 
-type SearchTab = "book" | "context" 
+type SearchTab = "book" | "context"
+
+const RESULT_SOURCE_STYLES: Record<string, { text: string; label: string }> = {
+  reference: { text: "text-amber-500", label: "Reference" },
+  keyword: { text: "text-green-600", label: "Keyword" },
+  semantic: { text: "text-indigo-300", label: "Semantic" },
+}
+
+/**
+ * Source badges for a search result, with a real cosine percentage shown
+ * only on semantic hits. Keyword ranks come from BM25 and reference hits
+ * are exact — neither has an honest percentage to show.
+ */
+function ResultSourceBadges({ result }: { result: SemanticSearchResult }) {
+  const sources = result.sources?.length ? result.sources : ["keyword"]
+  return (
+    <span className="mt-0.5 flex items-center gap-1">
+      {sources.map((source) => {
+        const style = RESULT_SOURCE_STYLES[source]
+        if (!style) return null
+        return (
+          <span
+            key={source}
+            className={cn(
+              "text-[0.5rem] font-medium uppercase tracking-wider",
+              style.text
+            )}
+          >
+            {style.label}
+          </span>
+        )
+      })}
+      {result.sources?.includes("semantic") && (
+        <span className="text-[0.5rem] text-muted-foreground">
+          {Math.round(result.similarity * 100)}%
+        </span>
+      )}
+    </span>
+  )
+}
 
 /** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -723,11 +762,7 @@ export function SearchPanel() {
                   <span className="text-xs font-semibold ">
                     {result.book_name}   {result.chapter}:{result.verse}
                   </span>
-                  <span
-                    className="mt-0.5 text-[0.5rem] text-muted-foreground"
-                  >
-                    {Math.round(result.similarity * 100)}%
-                  </span>
+                  <ResultSourceBadges result={result} />
                 </div>
                 <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
                   <HighlightedText text={result.verse_text} query={contextQuery} />
