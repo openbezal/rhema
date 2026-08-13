@@ -54,8 +54,12 @@ pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> 
 }
 
 /// Ensure the broadcast window for a given output exists (creates hidden if not).
+///
+/// Async on purpose: on Windows, building a webview window from a synchronous
+/// command deadlocks — the command blocks the thread the window creation
+/// needs to dispatch to, and `build()` never returns.
 #[tauri::command]
-pub fn ensure_broadcast_window(app: tauri::AppHandle, output_id: String) -> Result<(), String> {
+pub async fn ensure_broadcast_window(app: tauri::AppHandle, output_id: String) -> Result<(), String> {
     let label = window_label(&output_id);
     if app.get_webview_window(label).is_some() {
         return Ok(());
@@ -75,8 +79,10 @@ pub fn ensure_broadcast_window(app: tauri::AppHandle, output_id: String) -> Resu
     Ok(())
 }
 
+/// Async on purpose — see [`ensure_broadcast_window`]: sync window creation
+/// deadlocks on Windows.
 #[tauri::command]
-pub fn open_broadcast_window(
+pub async fn open_broadcast_window(
     app: tauri::AppHandle,
     output_id: String,
     monitor_index: usize,
@@ -140,8 +146,10 @@ pub fn open_broadcast_window(
     Ok(())
 }
 
+/// Async on purpose — `Window::hide`/`close` also round-trip through the
+/// main thread and can deadlock in a sync command on Windows.
 #[tauri::command]
-pub fn close_broadcast_window(
+pub async fn close_broadcast_window(
     app: tauri::AppHandle,
     output_id: String,
     runtime: State<'_, Mutex<NdiRuntime>>,
