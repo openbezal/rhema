@@ -1,25 +1,18 @@
+import { useMemo } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
 import { PlayIcon, PlusIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { bibleActions } from "@/hooks/use-bible"
 import { useQueueStore, useBibleStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
 import type { DetectionResult } from "@/types"
 
-const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  direct: { bg: "bg-green-500/15", text: "text-green-600", label: "Direct" },
-  semantic: { bg: "bg-indigo-500/15", text: "text-indigo-300", label: "Semantic" },
-}
-
-function SourceBadge({ source }: { source: string }) {
-  const style = SOURCE_COLORS[source] ?? { bg: "bg-muted", text: "text-muted-foreground", label: source }
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium uppercase tracking-wider ${style.bg} ${style.text}`}>
-      {style.label}
-    </span>
-  )
+const SOURCE_COLORS: Record<string, { text: string; label: string }> = {
+  direct: { text: "text-green-600", label: "Direct" },
+  semantic: { text: "text-indigo-300", label: "Semantic" },
 }
 
 function DetectionCard({ detection }: { detection: DetectionResult }) {
@@ -49,7 +42,6 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
     <div className="border-b border-border p-3 last:border-0">
       <div className="flex items-center gap-2">
         <ConfidenceDot confidence={detection.confidence} />
-        <SourceBadge source={detection.source} />
         <span className="text-sm font-semibold text-foreground">
           {detection.verse_ref}
         </span>
@@ -98,8 +90,58 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   )
 }
 
+function DetectionColumn({
+  source,
+  detections,
+}: {
+  source: "direct" | "semantic"
+  detections: DetectionResult[]
+}) {
+  const style = SOURCE_COLORS[source]
+  return (
+    <div className="flex min-h-0 flex-col">
+      <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5">
+        <span
+          className={cn(
+            "text-[0.5625rem] font-medium uppercase tracking-wider",
+            style.text
+          )}
+        >
+          {style.label}
+        </span>
+        <span className="text-[0.5625rem] text-muted-foreground">
+          {detections.length}
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {detections.length === 0 ? (
+          <p className="p-4 text-center text-xs text-muted-foreground">
+            No {style.label.toLowerCase()} detections yet
+          </p>
+        ) : (
+          detections.map((detection, i) => (
+            <DetectionCard key={`${detection.verse_ref}-${i}`} detection={detection} />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function DetectionsPanel() {
   const { detections } = useDetection()
+
+  // Issue #104: direct (spoken references) and semantic (quoted text)
+  // detections in separate columns, so a burst of direct hits doesn't push
+  // the semantic ones out of view.
+  const directDetections = useMemo(
+    () => detections.filter((d) => d.source === "direct"),
+    [detections]
+  )
+  const semanticDetections = useMemo(
+    () => detections.filter((d) => d.source !== "direct"),
+    [detections]
+  )
 
   return (
     <div
@@ -115,18 +157,16 @@ export function DetectionsPanel() {
         </button>
       </PanelHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-0">
-          {detections.length === 0 && (
-            <p className="p-4 text-center text-xs text-muted-foreground">
-              Verse detections will appear here during transcription
-            </p>
-          )}
-          {detections.map((detection, i) => (
-            <DetectionCard key={`${detection.verse_ref}-${i}`} detection={detection} />
-          ))}
+      {detections.length === 0 ? (
+        <p className="p-4 text-center text-xs text-muted-foreground">
+          Verse detections will appear here during transcription
+        </p>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-border">
+          <DetectionColumn source="direct" detections={directDetections} />
+          <DetectionColumn source="semantic" detections={semanticDetections} />
         </div>
-      </div>
+      )}
     </div>
   )
 }
