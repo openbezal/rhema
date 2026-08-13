@@ -7,9 +7,8 @@ import {
   XIcon,
   GripVerticalIcon,
 } from "lucide-react"
-import { useQueueStore, useBroadcastStore, useBibleStore } from "@/stores"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
-import { bibleActions } from "@/hooks/use-bible"
+import { useQueueStore } from "@/stores"
+import { presentVerse } from "@/hooks/use-broadcast"
 import type { QueueItem } from "@/types"
 
 function QueueItemRow({
@@ -25,10 +24,7 @@ function QueueItemRow({
 }) {
   const handlePresent = () => {
     useQueueStore.getState().setActive(index)
-    bibleActions.selectVerse(item.verse)
-    const translation = useBibleStore.getState().translations
-      .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
-    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(item.verse, translation))
+    void presentVerse(item.verse)
   }
 
   const handleRemove = () => {

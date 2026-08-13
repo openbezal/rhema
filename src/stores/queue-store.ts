@@ -16,6 +16,8 @@ interface QueueState {
   flashItem: (id: string) => void
   /** Find an existing item by book+chapter+verse. Returns its index or -1. */
   findDuplicate: (bookNumber: number, chapter: number, verse: number) => number
+  /** Fill in verse text on an item that was queued without it. Never overwrites non-empty text. */
+  backfillText: (id: string, text: string) => void
   /** Update a chapter-only queue item in place when the verse is refined. */
   updateEarlyRef: (bookNumber: number, chapter: number, verse: number, reference: string, verseText: string) => boolean
 }
@@ -29,13 +31,26 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   addItem: (item) =>
     set((state) => {
-      const duplicate = state.items.some(
+      const idx = state.items.findIndex(
         (i) =>
           i.verse.book_number === item.verse.book_number &&
           i.verse.chapter === item.verse.chapter &&
           i.verse.verse === item.verse.verse,
       )
-      if (duplicate) return state
+      if (idx !== -1) {
+        // Duplicate: don't re-add, but backfill text if the existing item
+        // was queued without it (detections can arrive with empty text).
+        const existing = state.items[idx]
+        if (!existing.verse.text && item.verse.text) {
+          const items = [...state.items]
+          items[idx] = {
+            ...existing,
+            verse: { ...existing.verse, text: item.verse.text },
+          }
+          return { items }
+        }
+        return state
+      }
       return { items: [item, ...state.items] }
     }),
   removeItem: (id) =>
@@ -63,6 +78,17 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         i.verse.chapter === chapter &&
         i.verse.verse === verse,
     ),
+  backfillText: (id, text) =>
+    set((state) => {
+      const idx = state.items.findIndex((i) => i.id === id)
+      if (idx === -1 || state.items[idx].verse.text || !text) return state
+      const items = [...state.items]
+      items[idx] = {
+        ...items[idx],
+        verse: { ...items[idx].verse, text },
+      }
+      return { items }
+    }),
   updateEarlyRef: (bookNumber, chapter, verse, reference, verseText) => {
     let found = false
     set((state) => {

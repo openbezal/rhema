@@ -2,11 +2,9 @@ import { useEffect } from "react"
 import { listen, type UnlistenFn } from "@tauri-apps/api/event"
 import { invoke } from "@tauri-apps/api/core"
 import { useBroadcastStore } from "@/stores/broadcast-store"
-import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { useSettingsStore } from "@/stores/settings-store"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
-import type { Verse } from "@/types"
+import { presentVerse } from "@/hooks/use-broadcast"
 
 /**
  * Listens for remote control events from the Rust backend (OSC / HTTP API)
@@ -149,40 +147,13 @@ function findCurrentVerseIndex(): number | null {
 
 /**
  * Present a queue item at the given index to the live display.
- * Mirrors the logic from QueueItemRow's handlePresent.
  */
 async function presentQueueItem(index: number) {
-  try {
-    const { items } = useQueueStore.getState()
-    const item = items[index]
-    if (!item) return
-
-    const { verse } = item
-
-    // Fetch the full verse from the backend to ensure we have complete data
-    // (AI-detected queue items may have partial verse objects)
-    const fullVerse = await invoke<Verse | null>("get_verse", {
-      translationId: useBibleStore.getState().activeTranslationId,
-      bookNumber: verse.book_number,
-      chapter: verse.chapter,
-      verse: verse.verse,
-    })
-
-    const verseToPresent = fullVerse ?? verse
-
-    const bibleState = useBibleStore.getState()
-    const translation =
-      bibleState.translations.find(
-        (t) => t.id === bibleState.activeTranslationId
-      )?.abbreviation ?? "KJV"
-
-    bibleState.selectVerse(verseToPresent)
-    useBroadcastStore
-      .getState()
-      .setLiveVerse(toVerseRenderData(verseToPresent, translation))
-  } catch (e) {
+  const item = useQueueStore.getState().items[index]
+  if (!item) return
+  await presentVerse(item.verse).catch((e) =>
     console.warn("[remote-control] presentQueueItem failed:", e)
-  }
+  )
 }
 
 /**

@@ -137,6 +137,11 @@ export function TranscriptPanel() {
           : queue.findDuplicate(d.book_number, d.chapter, d.verse)
         if (dupIdx !== -1) {
           const existing = queue.items[dupIdx]
+          // Backfill text if the existing item was queued without it
+          // (e.g. an earlier detection emitted with empty verse text).
+          if (!existing.verse.text && d.verse_text) {
+            queue.backfillText(existing.id, d.verse_text)
+          }
           queue.flashItem(existing.id)
           if (!d.is_chapter_only) queue.setActive(dupIdx)
           continue
@@ -145,7 +150,7 @@ export function TranscriptPanel() {
           id: crypto.randomUUID(),
           verse: {
             id: 0,
-            translation_id: 1,
+            translation_id: useBibleStore.getState().activeTranslationId,
             book_number: d.book_number,
             book_name: d.book_name,
             book_abbreviation: "",

@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { PlayIcon, PlusIcon } from "lucide-react"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { bibleActions } from "@/hooks/use-bible"
-import { useQueueStore, useBroadcastStore, useBibleStore } from "@/stores"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { useQueueStore, useBibleStore } from "@/stores"
+import { presentVerse } from "@/hooks/use-broadcast"
 import type { DetectionResult } from "@/types"
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
@@ -24,8 +24,16 @@ function SourceBadge({ source }: { source: string }) {
 
 function DetectionCard({ detection }: { detection: DetectionResult }) {
   const handlePresent = () => {
-    // Select this verse for preview
-    bibleActions.selectVerse({
+    // Navigate book search panel to this verse
+    if (detection.book_number > 0) {
+      bibleActions.navigateToVerse(
+        detection.book_number,
+        detection.chapter,
+        detection.verse
+      )
+    }
+    // Refetch full verse text, select for preview, and set live
+    void presentVerse({
       id: 0,
       translation_id: useBibleStore.getState().activeTranslationId,
       book_number: detection.book_number,
@@ -35,25 +43,6 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       verse: detection.verse,
       text: detection.verse_text,
     })
-    // Navigate book search panel to this verse
-    if (detection.book_number > 0) {
-      bibleActions.navigateToVerse(
-        detection.book_number,
-        detection.chapter,
-        detection.verse
-      )
-    }
-    // Set broadcast live verse
-    const translation = useBibleStore.getState().translations
-      .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
-    useBroadcastStore.getState().setLiveVerse(
-      toVerseRenderData({
-        id: 0, translation_id: useBibleStore.getState().activeTranslationId,
-        book_number: detection.book_number, book_name: detection.book_name,
-        book_abbreviation: "", chapter: detection.chapter,
-        verse: detection.verse, text: detection.verse_text,
-      }, translation)
-    )
   }
 
   return (
