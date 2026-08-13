@@ -15,6 +15,14 @@
 //! Pass `--probe-prefix` to also run the embedding-convention probes that
 //! gate the embedding regeneration work: a provenance probe (was the shipped
 //! index built with a "passage: " prefix?) and a query-format comparison.
+//!
+//! Pass `--fragments N` to additionally benchmark partial quoting the way a
+//! minister actually quotes: N random KJV verses are sampled (deterministic
+//! seed, any of the ~31k verses) and each contributes three queries — the
+//! first, middle, and last 8 words of the verse — reported as the
+//! frag_start / frag_middle / frag_end categories. Any verse containing the
+//! exact fragment counts as a correct answer, so common phrases that appear
+//! in several verses are scored fairly.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -27,6 +35,16 @@ use rhema_detection::{HnswVectorIndex, OnnxEmbedder};
 
 const K: usize = 15;
 const MRR_DEPTH: usize = 10;
+
+/// Words per generated verse fragment (--fragments mode).
+const FRAGMENT_WORDS: usize = 8;
+
+/// Minimum verse length (words) to be eligible for fragment sampling, so the
+/// start/middle/end windows are meaningfully distinct.
+const FRAGMENT_MIN_WORDS: usize = 12;
+
+/// Fixed seed for fragment sampling — results must be reproducible run-to-run.
+const FRAGMENT_SEED: u64 = 0x5EED_0F_B1B1E;
 
 /// Query formats compared by the `--probe-prefix` query-format probe.
 /// "passage: " is the E5-style prefix used by the precompute binary; the
@@ -143,13 +161,26 @@ fn main() {
         );
     }
 
-    let golden: GoldenFile = serde_json::from_str(
+    let mut golden: GoldenFile = serde_json::from_str(
         &std::fs::read_to_string(&golden_path).expect("read golden set"),
     )
     .expect("parse golden set");
     log::info!("Loaded {} golden queries", golden.queries.len());
 
     let db = BibleDb::open(Path::new(&db_path)).expect("open bible db");
+
+    let fragments: usize = get_arg(&args, "--fragments")
+        .map(|n| n.parse().expect("--fragments takes a number"))
+        .unwrap_or(0);
+    if fragments > 0 {
+        let generated = generate_fragment_queries(&db, fragments);
+        log::info!(
+            "Generated {} fragment queries from {fragments} random KJV verses",
+            generated.len()
+        );
+        golden.queries.extend(generated);
+    }
+    let golden = golden;
 
     log::info!("Loading ONNX model from {model_path}...");
     let mut embedder =
@@ -368,6 +399,84 @@ fn run_provenance_probe(embedder: &mut OnnxEmbedder, index: &HnswVectorIndex, db
 
 fn dot(a: &[f32], b: &[f32]) -> f64 {
     a.iter().zip(b.iter()).map(|(&x, &y)| f64::from(x) * f64::from(y)).sum()
+}
+
+/// Sample `count` random KJV verses (deterministic seed) and build three
+/// queries per verse: the first, middle, and last `FRAGMENT_WORDS` words.
+///
+/// Acceptance for each fragment is every KJV verse whose whitespace-normalized
+/// text contains the fragment — common phrases legitimately live in several
+/// verses and any of them is a correct search result.
+fn generate_fragment_queries(db: &BibleDb, count: usize) -> Vec<GoldenQuery> {
+    let verses = db
+        .load_translation_verses_for_search(1)
+        .expect("load KJV verses for fragment sampling");
+
+    // Normalized text per verse, shared by fragment slicing and acceptance.
+    let normalized: Vec<(VerseKey, String)> = verses
+        .iter()
+        .map(|v| {
+            (
+                VerseKey { book_number: v.book_number, chapter: v.chapter, verse: v.verse },
+                v.text.split_whitespace().collect::<Vec<_>>().join(" "),
+            )
+        })
+        .collect();
+
+    let mut eligible: Vec<usize> = normalized
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, text))| text.split_whitespace().count() >= FRAGMENT_MIN_WORDS)
+        .map(|(i, _)| i)
+        .collect();
+
+    // Fisher-Yates with a fixed-seed xorshift so every run samples the same
+    // verses without pulling in a rand dependency.
+    let mut state = FRAGMENT_SEED;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let n = eligible.len();
+    for i in (1..n).rev() {
+        #[expect(clippy::cast_possible_truncation, reason = "index fits in usize")]
+        let j = (next() % (i as u64 + 1)) as usize;
+        eligible.swap(i, j);
+    }
+    eligible.truncate(count.min(n));
+
+    let mut queries = Vec::with_capacity(eligible.len() * 3);
+    for (sample_no, &vi) in eligible.iter().enumerate() {
+        let (_, text) = &normalized[vi];
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let mid_start = (words.len() - FRAGMENT_WORDS) / 2;
+        let windows = [
+            ("frag_start", 0),
+            ("frag_middle", mid_start),
+            ("frag_end", words.len() - FRAGMENT_WORDS),
+        ];
+        for (category, start) in windows {
+            let fragment = words[start..start + FRAGMENT_WORDS].join(" ");
+            let accept: Vec<AcceptKey> = normalized
+                .iter()
+                .filter(|(_, t)| t.contains(&fragment))
+                .map(|(k, _)| AcceptKey {
+                    book_number: k.book_number,
+                    chapter: k.chapter,
+                    verse: k.verse,
+                })
+                .collect();
+            queries.push(GoldenQuery {
+                id: format!("{category}-{sample_no}"),
+                category: category.to_string(),
+                query: fragment,
+                accept,
+            });
+        }
+    }
+    queries
 }
 
 fn get_arg(args: &[String], flag: &str) -> Option<String> {
