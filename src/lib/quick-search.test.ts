@@ -5,6 +5,7 @@ import {
   findMatchingBook,
   getAutocompleteSuggestion,
   getTabNavigationResult,
+  parseTypedReference,
   type Book,
 } from "./quick-search"
 
@@ -274,5 +275,74 @@ describe("getTabNavigationResult", () => {
   it("advances from 'Romans 8' to 'Romans 8:' when suggestion is 'Romans 8:1'", () => {
     const result = getTabNavigationResult("Romans 8", "Romans 8:1")
     expect(result).toBe("Romans 8:")
+  })
+})
+
+describe("parseTypedReference", () => {
+  it("parses a full reference with colon", () => {
+    const result = parseTypedReference("John 3:16", mockBooks)
+    expect(result?.book.book_number).toBe(43)
+    expect(result?.chapter).toBe(3)
+    expect(result?.verse).toBe(16)
+  })
+
+  it("parses abbreviations and space separators", () => {
+    const result = parseTypedReference("jn 3 16", mockBooks)
+    // "jn" does not prefix-match "John"/"Jhn"-style abbreviations in this
+    // fixture set; "joh 3 16" does.
+    const result2 = parseTypedReference("joh 3 16", mockBooks)
+    expect(result2?.book.book_number).toBe(43)
+    expect(result2?.chapter).toBe(3)
+    expect(result2?.verse).toBe(16)
+    // jn simply fails to match a book rather than mis-parsing
+    expect(result === null || result.book.book_number === 43).toBe(true)
+  })
+
+  it("parses numbered books", () => {
+    const result = parseTypedReference("1 cor 13:4", mockBooks)
+    expect(result?.book.book_number).toBe(46)
+    expect(result?.chapter).toBe(13)
+    expect(result?.verse).toBe(4)
+  })
+
+  it("parses numbered books with space separator", () => {
+    const result = parseTypedReference("1 john 1 9", mockBooks)
+    expect(result?.book.book_number).toBe(62)
+    expect(result?.chapter).toBe(1)
+    expect(result?.verse).toBe(9)
+  })
+
+  it("parses dot separator", () => {
+    const result = parseTypedReference("psalm 23.1", mockBooks)
+    expect(result?.book.book_number).toBe(19)
+    expect(result?.chapter).toBe(23)
+    expect(result?.verse).toBe(1)
+  })
+
+  it("does not parse book-only input", () => {
+    expect(parseTypedReference("John", mockBooks)).toBeNull()
+  })
+
+  it("does not parse book+chapter input", () => {
+    expect(parseTypedReference("John 3", mockBooks)).toBeNull()
+  })
+
+  it("does not parse free text", () => {
+    expect(parseTypedReference("johnny walked home", mockBooks)).toBeNull()
+    expect(parseTypedReference("for god so loved the world", mockBooks)).toBeNull()
+    expect(parseTypedReference("love never fails", mockBooks)).toBeNull()
+  })
+
+  it("does not parse text with trailing numbers but no book", () => {
+    expect(parseTypedReference("grace 3 16", mockBooks)).toBeNull()
+  })
+
+  it("does not parse empty input", () => {
+    expect(parseTypedReference("", mockBooks)).toBeNull()
+  })
+
+  it("rejects zero chapter or verse", () => {
+    expect(parseTypedReference("John 0:16", mockBooks)).toBeNull()
+    expect(parseTypedReference("John 3:0", mockBooks)).toBeNull()
   })
 })

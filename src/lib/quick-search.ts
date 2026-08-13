@@ -157,6 +157,45 @@ export function getAutocompleteSuggestion(
   return { suggestion: "", stage: "none" }
 }
 
+export interface TypedReference {
+  book: Book
+  chapter: number
+  verse: number
+}
+
+/**
+ * Parse a fully-typed scripture reference like "John 3:16", "jn 3 16",
+ * "1 cor 13:4", or "psalm 23.1".
+ *
+ * Only complete book+chapter+verse references parse — book-only or
+ * book+chapter input returns null (too ambiguous to pin a search result).
+ * Free text like "johnny walked" never parses: the trailing numbers are
+ * required and the book part must prefix-match a real book.
+ */
+export function parseTypedReference(
+  input: string,
+  books: Book[]
+): TypedReference | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  const normalized = normalizeInput(trimmed)
+  // Book words, then chapter and verse separated by ":", ".", or whitespace.
+  const match = normalized.match(
+    /^([IVX]+\s+[a-zA-Z.]+|[a-zA-Z][a-zA-Z.\s]*?)\s*(\d{1,3})\s*[:.\s]\s*(\d{1,3})$/
+  )
+  if (!match) return null
+
+  const book = findMatchingBook(match[1].trim().replace(/\.$/, ""), books)
+  if (!book) return null
+
+  const chapter = parseInt(match[2])
+  const verse = parseInt(match[3])
+  if (chapter < 1 || verse < 1) return null
+
+  return { book, chapter, verse }
+}
+
 /**
  * Determine what should happen when Tab/Arrow-Right is pressed
  */

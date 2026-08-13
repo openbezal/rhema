@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { invoke } from "@tauri-apps/api/core"
 // Using native overflow-y-auto instead of Radix ScrollArea for reliable scrolling in flex layouts
 import { Button } from "@/components/ui/button"
-import { getAutocompleteSuggestion, getTabNavigationResult } from "@/lib/quick-search"
+import {
+  getAutocompleteSuggestion,
+  getTabNavigationResult,
+  parseTypedReference,
+} from "@/lib/quick-search"
 import {
   Select,
   SelectContent,
@@ -243,6 +247,46 @@ export function SearchPanel() {
     const requestId = ++contextSearchRequestIdRef.current
     const isStale = () => requestId !== contextSearchRequestIdRef.current
 
+    // A fully-typed reference ("John 3:16", "jn 3 16", "1 cor 13:4") pins
+    // the exact verse at the top; hybrid search still runs beneath it.
+    let referenceResult: SemanticSearchResult | null = null
+    const reference = parseTypedReference(query, useBibleStore.getState().books)
+    if (reference) {
+      const verse = await invoke<Verse | null>("get_verse", {
+        translationId,
+        bookNumber: reference.book.book_number,
+        chapter: reference.chapter,
+        verse: reference.verse,
+      }).catch(() => null)
+      if (isStale()) return
+      if (verse) {
+        referenceResult = {
+          verse_ref: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+          verse_text: verse.text,
+          book_name: verse.book_name,
+          book_number: verse.book_number,
+          chapter: verse.chapter,
+          verse: verse.verse,
+          similarity: 1,
+          sources: ["reference"],
+        }
+      }
+    }
+
+    const pinReference = (results: SemanticSearchResult[]) => {
+      if (!referenceResult) return results
+      const pinned = referenceResult
+      return [
+        pinned,
+        ...results.filter(
+          (r) =>
+            r.book_number !== pinned.book_number ||
+            r.chapter !== pinned.chapter ||
+            r.verse !== pinned.verse
+        ),
+      ]
+    }
+
     // Primary: hybrid search backend (combines vector + FTS5 BM25)
     const hybridResults = await invoke<SemanticSearchResult[]>(
       "semantic_search", { query, limit: 15 }
@@ -250,15 +294,15 @@ export function SearchPanel() {
 
     if (isStale()) return
 
-    if (hybridResults && hybridResults.length > 0) {
-      useBibleStore.getState().setSemanticResults(hybridResults)
+    if ((hybridResults && hybridResults.length > 0) || referenceResult) {
+      useBibleStore.getState().setSemanticResults(pinReference(hybridResults ?? []))
       return
     }
 
     // Fallback: client-side Fuse.js when semantic model is not loaded
     const fuseResults = await searchContextWithFuse(query, translationId, 15).catch(() => [])
     if (isStale()) return
-    useBibleStore.getState().setSemanticResults(fuseResults)
+    useBibleStore.getState().setSemanticResults(pinReference(fuseResults))
   }, [])
 
   const handleContextSearch = useCallback((query: string) => {

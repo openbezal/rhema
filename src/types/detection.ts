@@ -36,4 +36,6 @@ export interface SemanticSearchResult {
   chapter: number
   verse: number
   similarity: number
+  /** Which engines found this verse: "reference", "semantic", or "keyword". */
+  sources?: string[]
 }
