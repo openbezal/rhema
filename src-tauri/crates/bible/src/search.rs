@@ -106,6 +106,11 @@ fn build_or_query(input: &str) -> String {
 
 // ── SQL runner ──────────────────────────────────────────────────────
 
+/// Upper bound on how many rows a single verse can occupy in the FTS index
+/// (one per English translation, currently 7, with headroom). Used to size
+/// the inner materialization limit in `run_fts_query`.
+const TRANSLATION_FANOUT: usize = 10;
+
 /// Execute a BM25-ranked FTS5 query across all English translations.
 ///
 /// Grouped by verse reference so the LIMIT applies to UNIQUE verses: without
@@ -118,6 +123,12 @@ fn build_or_query(input: &str) -> String {
 /// run in an aggregate context, and without materialization SQLite flattens
 /// the subquery into the outer aggregate ("unable to use function bm25 in
 /// the requested context").
+///
+/// The inner `LIMIT` bounds materialization on broad queries (an OR of
+/// common words can match most of the corpus) while staying exact: with at
+/// most `TRANSLATION_FANOUT` rows per verse, the best row of each of the
+/// top `limit` unique verses always sits within the top
+/// `limit × TRANSLATION_FANOUT` ranked rows.
 #[expect(
     clippy::cast_possible_wrap,
     reason = "limit is a small page-size value that fits in i64"
@@ -137,6 +148,8 @@ fn run_fts_query(
              JOIN verses v ON v.rowid = fts.rowid \
              JOIN translations t ON v.translation_id = t.id \
              WHERE fts.text MATCH ?1 AND t.language = 'en' \
+             ORDER BY rank \
+             LIMIT ?3 \
          ) \
          SELECT MIN(rank) as rank, book_number, book_name, chapter, verse \
          FROM ranked \
@@ -145,7 +158,11 @@ fn run_fts_query(
          LIMIT ?2",
     )?;
     let rows = stmt.query_map(
-        rusqlite::params![fts_query, limit as i64],
+        rusqlite::params![
+            fts_query,
+            limit as i64,
+            (limit * TRANSLATION_FANOUT) as i64
+        ],
         |row: &rusqlite::Row| {
             Ok(Bm25Result {
                 rank: row.get(0)?,
