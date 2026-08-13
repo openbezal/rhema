@@ -323,37 +323,24 @@ pub async fn start_transcription(
     let evt_active = stt_active.clone();
     let event_app = app.clone();
 
-    // Background semantic detection channel — non-blocking, drops if busy
-    let (semantic_tx, mut semantic_rx) = tokio::sync::mpsc::channel::<String>(4);
-
-    // Background detection channel — direct + reading mode, non-blocking
+    // Background detection channel — direct + reading mode + FTS, non-blocking
     let (detect_tx, mut detect_rx) = tokio::sync::mpsc::channel::<String>(16);
 
     // [DIAG] Counters so we can see whether transcripts are being dropped
-    // because the detection workers can't keep up. Logged every 25 sends
+    // because the detection worker can't keep up. Logged every 25 sends
     // alongside current queue depth.
     let detect_sent = Arc::new(AtomicU64::new(0));
     let detect_dropped = Arc::new(AtomicU64::new(0));
-    let semantic_sent = Arc::new(AtomicU64::new(0));
-    let semantic_dropped = Arc::new(AtomicU64::new(0));
 
-    // Spawn semantic detection worker (runs ONNX inference without blocking transcript).
-    // Uses spawn_blocking so ONNX doesn't starve the tokio async runtime
-    // (WebSocket readers, event emitters, etc.).
-    let sem_app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        while let Some(text) = semantic_rx.recv().await {
-            let app_clone = sem_app.clone();
-            let _ = tokio::task::spawn_blocking(move || {
-                run_semantic_detection(&app_clone, &text);
-            })
-            .await;
-        }
-    });
-
-    // Spawn detection worker (runs direct detection + reading mode without blocking
-    // transcript delivery). Uses spawn_blocking so mutex locks and DB I/O don't
-    // starve the tokio runtime.
+    // Spawn ONE detection worker that runs direct detection first, then the
+    // FTS5 pass — sequentially. They used to run concurrently on the same
+    // utterance and contended for the single SQLite connection mutex, which
+    // pushed direct detection from ~1-2ms to ~18ms. Sequential also lets us
+    // skip the FTS pass entirely when the utterance IS a spoken reference:
+    // text-searching "Revelation chapter 3 verse 4" only yields junk hits
+    // that pollute (and now replace) the semantic detections column.
+    // Uses spawn_blocking so mutex locks and DB I/O don't starve the tokio
+    // runtime (WebSocket readers, event emitters, etc.).
     let det_app = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(transcript) = detect_rx.recv().await {
@@ -361,6 +348,11 @@ pub async fn start_transcription(
             let _ = tokio::task::spawn_blocking(move || {
                 let direct_found = run_direct_detection(&app_clone, &transcript);
                 check_reading_mode(&app_clone, &transcript, direct_found);
+                if direct_found {
+                    log::info!("[DET-SEMANTIC] Skipped — utterance is a spoken reference");
+                } else {
+                    run_semantic_detection(&app_clone, &transcript);
+                }
             })
             .await;
         }
@@ -368,8 +360,6 @@ pub async fn start_transcription(
 
     let detect_sent_evt = detect_sent.clone();
     let detect_dropped_evt = detect_dropped.clone();
-    let semantic_sent_evt = semantic_sent.clone();
-    let semantic_dropped_evt = semantic_dropped.clone();
 
     tauri::async_runtime::spawn(async move {
         while let Some(event) = event_rx.recv().await {
@@ -437,30 +427,6 @@ pub async fn start_transcription(
                                 let sent = detect_sent_evt.load(Ordering::Relaxed);
                                 log::warn!(
                                     "[QUEUE] detect_tx DROPPED (consumer behind) sent={sent} dropped={d}"
-                                );
-                            }
-                        }
-
-                        // Send every is_final fragment to FTS5 immediately.
-                        // No sentence buffer — FTS5 is fast enough (~20-50ms)
-                        // to run on every fragment without waiting for pauses.
-                        match semantic_tx.try_send(transcript.clone()) {
-                            Ok(()) => {
-                                let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                if n % 25 == 0 {
-                                    let depth = semantic_tx.max_capacity() - semantic_tx.capacity();
-                                    let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
-                                    log::info!(
-                                        "[QUEUE] semantic_tx sent={n} dropped={dropped} depth={depth}/{}",
-                                        semantic_tx.max_capacity()
-                                    );
-                                }
-                            }
-                            Err(_) => {
-                                let d = semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                let sent = semantic_sent_evt.load(Ordering::Relaxed);
-                                log::warn!(
-                                    "[QUEUE] semantic_tx DROPPED (consumer behind) sent={sent} dropped={d}"
                                 );
                             }
                         }
