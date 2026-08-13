@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rhema_bible::BibleDb;
-use rhema_detection::fusion::{fuse, VerseKey};
+use rhema_detection::fusion::{fuse_rrf, VerseKey};
 use rhema_detection::semantic::embedder::TextEmbedder;
 use rhema_detection::semantic::index::VectorIndex;
 use rhema_detection::{HnswVectorIndex, OnnxEmbedder};
@@ -91,12 +91,17 @@ struct Tally {
     hits_at_1: usize,
     hits_at_5: usize,
     mrr_sum: f64,
+    latency_ms_sum: f64,
+    latency_ms_max: f64,
 }
 
 impl Tally {
-    /// Record one query given the rank (0-based) of the best accepted verse.
-    fn record(&mut self, best_rank: Option<usize>) {
+    /// Record one query given the rank (0-based) of the best accepted verse
+    /// and how long this mode took to produce its ranked list.
+    fn record(&mut self, best_rank: Option<usize>, latency_ms: f64) {
         self.queries += 1;
+        self.latency_ms_sum += latency_ms;
+        self.latency_ms_max = self.latency_ms_max.max(latency_ms);
         if let Some(rank) = best_rank {
             if rank == 0 {
                 self.hits_at_1 += 1;
@@ -113,12 +118,14 @@ impl Tally {
     }
 
     #[expect(clippy::cast_precision_loss, reason = "query counts are small")]
-    fn row(&self) -> (f64, f64, f64) {
+    fn row(&self) -> (f64, f64, f64, f64, f64) {
         let n = self.queries.max(1) as f64;
         (
             self.hits_at_1 as f64 / n,
             self.hits_at_5 as f64 / n,
             self.mrr_sum / n,
+            self.latency_ms_sum / n,
+            self.latency_ms_max,
         )
     }
 }
@@ -223,27 +230,37 @@ fn run_benchmark(
     for q in &golden.queries {
         let accepts: Vec<VerseKey> = q.accept.iter().map(|a| a.key()).collect();
 
+        let t0 = std::time::Instant::now();
         let fts_keys = fts_search(db, &q.query);
+        let fts_ms = t0.elapsed().as_secs_f64() * 1000.0;
+
+        let t1 = std::time::Instant::now();
         let vector_hits = vector_search(db, embedder, index, &q.query, query_prefix);
-        let fused_keys: Vec<VerseKey> = fuse(&vector_hits, &fts_keys)
+        let vector_ms = t1.elapsed().as_secs_f64() * 1000.0;
+
+        let t2 = std::time::Instant::now();
+        let fused_keys: Vec<VerseKey> = fuse_rrf(&vector_hits, &fts_keys, K)
             .into_iter()
             .map(|h| h.key)
             .collect();
+        let fused_ms = fts_ms + vector_ms + t2.elapsed().as_secs_f64() * 1000.0;
         let vector_keys: Vec<VerseKey> = vector_hits.iter().map(|&(k, _)| k).collect();
 
-        for (mode, keys) in [
-            ("fts", &fts_keys),
-            ("vector", &vector_keys),
-            ("fused", &fused_keys),
+        for (mode, keys, latency_ms) in [
+            ("fts", &fts_keys, fts_ms),
+            ("vector", &vector_keys, vector_ms),
+            ("fused", &fused_keys, fused_ms),
         ] {
             let best = best_rank(keys, &accepts);
-            tallies.entry((q.category.clone(), mode)).or_default().record(best);
-            tallies.entry(("ALL".to_string(), mode)).or_default().record(best);
+            tallies.entry((q.category.clone(), mode)).or_default().record(best, latency_ms);
+            tallies.entry(("ALL".to_string(), mode)).or_default().record(best, latency_ms);
         }
         log::debug!("query {} done", q.id);
     }
 
     print_table(&tallies);
+    println!("\nNote: vector/fused latency is dominated by the one ONNX query embedding;");
+    println!("the live STT detection path never runs it (FTS-only).");
 }
 
 /// Vector-only run used by the query-format probe.
@@ -258,11 +275,13 @@ fn run_benchmark_vector_only(
     let mut tallies: HashMap<(String, &'static str), Tally> = HashMap::new();
     for q in &golden.queries {
         let accepts: Vec<VerseKey> = q.accept.iter().map(|a| a.key()).collect();
+        let t0 = std::time::Instant::now();
         let hits = vector_search(db, embedder, index, &q.query, query_prefix);
+        let latency_ms = t0.elapsed().as_secs_f64() * 1000.0;
         let keys: Vec<VerseKey> = hits.iter().map(|&(k, _)| k).collect();
         let best = best_rank(&keys, &accepts);
-        tallies.entry((q.category.clone(), "vector")).or_default().record(best);
-        tallies.entry(("ALL".to_string(), "vector")).or_default().record(best);
+        tallies.entry((q.category.clone(), "vector")).or_default().record(best, latency_ms);
+        tallies.entry(("ALL".to_string(), "vector")).or_default().record(best, latency_ms);
     }
     println!("(query prefix mode: {mode_name})");
     print_table(&tallies);
@@ -317,16 +336,16 @@ fn print_table(tallies: &HashMap<(String, &'static str), Tally>) {
     categories.push(&all);
 
     println!(
-        "{:<16} {:<8} {:>4} {:>8} {:>8} {:>8}",
-        "category", "mode", "n", "R@1", "R@5", "MRR@10"
+        "{:<16} {:<8} {:>4} {:>8} {:>8} {:>8} {:>9} {:>9}",
+        "category", "mode", "n", "R@1", "R@5", "MRR@10", "avg ms", "max ms"
     );
     for cat in categories {
         for mode in ["fts", "vector", "fused"] {
             if let Some(t) = tallies.get(&(cat.clone(), mode)) {
-                let (r1, r5, mrr) = t.row();
+                let (r1, r5, mrr, avg_ms, max_ms) = t.row();
                 println!(
-                    "{:<16} {:<8} {:>4} {:>8.3} {:>8.3} {:>8.3}",
-                    cat, mode, t.queries, r1, r5, mrr
+                    "{:<16} {:<8} {:>4} {:>8.3} {:>8.3} {:>8.3} {:>9.1} {:>9.1}",
+                    cat, mode, t.queries, r1, r5, mrr, avg_ms, max_ms
                 );
             }
         }

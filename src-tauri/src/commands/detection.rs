@@ -5,7 +5,9 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::State;
 
-use rhema_detection::fusion::{fuse, FusedOrigin, VerseKey};
+use rhema_detection::fusion::{
+    fuse_rrf, VerseKey, FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE, FTS5_RANK0_CONFIDENCE,
+};
 use rhema_detection::{DetectionPipeline, MergedDetection, ReadingMode};
 
 use crate::state::AppState;
@@ -143,6 +145,8 @@ pub struct SemanticSearchResult {
     pub chapter: i32,
     pub verse: i32,
     pub similarity: f64,
+    /// Which engines found this verse: "semantic", "keyword", or both.
+    pub sources: Vec<String>,
 }
 
 #[tauri::command]
@@ -153,6 +157,10 @@ pub fn semantic_search(
     limit: Option<usize>,
 ) -> Result<Vec<SemanticSearchResult>, String> {
     let k = limit.unwrap_or(10);
+    // Fetch deeper candidate lists than the display limit: RRF rewards
+    // agreement between engines, so both lists need enough depth for the
+    // overlap to surface.
+    let depth = (3 * k).max(30);
 
     // Lock pipeline for vector search (may be slow if ONNX runs)
     let vector_results = {
@@ -160,39 +168,21 @@ pub fn semantic_search(
         if !pipeline.has_semantic() {
             return Err("Semantic search not available — model or embeddings not loaded".into());
         }
-        pipeline.semantic_search(&query, k)
+        pipeline.semantic_search(&query, depth)
     }; // Pipeline lock dropped
 
     // Lock AppState for DB lookups only (fast)
     let app_state = state.lock().map_err(|e| e.to_string())?;
 
-    let resolved_vector: Vec<SemanticSearchResult> = vector_results
+    let vector_hits: Vec<(VerseKey, f64)> = vector_results
         .into_iter()
         .filter_map(|(verse_id, similarity)| {
-            if let Some(ref db) = app_state.bible_db {
-                if let Ok(Some(v)) = db.get_verse_by_id(verse_id) {
-                    return Some(SemanticSearchResult {
-                        verse_ref: format!("{} {}:{}", v.book_name, v.chapter, v.verse),
-                        verse_text: v.text,
-                        book_name: v.book_name,
-                        book_number: v.book_number,
-                        chapter: v.chapter,
-                        verse: v.verse,
-                        similarity,
-                    });
-                }
-            }
-            None
-        })
-        .collect();
-
-    let vector_hits: Vec<(VerseKey, f64)> = resolved_vector
-        .iter()
-        .map(|r| {
-            (
-                VerseKey { book_number: r.book_number, chapter: r.chapter, verse: r.verse },
-                r.similarity,
-            )
+            let db = app_state.bible_db.as_ref()?;
+            let v = db.get_verse_by_id(verse_id).ok().flatten()?;
+            Some((
+                VerseKey { book_number: v.book_number, chapter: v.chapter, verse: v.verse },
+                similarity,
+            ))
         })
         .collect();
 
@@ -200,48 +190,58 @@ pub fn semantic_search(
     let fts_keys: Vec<VerseKey> = app_state
         .bible_db
         .as_ref()
-        .and_then(|db| db.search_verses_bm25(&query, k).ok())
+        .and_then(|db| db.search_verses_bm25(&query, depth).ok())
         .unwrap_or_default()
         .iter()
         .map(|f| VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse })
         .collect();
 
-    // Merge and order both result sets; resolve FTS5-only hits to the active
+    // Rank by reciprocal rank fusion, then resolve each hit to the active
     // translation's text.
-    let mut results: Vec<SemanticSearchResult> = Vec::new();
-    for hit in fuse(&vector_hits, &fts_keys) {
-        match hit.origin {
-            FusedOrigin::Vector => {
-                if let Some(r) = resolved_vector.iter().find(|r| {
-                    r.book_number == hit.key.book_number
-                        && r.chapter == hit.key.chapter
-                        && r.verse == hit.key.verse
-                }) {
-                    results.push(r.clone());
-                }
+    #[expect(clippy::cast_precision_loss, reason = "rank is small")]
+    let results: Vec<SemanticSearchResult> = fuse_rrf(&vector_hits, &fts_keys, k)
+        .into_iter()
+        .enumerate()
+        .filter_map(|(fts_rank, hit)| {
+            let db = app_state.bible_db.as_ref()?;
+            let v = db
+                .get_verse(
+                    app_state.active_translation_id,
+                    hit.key.book_number,
+                    hit.key.chapter,
+                    hit.key.verse,
+                )
+                .ok()
+                .flatten()?;
+
+            let mut sources = Vec::with_capacity(2);
+            if hit.cosine.is_some() {
+                sources.push("semantic".to_string());
             }
-            FusedOrigin::Fts5 => {
-                if let Some(ref db) = app_state.bible_db {
-                    if let Ok(Some(v)) = db.get_verse(
-                        app_state.active_translation_id,
-                        hit.key.book_number,
-                        hit.key.chapter,
-                        hit.key.verse,
-                    ) {
-                        results.push(SemanticSearchResult {
-                            verse_ref: format!("{} {}:{}", v.book_name, v.chapter, v.verse),
-                            verse_text: v.text,
-                            book_name: v.book_name,
-                            book_number: v.book_number,
-                            chapter: v.chapter,
-                            verse: v.verse,
-                            similarity: hit.score,
-                        });
-                    }
-                }
+            if hit.from_fts {
+                sources.push("keyword".to_string());
             }
-        }
-    }
+
+            // Display value only — ordering is the RRF score. Semantic hits
+            // show their real cosine; keyword-only hits keep the legacy
+            // rank-derived confidence until the UI grows source badges.
+            let similarity = hit.cosine.unwrap_or_else(|| {
+                (FTS5_RANK0_CONFIDENCE - fts_rank as f64 * FTS5_CONFIDENCE_DECAY)
+                    .max(FTS5_MIN_CONFIDENCE)
+            });
+
+            Some(SemanticSearchResult {
+                verse_ref: format!("{} {}:{}", v.book_name, v.chapter, v.verse),
+                verse_text: v.text,
+                book_name: v.book_name,
+                book_number: v.book_number,
+                chapter: v.chapter,
+                verse: v.verse,
+                similarity,
+                sources,
+            })
+        })
+        .collect();
 
     Ok(results)
 }
