@@ -9,11 +9,13 @@ import {
   useDetectionStore,
   useQueueStore,
   useBibleStore,
+  useBroadcastStore,
   useTranscriptStore,
 } from "@/stores"
 import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
 import { bibleActions } from "@/hooks/use-bible"
+import { presentVerse } from "@/hooks/use-broadcast"
 import type { DetectionResult, ReadingAdvance } from "@/types"
 
 /**
@@ -83,8 +85,7 @@ export function TranscriptPanel() {
       (d) => d.source === "direct" && !d.is_chapter_only
     )
     if (directHit && directHit.book_number > 0) {
-      // Select verse immediately so preview/live panels update
-      bibleActions.selectVerse({
+      const detectedVerse = {
         id: 0,
         translation_id: useBibleStore.getState().activeTranslationId,
         book_number: directHit.book_number,
@@ -93,7 +94,15 @@ export function TranscriptPanel() {
         chapter: directHit.chapter,
         verse: directHit.verse,
         text: directHit.verse_text,
-      })
+      }
+      // Detections always update the preview. They only reach the live
+      // display when auto-live is on — otherwise the operator presents
+      // manually (issue #105).
+      if (useBroadcastStore.getState().autoLive) {
+        void presentVerse(detectedVerse)
+      } else {
+        bibleActions.selectVerse(detectedVerse)
+      }
       // Navigate book search panel to this verse
       useBibleStore
         .getState()
@@ -173,7 +182,7 @@ export function TranscriptPanel() {
   // Does NOT add to queue — only direct/semantic feed the queue.
   useTauriEvent<ReadingAdvance>("reading_mode_verse", (advance) => {
     if (advance.book_number > 0) {
-      bibleActions.selectVerse({
+      const advanceVerse = {
         id: 0,
         translation_id: useBibleStore.getState().activeTranslationId,
         book_number: advance.book_number,
@@ -182,7 +191,14 @@ export function TranscriptPanel() {
         chapter: advance.chapter,
         verse: advance.verse,
         text: advance.verse_text,
-      })
+      }
+      // Same auto-live gate as detections: preview always follows, the live
+      // display only when the operator allows it (issue #105).
+      if (useBroadcastStore.getState().autoLive) {
+        void presentVerse(advanceVerse)
+      } else {
+        bibleActions.selectVerse(advanceVerse)
+      }
       useBibleStore.getState().setPendingNavigation({
         bookNumber: advance.book_number,
         chapter: advance.chapter,

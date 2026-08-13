@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { Verse } from "@/types"
-import { deriveLiveVerse, presentVerse } from "./use-broadcast"
+import { presentVerse } from "./use-broadcast"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 
@@ -24,32 +24,6 @@ const sampleVerse: Verse = {
   verse: 2,
   text: "The earth was without form and void.",
 }
-
-describe("deriveLiveVerse", () => {
-  it("returns null when live output is off", () => {
-    const result = deriveLiveVerse({
-      isLive: false,
-      selectedVerse: sampleVerse,
-      translation: "NKJV",
-    })
-
-    expect(result).toBeNull()
-  })
-
-  it("returns verse render data when live output is on", () => {
-    const result = deriveLiveVerse({
-      isLive: true,
-      selectedVerse: sampleVerse,
-      translation: "NKJV",
-    })
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        reference: "Genesis 1:2 (NKJV)",
-      }),
-    )
-  })
-})
 
 describe("presentVerse", () => {
   const staleVerse: Verse = {
@@ -79,7 +53,7 @@ describe("presentVerse", () => {
         },
       ],
     })
-    useBroadcastStore.setState({ liveVerse: null })
+    useBroadcastStore.setState({ liveVerse: null, liveSourceVerse: null })
   })
 
   it("presents the refetched verse text, not the stale queue text", async () => {
@@ -134,6 +108,34 @@ describe("presentVerse", () => {
     expect(useBibleStore.getState().selectedVerse).toEqual(sampleVerse)
     expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
       sampleVerse.text,
+    )
+  })
+
+  it("records the presented verse as the live source verse", async () => {
+    const fullVerse: Verse = { ...staleVerse, id: 26137, translation_id: 2, text: "For God so loved the world" }
+    mockInvoke.mockResolvedValue(fullVerse)
+
+    await presentVerse(staleVerse)
+
+    expect(useBroadcastStore.getState().liveSourceVerse).toEqual(fullVerse)
+  })
+
+  it("ignores a stale refetch that resolves after a newer present call", async () => {
+    const older: Verse = { ...sampleVerse, verse: 1, text: "In the beginning" }
+    let resolveOlder: (v: Verse) => void = () => {}
+    mockInvoke
+      .mockImplementationOnce(
+        () => new Promise<Verse>((resolve) => (resolveOlder = resolve)),
+      )
+      .mockResolvedValueOnce(sampleVerse)
+
+    const first = presentVerse(older)
+    await presentVerse(sampleVerse)
+    resolveOlder(older)
+    await first
+
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "Genesis 1:2 (NKJV)",
     )
   })
 })

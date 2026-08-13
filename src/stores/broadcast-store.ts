@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
-import type { BroadcastTheme, VerseRenderData } from "@/types"
+import type { BroadcastTheme, Verse, VerseRenderData } from "@/types"
 import { BUILTIN_THEMES, BROADCAST_OVERLAY, CLASSIC_DARK } from "@/lib/builtin-themes"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
@@ -15,6 +15,13 @@ interface BroadcastState {
   altActiveThemeId: string
   isLive: boolean
   liveVerse: VerseRenderData | null
+  // The Verse the live output was presented from, kept so it can be
+  // re-presented (e.g. after a translation change). Preview selection never
+  // writes this — only an explicit present does.
+  liveSourceVerse: Verse | null
+  // When on, detections auto-present to the live output. When off, the live
+  // output only changes via explicit presents (manual operator control).
+  autoLive: boolean
 
   // Designer state
   isDesignerOpen: boolean
@@ -34,7 +41,8 @@ interface BroadcastState {
   setActiveTheme: (id: string) => void
   setAltActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
-  setLiveVerse: (verse: VerseRenderData | null) => void
+  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null) => void
+  setAutoLive: (auto: boolean) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
 
@@ -83,16 +91,17 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
 function emitDraftToBroadcast(state: BroadcastState): void {
   if (!state.draftTheme) return
   const id = state.editingThemeId
+  const verse = state.isLive ? state.liveVerse : null
   if (id === state.activeThemeId) {
     void emitTo("broadcast", "broadcast:verse-update", {
       theme: state.draftTheme,
-      verse: state.liveVerse,
+      verse,
     }).catch(() => {})
   }
   if (id === state.altActiveThemeId) {
     void emitTo("broadcast-alt", "broadcast:verse-update", {
       theme: state.draftTheme,
-      verse: state.liveVerse,
+      verse,
     }).catch(() => {})
   }
 }
@@ -103,6 +112,8 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   altActiveThemeId: BUILTIN_THEMES[0].id,
   isLive: false,
   liveVerse: null,
+  liveSourceVerse: null,
+  autoLive: true,
   isDesignerOpen: false,
   editingThemeId: null,
   renamingThemeId: null,
@@ -184,7 +195,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
 
     void emitTo(label, "broadcast:verse-update", {
       theme,
-      verse: s.liveVerse,
+      verse: s.isLive ? s.liveVerse : null,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {
@@ -199,11 +210,15 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set({ altActiveThemeId })
     get().syncBroadcastOutputFor("alt")
   },
-  setLive: (isLive) => set({ isLive }),
-  setLiveVerse: (liveVerse) => {
-    set({ liveVerse })
+  setLive: (isLive) => {
+    set({ isLive })
     get().syncBroadcastOutput()
   },
+  setLiveVerse: (liveVerse, source = null) => {
+    set({ liveVerse, liveSourceVerse: source })
+    get().syncBroadcastOutput()
+  },
+  setAutoLive: (autoLive) => set({ autoLive }),
 
   // Designer
   setDesignerOpen: (isDesignerOpen) => {
@@ -296,6 +311,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       const customThemes = (await store.get("customThemes")) as BroadcastTheme[] | undefined
       const activeId = (await store.get("activeThemeId")) as string | undefined
       const altActiveId = (await store.get("altActiveThemeId")) as string | undefined
+      const autoLive = (await store.get("autoLive")) as boolean | undefined
 
       const patch: Partial<BroadcastState> = {}
       if (customThemes && Array.isArray(customThemes) && customThemes.length > 0) {
@@ -303,6 +319,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       }
       if (activeId) patch.activeThemeId = activeId
       if (altActiveId) patch.altActiveThemeId = altActiveId
+      if (typeof autoLive === "boolean") patch.autoLive = autoLive
 
       if (Object.keys(patch).length > 0) {
         useBroadcastStore.setState(patch)
@@ -313,7 +330,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
         const changed =
           state.themes !== prevState.themes ||
           state.activeThemeId !== prevState.activeThemeId ||
-          state.altActiveThemeId !== prevState.altActiveThemeId
+          state.altActiveThemeId !== prevState.altActiveThemeId ||
+          state.autoLive !== prevState.autoLive
         if (!changed) return
         if (saveTimer) clearTimeout(saveTimer)
         saveTimer = setTimeout(() => {
@@ -341,6 +359,7 @@ async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
     await store.set("customThemes", customThemes)
     await store.set("activeThemeId", state.activeThemeId)
     await store.set("altActiveThemeId", state.altActiveThemeId)
+    await store.set("autoLive", state.autoLive)
     await store.save()
   } catch {
     console.warn("[broadcast] Failed to persist themes")

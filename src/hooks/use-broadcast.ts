@@ -11,14 +11,25 @@ export function toVerseRenderData(verse: Verse, translation: string): VerseRende
   }
 }
 
+// Monotonic ticket so an older present whose refetch resolves late can't
+// overwrite a newer one (detections can present in quick succession).
+let presentSeq = 0
+
 /**
  * Refetch the full verse from the backend and present it to preview + live
  * output. Queue/detection items may carry partial verse objects (empty text,
  * synthetic id 0, stale translation_id), so always look the verse up by
  * book/chapter/verse against the active translation. Falls back to the passed
  * verse if the lookup fails — never blanks the output on error.
+ *
+ * This is the ONLY path that changes the live output verse. Detections and
+ * navigation update the preview (`selectedVerse`); the live output follows
+ * only through an explicit present (or auto-live, which calls this).
  */
 export async function presentVerse(verse: Verse): Promise<void> {
+  presentSeq += 1
+  const ticket = presentSeq
+
   let verseToPresent = verse
   try {
     const fullVerse = await invoke<Verse | null>("get_verse", {
@@ -32,30 +43,19 @@ export async function presentVerse(verse: Verse): Promise<void> {
     console.warn("[broadcast] get_verse refetch failed, using cached verse:", e)
   }
 
+  // A newer present started while we were refetching — let it win.
+  if (ticket !== presentSeq) return
+
   const bibleState = useBibleStore.getState()
   const translation =
     bibleState.translations.find((t) => t.id === bibleState.activeTranslationId)
       ?.abbreviation ?? "KJV"
 
-  // Update selectedVerse too: live-output-panel re-derives the live verse
-  // from selectedVerse, so it must carry the same (refetched) text.
+  // Keep the preview in sync with what was just presented.
   bibleState.selectVerse(verseToPresent)
   useBroadcastStore
     .getState()
-    .setLiveVerse(toVerseRenderData(verseToPresent, translation))
-}
-
-export function deriveLiveVerse({
-  isLive,
-  selectedVerse,
-  translation,
-}: {
-  isLive: boolean
-  selectedVerse: Verse | null
-  translation: string
-}): VerseRenderData | null {
-  if (!isLive || !selectedVerse) return null
-  return toVerseRenderData(selectedVerse, translation)
+    .setLiveVerse(toVerseRenderData(verseToPresent, translation), verseToPresent)
 }
 
 export const broadcastActions = {
