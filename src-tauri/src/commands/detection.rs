@@ -114,27 +114,13 @@ pub fn detection_status(
     Ok(DetectionStatusResult {
         has_direct: true,
         has_semantic: pipeline.has_semantic(),
-        paraphrase_enabled: pipeline.use_synonyms(),
     })
-}
-
-/// Toggle paraphrase detection (synonym expansion) on/off
-#[tauri::command]
-pub fn toggle_paraphrase_detection(
-    pipeline_state: State<'_, Mutex<DetectionPipeline>>,
-    enabled: bool,
-) -> Result<bool, String> {
-    let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
-    pipeline.set_use_synonyms(enabled);
-    log::info!("[DET] Paraphrase detection (synonyms) set to: {enabled}");
-    Ok(enabled)
 }
 
 #[derive(Serialize)]
 pub struct DetectionStatusResult {
     pub has_direct: bool,
     pub has_semantic: bool,
-    pub paraphrase_enabled: bool,
 }
 
 #[derive(Clone, Serialize)]

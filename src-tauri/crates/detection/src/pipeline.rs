@@ -1,12 +1,6 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use rhema_bible::Bm25Result;
-
 use crate::direct::detector::DirectDetector;
-use crate::fusion::{FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE, FTS5_RANK0_CONFIDENCE};
 use crate::merger::{DetectionMerger, MergedDetection};
 use crate::semantic::detector::SemanticDetector;
-use crate::types::{Detection, DetectionSource, VerseRef};
 
 /// Minimum word count for vector embedding search (short text lacks semantic signal).
 const MIN_WORDS_FOR_VECTOR: usize = 5;
@@ -79,80 +73,6 @@ impl DetectionPipeline {
     /// Check if semantic search is available (model loaded + index populated).
     pub fn has_semantic(&self) -> bool {
         self.semantic.is_ready()
-    }
-
-    /// Enable or disable synonym expansion (paraphrase detection mode).
-    pub fn set_use_synonyms(&mut self, enabled: bool) {
-        self.semantic.set_use_synonyms(enabled);
-    }
-
-    /// Returns whether synonym expansion is currently enabled.
-    pub fn use_synonyms(&self) -> bool {
-        self.semantic.use_synonyms()
-    }
-
-    /// Run hybrid semantic detection combining vector search with pre-fetched
-    /// FTS5 BM25 results. Used by the real-time STT pipeline.
-    ///
-    /// Vector results found by both methods get a confidence boost;
-    /// FTS5-only results are added with rank-derived confidence.
-    #[expect(clippy::cast_precision_loss, reason = "rank index is small")]
-    pub fn process_hybrid_with_fts(
-        &mut self,
-        text: &str,
-        fts_results: &[Bm25Result],
-    ) -> Vec<MergedDetection> {
-        // Vector search needs enough words for meaningful embeddings;
-        // FTS5 keyword matching works with fewer words.
-        let mut vector_detections = if text.split_whitespace().count() >= MIN_WORDS_FOR_VECTOR {
-            self.semantic.detect(text)
-        } else {
-            vec![]
-        };
-
-        if fts_results.is_empty() {
-            return self.merger.merge(vec![], vector_detections);
-        }
-
-        // Add FTS5 results as detections with populated VerseRef (no verse_id).
-        // The merger will dedup if both vector and FTS5 find the same verse.
-        // to_result() resolves VerseRef via the active translation's db.get_verse().
-        #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64")]
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
-
-        let snippet = text.to_string();
-        for (rank, fts) in fts_results.iter().enumerate() {
-            let confidence = FTS5_RANK0_CONFIDENCE - (rank as f64 * FTS5_CONFIDENCE_DECAY);
-            if confidence < FTS5_MIN_CONFIDENCE {
-                break;
-            }
-            log::debug!(
-                "[HYBRID] FTS5 hit: {} {}:{} rank={} conf={:.0}%",
-                fts.book_name, fts.chapter, fts.verse,
-                rank,
-                confidence * 100.0
-            );
-            vector_detections.push(Detection {
-                verse_ref: VerseRef {
-                    book_number: fts.book_number,
-                    book_name: fts.book_name.clone(),
-                    chapter: fts.chapter,
-                    verse_start: fts.verse,
-                    verse_end: None,
-                },
-                verse_id: None,
-                confidence,
-                source: DetectionSource::Semantic { similarity: confidence },
-                transcript_snippet: snippet.clone(),
-                detected_at: now,
-                is_chapter_only: false,
-            });
-        }
-
-        self.merger.merge(vec![], vector_detections)
     }
 
     /// Run a standalone semantic search query (for the search UI).

@@ -1,36 +1,19 @@
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::cache::EmbeddingCache;
-use super::chunker::Chunker;
 use super::embedder::{StubEmbedder, TextEmbedder};
-use super::ensemble::EnsembleSearcher;
 use super::index::{StubIndex, VectorIndex};
-use super::synonyms::SynonymExpander;
 use crate::types::{Detection, DetectionSource, VerseRef};
-
-/// Default cache capacity (number of text-chunk entries).
-const DEFAULT_CACHE_CAPACITY: usize = 256;
 
 /// Default cosine-similarity threshold below which results are discarded.
 const DEFAULT_CONFIDENCE_THRESHOLD: f64 = 0.50;
 
-/// Orchestrator that combines text chunking, embedding, vector search,
-/// and caching to detect Bible verses from transcript text using
-/// semantic similarity.
+/// Orchestrator that combines embedding and vector search to detect Bible
+/// verses from transcript text using semantic similarity.
 pub struct SemanticDetector {
     embedder: Box<dyn TextEmbedder>,
     index: Box<dyn VectorIndex>,
-    #[allow(dead_code)]
-    chunker: Chunker,
-    cache: EmbeddingCache,
     confidence_threshold: f64,
-    #[allow(dead_code)]
-    synonym_expander: SynonymExpander,
-    ensemble: EnsembleSearcher,
-    /// When true, uses ensemble search (3 strategies) for better accuracy.
-    /// When false, single direct embedding for speed.
-    use_synonyms: bool,
 }
 
 impl SemanticDetector {
@@ -39,12 +22,7 @@ impl SemanticDetector {
         Self {
             embedder,
             index,
-            chunker: Chunker::new(),
-            cache: EmbeddingCache::new(DEFAULT_CACHE_CAPACITY),
             confidence_threshold: DEFAULT_CONFIDENCE_THRESHOLD,
-            synonym_expander: SynonymExpander::new(),
-            ensemble: EnsembleSearcher::new(),
-            use_synonyms: false, // Off by default — enable via toggle_paraphrase_detection
         }
     }
 
@@ -56,16 +34,6 @@ impl SemanticDetector {
         Self::new(Box::new(StubEmbedder::new(1024)), Box::new(StubIndex))
     }
 
-    /// Enable or disable synonym expansion (paraphrase detection mode).
-    pub fn set_use_synonyms(&mut self, enabled: bool) {
-        self.use_synonyms = enabled;
-    }
-
-    /// Returns whether synonym expansion is currently enabled.
-    pub fn use_synonyms(&self) -> bool {
-        self.use_synonyms
-    }
-
     /// Returns `true` when the underlying index contains vectors and
     /// the detector can produce meaningful results.
     pub fn is_ready(&self) -> bool {
@@ -74,8 +42,7 @@ impl SemanticDetector {
 
     /// Detect Bible verses in `text` using semantic similarity.
     ///
-    /// The text is split into overlapping sentence windows, each window
-    /// is embedded, and the nearest verses in the vector index are
+    /// The text is embedded and the nearest verses in the vector index are
     /// returned if they exceed the confidence threshold.
     ///
     /// The returned `Detection` objects have placeholder `VerseRef`
@@ -86,57 +53,22 @@ impl SemanticDetector {
             return vec![];
         }
 
+        let Ok(embedding) = self.embedder.embed(text) else { return vec![] };
+        let Ok(results) = self.index.search(&embedding, 5) else { return vec![] };
+
+        let now = Self::timestamp_ms();
+        let mut seen_verse_ids = HashSet::new();
         let mut detections = Vec::new();
-
-        if self.use_synonyms {
-            // Ensemble search: 3 strategies (original + synonym + concept)
-            // More expensive (~3 embed calls) but much better accuracy for paraphrases.
-            match self.ensemble.search(
-                text,
-                self.embedder.as_ref(),
-                self.index.as_ref(),
-                5,
-            ) {
-                Ok(results) => {
-                    let now = Self::timestamp_ms();
-                    for result in results {
-                        if result.best_similarity >= self.confidence_threshold {
-                            detections.push(Self::make_detection(
-                                result.verse_id,
-                                result.best_similarity,
-                                text,
-                                now,
-                            ));
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::warn!("[SEMANTIC] Ensemble search failed: {e}");
-                }
-            }
-        } else {
-            // Single direct embedding: fast (~1 embed call), good for exact quotes.
-            let Ok(embedding) = self.embedder.embed(text) else { return vec![] };
-
-            let Ok(results) = self.index.search(&embedding, 5) else { return vec![] };
-
-            // Cache for future lookups
-            self.cache
-                .insert(text.to_string(), (embedding, results.clone()));
-
-            let now = Self::timestamp_ms();
-            let mut seen_verse_ids = HashSet::new();
-            for result in &results {
-                if result.similarity >= self.confidence_threshold
-                    && seen_verse_ids.insert(result.verse_id)
-                {
-                    detections.push(Self::make_detection(
-                        result.verse_id,
-                        result.similarity,
-                        text,
-                        now,
-                    ));
-                }
+        for result in &results {
+            if result.similarity >= self.confidence_threshold
+                && seen_verse_ids.insert(result.verse_id)
+            {
+                detections.push(Self::make_detection(
+                    result.verse_id,
+                    result.similarity,
+                    text,
+                    now,
+                ));
             }
         }
 

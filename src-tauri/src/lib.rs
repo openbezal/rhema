@@ -42,7 +42,6 @@ pub fn run() {
             commands::detection::detect_verses,
             commands::detection::detection_status,
             commands::detection::semantic_search,
-            commands::detection::toggle_paraphrase_detection,
             commands::detection::reading_mode_status,
             commands::detection::stop_reading_mode,
             commands::audio::get_audio_devices,
