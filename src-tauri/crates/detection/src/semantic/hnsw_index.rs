@@ -123,6 +123,17 @@ impl HnswVectorIndex {
             dimension: dim,
         })
     }
+
+    /// Return the stored vector for `verse_id`, if present.
+    ///
+    /// Used by diagnostic tooling (e.g. the search benchmark's embedding
+    /// provenance probe) to compare freshly computed embeddings against
+    /// the shipped index.
+    pub fn vector(&self, verse_id: i64) -> Option<&[f32]> {
+        let idx = self.verse_ids.iter().position(|&id| id == verse_id)?;
+        let start = idx * self.dimension;
+        Some(&self.embeddings[start..start + self.dimension])
+    }
 }
 
 #[cfg(feature = "vector-search")]

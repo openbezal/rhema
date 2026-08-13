@@ -598,7 +598,7 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
         return;
     };
 
-    use super::detection::{FTS5_RANK0_CONFIDENCE, FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE};
+    use rhema_detection::fusion::{FTS5_RANK0_CONFIDENCE, FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE};
 
     let results: Vec<super::detection::DetectionResult> = fts
         .iter()

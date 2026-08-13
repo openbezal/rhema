@@ -18,6 +18,7 @@
 pub mod types;
 pub mod error;
 pub mod direct;
+pub mod fusion;
 pub mod semantic;
 pub mod merger;
 pub mod pipeline;

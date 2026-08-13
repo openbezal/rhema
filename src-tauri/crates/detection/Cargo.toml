@@ -30,8 +30,14 @@ default = []
 onnx = ["ort", "ndarray", "tokenizers"]
 vector-search = ["bytemuck"]
 precompute-bin = ["onnx", "vector-search", "env_logger"]
+bench-bin = ["onnx", "vector-search", "env_logger"]
 
 [[bin]]
 name = "precompute"
 path = "src/bin/precompute.rs"
 required-features = ["precompute-bin"]
+
+[[bin]]
+name = "search_bench"
+path = "src/bin/search_bench.rs"
+required-features = ["bench-bin"]

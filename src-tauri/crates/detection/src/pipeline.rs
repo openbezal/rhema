@@ -3,18 +3,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rhema_bible::Bm25Result;
 
 use crate::direct::detector::DirectDetector;
+use crate::fusion::{FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE, FTS5_RANK0_CONFIDENCE};
 use crate::merger::{DetectionMerger, MergedDetection};
 use crate::semantic::detector::SemanticDetector;
 use crate::types::{Detection, DetectionSource, VerseRef};
-
-/// Confidence assigned to the best FTS5 BM25 match (rank 0).
-const FTS5_RANK0_CONFIDENCE: f64 = 0.75;
-
-/// Confidence decrease per FTS5 rank position (rank 1 = 0.71, rank 2 = 0.67, etc.).
-const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
-
-/// FTS5 results below this confidence are not included.
-const FTS5_MIN_CONFIDENCE: f64 = 0.50;
 
 /// Minimum word count for vector embedding search (short text lacks semantic signal).
 const MIN_WORDS_FOR_VECTOR: usize = 5;

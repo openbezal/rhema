@@ -1,23 +1,14 @@
 #![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
 
-use std::collections::HashSet;
 use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::State;
 
+use rhema_detection::fusion::{fuse, FusedOrigin, VerseKey};
 use rhema_detection::{DetectionPipeline, MergedDetection, ReadingMode};
 
 use crate::state::AppState;
-
-/// Confidence assigned to the best FTS5 BM25 match (rank 0) in context search.
-pub(crate) const FTS5_RANK0_CONFIDENCE: f64 = 0.75;
-
-/// Confidence decrease per FTS5 rank position.
-pub(crate) const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
-
-/// FTS5 results below this confidence are not included.
-pub(crate) const FTS5_MIN_CONFIDENCE: f64 = 0.50;
 
 /// Serializable detection result for the frontend
 #[derive(Clone, Serialize)]
@@ -143,7 +134,7 @@ pub struct DetectionStatusResult {
     pub paraphrase_enabled: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct SemanticSearchResult {
     pub verse_ref: String,
     pub verse_text: String,
@@ -175,7 +166,7 @@ pub fn semantic_search(
     // Lock AppState for DB lookups only (fast)
     let app_state = state.lock().map_err(|e| e.to_string())?;
 
-    let mut results: Vec<SemanticSearchResult> = vector_results
+    let resolved_vector: Vec<SemanticSearchResult> = vector_results
         .into_iter()
         .filter_map(|(verse_id, similarity)| {
             if let Some(ref db) = app_state.bible_db {
@@ -195,44 +186,62 @@ pub fn semantic_search(
         })
         .collect();
 
-    // FTS5 BM25 across all English translations — resolve to active translation
-    if let Some(ref db) = app_state.bible_db {
-        let fts_results = db.search_verses_bm25(&query, k).unwrap_or_default();
-        let seen: HashSet<(i32, i32, i32)> = results
-            .iter()
-            .map(|r| (r.book_number, r.chapter, r.verse))
-            .collect();
+    let vector_hits: Vec<(VerseKey, f64)> = resolved_vector
+        .iter()
+        .map(|r| {
+            (
+                VerseKey { book_number: r.book_number, chapter: r.chapter, verse: r.verse },
+                r.similarity,
+            )
+        })
+        .collect();
 
-        for (rank, fts) in fts_results.iter().enumerate() {
-            if !seen.contains(&(fts.book_number, fts.chapter, fts.verse)) {
-                #[expect(clippy::cast_precision_loss, reason = "rank is small")]
-                let similarity = FTS5_RANK0_CONFIDENCE - (rank as f64 * FTS5_CONFIDENCE_DECAY);
-                if similarity < FTS5_MIN_CONFIDENCE {
-                    break;
+    // FTS5 BM25 across all English translations
+    let fts_keys: Vec<VerseKey> = app_state
+        .bible_db
+        .as_ref()
+        .and_then(|db| db.search_verses_bm25(&query, k).ok())
+        .unwrap_or_default()
+        .iter()
+        .map(|f| VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse })
+        .collect();
+
+    // Merge and order both result sets; resolve FTS5-only hits to the active
+    // translation's text.
+    let mut results: Vec<SemanticSearchResult> = Vec::new();
+    for hit in fuse(&vector_hits, &fts_keys) {
+        match hit.origin {
+            FusedOrigin::Vector => {
+                if let Some(r) = resolved_vector.iter().find(|r| {
+                    r.book_number == hit.key.book_number
+                        && r.chapter == hit.key.chapter
+                        && r.verse == hit.key.verse
+                }) {
+                    results.push(r.clone());
                 }
-                // Resolve to active translation text
-                if let Ok(Some(v)) = db.get_verse(
-                    app_state.active_translation_id,
-                    fts.book_number,
-                    fts.chapter,
-                    fts.verse,
-                ) {
-                    results.push(SemanticSearchResult {
-                        verse_ref: format!("{} {}:{}", v.book_name, v.chapter, v.verse),
-                        verse_text: v.text,
-                        book_name: v.book_name,
-                        book_number: v.book_number,
-                        chapter: v.chapter,
-                        verse: v.verse,
-                        similarity,
-                    });
+            }
+            FusedOrigin::Fts5 => {
+                if let Some(ref db) = app_state.bible_db {
+                    if let Ok(Some(v)) = db.get_verse(
+                        app_state.active_translation_id,
+                        hit.key.book_number,
+                        hit.key.chapter,
+                        hit.key.verse,
+                    ) {
+                        results.push(SemanticSearchResult {
+                            verse_ref: format!("{} {}:{}", v.book_name, v.chapter, v.verse),
+                            verse_text: v.text,
+                            book_name: v.book_name,
+                            book_number: v.book_number,
+                            chapter: v.chapter,
+                            verse: v.verse,
+                            similarity: hit.score,
+                        });
+                    }
                 }
             }
         }
     }
-
-    // Ensure highest similarity is always first
-    results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
 
     Ok(results)
 }
