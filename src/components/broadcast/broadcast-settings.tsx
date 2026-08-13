@@ -130,8 +130,15 @@ export function BroadcastSettings({
 
   const reconcilePreviewState = useCallback(async (outputId: string = "main") => {
     const label = outputId === "alt" ? "broadcast-alt" : "broadcast"
-    const windows = await getAllWindows()
-    return windows.some((w) => w.label === label)
+    try {
+      const windows = await getAllWindows()
+      const window = windows.find((w) => w.label === label)
+      // A window hidden for NDI still exists — only a visible one counts as
+      // an open preview.
+      return window ? await window.isVisible() : false
+    } catch {
+      return false
+    }
   }, [])
 
   const fetchMonitors = useCallback(async () => {
@@ -189,17 +196,24 @@ export function BroadcastSettings({
     syncNdiConfigToOutput,
   ])
 
+  // Keep the preview buttons in sync with the actual windows: reconcile when
+  // the dialog opens (the window may outlive a dialog close/reopen) and keep
+  // polling so an OS-level close of the projector flips the button back.
   useEffect(() => {
-    if (!open || !isPreviewOpen) return
+    if (!open) return
 
-    const intervalId = setInterval(() => {
-      void reconcilePreviewState()
-    }, 750)
+    const reconcileBoth = () => {
+      void reconcilePreviewState("main").then(setIsPreviewOpen)
+      void reconcilePreviewState("alt").then(setAltIsPreviewOpen)
+    }
+
+    reconcileBoth()
+    const intervalId = setInterval(reconcileBoth, 750)
 
     return () => {
       clearInterval(intervalId)
     }
-  }, [open, isPreviewOpen, reconcilePreviewState])
+  }, [open, reconcilePreviewState])
 
   const handleMainThemeChange = (id: string) => {
     setMainThemeId(id)
