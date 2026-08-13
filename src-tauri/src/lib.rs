@@ -72,6 +72,14 @@ pub fn run() {
 
             memstats::spawn();
 
+            // Point the NDI runtime at the bundled resource dir (production).
+            // The source-checkout path stays as a fallback inside the crate.
+            if let Ok(resource_dir) = app.path().resource_dir() {
+                let managed_ndi = app.state::<Mutex<rhema_broadcast::ndi::NdiRuntime>>();
+                let mut ndi = managed_ndi.lock().unwrap();
+                ndi.set_library_search_dirs(vec![resource_dir]);
+            }
+
             // Try resource dir first (production), then dev fallback
             let db_path = app
                 .path()

@@ -1,0 +1,9 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "resources": {
+      "../data/rhema.db": "rhema.db",
+      "../sdk/ndi/windows/Processing.NDI.Lib.x64.dll": "sdk/ndi/windows/Processing.NDI.Lib.x64.dll"
+    }
+  }
+}

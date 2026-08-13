@@ -133,17 +133,27 @@ pub enum NdiError {
 #[derive(Default)]
 pub struct NdiRuntime {
     sessions: std::collections::HashMap<String, ActiveNdiSession>,
+    /// Directories searched (in order) for the NDI runtime library before the
+    /// compile-time dev fallback. In production this is the Tauri resource dir.
+    library_search_dirs: Vec<PathBuf>,
 }
 
 impl std::fmt::Debug for NdiRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NdiRuntime")
             .field("active_sessions", &self.sessions.len())
+            .field("library_search_dirs", &self.library_search_dirs)
             .finish()
     }
 }
 
 impl NdiRuntime {
+    /// Set the directories searched for the NDI runtime library, in order of
+    /// preference. The compile-time dev checkout path stays as a fallback.
+    pub fn set_library_search_dirs(&mut self, dirs: Vec<PathBuf>) {
+        self.library_search_dirs = dirs;
+    }
+
     /// Check if a specific session is active.
     pub fn is_active(&self, session_id: &str) -> bool {
         self.sessions.contains_key(session_id)
@@ -166,7 +176,7 @@ impl NdiRuntime {
         }
 
         log::info!("NDI[{session_id}]: starting session '{}'", request.source_name);
-        let session = ActiveNdiSession::create(request)?;
+        let session = ActiveNdiSession::create(request, &self.library_search_dirs)?;
         let info = session.info.clone();
         log::info!(
             "NDI[{session_id}]: session active — {}x{} @ {}fps",
@@ -231,13 +241,16 @@ unsafe impl Sync for NdiRuntime {}
 
 impl ActiveNdiSession {
     #[expect(clippy::needless_pass_by_value, reason = "request fields are destructured and moved into the session")]
-    fn create(request: NdiStartRequest) -> Result<Self, NdiError> {
+    fn create(request: NdiStartRequest, library_search_dirs: &[PathBuf]) -> Result<Self, NdiError> {
         let source_name = request.source_name.trim().to_string();
         if source_name.is_empty() {
             return Err(NdiError::EmptySourceName);
         }
 
-        let library_path = resolve_library_path()?;
+        let mut search_dirs = library_search_dirs.to_vec();
+        search_dirs.push(dev_fallback_dir());
+        let library_path = resolve_library_path(&search_dirs)?;
+        log::info!("NDI: loading runtime library from {}", library_path.display());
         // SAFETY: library_path was validated to exist by resolve_library_path()
         let library = unsafe { Library::new(&library_path) }
             .map_err(|e| NdiError::LibraryLoad(e.to_string()))?;
@@ -384,31 +397,42 @@ impl Drop for ActiveNdiSession {
     }
 }
 
-fn resolve_library_path() -> Result<PathBuf, NdiError> {
-    let candidates: Vec<&str> = if cfg!(target_os = "macos") {
-        vec!["sdk/ndi/macos/libndi.dylib"]
+/// Relative locations of the NDI runtime library for the current OS. The same
+/// layout is used by the repo checkout (`sdk/…` at the workspace root) and by
+/// the bundled app (`sdk/…` inside the Tauri resource dir).
+fn library_candidates() -> &'static [&'static str] {
+    if cfg!(target_os = "macos") {
+        &["sdk/ndi/macos/libndi.dylib"]
     } else if cfg!(target_os = "windows") {
-        vec!["sdk/ndi/windows/Processing.NDI.Lib.x64.dll"]
+        &["sdk/ndi/windows/Processing.NDI.Lib.x64.dll"]
     } else {
-        vec![
+        &[
             "sdk/ndi/linux/libndi.so",
             "sdk/ndi/linux/x86_64/libndi.so.6",
             "sdk/ndi/linux/libndi.so.6",
         ]
-    };
+    }
+}
 
-    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-    for candidate in &candidates {
-        if candidate.is_empty() {
-            continue;
-        }
-        let absolute = base.join(candidate);
-        if absolute.exists() {
-            return Ok(absolute);
+/// Dev fallback: the workspace root of a source checkout. Only meaningful on
+/// the machine the binary was compiled on.
+fn dev_fallback_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
+}
+
+fn resolve_library_path(search_dirs: &[PathBuf]) -> Result<PathBuf, NdiError> {
+    let mut attempted = Vec::new();
+    for base in search_dirs {
+        for candidate in library_candidates() {
+            let absolute = base.join(candidate);
+            if absolute.exists() {
+                return Ok(absolute);
+            }
+            attempted.push(absolute.display().to_string());
         }
     }
 
-    Err(NdiError::LibraryNotFound(candidates.join(", ")))
+    Err(NdiError::LibraryNotFound(attempted.join(", ")))
 }
 
 fn load_symbol<'a, T>(
@@ -421,4 +445,64 @@ fn load_symbol<'a, T>(
         symbol: name,
         message: e.to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Unique per-test scratch dir, removed on drop.
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(tag: &str) -> Self {
+            let dir = std::env::temp_dir()
+                .join(format!("rhema-ndi-test-{tag}-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn plant_library(base: &Path) -> PathBuf {
+        let path = base.join(library_candidates()[0]);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, b"stub").unwrap();
+        path
+    }
+
+    #[test]
+    fn resolves_library_from_search_dir() {
+        let dir = TempDir::new("resolve");
+        let planted = plant_library(&dir.0);
+        let resolved = resolve_library_path(std::slice::from_ref(&dir.0)).unwrap();
+        assert_eq!(resolved, planted);
+    }
+
+    #[test]
+    fn earlier_search_dirs_win() {
+        let first = TempDir::new("first");
+        let second = TempDir::new("second");
+        let planted_first = plant_library(&first.0);
+        let _planted_second = plant_library(&second.0);
+        let resolved = resolve_library_path(&[first.0.clone(), second.0.clone()]).unwrap();
+        assert_eq!(resolved, planted_first);
+    }
+
+    #[test]
+    fn missing_library_reports_attempted_paths() {
+        let dir = TempDir::new("missing");
+        let err = resolve_library_path(std::slice::from_ref(&dir.0)).unwrap_err();
+        match err {
+            NdiError::LibraryNotFound(paths) => {
+                assert!(paths.contains(dir.0.to_str().unwrap()), "attempted paths: {paths}");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
 }
