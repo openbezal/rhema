@@ -562,15 +562,35 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
             return false;
         }
     };
-    let results: Vec<super::detection::DetectionResult> = merged
+    let mut results: Vec<super::detection::DetectionResult> = merged
         .iter()
         .map(|m| super::detection::to_result(&app_state, m))
         .collect();
+
+    // Backstop for issue #141: the detector validates against union-max verse
+    // counts across all translations, so a verse can still be missing from
+    // the *active* translation. Never emit a detection with no text.
+    if app_state.bible_db.is_some() {
+        results.retain(|r| {
+            if r.verse_text.is_empty() {
+                log::warn!(
+                    "[DET-DIRECT] Dropping {} — verse not found in active translation",
+                    r.verse_ref
+                );
+                false
+            } else {
+                true
+            }
+        });
+    }
 
     for r in &results {
         log::info!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
     }
     drop(app_state);
+    if results.is_empty() {
+        return false;
+    }
     log::info!(
         "[LAT] emit verse_detections t={} src=direct n={} first={:?}",
         epoch_ms(),

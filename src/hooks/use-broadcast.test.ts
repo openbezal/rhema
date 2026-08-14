@@ -120,6 +120,36 @@ describe("presentVerse", () => {
     expect(useBroadcastStore.getState().liveSourceVerse).toEqual(fullVerse)
   })
 
+  it("refuses to present a verse with empty text (issue #141)", async () => {
+    // Refetch finds nothing and the cached verse has no text (e.g. a cited
+    // verse that doesn't exist) — the live output must not change.
+    mockInvoke.mockResolvedValue(null)
+
+    await presentVerse(staleVerse)
+
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
+    expect(useBroadcastStore.getState().liveSourceVerse).toBeNull()
+  })
+
+  it("refuses to replace the live verse with an empty one", async () => {
+    const fullVerse: Verse = { ...staleVerse, id: 26137, translation_id: 2, text: "For God so loved the world" }
+    // Route by command — mark() also calls invoke ("ui_mark"), so Once
+    // queues would be consumed by instrumentation.
+    let lookups = 0
+    mockInvoke.mockImplementation((cmd: unknown) => {
+      if (cmd !== "get_verse") return Promise.resolve(undefined)
+      lookups += 1
+      return Promise.resolve(lookups === 1 ? fullVerse : null)
+    })
+
+    await presentVerse(staleVerse)
+    await presentVerse({ ...sampleVerse, text: "" })
+
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "John 3:16 (NKJV)",
+    )
+  })
+
   it("ignores a stale refetch that resolves after a newer present call", async () => {
     const older: Verse = { ...sampleVerse, verse: 1, text: "In the beginning" }
     let resolveOlder: (v: Verse) => void = () => {}

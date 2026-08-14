@@ -669,6 +669,19 @@ pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Contin
         return None;
     }
 
+    // Pattern 0: "N:M" in the leading tokens — a re-citation like "22:20"
+    // right after an incomplete "Revelation 20". Must run before the bare
+    // number pattern, which would otherwise grab the 22 as a verse.
+    for i in 0..tokens.len().min(6) {
+        if let (Some(Token::Number(ch)), Some(Token::Colon), Some(Token::Number(v))) =
+            (tokens.get(i), tokens.get(i + 1), tokens.get(i + 2))
+        {
+            if *ch > 0 && *v > 0 && *v <= 176 {
+                return Some(Continuation::ChapterAndVerse(*ch, *v));
+            }
+        }
+    }
+
     // Pattern 1: "chapter N [... verse M]"
     for i in 0..tokens.len() {
         if let Token::Word(w) = &tokens[i] {
@@ -721,6 +734,120 @@ pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Contin
             }
             // After book+chapter (e.g., "Acts 3"), bare "22" = verse
             return Some(Continuation::VerseOnly(num));
+        }
+    }
+
+    None
+}
+
+/// A book-less reference resolved against recent context (the last book heard).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContextualRef {
+    /// "chapter 22 verse 20" (`keyword_anchored: true`) or bare "22:20" (`false`).
+    ChapterVerse {
+        chapter: i32,
+        verse: i32,
+        keyword_anchored: bool,
+    },
+    /// "verse 5" — needs both book and chapter from context.
+    VerseOnly(i32),
+    /// "chapter 22" — book from context, verse still to come.
+    ChapterOnly(i32),
+}
+
+/// True when the "N:M" at token index `i` looks like a time of day rather than
+/// a chapter:verse pair ("at 10:30", "10:30 am", "10:30 a.m.", "10 o'clock").
+fn colon_pair_is_time(tokens: &[Token], i: usize) -> bool {
+    if i > 0 {
+        if let Some(Token::Word(w)) = tokens.get(i - 1) {
+            if w == "at" {
+                return true;
+            }
+        }
+    }
+    match (tokens.get(i + 3), tokens.get(i + 4)) {
+        (Some(Token::Word(w)), _) if w == "am" || w == "pm" || w == "oclock" => true,
+        // Alphabetic-only tokenization splits "a.m." into "a", "m" and
+        // "o'clock" into "o", "clock".
+        (Some(Token::Word(a)), Some(Token::Word(b))) => {
+            ((a == "a" || a == "p") && b == "m") || (a == "o" && b == "clock")
+        }
+        _ => false,
+    }
+}
+
+/// Parse a Bible reference from text that contains NO book name, so it can be
+/// resolved against the last book/chapter heard ([`crate::direct::context::ReferenceContext`]).
+///
+/// Only patterns that are unlikely to fire on ordinary speech are recognized:
+/// keyword-anchored "chapter N [verse M]" and "verse N", plus the bare colon
+/// pair "N:M" (guarded against times of day). Spoken number forms are handled
+/// by [`consume_number`].
+pub fn parse_contextual(text: &str) -> Option<ContextualRef> {
+    let lower = text.to_lowercase();
+    let tokens = tokenize(lower.trim());
+
+    if tokens.is_empty() {
+        return None;
+    }
+
+    // Pattern 1: "chapter N [... verse M]"
+    for i in 0..tokens.len() {
+        if let Token::Word(w) = &tokens[i] {
+            if w == "chapter" {
+                if let Some((chapter, next_idx)) = consume_number(&tokens, i + 1) {
+                    if chapter <= 0 {
+                        continue;
+                    }
+                    // Scan forward for "verse" keyword (up to 15 tokens)
+                    let scan_limit = (next_idx + 15).min(tokens.len());
+                    for j in next_idx..scan_limit {
+                        if let Token::Word(vw) = &tokens[j] {
+                            if vw == "verse" || vw == "verses" {
+                                if let Some((verse, _)) = consume_number(&tokens, j + 1) {
+                                    if verse > 0 && verse <= 176 {
+                                        return Some(ContextualRef::ChapterVerse {
+                                            chapter,
+                                            verse,
+                                            keyword_anchored: true,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return Some(ContextualRef::ChapterOnly(chapter));
+                }
+            }
+        }
+    }
+
+    // Pattern 2: "verse N" / "verses N" anywhere in text
+    for i in 0..tokens.len() {
+        if let Token::Word(w) = &tokens[i] {
+            if w == "verse" || w == "verses" {
+                if let Some((verse, _)) = consume_number(&tokens, i + 1) {
+                    if verse > 0 && verse <= 176 {
+                        return Some(ContextualRef::VerseOnly(verse));
+                    }
+                }
+            }
+        }
+    }
+
+    // Pattern 3: bare "N:M" — riskier (times of day), so guarded here and
+    // held to a shorter context window by the detector.
+    for i in 0..tokens.len() {
+        if let (Some(Token::Number(ch)), Some(Token::Colon), Some(Token::Number(v))) =
+            (tokens.get(i), tokens.get(i + 1), tokens.get(i + 2))
+        {
+            if *ch > 0 && *v > 0 && *v <= 176 && !colon_pair_is_time(&tokens, i) {
+                return Some(ContextualRef::ChapterVerse {
+                    chapter: *ch,
+                    verse: *v,
+                    keyword_anchored: false,
+                });
+            }
         }
     }
 
@@ -1121,5 +1248,86 @@ mod tests {
             try_extract_continuation("something unrelated here", false),
             None
         );
+    }
+
+    #[test]
+    fn test_continuation_colon_pattern() {
+        // "Revelation 20" pending, then a correction "22:20" — must be
+        // chapter+verse, not a bare-22 verse continuation.
+        assert_eq!(
+            try_extract_continuation("22:20", false),
+            Some(Continuation::ChapterAndVerse(22, 20))
+        );
+        assert_eq!(
+            try_extract_continuation("22:20", true),
+            Some(Continuation::ChapterAndVerse(22, 20))
+        );
+    }
+
+    #[test]
+    fn test_contextual_chapter_verse() {
+        assert_eq!(
+            parse_contextual("go to chapter 22 verse 20"),
+            Some(ContextualRef::ChapterVerse {
+                chapter: 22,
+                verse: 20,
+                keyword_anchored: true
+            })
+        );
+        assert_eq!(
+            parse_contextual("chapter three verse sixteen"),
+            Some(ContextualRef::ChapterVerse {
+                chapter: 3,
+                verse: 16,
+                keyword_anchored: true
+            })
+        );
+    }
+
+    #[test]
+    fn test_contextual_verse_only() {
+        assert_eq!(
+            parse_contextual("now look at verse 2"),
+            Some(ContextualRef::VerseOnly(2))
+        );
+        assert_eq!(
+            parse_contextual("verse twenty two"),
+            Some(ContextualRef::VerseOnly(22))
+        );
+    }
+
+    #[test]
+    fn test_contextual_chapter_only() {
+        assert_eq!(
+            parse_contextual("turn to chapter 22"),
+            Some(ContextualRef::ChapterOnly(22))
+        );
+    }
+
+    #[test]
+    fn test_contextual_bare_colon() {
+        assert_eq!(
+            parse_contextual("22:20"),
+            Some(ContextualRef::ChapterVerse {
+                chapter: 22,
+                verse: 20,
+                keyword_anchored: false
+            })
+        );
+    }
+
+    #[test]
+    fn test_contextual_rejects_time_of_day() {
+        assert_eq!(parse_contextual("see you at 10:30"), None);
+        assert_eq!(parse_contextual("10:30 am"), None);
+        assert_eq!(parse_contextual("10:30 a.m. tomorrow"), None);
+        assert_eq!(parse_contextual("10:30 pm service"), None);
+    }
+
+    #[test]
+    fn test_contextual_none_on_plain_text() {
+        assert_eq!(parse_contextual("the weather is nice today"), None);
+        assert_eq!(parse_contextual("there were 12 disciples"), None);
+        assert_eq!(parse_contextual(""), None);
     }
 }

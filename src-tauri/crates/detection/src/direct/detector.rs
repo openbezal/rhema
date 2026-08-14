@@ -8,6 +8,7 @@ use super::automaton::{BookMatch, BookMatcher};
 use super::context::ReferenceContext;
 use super::fuzzy;
 use super::parser;
+use super::versification;
 use crate::types::{Detection, DetectionSource, VerseRef};
 
 /// Translation command patterns — maps spoken phrases to translation abbreviations.
@@ -311,6 +312,19 @@ fn is_valid_reference(book_number: i32, chapter: i32) -> bool {
     chapter >= 1 && chapter <= max_ch
 }
 
+/// Drop a verse-range end that can't exist (past the chapter's last verse or
+/// before the start), so a bad range end doesn't invalidate a valid start.
+fn clamp_verse_end(verse_ref: &mut VerseRef) {
+    if let (Some(end), Some(max)) = (
+        verse_ref.verse_end,
+        versification::max_verse(verse_ref.book_number, verse_ref.chapter),
+    ) {
+        if end > max || end < verse_ref.verse_start {
+            verse_ref.verse_end = None;
+        }
+    }
+}
+
 /// Filler phrases commonly found in sermon transcripts that confuse detection.
 /// These are stripped (case-insensitively) before the text reaches the automaton.
 const FILLER_PHRASES: &[&str] = &[
@@ -413,6 +427,19 @@ fn clean_transcript(text: &str) -> String {
 /// How long to wait for an incomplete reference to be completed (15 seconds).
 /// Preachers often pause between book name and chapter/verse.
 const INCOMPLETE_REF_TIMEOUT_MS: u128 = 15_000;
+
+/// Confidence for contextual (book-less) detections resolved against the last
+/// book heard. All deliberately >= 0.90: that keeps the semantic FTS pass
+/// suppressed for the utterance and stays above the 0.80 auto-queue threshold.
+const CONTEXTUAL_CHAPTER_VERSE_CONFIDENCE: f64 = 0.95;
+const CONTEXTUAL_VERSE_ONLY_CONFIDENCE: f64 = 0.92;
+const CONTEXTUAL_BARE_COLON_CONFIDENCE: f64 = 0.90;
+
+/// Bare "N:M" (no "chapter"/"verse" keyword) is the riskiest contextual
+/// pattern — it can match times of day — so it only resolves against context
+/// updated within this window. Corrections ("Revelation 20:22... 22:20")
+/// arrive within seconds.
+const BARE_COLON_CONTEXT_WINDOW_SECS: u64 = 30;
 
 /// An incomplete reference waiting for verse completion.
 #[derive(Debug, Clone)]
@@ -554,7 +581,14 @@ impl DirectDetector {
                         let mut completed = incomplete.verse_ref.clone();
                         completed.chapter = ch;
                         completed.verse_start = v;
-                        if is_valid_reference(completed.book_number, completed.chapter) {
+                        if is_valid_reference(completed.book_number, completed.chapter)
+                            && versification::is_valid_verse(
+                                completed.book_number,
+                                completed.chapter,
+                                completed.verse_start,
+                            )
+                        {
+                            clamp_verse_end(&mut completed);
                             detections.push(self.make_direct_detection(
                                 &completed,
                                 compute_confidence(&completed, &completed),
@@ -564,6 +598,8 @@ impl DirectDetector {
                             ));
                             self.push_recent(&completed);
                             self.context.update(&completed);
+                        } else {
+                            self.remember_rejected(&completed);
                         }
                         self.incomplete = None;
                         return detections;
@@ -571,7 +607,14 @@ impl DirectDetector {
                     parser::Continuation::VerseOnly(v) => {
                         let mut completed = incomplete.verse_ref.clone();
                         completed.verse_start = v;
-                        if is_valid_reference(completed.book_number, completed.chapter) {
+                        if is_valid_reference(completed.book_number, completed.chapter)
+                            && versification::is_valid_verse(
+                                completed.book_number,
+                                completed.chapter,
+                                completed.verse_start,
+                            )
+                        {
+                            clamp_verse_end(&mut completed);
                             detections.push(self.make_direct_detection(
                                 &completed,
                                 compute_confidence(&completed, &completed),
@@ -581,6 +624,8 @@ impl DirectDetector {
                             ));
                             self.push_recent(&completed);
                             self.context.update(&completed);
+                        } else {
+                            self.remember_rejected(&completed);
                         }
                         self.incomplete = None;
                         return detections;
@@ -625,7 +670,7 @@ impl DirectDetector {
         for book_match in effective_matches {
             if let Some(verse_ref) = parser::parse_reference(text, book_match) {
                 // Resolve any partial references using context
-                let resolved = self.context.resolve(&verse_ref);
+                let mut resolved = self.context.resolve(&verse_ref);
 
                 // Skip if we couldn't resolve to a meaningful reference
                 if resolved.book_number == 0 || resolved.chapter == 0 {
@@ -637,6 +682,7 @@ impl DirectDetector {
                 if resolved.chapter > 0
                     && !is_valid_reference(resolved.book_number, resolved.chapter)
                 {
+                    self.remember_rejected(&resolved);
                     continue;
                 }
 
@@ -656,6 +702,20 @@ impl DirectDetector {
                     self.context.update(&resolved);
                     continue;
                 }
+
+                // Skip non-existent verses (e.g., "Revelation 20:22" — Rev 20
+                // ends at verse 15), but remember the book/chapter so a
+                // follow-up correction without the book name ("22:20") can
+                // still resolve (issue #141).
+                if !versification::is_valid_verse(
+                    resolved.book_number,
+                    resolved.chapter,
+                    resolved.verse_start,
+                ) {
+                    self.remember_rejected(&resolved);
+                    continue;
+                }
+                clamp_verse_end(&mut resolved);
 
                 // Full reference — also clear any pending incomplete
                 self.incomplete = None;
@@ -690,7 +750,103 @@ impl DirectDetector {
             }
         }
 
+        // Step 4: No book name anywhere in the text — try to resolve a
+        // book-less reference ("22:20", "verse 5", "chapter 22 verse 20")
+        // against the last book heard (issue #141).
+        if detections.is_empty() && effective_matches.is_empty() {
+            if let Some(detection) = self.try_contextual_detection(text) {
+                detections.push(detection);
+            }
+        }
+
         detections
+    }
+
+    /// Resolve a book-less reference against recent context. Returns a
+    /// detection for chapter+verse patterns; a chapter-only pattern parks an
+    /// [`IncompleteRef`] (reusing the normal completion machinery) and
+    /// returns `None`.
+    fn try_contextual_detection(&mut self, text: &str) -> Option<Detection> {
+        let contextual = parser::parse_contextual(text)?;
+        let (book_number, book_name) = {
+            let (num, name) = self.context.last_book()?;
+            (num, name.to_string())
+        };
+
+        let (chapter, verse, confidence) = match contextual {
+            parser::ContextualRef::ChapterVerse {
+                chapter,
+                verse,
+                keyword_anchored,
+            } => {
+                // Bare "N:M" only counts shortly after a citation — it's the
+                // pattern most likely to be something else (a time of day).
+                if !keyword_anchored && !self.context.is_fresh(BARE_COLON_CONTEXT_WINDOW_SECS) {
+                    return None;
+                }
+                let confidence = if keyword_anchored {
+                    CONTEXTUAL_CHAPTER_VERSE_CONFIDENCE
+                } else {
+                    CONTEXTUAL_BARE_COLON_CONFIDENCE
+                };
+                (chapter, verse, confidence)
+            }
+            parser::ContextualRef::VerseOnly(verse) => (
+                self.context.last_chapter()?,
+                verse,
+                CONTEXTUAL_VERSE_ONLY_CONFIDENCE,
+            ),
+            parser::ContextualRef::ChapterOnly(chapter) => {
+                if !is_valid_reference(book_number, chapter) {
+                    return None;
+                }
+                let verse_ref = VerseRef {
+                    book_number,
+                    book_name,
+                    chapter,
+                    verse_start: 0,
+                    verse_end: None,
+                };
+                self.context.update(&verse_ref);
+                self.incomplete = Some(IncompleteRef {
+                    verse_ref,
+                    timestamp: Instant::now(),
+                    chapter_is_default: false,
+                });
+                return None;
+            }
+        };
+
+        if !is_valid_reference(book_number, chapter)
+            || !versification::is_valid_verse(book_number, chapter, verse)
+        {
+            return None;
+        }
+
+        let verse_ref = VerseRef {
+            book_number,
+            book_name,
+            chapter,
+            verse_start: verse,
+            verse_end: None,
+        };
+        self.push_recent(&verse_ref);
+        self.context.update(&verse_ref);
+        self.incomplete = None;
+        Some(self.make_direct_detection(&verse_ref, confidence, text, 0, text.len()))
+    }
+
+    /// Record a rejected reference's book (and chapter, when the chapter
+    /// itself is valid) as context, so a follow-up correction that omits the
+    /// book name can still resolve.
+    fn remember_rejected(&mut self, verse_ref: &VerseRef) {
+        let mut ctx_ref = verse_ref.clone();
+        ctx_ref.verse_start = 0;
+        ctx_ref.verse_end = None;
+        if !is_valid_reference(ctx_ref.book_number, ctx_ref.chapter) {
+            ctx_ref.chapter = 0;
+        }
+        self.context.update(&ctx_ref);
     }
 
     /// Check if text contains a "previous verse" / "last verse" command.
@@ -769,6 +925,22 @@ impl DirectDetector {
             transcript_snippet: snippet,
             detected_at: now,
             is_chapter_only: false,
+        }
+    }
+
+    /// Test helper: backdate the pending incomplete reference past its
+    /// timeout without sleeping.
+    #[cfg(test)]
+    fn expire_incomplete(&mut self) {
+        if let Some(ref mut inc) = self.incomplete {
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "timeout constant is far below u64::MAX millis"
+            )]
+            let past = std::time::Duration::from_millis(INCOMPLETE_REF_TIMEOUT_MS as u64 + 1_000);
+            if let Some(ts) = Instant::now().checked_sub(past) {
+                inc.timestamp = ts;
+            }
         }
     }
 }
@@ -1606,5 +1778,149 @@ mod tests {
         assert!(!results.is_empty());
         assert_eq!(results[0].verse_ref.chapter, 3);
         assert_eq!(results[0].verse_ref.verse_start, 15);
+    }
+
+    // --- Issue #141: verse-existence validation + contextual resolution ---
+
+    #[test]
+    fn test_nonexistent_verse_not_emitted() {
+        // Revelation 20 ends at verse 15 — 20:22 must never be emitted.
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("Revelation 20:22");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_invalid_verse_then_bare_colon_correction() {
+        // The incident from issue #141: preacher says "Revelation 20:22"
+        // (doesn't exist), then corrects to "22:20" without the book name.
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation 20:22");
+        assert!(results.is_empty());
+
+        let results = detector.detect("22:20");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+        assert!(results[0].confidence >= 0.90);
+    }
+
+    #[test]
+    fn test_late_verse_after_emitted_reference() {
+        // After a complete reference is emitted, a later "verse N" must still
+        // resolve against it (the incomplete machine is cleared on emit).
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation chapter 20 verse 2");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.verse_start, 2);
+
+        let results = detector.detect("and the dragon was bound as john saw");
+        assert!(results.is_empty());
+
+        let results = detector.detect("now verse 5 says");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 20);
+        assert_eq!(results[0].verse_ref.verse_start, 5);
+    }
+
+    #[test]
+    fn test_late_verse_number_long_gap() {
+        // "Revelation chapter 20" parks an incomplete ref; after its 15s
+        // timeout expires, "verse 2" must still resolve via context.
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation chapter 20");
+        assert!(results.is_empty());
+        assert!(detector.incomplete.is_some());
+
+        detector.expire_incomplete();
+
+        let results = detector.detect("verse 2");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 20);
+        assert_eq!(results[0].verse_ref.verse_start, 2);
+    }
+
+    #[test]
+    fn test_contextual_requires_context() {
+        // With no book ever heard, book-less patterns must not fire.
+        let mut detector = DirectDetector::new();
+        assert!(detector.detect("22:20").is_empty());
+        assert!(detector.detect("verse 5").is_empty());
+    }
+
+    #[test]
+    fn test_bare_colon_chapter_exceeds_context_book() {
+        // Revelation has 22 chapters — "50:1" can't resolve against it.
+        let mut detector = DirectDetector::new();
+        detector.detect("Revelation 20:2");
+        assert!(detector.detect("50:1").is_empty());
+    }
+
+    #[test]
+    fn test_contextual_nonexistent_verse_rejected() {
+        // Context is Revelation; "20:22" is book-less but still impossible.
+        let mut detector = DirectDetector::new();
+        detector.detect("Revelation 22:1");
+        assert!(detector.detect("20:22").is_empty());
+    }
+
+    #[test]
+    fn test_contextual_chapter_only_parks_incomplete() {
+        // "chapter 22" with Revelation context parks an incomplete ref that
+        // the normal continuation machinery then completes.
+        let mut detector = DirectDetector::new();
+        detector.detect("Revelation 20:2");
+
+        let results = detector.detect("turn to chapter 22");
+        assert!(results.is_empty());
+        let inc = detector.incomplete.as_ref().unwrap();
+        assert_eq!(inc.verse_ref.book_number, 66);
+        assert_eq!(inc.verse_ref.chapter, 22);
+
+        let results = detector.detect("verse 20");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_invalid_continuation_updates_context() {
+        // "Revelation 20" pending, then "22:20" — the continuation colon
+        // pattern must yield 22:20, not treat 22 as a bare verse.
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation 20");
+        assert!(results.is_empty());
+
+        let results = detector.detect("22:20");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_contextual_ignores_time_of_day() {
+        let mut detector = DirectDetector::new();
+        detector.detect("Revelation 20:2");
+        assert!(detector.detect("the service starts at 10:30").is_empty());
+        assert!(detector.detect("10:30 am tomorrow").is_empty());
+    }
+
+    #[test]
+    fn test_verse_range_end_clamped() {
+        // John 3 ends at verse 36 — a range end past that is dropped, but
+        // the valid start still emits.
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("John 3:16-99");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.verse_start, 16);
+        assert_eq!(results[0].verse_ref.verse_end, None);
     }
 }

@@ -49,6 +49,16 @@ export async function presentVerse(verse: Verse): Promise<void> {
   // A newer present started while we were refetching — let it win.
   if (ticket !== presentSeq) return
 
+  // Never present a verse with no text (e.g. a citation that doesn't exist
+  // in the active translation) — keep whatever is currently live instead.
+  if (!verseToPresent.text?.trim()) {
+    console.warn(
+      "[broadcast] refusing to present verse with empty text:",
+      `${verseToPresent.book_name} ${verseToPresent.chapter}:${verseToPresent.verse}`,
+    )
+    return
+  }
+
   const bibleState = useBibleStore.getState()
   const translation =
     bibleState.translations.find((t) => t.id === bibleState.activeTranslationId)

@@ -11,8 +11,9 @@ pub struct ReferenceContext {
     last_timestamp: Option<Instant>,
 }
 
-/// How long context remains valid (60 seconds).
-const CONTEXT_TIMEOUT_SECS: u64 = 60;
+/// How long context remains valid (90 seconds — preachers often expound for
+/// a while between citing a book and calling out the next verse number).
+const CONTEXT_TIMEOUT_SECS: u64 = 90;
 
 impl ReferenceContext {
     pub fn new() -> Self {
@@ -66,6 +67,31 @@ impl ReferenceContext {
         }
 
         resolved
+    }
+
+    /// Check if context was updated within the last `within_secs` seconds.
+    /// Used for patterns that need a tighter window than the full timeout
+    /// (e.g. bare "N:M" corrections).
+    pub fn is_fresh(&self, within_secs: u64) -> bool {
+        match self.last_timestamp {
+            Some(ts) => ts.elapsed().as_secs() < within_secs,
+            None => false,
+        }
+    }
+
+    /// The last book heard, if context is still valid.
+    pub fn last_book(&self) -> Option<(i32, &str)> {
+        if !self.is_valid() {
+            return None;
+        }
+        let book = self.last_book?;
+        let name = self.last_book_name.as_deref()?;
+        Some((book, name))
+    }
+
+    /// The last chapter heard, if context is still valid.
+    pub fn last_chapter(&self) -> Option<i32> {
+        if self.is_valid() { self.last_chapter } else { None }
     }
 
     /// Update context with the latest detection.
