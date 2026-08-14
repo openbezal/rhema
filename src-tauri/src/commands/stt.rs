@@ -804,6 +804,31 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
 
     let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
 
+    // If the utterance explicitly names a book that differs from the one
+    // being read, it's a spoken reference (possibly one direct detection
+    // rejected as non-existent), not an in-book navigation command. Reading
+    // mode must not reinterpret its numbers against its own book — that's
+    // how "Revelation chapter 20 verse 22" while reading Hebrews 12 ended
+    // up presenting Hebrews 12:22 (issue #141).
+    {
+        let rm_book = {
+            let Ok(rm) = rm_managed.lock() else { return false };
+            if rm.is_active() || rm.has_verses() { rm.current_book() } else { 0 }
+        };
+        if rm_book != 0 {
+            let detector_state: State<'_, Mutex<rhema_detection::DirectDetector>> = app.state();
+            let mentioned = match detector_state.lock() {
+                Ok(d) => d.mentioned_books(transcript),
+                Err(_) => Vec::new(),
+            };
+            drop(detector_state);
+            if !mentioned.is_empty() && !mentioned.contains(&rm_book) {
+                log::info!("[READING] Skipping — utterance names a different book than the one being read");
+                return false;
+            }
+        }
+    }
+
     // Check for chapter navigation commands (e.g., "let's go to chapter seven").
     {
         let chapter_change = {
@@ -841,12 +866,22 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
                 if !chapter_verses.is_empty() {
                     let start_verse = change.start_verse.unwrap_or(1);
 
-                    // Find the text for the starting verse
-                    let start_verse_text = chapter_verses
+                    // Never navigate to a verse that doesn't exist in the
+                    // chapter (e.g. "chapter 12 verse 64") — presenting
+                    // verse 1's text under a wrong reference is worse than
+                    // ignoring the command (issue #141).
+                    let Some(start_verse_text) = chapter_verses
                         .iter()
                         .find(|v| v.verse == start_verse)
                         .map(|v| v.text.clone())
-                        .unwrap_or_else(|| chapter_verses[0].text.clone());
+                    else {
+                        log::warn!(
+                            "[READING] Ignoring chapter change — verse {start_verse} not in {} {}",
+                            change.book_name,
+                            change.new_chapter
+                        );
+                        return false;
+                    };
 
                     let verses: Vec<(i32, String)> = chapter_verses
                         .into_iter()

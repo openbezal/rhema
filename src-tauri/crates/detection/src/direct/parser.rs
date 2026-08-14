@@ -822,12 +822,25 @@ pub fn parse_contextual(text: &str) -> Option<ContextualRef> {
         }
     }
 
-    // Pattern 2: "verse N" / "verses N" anywhere in text
+    // Pattern 2: "[N] verse M" anywhere in text. A number right before the
+    // "verse" keyword is the chapter ("22 verse 20" → 22:20), matching how
+    // spoken corrections omit the "chapter" keyword.
     for i in 0..tokens.len() {
         if let Token::Word(w) = &tokens[i] {
             if w == "verse" || w == "verses" {
                 if let Some((verse, _)) = consume_number(&tokens, i + 1) {
                     if verse > 0 && verse <= 176 {
+                        if i > 0 {
+                            if let Token::Number(chapter) = &tokens[i - 1] {
+                                if *chapter > 0 {
+                                    return Some(ContextualRef::ChapterVerse {
+                                        chapter: *chapter,
+                                        verse,
+                                        keyword_anchored: true,
+                                    });
+                                }
+                            }
+                        }
                         return Some(ContextualRef::VerseOnly(verse));
                     }
                 }
@@ -852,6 +865,27 @@ pub fn parse_contextual(text: &str) -> Option<ContextualRef> {
     }
 
     None
+}
+
+/// All adjacent digit-number pairs in the text, in order of appearance.
+///
+/// Deepgram renders a spoken "twenty-two twenty" as "22 20" — two plain
+/// numbers, never a colon — so corrections like "Revelation 20:22... 22 20"
+/// only surface this way. The detector validates each pair against the
+/// context book and takes the last valid one; this stays safe because it
+/// only runs in a short window after a citation.
+pub fn extract_adjacent_number_pairs(text: &str) -> Vec<(i32, i32)> {
+    let lower = text.to_lowercase();
+    let tokens = tokenize(lower.trim());
+    let mut pairs = Vec::new();
+    for i in 0..tokens.len().saturating_sub(1) {
+        if let (Token::Number(a), Token::Number(b)) = (&tokens[i], &tokens[i + 1]) {
+            if *a > 0 && *b > 0 && *b <= 176 {
+                pairs.push((*a, *b));
+            }
+        }
+    }
+    pairs
 }
 
 #[cfg(test)]
@@ -1329,5 +1363,30 @@ mod tests {
         assert_eq!(parse_contextual("the weather is nice today"), None);
         assert_eq!(parse_contextual("there were 12 disciples"), None);
         assert_eq!(parse_contextual(""), None);
+    }
+
+    #[test]
+    fn test_contextual_number_verse_number() {
+        // "22 verse 20" — a correction that omits the "chapter" keyword.
+        assert_eq!(
+            parse_contextual("22 verse 20."),
+            Some(ContextualRef::ChapterVerse {
+                chapter: 22,
+                verse: 20,
+                keyword_anchored: true
+            })
+        );
+    }
+
+    #[test]
+    fn test_extract_adjacent_number_pairs() {
+        // Deepgram renders spoken "twenty-two twenty" as "22 20", no colon.
+        assert_eq!(extract_adjacent_number_pairs("22 20."), vec![(22, 20)]);
+        assert_eq!(
+            extract_adjacent_number_pairs("Revelation 20 22. 22 20."),
+            vec![(20, 22), (22, 22), (22, 20)]
+        );
+        assert_eq!(extract_adjacent_number_pairs("there were 12 disciples"), vec![]);
+        assert_eq!(extract_adjacent_number_pairs("verse 5"), vec![]);
     }
 }

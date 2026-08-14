@@ -598,10 +598,17 @@ impl DirectDetector {
                             ));
                             self.push_recent(&completed);
                             self.context.update(&completed);
+                            self.incomplete = None;
                         } else {
+                            // The naive completion doesn't exist — the text
+                            // may be a correction ("22 20" after "Revelation
+                            // 20"), so retry it contextually.
                             self.remember_rejected(&completed);
+                            self.incomplete = None;
+                            if let Some(d) = self.try_contextual_detection(text) {
+                                detections.push(d);
+                            }
                         }
-                        self.incomplete = None;
                         return detections;
                     }
                     parser::Continuation::VerseOnly(v) => {
@@ -624,10 +631,14 @@ impl DirectDetector {
                             ));
                             self.push_recent(&completed);
                             self.context.update(&completed);
+                            self.incomplete = None;
                         } else {
                             self.remember_rejected(&completed);
+                            self.incomplete = None;
+                            if let Some(d) = self.try_contextual_detection(text) {
+                                detections.push(d);
+                            }
                         }
-                        self.incomplete = None;
                         return detections;
                     }
                     parser::Continuation::ChapterOnly(ch) => {
@@ -667,6 +678,7 @@ impl DirectDetector {
         };
 
         // Step 2 & 3: Parse references and resolve context
+        let mut rejected_reference = false;
         for book_match in effective_matches {
             if let Some(verse_ref) = parser::parse_reference(text, book_match) {
                 // Resolve any partial references using context
@@ -683,6 +695,7 @@ impl DirectDetector {
                     && !is_valid_reference(resolved.book_number, resolved.chapter)
                 {
                     self.remember_rejected(&resolved);
+                    rejected_reference = true;
                     continue;
                 }
 
@@ -713,6 +726,7 @@ impl DirectDetector {
                     resolved.verse_start,
                 ) {
                     self.remember_rejected(&resolved);
+                    rejected_reference = true;
                     continue;
                 }
                 clamp_verse_end(&mut resolved);
@@ -750,10 +764,12 @@ impl DirectDetector {
             }
         }
 
-        // Step 4: No book name anywhere in the text — try to resolve a
-        // book-less reference ("22:20", "verse 5", "chapter 22 verse 20")
-        // against the last book heard (issue #141).
-        if detections.is_empty() && effective_matches.is_empty() {
+        // Step 4: Try to resolve a book-less reference ("22 20", "verse 5",
+        // "chapter 22 verse 20") against the last book heard (issue #141).
+        // Runs when the text has no book name at all, or when every parsed
+        // reference was rejected as non-existent — the trailing numbers may
+        // be a correction ("Revelation 20 22. 22 20.").
+        if detections.is_empty() && (effective_matches.is_empty() || rejected_reference) {
             if let Some(detection) = self.try_contextual_detection(text) {
                 detections.push(detection);
             }
@@ -767,10 +783,43 @@ impl DirectDetector {
     /// [`IncompleteRef`] (reusing the normal completion machinery) and
     /// returns `None`.
     fn try_contextual_detection(&mut self, text: &str) -> Option<Detection> {
-        let contextual = parser::parse_contextual(text)?;
         let (book_number, book_name) = {
             let (num, name) = self.context.last_book()?;
             (num, name.to_string())
+        };
+
+        let Some(contextual) = parser::parse_contextual(text) else {
+            // No keyword or colon pattern — fall back to adjacent number
+            // pairs ("22 20": Deepgram never renders spoken chapter:verse
+            // corrections with a colon). Same tight window as bare colons;
+            // the last pair that exists in the context book wins.
+            if !self.context.is_fresh(BARE_COLON_CONTEXT_WINDOW_SECS) {
+                return None;
+            }
+            let (chapter, verse) = parser::extract_adjacent_number_pairs(text)
+                .into_iter()
+                .rev()
+                .find(|&(ch, v)| {
+                    is_valid_reference(book_number, ch)
+                        && versification::is_valid_verse(book_number, ch, v)
+                })?;
+            let verse_ref = VerseRef {
+                book_number,
+                book_name,
+                chapter,
+                verse_start: verse,
+                verse_end: None,
+            };
+            self.push_recent(&verse_ref);
+            self.context.update(&verse_ref);
+            self.incomplete = None;
+            return Some(self.make_direct_detection(
+                &verse_ref,
+                CONTEXTUAL_BARE_COLON_CONFIDENCE,
+                text,
+                0,
+                text.len(),
+            ));
         };
 
         let (chapter, verse, confidence) = match contextual {
@@ -834,6 +883,18 @@ impl DirectDetector {
         self.context.update(&verse_ref);
         self.incomplete = None;
         Some(self.make_direct_detection(&verse_ref, confidence, text, 0, text.len()))
+    }
+
+    /// Book numbers explicitly named in the text (after transcript cleaning).
+    /// Lets the app layer keep reading mode from reinterpreting numbers that
+    /// belong to a spoken reference for a different book.
+    pub fn mentioned_books(&self, text: &str) -> Vec<i32> {
+        let cleaned = clean_transcript(text);
+        self.matcher
+            .find_books(&cleaned)
+            .iter()
+            .map(|m| m.book_number)
+            .collect()
     }
 
     /// Record a rejected reference's book (and chapter, when the chapter
@@ -1911,6 +1972,79 @@ mod tests {
         detector.detect("Revelation 20:2");
         assert!(detector.detect("the service starts at 10:30").is_empty());
         assert!(detector.detect("10:30 am tomorrow").is_empty());
+    }
+
+    #[test]
+    fn test_correction_pair_after_invalid_citation() {
+        // Live-test flow: Deepgram renders "Revelation 20:22" as
+        // "Revelation 20 22." and the correction as "22 20." — no colons.
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation 20 22.");
+        assert!(results.is_empty());
+
+        let results = detector.detect("22 20.");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_correction_pair_with_pending_incomplete() {
+        // Partials park "Revelation 20" as incomplete before the correction
+        // arrives; the naive completion (20:22) is invalid and must fall
+        // through to the pair correction.
+        let mut detector = DirectDetector::new();
+
+        detector.detect("Revelation");
+        detector.detect("20 22");
+        assert!(detector.detect("Revelation 20 22.").is_empty());
+
+        let results = detector.detect("22 20.");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_single_utterance_pair_correction() {
+        // Citation and correction arrive in one final: the invalid pairs
+        // (20:22, 22:22) are skipped, the last valid pair (22:20) wins.
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation 20 22. 22 20.");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_number_verse_correction() {
+        // "22 verse 20" — chapter spoken without the "chapter" keyword.
+        let mut detector = DirectDetector::new();
+
+        assert!(detector.detect("Revelation chapter 20 verse 22.").is_empty());
+
+        let results = detector.detect("22 verse 20.");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_pair_requires_context() {
+        let mut detector = DirectDetector::new();
+        assert!(detector.detect("22 20.").is_empty());
+    }
+
+    #[test]
+    fn test_mentioned_books() {
+        let detector = DirectDetector::new();
+        assert_eq!(detector.mentioned_books("Revelation chapter 20 verse 22"), vec![66]);
+        assert_eq!(detector.mentioned_books("22 verse 20."), Vec::<i32>::new());
     }
 
     #[test]
