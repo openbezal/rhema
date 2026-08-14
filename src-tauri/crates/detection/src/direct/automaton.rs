@@ -91,10 +91,11 @@ impl BookMatcher {
             let start = mat.start();
             let end = mat.end();
 
-            // Check word boundary at start
+            // Check word boundary at start. An apostrophe is word-internal:
+            // without this, "we're" matches the Revelation alias "Re".
             if start > 0 {
                 let prev = text_bytes[start - 1];
-                if prev.is_ascii_alphanumeric() {
+                if prev.is_ascii_alphanumeric() || prev == b'\'' {
                     continue;
                 }
             }

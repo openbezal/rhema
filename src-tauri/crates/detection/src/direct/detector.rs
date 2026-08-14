@@ -734,6 +734,17 @@ impl DirectDetector {
                 // Full reference — also clear any pending incomplete
                 self.incomplete = None;
 
+                // Repeated citations in one utterance ("Revelation 20:22
+                // Revelation 20:22 sorry…") parse once per book match —
+                // emit each distinct reference only once.
+                if detections.iter().any(|d: &Detection| {
+                    d.verse_ref.book_number == resolved.book_number
+                        && d.verse_ref.chapter == resolved.chapter
+                        && d.verse_ref.verse_start == resolved.verse_start
+                }) {
+                    continue;
+                }
+
                 let confidence = compute_confidence(&resolved, &verse_ref);
                 let snippet = extract_snippet(text, book_match.start, book_match.end);
 
@@ -2045,6 +2056,34 @@ mod tests {
         let detector = DirectDetector::new();
         assert_eq!(detector.mentioned_books("Revelation chapter 20 verse 22"), vec![66]);
         assert_eq!(detector.mentioned_books("22 verse 20."), Vec::<i32>::new());
+    }
+
+    #[test]
+    fn test_sorry_correction_live_sequence() {
+        // Exact live-test flow: repeated invalid citation, "oh, sorry", then
+        // the bare-pair correction — first within one utterance, then the
+        // partial without the correction must not invent a verse.
+        let mut detector = DirectDetector::new();
+
+        let results = detector.detect("Revelation chapter 20 22 Revelation 20 22 Oh, sorry.");
+        assert!(results.is_empty(), "must not invent Rev 20:1, got {results:?}");
+
+        let results =
+            detector.detect("Revelation chapter 20 22 Revelation 20 22 oh, sorry. 22 20.");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_number, 66);
+        assert_eq!(results[0].verse_ref.chapter, 22);
+        assert_eq!(results[0].verse_ref.verse_start, 20);
+    }
+
+    #[test]
+    fn test_contraction_is_not_a_book() {
+        // "we're" must not match the Revelation alias "Re".
+        let detector = DirectDetector::new();
+        assert!(detector
+            .mentioned_books("We're opening our bible to the book of Hebrews chapter 12.")
+            .iter()
+            .all(|&b| b == 58));
     }
 
     #[test]

@@ -247,6 +247,30 @@ fn try_correction_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
         }
     }
 
+    // No keywords after the correction — a bare pair ("sorry. 22 20") or
+    // colon pair is the corrected chapter:verse itself.
+    if corrected_chapter.is_none() && corrected_verse.is_none() {
+        for i in (correction_idx + 1)..tokens.len().saturating_sub(1) {
+            if let (Token::Number(ch), second) = (&tokens[i], &tokens[i + 1]) {
+                let verse = match second {
+                    Token::Number(v) => Some(*v),
+                    Token::Colon => match tokens.get(i + 2) {
+                        Some(Token::Number(v)) => Some(*v),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(v) = verse {
+                    if *ch > 0 && v > 0 && v <= 176 {
+                        corrected_chapter = Some(*ch);
+                        corrected_verse = Some(v);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Apply correction logic:
     // - If something is corrected, use the corrected value
     // - Otherwise, keep the initial value
@@ -258,11 +282,14 @@ fn try_correction_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
         return None;
     }
 
+    // A missing verse stays 0 (chapter-only): the detector parks it as an
+    // incomplete ref. Defaulting to verse 1 invented detections like
+    // "…chapter 20 … oh, sorry." → 20:1 at full confidence (issue #141).
     Some(VerseRef {
         book_number: book_match.book_number,
         book_name: book_match.book_name.clone(),
         chapter: final_chapter.unwrap_or(1),
-        verse_start: final_verse.unwrap_or(1),
+        verse_start: final_verse.unwrap_or(0),
         verse_end: None,
     })
 }
@@ -1180,13 +1207,37 @@ mod tests {
 
     #[test]
     fn test_correction_chapter_only() {
-        // Pattern: "Romans chapter 8 sorry chapter 12" → Romans 12:1
+        // Pattern: "Romans chapter 8 sorry chapter 12" → Romans 12, no verse
+        // yet (verse_start 0 → parked as incomplete; defaulting to verse 1
+        // used to invent detections the preacher never spoke).
         let bm = make_book_match("Romans", 45, 6);
         let text = "Romans chapter 8 sorry chapter 12";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 12);
-        assert_eq!(result.verse_start, 1);
+        assert_eq!(result.verse_start, 0);
         assert_eq!(result.verse_end, None);
+    }
+
+    #[test]
+    fn test_correction_bare_pair_after_keyword() {
+        // Live incident: "…chapter 20 22 … oh, sorry. 22 20." — the corrected
+        // reference arrives as a bare pair with no chapter/verse keyword.
+        let bm = make_book_match("Revelation", 66, 0);
+        let text = "Revelation chapter 20 22 oh, sorry. 22 20.";
+        let result = parse_reference(text, &bm).unwrap();
+        assert_eq!(result.chapter, 22);
+        assert_eq!(result.verse_start, 20);
+    }
+
+    #[test]
+    fn test_correction_without_numbers_is_chapter_only() {
+        // "…chapter 20 … oh, sorry." with nothing after must NOT invent
+        // verse 1 — it stays chapter-only until the correction arrives.
+        let bm = make_book_match("Revelation", 66, 0);
+        let text = "Revelation chapter 20 oh, sorry.";
+        let result = parse_reference(text, &bm).unwrap();
+        assert_eq!(result.chapter, 20);
+        assert_eq!(result.verse_start, 0);
     }
 
     #[test]
