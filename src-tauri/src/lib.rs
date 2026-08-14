@@ -151,9 +151,7 @@ pub fn run() {
                                         check_embedding_provenance(&embeddings_path, &model_path)
                                     {
                                         // Surface in the UI (warning banner via detection_status).
-                                        let managed_state = app.state::<Mutex<state::AppState>>();
-                                        managed_state.lock().unwrap().embedding_warning =
-                                            Some(warning);
+                                        set_embedding_warning(app.handle(), warning);
                                     }
                                     pipeline.set_semantic(
                                         rhema_detection::SemanticDetector::new(
@@ -161,6 +159,13 @@ pub fn run() {
                                             Box::new(index),
                                         ),
                                     );
+                                    drop(pipeline);
+                                    // The sidecar can be missing (indexes built before it
+                                    // existed) or wrong — verify EMPIRICALLY in the
+                                    // background: a matched index finds a verse's own text
+                                    // at ~1.0 similarity; the historical mismatched index
+                                    // scored ~0.65. One ONNX embed, off the startup path.
+                                    spawn_embedding_self_check(app.handle().clone());
                                 }
                                 Err(e) => {
                                     log::warn!("Failed to load verse embeddings: {e}");
@@ -188,6 +193,75 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Store an embedding warning in `AppState` (read by `detection_status`)
+/// and push it to the webview so the banner appears without a reload.
+fn set_embedding_warning(app: &tauri::AppHandle, warning: String) {
+    use tauri::{Emitter, Manager};
+    let managed_state = app.state::<Mutex<state::AppState>>();
+    managed_state.lock().unwrap().embedding_warning = Some(warning.clone());
+    let _ = app.emit("embedding_warning", warning);
+}
+
+/// Empirical index verification, run in the background after startup.
+///
+/// Embeds one known verse's exact KJV text and asks the index for its
+/// nearest neighbour. A healthy index returns that same verse at ~1.0
+/// cosine; the historical mismatched index (built with a different
+/// model/pooling) scored ~0.65. This needs no provenance sidecar, so it
+/// catches the most common broken state in the wild: an old index with no
+/// `meta.json` at all.
+fn spawn_embedding_self_check(app: tauri::AppHandle) {
+    use tauri::Manager;
+    tauri::async_runtime::spawn(async move {
+        let _ = tokio::task::spawn_blocking(move || {
+            // John 3:16 KJV — present in every index build.
+            let (verse_id, verse_text) = {
+                let managed_state = app.state::<Mutex<state::AppState>>();
+                let app_state = managed_state.lock().unwrap();
+                let Some(db) = app_state.bible_db.as_ref() else { return };
+                match db.get_verse(1, 43, 3, 16) {
+                    Ok(Some(v)) => (v.id, v.text),
+                    _ => return,
+                }
+            };
+
+            let top_hit = {
+                let managed_pipeline =
+                    app.state::<Mutex<rhema_detection::DetectionPipeline>>();
+                let mut pipeline = managed_pipeline.lock().unwrap();
+                if !pipeline.has_semantic() {
+                    return;
+                }
+                pipeline.semantic_search(&verse_text, 1).into_iter().next()
+            };
+
+            match top_hit {
+                Some((id, similarity)) if id == verse_id && similarity >= 0.98 => {
+                    log::info!(
+                        "Embedding index self-check OK (self-similarity {similarity:.4})"
+                    );
+                }
+                other => {
+                    let observed = other.map_or_else(
+                        || "no result".to_string(),
+                        |(id, sim)| format!("verse_id {id} at {sim:.2}"),
+                    );
+                    let warning = format!(
+                        "Semantic search index failed verification: a test verse should \
+                         match its own embedding at ~1.0 similarity but returned {observed}. \
+                         The index was built with a different model than the app is running, \
+                         so semantic results will be unreliable. Fix: delete \
+                         embeddings/kjv-qwen3-0.6b* and run `bun run setup:all --with-embedding`."
+                    );
+                    log::warn!("{warning}");
+                    set_embedding_warning(&app, warning);
+                }
+            }
+        })
+        .await;
+    });
 }
 
 /// Compare the embeddings' provenance sidecar (written by the precompute

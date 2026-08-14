@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { AlertTriangleIcon, XIcon } from "lucide-react"
+import { useTauriEvent } from "@/hooks/use-tauri-event"
 import type { DetectionStatus } from "@/types"
 
 /**
@@ -8,6 +9,10 @@ import type { DetectionStatus } from "@/types"
  * embedding index was built with a different ONNX model than the one the
  * app loaded (semantic results would be unreliable). Renders nothing in the
  * healthy cases: no embeddings installed, or index and model match.
+ *
+ * Two sources: the initial detection_status fetch (sidecar check at
+ * startup) and the "embedding_warning" event pushed when the background
+ * self-check — which needs no sidecar — finishes a few seconds later.
  */
 export function EmbeddingWarningBanner() {
   const [warning, setWarning] = useState<string | null>(null)
@@ -20,6 +25,10 @@ export function EmbeddingWarningBanner() {
       })
       .catch(() => {})
   }, [])
+
+  useTauriEvent<string>("embedding_warning", (message) => {
+    setWarning(message)
+  })
 
   // Always occupy the grid row — the parent grid's `auto` row collapses to
   // zero height when this is empty, and other rows keep their slots.
