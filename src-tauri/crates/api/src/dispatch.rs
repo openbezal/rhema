@@ -16,7 +16,8 @@ pub trait CommandSink: Send + Sync {
 
 /// Routes `RemoteCommand` variants to the correct sink method.
 ///
-/// Frontend-bound (`emit_event`): Next, Prev, Theme, Opacity, `OnAir`
+/// Frontend-bound (`emit_event`): Next, Prev, Theme, Opacity, `OnAir`,
+/// `SendToLive`, `BibleNext`, `BiblePrev`, `AddToQueue`
 /// Backend-bound (`invoke_backend`): Show, Hide, Confidence
 pub struct CommandDispatcher;
 
@@ -40,6 +41,10 @@ impl CommandDispatcher {
                 let payload = serde_json::json!({ "active": active }).to_string();
                 sink.emit_event("remote:on_air", &payload)
             }
+            RemoteCommand::SendToLive => sink.emit_event("remote:send_to_live", "{}"),
+            RemoteCommand::BibleNext => sink.emit_event("remote:bible_next", "{}"),
+            RemoteCommand::BiblePrev => sink.emit_event("remote:bible_prev", "{}"),
+            RemoteCommand::AddToQueue => sink.emit_event("remote:add_to_queue", "{}"),
             RemoteCommand::Show => sink.invoke_backend("show_broadcast", "{}"),
             RemoteCommand::Hide => sink.invoke_backend("hide_broadcast", "{}"),
             RemoteCommand::Confidence(val) => {
@@ -170,6 +175,46 @@ mod tests {
         assert!(payload.contains("true"));
     }
 
+    // The event name is the whole contract with the frontend listener — no
+    // compiler or type checker crosses that boundary, so each one is pinned
+    // here as a literal and again in src/lib/remote-events.ts.
+
+    #[test]
+    fn dispatch_send_to_live_emits_event() {
+        let sink = MockSink::new();
+        CommandDispatcher::dispatch(&RemoteCommand::SendToLive, &sink).unwrap();
+        assert_eq!(sink.event_count(), 1);
+        assert_eq!(sink.backend_count(), 0);
+        assert_eq!(sink.last_event().0, "remote:send_to_live");
+    }
+
+    #[test]
+    fn dispatch_bible_next_emits_event() {
+        let sink = MockSink::new();
+        CommandDispatcher::dispatch(&RemoteCommand::BibleNext, &sink).unwrap();
+        assert_eq!(sink.event_count(), 1);
+        assert_eq!(sink.backend_count(), 0);
+        assert_eq!(sink.last_event().0, "remote:bible_next");
+    }
+
+    #[test]
+    fn dispatch_bible_prev_emits_event() {
+        let sink = MockSink::new();
+        CommandDispatcher::dispatch(&RemoteCommand::BiblePrev, &sink).unwrap();
+        assert_eq!(sink.event_count(), 1);
+        assert_eq!(sink.backend_count(), 0);
+        assert_eq!(sink.last_event().0, "remote:bible_prev");
+    }
+
+    #[test]
+    fn dispatch_add_to_queue_emits_event() {
+        let sink = MockSink::new();
+        CommandDispatcher::dispatch(&RemoteCommand::AddToQueue, &sink).unwrap();
+        assert_eq!(sink.event_count(), 1);
+        assert_eq!(sink.backend_count(), 0);
+        assert_eq!(sink.last_event().0, "remote:add_to_queue");
+    }
+
     // --- Backend-bound command tests ---
 
     #[test]
@@ -211,6 +256,10 @@ mod tests {
             RemoteCommand::Theme("test".into()),
             RemoteCommand::Opacity(0.5),
             RemoteCommand::OnAir(false),
+            RemoteCommand::SendToLive,
+            RemoteCommand::BibleNext,
+            RemoteCommand::BiblePrev,
+            RemoteCommand::AddToQueue,
         ];
 
         for cmd in &frontend_cmds {
@@ -227,6 +276,8 @@ mod tests {
 
     #[test]
     fn backend_commands_never_emit_events() {
+        // Unchanged by the four commands added for #144 — all of them are
+        // frontend-bound, so none belongs in this list.
         let backend_cmds = vec![
             RemoteCommand::Show,
             RemoteCommand::Hide,

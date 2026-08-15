@@ -11,12 +11,16 @@ controller-specific tips, see [Remote control](/docs/features/remote-control).
 
 ## Command catalog
 
-Eight commands are supported by both protocols:
+Twelve commands are supported by both protocols:
 
 | Command | Effect |
 | --- | --- |
 | `next` | Advance the verse queue by one |
 | `prev` | Move back one in the queue |
+| `bible_next` | Advance the Bible Text panel by one verse (does not move the queue) |
+| `bible_prev` | Move the Bible Text panel back one verse |
+| `send_to_live` | Present the previewed verse on the live output |
+| `add_to_queue` | Add the previewed verse to the queue |
 | `show` | Bring the overlay on-air |
 | `hide` | Take the overlay off-air |
 | `theme <value>` | Switch the active theme by name |
@@ -27,6 +31,22 @@ Eight commands are supported by both protocols:
 Commands are case-insensitive on input. `value` argument types vary:
 `theme` is a string, `opacity` and `confidence` are floats in `[0.0,
 1.0]`, and `on_air` is a boolean (`true` / `false`).
+
+`next`, `prev`, `bible_next`, `bible_prev`, `send_to_live`, `add_to_queue`,
+`show` and `hide` take no argument.
+
+Over OSC an extra argument is ignored, so a controller that sends a value with
+every button press works unchanged. Over HTTP the body must match exactly —
+adding a `value` key to an argument-free command returns `422`.
+
+`bible_next` and `bible_prev` step within the current chapter and continue into
+the adjacent chapter of the same book at its edges. They stop at a book
+boundary rather than rolling into the next book, and do nothing at all when
+there is no chapter on the other side.
+
+`send_to_live` and `add_to_queue` act on the verse in Program preview. With
+nothing previewed, both are no-ops — `send_to_live` will never blank the live
+output.
 
 ## OSC
 
@@ -40,6 +60,10 @@ works.
 | --- | --- | --- |
 | `/rhema/next` | none | `oscsend localhost 8000 /rhema/next` |
 | `/rhema/prev` | none | `oscsend localhost 8000 /rhema/prev` |
+| `/rhema/bible_next` | none | `oscsend localhost 8000 /rhema/bible_next` |
+| `/rhema/bible_prev` | none | `oscsend localhost 8000 /rhema/bible_prev` |
+| `/rhema/send_to_live` | none | `oscsend localhost 8000 /rhema/send_to_live` |
+| `/rhema/add_to_queue` | none | `oscsend localhost 8000 /rhema/add_to_queue` |
 | `/rhema/show` | none | `oscsend localhost 8000 /rhema/show` |
 | `/rhema/hide` | none | `oscsend localhost 8000 /rhema/hide` |
 | `/rhema/theme` | string | `oscsend localhost 8000 /rhema/theme s "Classic Dark"` |
@@ -87,23 +111,28 @@ refreshes once per second:
 `active_theme` and `live_verse` are nullable — they're `null` until a
 theme is selected or a verse is sent live.
 
-### `POST /api/v1/control`
+### `POST /api/v1/command`
 
 Dispatch any command from the catalog. The body is JSON with a
 `command` key and (for commands that take a parameter) a `value` key:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/control \
+curl -X POST http://localhost:8080/api/v1/command \
   -H 'Content-Type: application/json' \
   -d '{"command":"theme","value":"Classic Dark"}'
 ```
 
 ```json
-{ "success": true, "error": null }
+{ "success": true }
 ```
 
-Unknown commands and invalid JSON are rejected with `success: false`
-and a descriptive `error` string.
+`error` is present only on failure. Unknown commands and invalid JSON are
+rejected with `success: false` and a descriptive `error` string.
+
+`POST /api/v1/control` is mounted as an alias for the same handler. Earlier
+builds mounted only that path while the docs advertised `/api/v1/command`, so
+the alias stays to keep existing integrations working. Write new ones against
+`/api/v1/command`.
 
 <Callout title="CORS is permissive by default" type="warn">
 The Axum router attaches `CorsLayer::permissive()`, so any origin on

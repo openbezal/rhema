@@ -48,6 +48,7 @@ import { useSettingsStore } from "@/stores"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
+import { REMOTE_EVENTS } from "@/lib/remote-events"
 import type { DeviceInfo } from "@/types/audio"
 
 /* -------------------------------------------------------------------------- */
@@ -632,12 +633,7 @@ function RemoteControlSection() {
     async function setup() {
       const { listen } = await import("@tauri-apps/api/event")
 
-      const remoteEvents = [
-        "remote:next", "remote:prev", "remote:theme", "remote:opacity",
-        "remote:on_air", "remote:show", "remote:hide", "remote:confidence",
-      ]
-
-      for (const event of remoteEvents) {
+      for (const event of Object.values(REMOTE_EVENTS)) {
         const unlisten = await listen(event, () => {
           if (cancelled) return
           const entry: CommandLogEntry = {

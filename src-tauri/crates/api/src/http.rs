@@ -115,7 +115,9 @@ where
     let app = Router::new()
         .route("/api/v1/health", get(health_handler))
         .route("/api/v1/status", get(status_handler::<S>))
-        .route("/api/v1/control", post(control_handler::<S>))
+        .route("/api/v1/command", post(command_handler::<S>))
+        // Undocumented alias for the path the code shipped with before #146.
+        .route("/api/v1/control", post(command_handler::<S>))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -178,33 +180,33 @@ async fn status_handler<S: CommandSink + 'static>(
 }
 
 #[derive(Deserialize)]
-struct ControlRequest {
+struct CommandRequest {
     #[serde(flatten)]
     command: RemoteCommand,
 }
 
 #[derive(Serialize)]
-struct ControlResponse {
+struct CommandResponse {
     success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
 
-async fn control_handler<S: CommandSink + 'static>(
+async fn command_handler<S: CommandSink + 'static>(
     AxumState(state): AxumState<Arc<AppState<S>>>,
-    Json(request): Json<ControlRequest>,
+    Json(request): Json<CommandRequest>,
 ) -> impl IntoResponse {
     match CommandDispatcher::dispatch(&request.command, &*state.sink) {
         Ok(()) => (
             StatusCode::OK,
-            Json(ControlResponse {
+            Json(CommandResponse {
                 success: true,
                 error: None,
             }),
         ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ControlResponse {
+            Json(CommandResponse {
                 success: false,
                 error: Some(e.to_string()),
             }),
@@ -350,8 +352,41 @@ mod tests {
         handle.stop();
     }
 
+    /// The path asserted here is the one `documentation/remote-control.md`
+    /// publishes. Issue #146 shipped because this test asserted the path the
+    /// router happened to mount instead, so the two could drift apart and
+    /// still pass.
     #[tokio::test]
-    async fn control_endpoint_dispatches_command() {
+    async fn command_endpoint_dispatches_command() {
+        let sink = Arc::new(MockSink::new());
+        let status = new_shared_status();
+        let config = HttpConfig {
+            port: 0,
+            host: "127.0.0.1".into(),
+        };
+
+        let result = start_http_server(config, sink.clone(), status)
+            .await
+            .expect("should bind");
+        let port = result.bound_port;
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let body = r#"{"command":"next"}"#;
+        let resp = raw_http_request(port, "POST", "/api/v1/command", Some(body)).await;
+        assert!(resp.contains("200 OK"), "Expected 200, got: {resp}");
+        assert!(resp.contains("\"success\":true"));
+
+        // Give dispatch a moment
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(sink.command_count() > 0, "Sink should have received command");
+
+        let mut handle = result.handle;
+        handle.stop();
+    }
+
+    #[tokio::test]
+    async fn control_alias_still_dispatches() {
         let sink = Arc::new(MockSink::new());
         let status = new_shared_status();
         let config = HttpConfig {
@@ -371,7 +406,31 @@ mod tests {
         assert!(resp.contains("200 OK"), "Expected 200, got: {resp}");
         assert!(resp.contains("\"success\":true"));
 
-        // Give dispatch a moment
+        let mut handle = result.handle;
+        handle.stop();
+    }
+
+    #[tokio::test]
+    async fn command_endpoint_dispatches_send_to_live() {
+        let sink = Arc::new(MockSink::new());
+        let status = new_shared_status();
+        let config = HttpConfig {
+            port: 0,
+            host: "127.0.0.1".into(),
+        };
+
+        let result = start_http_server(config, sink.clone(), status)
+            .await
+            .expect("should bind");
+        let port = result.bound_port;
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        let body = r#"{"command":"send_to_live"}"#;
+        let resp = raw_http_request(port, "POST", "/api/v1/command", Some(body)).await;
+        assert!(resp.contains("200 OK"), "Expected 200, got: {resp}");
+        assert!(resp.contains("\"success\":true"));
+
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         assert!(sink.command_count() > 0, "Sink should have received command");
 

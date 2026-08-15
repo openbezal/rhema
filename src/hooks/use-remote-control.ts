@@ -4,7 +4,8 @@ import { invoke } from "@tauri-apps/api/core"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { useSettingsStore } from "@/stores/settings-store"
-import { presentVerse } from "@/hooks/use-broadcast"
+import { REMOTE_EVENTS } from "@/lib/remote-events"
+import { remoteActions } from "@/lib/remote-actions"
 
 /**
  * Listens for remote control events from the Rust backend (OSC / HTTP API)
@@ -18,40 +19,26 @@ export function useRemoteControl() {
     const unlisteners: UnlistenFn[] = []
 
     async function setup() {
-      // remote:next — advance queue to next verse and present it
-      const u1 = await listen("remote:next", () => {
-        if (cancelled) return
-        const { items, activeIndex } = useQueueStore.getState()
-        if (items.length === 0) return
-
-        const currentIndex = activeIndex ?? findCurrentVerseIndex()
-        const nextIndex = Math.min(
-          currentIndex === null ? 0 : currentIndex + 1,
-          items.length - 1
+      const register = async (event: string, handler: () => void) => {
+        unlisteners.push(
+          await listen(event, () => {
+            if (cancelled) return
+            handler()
+          }),
         )
-        useQueueStore.getState().setActive(nextIndex)
-        presentQueueItem(nextIndex)
-      })
-      unlisteners.push(u1)
+      }
 
-      // remote:prev — go to previous verse in queue and present it
-      const u2 = await listen("remote:prev", () => {
-        if (cancelled) return
-        const { items, activeIndex } = useQueueStore.getState()
-        if (items.length === 0) return
-
-        const currentIndex = activeIndex ?? findCurrentVerseIndex()
-        const prevIndex = Math.max(
-          currentIndex === null ? 0 : currentIndex - 1,
-          0
-        )
-        useQueueStore.getState().setActive(prevIndex)
-        presentQueueItem(prevIndex)
-      })
-      unlisteners.push(u2)
+      await register(REMOTE_EVENTS.next, remoteActions.queueNext)
+      await register(REMOTE_EVENTS.prev, remoteActions.queuePrev)
+      await register(REMOTE_EVENTS.send_to_live, remoteActions.sendToLive)
+      await register(REMOTE_EVENTS.add_to_queue, remoteActions.addToQueue)
+      await register(REMOTE_EVENTS.bible_next, remoteActions.bibleNext)
+      await register(REMOTE_EVENTS.bible_prev, remoteActions.biblePrev)
+      await register(REMOTE_EVENTS.show, () => remoteActions.toggleOnAir(true))
+      await register(REMOTE_EVENTS.hide, () => remoteActions.toggleOnAir(false))
 
       // remote:theme — switch active theme by name
-      const u3 = await listen<string>("remote:theme", (event) => {
+      const u3 = await listen<string>(REMOTE_EVENTS.theme, (event) => {
         if (cancelled) return
         const payload = parsePayload(event.payload)
         const name = payload?.name as string | undefined
@@ -68,7 +55,7 @@ export function useRemoteControl() {
       unlisteners.push(u3)
 
       // remote:opacity — set broadcast output opacity
-      const u4 = await listen<string>("remote:opacity", (event) => {
+      const u4 = await listen<string>(REMOTE_EVENTS.opacity, (event) => {
         if (cancelled) return
         const payload = parsePayload(event.payload)
         const value = payload?.value as number | undefined
@@ -81,31 +68,17 @@ export function useRemoteControl() {
       unlisteners.push(u4)
 
       // remote:on_air — toggle live broadcast state
-      const u5 = await listen<string>("remote:on_air", (event) => {
+      const u5 = await listen<string>(REMOTE_EVENTS.on_air, (event) => {
         if (cancelled) return
         const payload = parsePayload(event.payload)
         const active = payload?.active as boolean | undefined
         if (active === undefined) return
-        useBroadcastStore.getState().setLive(active)
+        remoteActions.toggleOnAir(active)
       })
       unlisteners.push(u5)
 
-      // remote:show — show broadcast output
-      const u6 = await listen("remote:show", () => {
-        if (cancelled) return
-        useBroadcastStore.getState().setLive(true)
-      })
-      unlisteners.push(u6)
-
-      // remote:hide — hide broadcast output
-      const u7 = await listen("remote:hide", () => {
-        if (cancelled) return
-        useBroadcastStore.getState().setLive(false)
-      })
-      unlisteners.push(u7)
-
       // remote:confidence — set detection confidence threshold
-      const u8 = await listen<string>("remote:confidence", (event) => {
+      const u8 = await listen<string>(REMOTE_EVENTS.confidence, (event) => {
         if (cancelled) return
         const payload = parsePayload(event.payload)
         const value = payload?.value as number | undefined
@@ -128,32 +101,6 @@ export function useRemoteControl() {
       clearInterval(statusInterval)
     }
   }, [])
-}
-
-/**
- * Find the index of the currently displayed verse in the queue.
- * Returns null if the live verse doesn't match any queue item.
- */
-function findCurrentVerseIndex(): number | null {
-  const { liveVerse } = useBroadcastStore.getState()
-  if (!liveVerse) return null
-
-  const { items } = useQueueStore.getState()
-  const index = items.findIndex(
-    (item) => item.reference === liveVerse.reference
-  )
-  return index >= 0 ? index : null
-}
-
-/**
- * Present a queue item at the given index to the live display.
- */
-async function presentQueueItem(index: number) {
-  const item = useQueueStore.getState().items[index]
-  if (!item) return
-  await presentVerse(item.verse).catch((e) =>
-    console.warn("[remote-control] presentQueueItem failed:", e)
-  )
 }
 
 /**

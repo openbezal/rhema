@@ -89,8 +89,10 @@ pub fn coerce_string(arg: &OscType) -> Result<String, CommandError> {
 
 /// Parse an OSC address + arguments into a `RemoteCommand`.
 ///
-/// Handles all 8 Rhema OSC addresses:
+/// Handles all 12 Rhema OSC addresses:
 /// - `/rhema/next`, `/rhema/prev`, `/rhema/show`, `/rhema/hide` (no arguments)
+/// - `/rhema/send_to_live`, `/rhema/bible_next`, `/rhema/bible_prev`,
+///   `/rhema/add_to_queue` (no arguments)
 /// - `/rhema/theme` (string argument)
 /// - `/rhema/opacity`, `/rhema/confidence` (float argument, normalized to [0.0, 1.0])
 /// - `/rhema/on_air` (bool argument)
@@ -100,6 +102,10 @@ pub fn parse_osc(address: &str, args: &[OscType]) -> Result<RemoteCommand, Comma
         "/rhema/prev" => Ok(RemoteCommand::Prev),
         "/rhema/show" => Ok(RemoteCommand::Show),
         "/rhema/hide" => Ok(RemoteCommand::Hide),
+        "/rhema/send_to_live" => Ok(RemoteCommand::SendToLive),
+        "/rhema/bible_next" => Ok(RemoteCommand::BibleNext),
+        "/rhema/bible_prev" => Ok(RemoteCommand::BiblePrev),
+        "/rhema/add_to_queue" => Ok(RemoteCommand::AddToQueue),
         "/rhema/theme" => {
             let arg = args.first().ok_or_else(|| CommandError::MissingArgument {
                 address: address.into(),
@@ -278,6 +284,52 @@ mod tests {
     #[test]
     fn parse_osc_hide() {
         assert_eq!(parse_osc("/rhema/hide", &[]).unwrap(), RemoteCommand::Hide);
+    }
+
+    #[test]
+    fn parse_osc_send_to_live() {
+        assert_eq!(
+            parse_osc("/rhema/send_to_live", &[]).unwrap(),
+            RemoteCommand::SendToLive
+        );
+    }
+
+    #[test]
+    fn parse_osc_bible_next() {
+        assert_eq!(
+            parse_osc("/rhema/bible_next", &[]).unwrap(),
+            RemoteCommand::BibleNext
+        );
+    }
+
+    #[test]
+    fn parse_osc_bible_prev() {
+        assert_eq!(
+            parse_osc("/rhema/bible_prev", &[]).unwrap(),
+            RemoteCommand::BiblePrev
+        );
+    }
+
+    #[test]
+    fn parse_osc_add_to_queue() {
+        assert_eq!(
+            parse_osc("/rhema/add_to_queue", &[]).unwrap(),
+            RemoteCommand::AddToQueue
+        );
+    }
+
+    #[test]
+    fn parse_osc_argument_free_commands_ignore_stray_args() {
+        // Controllers send a trailing value on every button press; the
+        // argument-free commands must treat it as noise, not an error.
+        assert_eq!(
+            parse_osc("/rhema/send_to_live", &[OscType::Float(1.0)]).unwrap(),
+            RemoteCommand::SendToLive
+        );
+        assert_eq!(
+            parse_osc("/rhema/bible_next", &[OscType::Int(1)]).unwrap(),
+            RemoteCommand::BibleNext
+        );
     }
 
     #[test]

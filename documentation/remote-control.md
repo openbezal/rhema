@@ -5,7 +5,10 @@ Rhema provides two remote control protocols for external integration: **OSC** (O
 ## Overview
 
 Remote control enables you to:
-- **Navigate verses** - Advance or go back through your verse queue
+- **Navigate the queue** - Advance or go back through your verse queue
+- **Read through a passage** - Step the Bible Text panel verse by verse, independently of the queue
+- **Drive the Live output** - Send the current Preview to Live
+- **Build the queue** - Add the previewed verse to the queue
 - **Control broadcast** - Show/hide output, toggle on-air status
 - **Switch themes** - Change active broadcast theme by name
 - **Adjust settings** - Modify confidence threshold and opacity
@@ -196,6 +199,98 @@ curl -X POST http://localhost:8080/api/v1/command \
   -d '{"command":"confidence","value":0.8}'
 ```
 
+### 9. **send_to_live** — Send the Preview to the Live Display
+
+Puts the verse currently showing in **Program preview** on the Live output — the same thing
+the panel's "Send to live" button does.
+
+Detections that Rhema is confident about go straight to Live; everything else stages in
+Preview first. This command is how you push a staged verse out without touching the app
+window. If nothing is in Preview, the command does nothing — it will never blank what the
+congregation is seeing.
+
+**OSC:**
+```
+/rhema/send_to_live
+```
+
+**HTTP:**
+```bash
+curl -X POST http://localhost:8080/api/v1/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"send_to_live"}'
+```
+
+### 10. **bible_next** — Next Verse in the Bible Text Panel
+
+Moves the **Bible Text** panel's selection forward one verse and scrolls it into view. The
+verse lands in Preview, ready for `send_to_live`.
+
+This is separate from `next`, which moves the **Queue**. Use `bible_next` to read straight
+through a passage the AI has not picked up yet; the Queue does not move.
+
+At the end of a chapter it continues into the next chapter of the same book. At the end of a
+book it stops — it does not roll over into the next book.
+
+**OSC:**
+```
+/rhema/bible_next
+```
+
+**HTTP:**
+```bash
+curl -X POST http://localhost:8080/api/v1/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"bible_next"}'
+```
+
+### 11. **bible_prev** — Previous Verse in the Bible Text Panel
+
+The reverse of `bible_next`. At the start of a chapter it continues into the last verse of the
+previous chapter; at the start of a book it stops.
+
+**OSC:**
+```
+/rhema/bible_prev
+```
+
+**HTTP:**
+```bash
+curl -X POST http://localhost:8080/api/v1/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"bible_prev"}'
+```
+
+### 12. **add_to_queue** — Add the Previewed Verse to the Queue
+
+Adds the verse currently showing in Preview to the Queue, exactly as the **+** button on a
+verse row does. Pressing it twice for the same verse is harmless — the Queue rejects
+duplicates.
+
+**OSC:**
+```
+/rhema/add_to_queue
+```
+
+**HTTP:**
+```bash
+curl -X POST http://localhost:8080/api/v1/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"add_to_queue"}'
+```
+
+> **Note on arguments:** `send_to_live`, `bible_next`, `bible_prev` and `add_to_queue` take no
+> arguments.
+>
+> Over **OSC** this is forgiving: controllers that send a value with every button press
+> (TouchOSC and Companion both do) work fine — the extra argument is ignored. Verified with
+> `/rhema/bible_next` carrying a float and `/rhema/add_to_queue` carrying an int; both dispatch
+> normally.
+>
+> Over **HTTP** it is strict: send `{"command":"bible_next"}` exactly. Adding a `value` key
+> returns `422 Unprocessable Entity`, because these commands deserialize as argument-free
+> variants. The same applies to `show` and `hide`.
+
 ## HTTP API Endpoints
 
 The HTTP API provides additional endpoints for querying status.
@@ -234,7 +329,16 @@ curl -X POST http://localhost:8080/api/v1/command \
 **Response:**
 ```json
 {
-  "status": "ok"
+  "success": true
+}
+```
+
+A rejected command returns `500` with the reason attached:
+
+```json
+{
+  "success": false,
+  "error": "Unknown OSC address: /rhema/nope"
 }
 ```
 
@@ -249,11 +353,18 @@ curl -X POST http://localhost:8080/api/v1/command \
    - Host: `127.0.0.1` (or your Rhema computer's IP)
    - Port: `8000`
 3. **Create buttons** for each command:
-   - **Next Verse**: OSC path `/rhema/next`
-   - **Prev Verse**: OSC path `/rhema/prev`
+   - **Next in Queue**: OSC path `/rhema/next`
+   - **Prev in Queue**: OSC path `/rhema/prev`
+   - **Next Verse (Bible panel)**: OSC path `/rhema/bible_next`
+   - **Prev Verse (Bible panel)**: OSC path `/rhema/bible_prev`
+   - **Send to Live**: OSC path `/rhema/send_to_live`
+   - **Add to Queue**: OSC path `/rhema/add_to_queue`
    - **Show Output**: OSC path `/rhema/show`
    - **Hide Output**: OSC path `/rhema/hide`
    - **Go Live**: OSC path `/rhema/on_air` with argument `true`
+
+A useful three-button layout for reading through a passage the AI has not detected:
+`bible_next` / `bible_prev` to move, `send_to_live` to push the verse you land on.
 
 ### TouchOSC / Lemur
 
@@ -265,6 +376,10 @@ Mobile control surfaces can send OSC commands directly.
 3. Configure OSC addresses:
    - `/rhema/next`
    - `/rhema/prev`
+   - `/rhema/bible_next`
+   - `/rhema/bible_prev`
+   - `/rhema/send_to_live`
+   - `/rhema/add_to_queue`
    - `/rhema/show`
    - `/rhema/hide`
 
@@ -313,6 +428,10 @@ const osc = new Client('localhost', 8000);
 // Send commands
 osc.send('/rhema/next');
 osc.send('/rhema/prev');
+osc.send('/rhema/bible_next');
+osc.send('/rhema/bible_prev');
+osc.send('/rhema/send_to_live');
+osc.send('/rhema/add_to_queue');
 osc.send('/rhema/theme', 'Classic Dark');
 osc.send('/rhema/opacity', 0.8);
 osc.send('/rhema/on_air', true);
@@ -356,6 +475,10 @@ osc = udp_client.SimpleUDPClient('localhost', 8000)
 # Send commands
 osc.send_message('/rhema/next', [])
 osc.send_message('/rhema/prev', [])
+osc.send_message('/rhema/bible_next', [])
+osc.send_message('/rhema/bible_prev', [])
+osc.send_message('/rhema/send_to_live', [])
+osc.send_message('/rhema/add_to_queue', [])
 osc.send_message('/rhema/theme', 'Classic Dark')
 osc.send_message('/rhema/opacity', 0.8)
 osc.send_message('/rhema/on_air', True)
@@ -439,16 +562,24 @@ If you see "Port already in use" error:
 
 ### Network Exposure
 
-By default, both OSC and HTTP bind to `0.0.0.0`, making them accessible from any device on your network.
+Both OSC and HTTP bind to `0.0.0.0`, so while a server is running it is reachable from any
+device on your network. There is no authentication, and CORS allows any origin. **This is not
+currently configurable from the app** — enabling a server exposes it to the whole network.
 
-**For local-only access:**
-- Bind to `127.0.0.1` instead (requires editing settings)
-- This prevents remote network access
+**`send_to_live` raises what that costs you.** Until now the worst an unauthenticated request
+could do was advance the queue or toggle opacity. It can now put a verse of its choosing on
+the Live output in front of the congregation. Treat an enabled remote-control server as an
+open door to your broadcast.
 
-**For production environments:**
-- Use firewall rules to restrict access
-- Consider VPN or SSH tunneling for remote access
-- HTTP does not include authentication (add reverse proxy with auth if needed)
+**Until a loopback-by-default option ships:**
+- Only enable the OSC and HTTP servers when you are actually using them
+- Restrict the ports (default 8000/UDP and 8080/TCP) with firewall rules to the devices that
+  need them
+- Prefer a trusted, password-protected network over open guest Wi-Fi
+- For remote access, use a VPN or SSH tunnel rather than exposing the ports directly
+
+Binding to loopback by default, with network exposure as an explicit opt-in, is the next
+change scheduled for this surface.
 
 ### Command Validation
 
@@ -472,7 +603,7 @@ All commands are validated before execution:
 - **Framework**: Axum (Rust async web framework)
 - **Transport**: TCP with keep-alive
 - **Content-Type**: `application/json`
-- **CORS**: Disabled by default (local use only)
+- **CORS**: Permissive — any origin is allowed. A page open in a browser on the same machine or network can reach this API. See [Security Considerations](#security-considerations).
 
 ### Command Flow
 
@@ -498,12 +629,13 @@ This ensures the `/api/v1/status` endpoint always returns current data.
 
 Planned additions to remote control:
 
+- **Loopback binding by default**, with network exposure as an explicit opt-in
+- **Authentication** for HTTP API (API keys or OAuth)
 - **WebSocket API** for real-time bidirectional communication
 - **MIDI support** for hardware controllers with MIDI over USB
-- **Authentication** for HTTP API (API keys or OAuth)
 - **Custom command macros** (trigger multiple commands at once)
 - **Verse navigation by reference** (e.g., `/rhema/goto John 3:16`)
-- **Queue management** (add/remove/reorder verses remotely)
+- **Further queue management** — removing, reordering and clearing (adding is covered by `add_to_queue`)
 
 ## Support
 

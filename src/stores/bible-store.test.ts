@@ -144,3 +144,25 @@ describe("bible store persistence", () => {
     })
   })
 })
+
+describe("requestVerseReveal", () => {
+  it("increments the counter and records the requested scroll block", async () => {
+    const { useBibleStore } = await import("./bible-store")
+    useBibleStore.setState({ revealRequest: 0, revealBlock: "nearest" })
+
+    useBibleStore.getState().requestVerseReveal("center")
+
+    expect(useBibleStore.getState().revealRequest).toBe(1)
+    expect(useBibleStore.getState().revealBlock).toBe("center")
+  })
+
+  it("fires again for an identical consecutive request", async () => {
+    const { useBibleStore } = await import("./bible-store")
+    useBibleStore.setState({ revealRequest: 0, revealBlock: "nearest" })
+
+    useBibleStore.getState().requestVerseReveal("nearest")
+    useBibleStore.getState().requestVerseReveal("nearest")
+
+    expect(useBibleStore.getState().revealRequest).toBe(2)
+  })
+})

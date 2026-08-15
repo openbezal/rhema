@@ -20,6 +20,17 @@ interface BibleState {
   currentChapter: Verse[]
   crossReferences: CrossReference[]
   pendingNavigation: PendingNavigation | null
+  /**
+   * Incremented to ask the Bible panel to scroll the selected verse into view.
+   * A counter rather than a flag: two identical consecutive requests must both
+   * fire, and a primitive keeps the panel's effect dependency simple.
+   *
+   * Only navigation requests a reveal. A plain `selectVerse` — which
+   * `presentVerse` calls on every auto-live detection — must not move the
+   * operator's scroll position mid-service.
+   */
+  revealRequest: number
+  revealBlock: ScrollLogicalPosition
 
   setTranslations: (translations: Translation[]) => void
   setActiveTranslation: (id: number) => void
@@ -30,6 +41,7 @@ interface BibleState {
   setCurrentChapter: (verses: Verse[]) => void
   setCrossReferences: (refs: CrossReference[]) => void
   setPendingNavigation: (nav: PendingNavigation | null) => void
+  requestVerseReveal: (block: ScrollLogicalPosition) => void
 }
 
 export const useBibleStore = create<BibleState>((set) => ({
@@ -42,6 +54,8 @@ export const useBibleStore = create<BibleState>((set) => ({
   currentChapter: [],
   crossReferences: [],
   pendingNavigation: null,
+  revealRequest: 0,
+  revealBlock: "nearest",
 
   setTranslations: (translations) => set({ translations }),
   setActiveTranslation: (activeTranslationId) => set({ activeTranslationId }),
@@ -52,6 +66,8 @@ export const useBibleStore = create<BibleState>((set) => ({
   setCurrentChapter: (currentChapter) => set({ currentChapter }),
   setCrossReferences: (crossReferences) => set({ crossReferences }),
   setPendingNavigation: (pendingNavigation) => set({ pendingNavigation }),
+  requestVerseReveal: (revealBlock) =>
+    set((s) => ({ revealRequest: s.revealRequest + 1, revealBlock })),
 }))
 
 /** Load persisted activeTranslationId from disk into Zustand, then sync to Rust backend. */

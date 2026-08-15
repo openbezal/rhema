@@ -17,6 +17,10 @@ pub enum RemoteCommand {
     Opacity(f32),
     Confidence(f32),
     OnAir(bool),
+    SendToLive,
+    BibleNext,
+    BiblePrev,
+    AddToQueue,
 }
 
 impl fmt::Display for RemoteCommand {
@@ -30,6 +34,10 @@ impl fmt::Display for RemoteCommand {
             RemoteCommand::Opacity(val) => write!(f, "opacity({val:.2})"),
             RemoteCommand::Confidence(val) => write!(f, "confidence({val:.2})"),
             RemoteCommand::OnAir(active) => write!(f, "on_air({active})"),
+            RemoteCommand::SendToLive => write!(f, "send_to_live"),
+            RemoteCommand::BibleNext => write!(f, "bible_next"),
+            RemoteCommand::BiblePrev => write!(f, "bible_prev"),
+            RemoteCommand::AddToQueue => write!(f, "add_to_queue"),
         }
     }
 }
@@ -88,6 +96,30 @@ mod tests {
         assert_eq!(json, serde_json::json!({"command": "on_air", "value": true}));
     }
 
+    #[test]
+    fn serialize_send_to_live() {
+        let json = serde_json::to_value(&RemoteCommand::SendToLive).unwrap();
+        assert_eq!(json, serde_json::json!({"command": "send_to_live"}));
+    }
+
+    #[test]
+    fn serialize_bible_next() {
+        let json = serde_json::to_value(&RemoteCommand::BibleNext).unwrap();
+        assert_eq!(json, serde_json::json!({"command": "bible_next"}));
+    }
+
+    #[test]
+    fn serialize_bible_prev() {
+        let json = serde_json::to_value(&RemoteCommand::BiblePrev).unwrap();
+        assert_eq!(json, serde_json::json!({"command": "bible_prev"}));
+    }
+
+    #[test]
+    fn serialize_add_to_queue() {
+        let json = serde_json::to_value(&RemoteCommand::AddToQueue).unwrap();
+        assert_eq!(json, serde_json::json!({"command": "add_to_queue"}));
+    }
+
     // --- Serde deserialization tests ---
 
     #[test]
@@ -110,6 +142,30 @@ mod tests {
         assert_eq!(cmd, RemoteCommand::Confidence(0.75));
     }
 
+    #[test]
+    fn deserialize_send_to_live() {
+        let cmd: RemoteCommand = serde_json::from_str(r#"{"command":"send_to_live"}"#).unwrap();
+        assert_eq!(cmd, RemoteCommand::SendToLive);
+    }
+
+    #[test]
+    fn deserialize_bible_next() {
+        let cmd: RemoteCommand = serde_json::from_str(r#"{"command":"bible_next"}"#).unwrap();
+        assert_eq!(cmd, RemoteCommand::BibleNext);
+    }
+
+    #[test]
+    fn deserialize_bible_prev() {
+        let cmd: RemoteCommand = serde_json::from_str(r#"{"command":"bible_prev"}"#).unwrap();
+        assert_eq!(cmd, RemoteCommand::BiblePrev);
+    }
+
+    #[test]
+    fn deserialize_add_to_queue() {
+        let cmd: RemoteCommand = serde_json::from_str(r#"{"command":"add_to_queue"}"#).unwrap();
+        assert_eq!(cmd, RemoteCommand::AddToQueue);
+    }
+
     // --- Round-trip tests ---
 
     #[test]
@@ -123,6 +179,10 @@ mod tests {
             RemoteCommand::Opacity(0.5),
             RemoteCommand::Confidence(0.9),
             RemoteCommand::OnAir(false),
+            RemoteCommand::SendToLive,
+            RemoteCommand::BibleNext,
+            RemoteCommand::BiblePrev,
+            RemoteCommand::AddToQueue,
         ];
 
         for cmd in variants {
@@ -171,11 +231,31 @@ mod tests {
         assert_eq!(RemoteCommand::OnAir(false).to_string(), "on_air(false)");
     }
 
+    #[test]
+    fn display_send_to_live() {
+        assert_eq!(RemoteCommand::SendToLive.to_string(), "send_to_live");
+    }
+
+    #[test]
+    fn display_bible_next() {
+        assert_eq!(RemoteCommand::BibleNext.to_string(), "bible_next");
+    }
+
+    #[test]
+    fn display_bible_prev() {
+        assert_eq!(RemoteCommand::BiblePrev.to_string(), "bible_prev");
+    }
+
+    #[test]
+    fn display_add_to_queue() {
+        assert_eq!(RemoteCommand::AddToQueue.to_string(), "add_to_queue");
+    }
+
     // --- Exhaustive match test ---
 
     #[test]
-    fn enum_has_exactly_8_variants() {
-        // This test ensures all 8 variants are covered.
+    fn enum_has_exactly_12_variants() {
+        // This test ensures all 12 variants are covered.
         // If a new variant is added, this match will fail to compile.
         let cmds: Vec<RemoteCommand> = vec![
             RemoteCommand::Next,
@@ -186,6 +266,10 @@ mod tests {
             RemoteCommand::Opacity(0.0),
             RemoteCommand::Confidence(0.0),
             RemoteCommand::OnAir(false),
+            RemoteCommand::SendToLive,
+            RemoteCommand::BibleNext,
+            RemoteCommand::BiblePrev,
+            RemoteCommand::AddToQueue,
         ];
 
         for cmd in &cmds {
@@ -198,9 +282,13 @@ mod tests {
                 RemoteCommand::Opacity(_) => {}
                 RemoteCommand::Confidence(_) => {}
                 RemoteCommand::OnAir(_) => {}
+                RemoteCommand::SendToLive => {}
+                RemoteCommand::BibleNext => {}
+                RemoteCommand::BiblePrev => {}
+                RemoteCommand::AddToQueue => {}
             }
         }
 
-        assert_eq!(cmds.len(), 8);
+        assert_eq!(cmds.len(), 12);
     }
 }

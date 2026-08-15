@@ -26,29 +26,40 @@ in the repository.
 | OSC | `8000` | UDP | Stream Deck (via Companion), TouchOSC, QLab, hardware |
 | HTTP | `8080` | TCP | REST clients, dashboards, scripting, status polling |
 
-Both default to binding `0.0.0.0` so a phone, a staff laptop, or a
-hardware controller on the LAN can reach them. Bind to `127.0.0.1` in
-Settings → Remote for local-only access.
+Both bind `0.0.0.0` so a phone, a staff laptop, or a hardware controller on
+the LAN can reach them. That bind is not configurable yet, and there is no
+authentication — while a server is running, anything on your network can drive
+it, including `send_to_live`. Enable the servers only while you're using them,
+and firewall the ports to the devices that need them. A loopback-by-default
+option with an explicit opt-in is the next change scheduled here.
 
 ## What you can do remotely
 
-| Action | OSC address | HTTP body (POST `/api/v1/control`) |
+| Action | OSC address | HTTP body (POST `/api/v1/command`) |
 | --- | --- | --- |
 | Next verse in queue | `/rhema/next` | `{ "command": "next" }` |
-| Previous verse | `/rhema/prev` | `{ "command": "prev" }` |
+| Previous verse in queue | `/rhema/prev` | `{ "command": "prev" }` |
+| Next verse in the Bible panel | `/rhema/bible_next` | `{ "command": "bible_next" }` |
+| Previous verse in the Bible panel | `/rhema/bible_prev` | `{ "command": "bible_prev" }` |
+| Send the preview to Live | `/rhema/send_to_live` | `{ "command": "send_to_live" }` |
+| Add the previewed verse to the queue | `/rhema/add_to_queue` | `{ "command": "add_to_queue" }` |
 | Show / hide overlay | `/rhema/show`, `/rhema/hide` | `{ "command": "show" }` |
 | Switch theme | `/rhema/theme "Classic Dark"` | `{ "command": "theme", "value": "Classic Dark" }` |
 | Set opacity | `/rhema/opacity 0.75` | `{ "command": "opacity", "value": 0.75 }` |
 | Set confidence threshold | `/rhema/confidence 0.8` | `{ "command": "confidence", "value": 0.8 }` |
 | Toggle on-air | `/rhema/on_air true` | `{ "command": "on_air", "value": true }` |
 
-All eight commands work identically across both protocols, so any
+All twelve commands work identically across both protocols, so any
 controller you already own (or build) talks the same dialect.
+
+`bible_next` and `bible_prev` move the **Bible Text** panel, not the queue —
+that's how you read straight through a passage the AI hasn't picked up yet.
+The verse you land on goes to preview; `send_to_live` pushes it out.
 
 <Callout title="Opacity is a stub today" type="warn">
 The `opacity` command is wired through the dispatcher but currently a
 placeholder — it'll take effect when the broadcast store gains opacity
-support. The other seven commands are fully live.
+support. The other eleven commands are fully live.
 </Callout>
 
 ## OSC
@@ -82,13 +93,17 @@ controls under `/api/v1/`:
 | --- | --- | --- |
 | `/api/v1/health` | GET | Liveness check — returns service name and version |
 | `/api/v1/status` | GET | Current state snapshot — on-air, active theme, live verse, queue length, confidence threshold |
-| `/api/v1/control` | POST | Dispatch a command (table above) |
+| `/api/v1/command` | POST | Dispatch a command (table above) |
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/control \
+curl -X POST http://localhost:8080/api/v1/command \
   -H 'Content-Type: application/json' \
   -d '{"command":"theme","value":"Classic Dark"}'
 ```
+
+`POST /api/v1/control` is still accepted as an alias for the same handler, so
+integrations written against older builds keep working. Use `/api/v1/command`
+for anything new.
 
 The status endpoint returns an authoritative view from a Rust-side
 state cache that the frontend refreshes once a second:
