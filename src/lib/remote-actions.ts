@@ -21,6 +21,12 @@ function findLiveQueueIndex(): number | null {
 async function presentQueueItem(index: number): Promise<void> {
   const item = useQueueStore.getState().items[index]
   if (!item) return
+  // Navigate the Bible panel to the presented verse, as detections do
+  useBibleStore.getState().setPendingNavigation({
+    bookNumber: item.verse.book_number,
+    chapter: item.verse.chapter,
+    verse: item.verse.verse,
+  })
   await presentVerse(item.verse).catch((e) =>
     console.warn("[remote-actions] presentQueueItem failed:", e),
   )

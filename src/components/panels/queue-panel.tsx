@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useQueueStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
+import { bibleActions } from "@/hooks/use-bible"
 import type { QueueItem } from "@/types"
 
 function QueueItemRow({
@@ -24,10 +25,17 @@ function QueueItemRow({
 }) {
   const handlePresent = () => {
     useQueueStore.getState().setActive(index)
+    // Navigate the Bible panel to the presented verse, as detections do
+    bibleActions.navigateToVerse(
+      item.verse.book_number,
+      item.verse.chapter,
+      item.verse.verse
+    )
     void presentVerse(item.verse)
   }
 
-  const handleRemove = () => {
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation()
     useQueueStore.getState().removeItem(item.id)
   }
 
@@ -48,8 +56,9 @@ function QueueItemRow({
   return (
     <div
       data-queue-idx={index}
+      onClick={handlePresent}
       className={cn(
-        "group flex h-10 items-center gap-2 rounded-md px-2.5 transition-colors",
+        "group flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 transition-colors",
         isHighlighted
           ? "animate-pulse border border-amber-500/40 bg-amber-500/15"
           : isActive
@@ -68,7 +77,14 @@ function QueueItemRow({
       {sourceBadge}
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button variant="ghost" size="icon-xs" onClick={handlePresent}>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            handlePresent()
+          }}
+        >
           <PlayIcon className="size-2.5" />
         </Button>
         <Button variant="ghost" size="icon-xs" onClick={handleRemove}>
