@@ -8,6 +8,12 @@ interface PendingNavigation {
   bookNumber: number
   chapter: number
   verse: number
+  /**
+   * Present the verse to the live output once navigation lands. Set only by
+   * manual operator actions (quick search); detections leave it unset so the
+   * Auto toggle stays the sole gate for detection-driven presents.
+   */
+  present?: boolean
 }
 
 interface BibleState {

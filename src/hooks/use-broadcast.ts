@@ -23,9 +23,9 @@ let presentSeq = 0
  * book/chapter/verse against the active translation. Falls back to the passed
  * verse if the lookup fails — never blanks the output on error.
  *
- * This is the ONLY path that changes the live output verse. Detections and
- * navigation update the preview (`selectedVerse`); the live output follows
- * only through an explicit present (or auto-live, which calls this).
+ * This is the ONLY path that changes the live output verse. Manual selection
+ * (verse click, arrow navigation, search) presents directly; detections update
+ * only the preview unless the Auto toggle is on.
  */
 export async function presentVerse(verse: Verse): Promise<void> {
   presentSeq += 1

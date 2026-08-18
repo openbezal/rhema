@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { useBibleStore } from "@/stores"
+import { presentVerse } from "@/hooks/use-broadcast"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
 
@@ -157,8 +158,15 @@ let stepSeq = 0
  * the store: the end of a book, the start of Genesis, and a chapter missing
  * from the active translation all resolve to doing nothing at all, leaving the
  * panel showing exactly what it was showing.
+ *
+ * `options.present` sends the landed verse to the live output. The panel's
+ * arrow keys pass it; the remote `bible_next` / `bible_prev` commands don't —
+ * they stay preview-only, with the remote's `send_to_live` as the commit.
  */
-export async function stepVerse(direction: "next" | "prev"): Promise<void> {
+export async function stepVerse(
+  direction: "next" | "prev",
+  options?: { present?: boolean }
+): Promise<void> {
   // Claim the ticket before anything else. A step that resolves synchronously
   // still has to invalidate a crossing already in flight, or the operator's
   // correction lands and the crossing it replaced arrives afterwards.
@@ -181,6 +189,7 @@ export async function stepVerse(direction: "next" | "prev"): Promise<void> {
         : state.currentChapter[state.currentChapter.length - 1]
     if (!entry) return
     state.selectVerse(entry)
+    if (options?.present) void presentVerse(entry)
     state.requestVerseReveal("nearest")
     return
   }
@@ -191,6 +200,7 @@ export async function stepVerse(direction: "next" | "prev"): Promise<void> {
     const loaded = findLoadedVerse(state.currentChapter, target)
     if (loaded) {
       state.selectVerse(loaded)
+      if (options?.present) void presentVerse(loaded)
       state.requestVerseReveal("nearest")
       return
     }
@@ -201,7 +211,7 @@ export async function stepVerse(direction: "next" | "prev"): Promise<void> {
     if (ticket !== stepSeq) return
 
     if (cursorChapter.some((v) => v.verse === target.verse)) {
-      useBibleStore.getState().setPendingNavigation(target)
+      useBibleStore.getState().setPendingNavigation({ ...target, present: options?.present })
       return
     }
 
@@ -217,6 +227,7 @@ export async function stepVerse(direction: "next" | "prev"): Promise<void> {
       bookNumber: cursor.bookNumber,
       chapter: crossingChapter,
       verse: landing.verse,
+      present: options?.present,
     })
   } catch (e) {
     console.warn("[bible] stepVerse chapter lookup failed:", e)

@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useBible, bibleActions, findLoadedVerse } from "@/hooks/use-bible"
+import { presentVerse } from "@/hooks/use-broadcast"
 import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
@@ -239,8 +240,8 @@ export function SearchPanel() {
         return
       }
 
-      const { bookNumber, chapter: navChapter, verse: navVerse } = pendingNavigation
-      const pendingKey = `${bookNumber}:${navChapter}:${navVerse}`
+      const { bookNumber, chapter: navChapter, verse: navVerse, present } = pendingNavigation
+      const pendingKey = `${bookNumber}:${navChapter}:${navVerse}:${present ? "live" : ""}`
       if (pendingKey === lastHandledKey) return
 
       const book = state.books.find((b) => b.book_number === bookNumber)
@@ -266,6 +267,7 @@ export function SearchPanel() {
         const target = verses.find((v) => v.verse === navVerse)
         if (target) {
           bibleActions.selectVerse(target)
+          if (present) void presentVerse(target)
           useBibleStore.getState().requestVerseReveal("center")
         }
         panelRef.current?.focus()
@@ -281,6 +283,7 @@ export function SearchPanel() {
 
   const handleVerseClick = useCallback((verse: Verse) => {
     bibleActions.selectVerse(verse)
+    void presentVerse(verse)
   }, [])
 
   // Arrow key navigation. Up and Down run the same stepping action the remote
@@ -297,10 +300,10 @@ export function SearchPanel() {
         setChapter((c) => c + 1)
       } else if (e.key === "ArrowDown") {
         e.preventDefault()
-        void bibleActions.stepVerse("next")
+        void bibleActions.stepVerse("next", { present: true })
       } else if (e.key === "ArrowUp") {
         e.preventDefault()
-        void bibleActions.stepVerse("prev")
+        void bibleActions.stepVerse("prev", { present: true })
       }
     },
     [chapter]
@@ -453,9 +456,18 @@ export function SearchPanel() {
       return
     }
 
-    // Enter clears input (verse is already showing in panel)
+    // Enter commits the typed reference: send it live and clear the input
     if (e.key === "Enter") {
       e.preventDefault()
+      const result = autocompleteResult
+      if (result.matchedBook && result.chapter && result.verse) {
+        useBibleStore.getState().setPendingNavigation({
+          bookNumber: result.matchedBook.book_number,
+          chapter: result.chapter,
+          verse: result.verse,
+          present: true,
+        })
+      }
       setQuickInput("")
       setShowQuickVerses(false)
       return
@@ -468,13 +480,14 @@ export function SearchPanel() {
       setShowQuickVerses(false)
       return
     }
-  }, [quickInput, quickSuggestion])
+  }, [quickInput, quickSuggestion, autocompleteResult])
 
   const handleQuickVerseClick = useCallback((verse: Verse) => {
     useBibleStore.getState().setPendingNavigation({
       bookNumber: verse.book_number,
       chapter: verse.chapter,
-      verse: verse.verse
+      verse: verse.verse,
+      present: true,
     })
     setQuickInput("")
     setShowQuickVerses(false)
@@ -772,7 +785,7 @@ export function SearchPanel() {
               <div
                 key={`${result.book_number}-${result.chapter}-${result.verse}-${idx}`}
                 onClick={() => {
-                  bibleActions.selectVerse({
+                  const verse: Verse = {
                     id: 0,
                     translation_id: activeTranslationId,
                     book_number: result.book_number,
@@ -781,7 +794,9 @@ export function SearchPanel() {
                     chapter: result.chapter,
                     verse: result.verse,
                     text: result.verse_text,
-                  })
+                  }
+                  bibleActions.selectVerse(verse)
+                  void presentVerse(verse)
                 }}
                 className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
               >
