@@ -7,8 +7,7 @@
   ],
   "windows": [
     "main",
-    "broadcast",
-    "broadcast-alt"
+    "broadcast-*"
   ],
   "permissions": [
     "global-shortcut:default"

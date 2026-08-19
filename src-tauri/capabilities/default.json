@@ -4,8 +4,7 @@
   "description": "enables the default permissions",
   "windows": [
     "main",
-    "broadcast",
-    "broadcast-alt"
+    "broadcast-*"
   ],
   "permissions": [
     "core:default",

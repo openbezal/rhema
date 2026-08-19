@@ -8,12 +8,20 @@ use tauri::State;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
 
-/// Map `output_id` ("main" | "alt") to Tauri window label.
-fn window_label(output_id: &str) -> &'static str {
-    match output_id {
-        "alt" => "broadcast-alt",
-        _ => "broadcast",
+/// Map `output_id` to its Tauri window label (`broadcast-{id}`).
+///
+/// Output ids are caller-supplied and end up in the window label and URL, so
+/// they are restricted to a safe charset. The capability files grant
+/// permissions to `broadcast-*`, which covers every label produced here.
+fn window_label(output_id: &str) -> Result<String, String> {
+    let valid = !output_id.is_empty()
+        && output_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !valid {
+        return Err(format!("invalid broadcast output id: {output_id:?}"));
     }
+    Ok(format!("broadcast-{output_id}"))
 }
 
 /// Map `output_id` to broadcast-output.html URL with query param.
@@ -63,17 +71,21 @@ pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> 
 /// command deadlocks — the command blocks the thread the window creation
 /// needs to dispatch to, and `build()` never returns.
 #[tauri::command]
-pub async fn ensure_broadcast_window(app: tauri::AppHandle, output_id: String) -> Result<(), String> {
-    let label = window_label(&output_id);
-    if app.get_webview_window(label).is_some() {
+pub async fn ensure_broadcast_window(
+    app: tauri::AppHandle,
+    output_id: String,
+    title: Option<String>,
+) -> Result<(), String> {
+    let label = window_label(&output_id)?;
+    if app.get_webview_window(&label).is_some() {
         return Ok(());
     }
     WebviewWindowBuilder::new(
         &app,
-        label,
+        &label,
         WebviewUrl::App(window_url(&output_id).into()),
     )
-    .title(if output_id == "alt" { "Rhema NDI Alt" } else { "Rhema NDI" })
+    .title(title.unwrap_or_else(|| "Rhema Output".to_string()))
     .inner_size(1920.0, 1080.0)
     .visible(false)
     .skip_taskbar(true)
@@ -90,9 +102,10 @@ pub async fn open_broadcast_window(
     app: tauri::AppHandle,
     output_id: String,
     monitor_index: usize,
+    title: Option<String>,
 ) -> Result<(), String> {
     log::info!("open_broadcast_window: output={output_id}, monitor_index={monitor_index}");
-    let label = window_label(&output_id);
+    let label = window_label(&output_id)?;
     let monitors = app.available_monitors().map_err(|e| {
         log::error!("open_broadcast_window: available_monitors failed: {e}");
         e.to_string()
@@ -123,22 +136,17 @@ pub async fn open_broadcast_window(
     // re-multiplied by the scale factor on scaled displays (Windows commonly
     // runs 125-150%), pushing the window off the target monitor. Physical
     // setters after the fact are unambiguous on both paths.
-    let window = if let Some(window) = app.get_webview_window(label) {
+    let window = if let Some(window) = app.get_webview_window(&label) {
         log::info!("open_broadcast_window: reusing existing window '{label}'");
         window
     } else {
         log::info!("open_broadcast_window: creating window '{label}'");
-        let title = if output_id == "alt" {
-            "Projector - Alt"
-        } else {
-            "Projector - Program"
-        };
         WebviewWindowBuilder::new(
             &app,
-            label,
+            &label,
             WebviewUrl::App(window_url(&output_id).into()),
         )
-        .title(title)
+        .title(title.unwrap_or_else(|| "Rhema Output".to_string()))
         .visible(false)
         .decorations(true)
         .always_on_top(false)
@@ -190,8 +198,8 @@ pub async fn close_broadcast_window(
     output_id: String,
     runtime: State<'_, Mutex<NdiRuntime>>,
 ) -> Result<(), String> {
-    let label = window_label(&output_id);
-    if let Some(window) = app.get_webview_window(label) {
+    let label = window_label(&output_id)?;
+    if let Some(window) = app.get_webview_window(&label) {
         let ndi_active = runtime
             .lock()
             .map_err(|e| e.to_string())?
@@ -272,4 +280,28 @@ pub fn push_ndi_frame(
     runtime
         .send_frame_rgba(&request.output_id, request.width, request.height, &rgba_data)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window_label;
+
+    #[test]
+    fn window_label_formats_valid_ids() {
+        assert_eq!(window_label("main").unwrap(), "broadcast-main");
+        assert_eq!(
+            window_label("3f2a9c10-4b7e-4d2a-9c51-8e6f0a1b2c3d").unwrap(),
+            "broadcast-3f2a9c10-4b7e-4d2a-9c51-8e6f0a1b2c3d"
+        );
+        assert_eq!(window_label("out_2").unwrap(), "broadcast-out_2");
+    }
+
+    #[test]
+    fn window_label_rejects_unsafe_ids() {
+        assert!(window_label("").is_err());
+        assert!(window_label("has space").is_err());
+        assert!(window_label("dot.dot").is_err());
+        assert!(window_label("query?x=1").is_err());
+        assert!(window_label("slash/id").is_err());
+    }
 }
