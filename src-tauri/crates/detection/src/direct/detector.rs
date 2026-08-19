@@ -2142,4 +2142,74 @@ mod tests {
         assert_eq!(first.verse_ref.chapter, 2);
         assert_eq!(first.verse_ref.verse_start, 8);
     }
+
+    /// Deepgram writes a spoken "one thirty-six" as two numbers, so
+    /// "Psalm 136 verse 1" arrives as "Psalm 1 36 verse 1" and used to be
+    /// detected as Psalms 1:1 at full confidence — the wrong psalm on air.
+    #[test]
+    fn psalm_chapter_split_into_digit_groups_is_rejoined() {
+        let mut detector = DirectDetector::new();
+        let out = detector.detect("Psalm 1 36 verse 1.");
+        assert_eq!(out.len(), 1, "expected one detection, got {out:?}");
+        assert_eq!(out[0].verse_ref.book_number, 19, "Psalms");
+        assert_eq!(out[0].verse_ref.chapter, 136);
+        assert_eq!(out[0].verse_ref.verse_start, 1);
+    }
+
+    #[test]
+    fn two_digit_chapter_split_is_rejoined() {
+        let mut detector = DirectDetector::new();
+        let out = detector.detect("Psalm 2 3 verse 4");
+        assert_eq!(out[0].verse_ref.chapter, 23);
+        assert_eq!(out[0].verse_ref.verse_start, 4);
+    }
+
+    /// The whole announcement from the service that surfaced this, which names
+    /// two psalms in one breath.
+    #[test]
+    fn split_chapter_survives_a_multi_reference_utterance() {
+        let mut detector = DirectDetector::new();
+        let out = detector.detect(
+            "Let's open our Bibles to Psalms chapter 100 and Psalm 1 36 verse 1",
+        );
+        let refs: Vec<(i32, i32)> = out
+            .iter()
+            .map(|d| (d.verse_ref.chapter, d.verse_ref.verse_start))
+            .collect();
+        assert!(refs.contains(&(136, 1)), "expected Psalms 136:1 in {refs:?}");
+        assert!(
+            !refs.iter().any(|&(c, _)| c == 1),
+            "Psalms 1 must not appear: {refs:?}"
+        );
+    }
+
+    /// A single chapter number before "verse" must keep its old meaning.
+    #[test]
+    fn single_chapter_numbers_are_untouched() {
+        for (text, chapter, verse) in [
+            ("Psalm 5 verse 10", 5, 10),
+            ("Psalm 1 verse 1", 1, 1),
+            ("John 3 verse 16", 3, 16),
+            ("Romans 8 verse 28", 8, 28),
+            ("Genesis 1 verse 1", 1, 1),
+        ] {
+            let mut detector = DirectDetector::new();
+            let out = detector.detect(text);
+            assert_eq!(out[0].verse_ref.chapter, chapter, "{text:?}");
+            assert_eq!(out[0].verse_ref.verse_start, verse, "{text:?}");
+        }
+    }
+
+    /// Joining is only allowed when the result is a real reference, so a pair
+    /// that would invent a chapter falls through to the existing rules.
+    #[test]
+    fn rejoining_requires_the_result_to_exist() {
+        // Jude has one chapter; "9 9" cannot become Jude 99.
+        let mut detector = DirectDetector::new();
+        let out = detector.detect("Jude 9 9 verse 1");
+        assert!(
+            out.iter().all(|d| d.verse_ref.chapter != 99),
+            "invented a chapter: {out:?}"
+        );
+    }
 }

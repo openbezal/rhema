@@ -60,6 +60,12 @@ pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
 
     // Try pattern: number followed by "verse" keyword then number
     // e.g. "32 verse 1"
+    // Before N-verse-M, so a chapter split into digit groups is rejoined
+    // rather than having its tail dropped.
+    if let Some(result) = try_split_chapter_verse_pattern(&tokens, book_match) {
+        return Some(result);
+    }
+
     if let Some(result) = try_number_verse_pattern(&tokens, book_match) {
         return Some(result);
     }
@@ -435,6 +441,52 @@ fn try_verse_only_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
                 }
             }
         }
+    }
+    None
+}
+
+/// "Psalm 1 36 verse 1" — a chapter spoken as digit groups.
+///
+/// Deepgram renders "one thirty-six" as two separate numbers, never "136"
+/// (the same quirk that made it write corrections as "22 20"). The existing
+/// `N verse M` rule then reads the first number as the chapter and silently
+/// discards the second, so "Psalm 1 36 verse 1" became Psalms 1:1 at full
+/// confidence instead of Psalms 136:1.
+///
+/// When an explicit "verse" keyword already says where the verse is, an
+/// adjacent pair of numbers before it must both belong to the chapter, so
+/// they are joined. Only accepted when the joined reference actually exists —
+/// otherwise this falls through to the existing rules unchanged.
+fn try_split_chapter_verse_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
+    for i in 0..tokens.len() {
+        let (first, after_first) = consume_number_at(tokens, i)?;
+        let Some((second, after_second)) = consume_number_at(tokens, after_first) else {
+            continue;
+        };
+        // Nobody says a chapter as "one three hundred"; a trailing group is
+        // always under 100, which also keeps this away from real verse numbers.
+        if first <= 0 || !(1..100).contains(&second) {
+            continue;
+        }
+        let Some(Token::Word(w)) = tokens.get(after_second) else {
+            continue;
+        };
+        if w != "verse" && w != "verses" {
+            continue;
+        }
+        let (verse, verse_next) = consume_number(tokens, after_second + 1)?;
+
+        let joined: i32 = format!("{first}{second}").parse().ok()?;
+        if !super::versification::is_valid_verse(book_match.book_number, joined, verse) {
+            continue;
+        }
+        return Some(VerseRef {
+            book_number: book_match.book_number,
+            book_name: book_match.book_name.clone(),
+            chapter: joined,
+            verse_start: verse,
+            verse_end: scan_verse_end(tokens, verse_next),
+        });
     }
     None
 }
