@@ -432,3 +432,19 @@ jobs:
           overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # GitHub's "get release by tag" API excludes drafts, so the action above
+      # cannot find the draft a previous attempt created: it takes the "create"
+      # path, hits already-exists, uploads the new assets, and leaves the old
+      # body in place. On v0.3.1 that stranded a "Linux build missing" warning
+      # on a release that had just been completed by a re-run. Setting the body
+      # explicitly makes the notes describe the attempt that actually produced
+      # them. `gh` finds drafts by tag, which the action's lookup does not.
+      - name: Sync release notes to this attempt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "v${{ steps.version.outputs.version }}" \
+            --notes-file release-notes.md
+
+          echo "Release notes synced for v${{ steps.version.outputs.version }}."
