@@ -332,8 +332,10 @@ jobs:
           # (overwrite_files is on).
           if [[ ${#missing[@]} -gt 0 ]]; then
             echo "::warning::Missing artifacts, no stable alias for: ${missing[*]}." \
-                 "The site's download buttons link to those filenames. Re-run the" \
-                 "failed build before publishing — artifacts are kept for 7 days."
+                 "The site's download buttons link to those filenames. Use 'Re-run" \
+                 "failed jobs' on this run before publishing — not 'Re-run all" \
+                 "jobs', which deletes the artifacts the other platforms produced." \
+                 "Artifacts are kept for 7 days; after that, re-tag instead."
           fi
           echo "missing=${missing[*]}" >> "$GITHUB_OUTPUT"
 
@@ -373,7 +375,12 @@ jobs:
               echo "> Platform builds missing from this release:" \
                    "\`${MISSING_ALIASES}\`."
               echo "> The website's download buttons link to those filenames and"
-              echo "> will 404. Re-run the failed build job before publishing."
+              echo "> will 404. Before publishing, use **Re-run failed jobs** on"
+              echo "> this run — it rebuilds only the failed platform, keeps the"
+              echo "> artifacts the others already produced, and re-runs this"
+              echo "> release job to add the missing files to this same draft."
+              echo "> Do not use *Re-run all jobs*: that deletes the existing"
+              echo "> artifacts and rebuilds every platform from scratch."
               echo ""
             fi
 
