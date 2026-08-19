@@ -339,11 +339,32 @@ describe("surface fills", () => {
 
     const draws = calls.filter((c) => c.method === "drawImage")
     expect(draws).toHaveLength(1)
+    // drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh): the source is the
+    // artwork's own bounds, the destination is the container.
+    const [, sx, sy, sw, sh, , , dw, dh] = draws[0].args as number[]
+    expect([sx, sy, sw, sh]).toEqual([0, 0, 1920, 300])
     // "cover" on a 1920x300 image in the 1728x432 band: scaled to the band's
-    // height and centred horizontally, so it starts left of the band's x.
-    const [, , , width, height] = draws[0].args as number[]
-    expect(height).toBe(432)
-    expect(width).toBeCloseTo(432 * (1920 / 300), 5)
+    // height and centred horizontally, so it overflows the band's width.
+    expect(dh).toBe(432)
+    expect(dw).toBeCloseTo(432 * (1920 / 300), 5)
+  })
+
+  it("fits the artwork's bounds, ignoring transparent margins", async () => {
+    // Artwork exported in the corner of a big transparent canvas: fitting the
+    // whole canvas would shrink the visible band into a corner of the band.
+    const { imageContentBox } = await import("./theme-image-cache")
+    const wideCanvasArtwork = {
+      naturalWidth: 1920,
+      naturalHeight: 1080,
+    } as HTMLImageElement
+    // Without a real 2d context the measurement degrades to the full image
+    // rather than throwing, which is what the renderer relies on.
+    expect(imageContentBox(wideCanvasArtwork)).toEqual({
+      sx: 0,
+      sy: 0,
+      sw: 1920,
+      sh: 1080,
+    })
   })
 
   it("clips the container image to the surface, not the whole frame", () => {

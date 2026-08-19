@@ -8,6 +8,7 @@ import {
   type RichInlineItem,
   type RichInlineLine,
 } from "@chenglou/pretext/rich-inline"
+import { imageContentBox } from "@/lib/theme-image-cache"
 import type {
   BroadcastTheme,
   SurfaceFill,
@@ -531,7 +532,10 @@ function drawImageFill(
   let drawW = rect.width
   let drawH = rect.height
 
-  const imgRatio = img.naturalWidth / img.naturalHeight
+  // Fit the artwork, not the canvas it was exported on: a band drawn in the
+  // corner of a transparent 1920x1080 export must still fill its container.
+  const { sx, sy, sw, sh } = imageContentBox(img)
+  const imgRatio = sw / sh
   const rectRatio = rect.width / rect.height
 
   switch (image.fit) {
@@ -561,7 +565,7 @@ function drawImageFill(
       break
   }
 
-  ctx.drawImage(img, drawX, drawY, drawW, drawH)
+  ctx.drawImage(img, sx, sy, sw, sh, drawX, drawY, drawW, drawH)
   ctx.filter = "none"
 
   if (image.tint) {

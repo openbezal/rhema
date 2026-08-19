@@ -44,6 +44,78 @@ export function loadThemeImage(url: string): Promise<HTMLImageElement | null> {
   return request
 }
 
+export interface ImageContentBox {
+  sx: number
+  sy: number
+  sw: number
+  sh: number
+}
+
+const contentBoxes = new WeakMap<HTMLImageElement, ImageContentBox>()
+
+/**
+ * The bounds of an image's non-transparent pixels.
+ *
+ * Artwork is often exported on a full-frame canvas with the graphic in one
+ * corner and the rest transparent. Fitting the whole canvas would shrink the
+ * visible art into a corner of its container, so fitting uses these bounds
+ * instead. Fully opaque images return their natural bounds unchanged.
+ */
+export function imageContentBox(img: HTMLImageElement): ImageContentBox {
+  const cached = contentBoxes.get(img)
+  if (cached) return cached
+
+  const width = img.naturalWidth
+  const height = img.naturalHeight
+  const full: ImageContentBox = { sx: 0, sy: 0, sw: width, sh: height }
+  if (!width || !height) return full
+
+  let box = full
+  try {
+    // Measure at a capped resolution: margins only need to be located, and
+    // scanning 4K of pixels on every theme load is not worth the precision.
+    const maxSide = 512
+    const ratio = Math.min(1, maxSide / Math.max(width, height))
+    const w = Math.max(1, Math.round(width * ratio))
+    const h = Math.max(1, Math.round(height * ratio))
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, w, h)
+      const { data } = ctx.getImageData(0, 0, w, h)
+      let minX = w
+      let minY = h
+      let maxX = -1
+      let maxY = -1
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (data[(y * w + x) * 4 + 3] > 8) {
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+          }
+        }
+      }
+      if (maxX >= minX && maxY >= minY) {
+        box = {
+          sx: Math.floor((minX / w) * width),
+          sy: Math.floor((minY / h) * height),
+          sw: Math.ceil(((maxX - minX + 1) / w) * width),
+          sh: Math.ceil(((maxY - minY + 1) / h) * height),
+        }
+      }
+    }
+  } catch {
+    // Tainted canvas or no 2d context — fit the whole image.
+  }
+
+  contentBoxes.set(img, box)
+  return box
+}
+
 /** Every image URL a theme references, across the frame and all surfaces. */
 export function themeImageUrls(theme: {
   background?: { image?: { url: string } | null }
