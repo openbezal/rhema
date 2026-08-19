@@ -156,6 +156,8 @@ async function main() {
         "--task",
         "feature-extraction",
         MODELS_DIR,
+        "--library-name",
+        "transformers",
       ])
       console.log(`  ✓ Model exported to ${MODELS_DIR}`)
     }
@@ -173,6 +175,8 @@ async function main() {
           "--arm64",
           "-o",
           MODELS_DIR_INT8,
+          "--library-name",
+          "transformers",
         ])
         console.log(`  ✓ INT8 model saved to ${MODELS_DIR_INT8}`)
       } catch {
@@ -221,7 +225,9 @@ async function main() {
   console.log("║   ✅ Setup complete!                          ║")
   console.log("╚══════════════════════════════════════════════╝")
   if (!withEmbedding) {
-    console.log("  Note: embedding re-ranking assets were skipped (optional).")
+    console.log(
+      "  Note: embedding re-ranking assets were skipped (optional)."
+    )
     console.log(
       "  Gain: better paraphrase search in the Context tab. Cost: ~2.5h build,"
     )
