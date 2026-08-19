@@ -120,11 +120,11 @@ const TRANSLATION_FANOUT: usize = 10;
 /// Grouped by verse reference so the LIMIT applies to UNIQUE verses: without
 /// the grouping, one verse matched in all 7 English translations consumed 7
 /// result slots, collapsing recall. Each verse keeps its best (lowest) BM25
-/// rank across translations; SQLite guarantees the bare columns come from
+/// rank across translations; `SQLite` guarantees the bare columns come from
 /// the row that produced the `MIN()` value.
 ///
 /// The CTE must be MATERIALIZED: FTS5's `bm25()` auxiliary function cannot
-/// run in an aggregate context, and without materialization SQLite flattens
+/// run in an aggregate context, and without materialization `SQLite` flattens
 /// the subquery into the outer aggregate ("unable to use function bm25 in
 /// the requested context").
 ///
@@ -430,7 +430,7 @@ mod tests {
             std::thread::current().id(),
         ));
         let _ = std::fs::remove_file(&path);
-        let db = BibleDb::open(&path).unwrap();
+        let db = BibleDb::open_writable(&path).unwrap();
         {
             let conn = db.conn.lock().unwrap();
             conn.execute_batch(

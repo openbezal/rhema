@@ -10,17 +10,37 @@ Rhema listens to a live sermon audio feed, transcribes speech in real time, dete
 
 ## Download
 
-| Platform | |
-|---|---|
-| **Windows** | [**Rhema-windows-x64-setup.exe**](https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe) — rebuilt from `main` on every merge |
-| macOS, Linux | No prebuilt binary yet — [build from source](#getting-started) |
+| Platform | | Requires |
+|---|---|---|
+| **Windows** | [**Rhema-windows-x64-setup.exe**](https://github.com/openbezal/rhema/releases/latest/download/Rhema-windows-x64-setup.exe) | Windows 10/11 x64 |
+| **macOS** | [**Rhema-macos-arm64.dmg**](https://github.com/openbezal/rhema/releases/latest/download/Rhema-macos-arm64.dmg) | macOS 11 Big Sur or newer, **Apple Silicon** |
+| **Linux** | [**Rhema-linux-x86_64.AppImage**](https://github.com/openbezal/rhema/releases/latest/download/Rhema-linux-x86_64.AppImage) | x86_64; `.deb` and `.rpm` on the [release page](https://github.com/openbezal/rhema/releases/latest) |
 
-The installer is unsigned, so Windows SmartScreen warns on first run (*More info → Run anyway*).
+There is no Intel Mac build — on an Intel Mac,
+[build from source](#getting-started).
 
-It also does **not** bundle the Bible database, embedding model, or Whisper
-model — together they exceed a gigabyte. The app starts without them, but verse
-detection and local speech-to-text stay inactive until you build from source and
-run `bun run setup:all`. All releases are listed at
+Every build is **unsigned** — there is no Apple Developer or Windows code
+signing certificate behind this project — so each OS warns on first run.
+
+**Windows:** SmartScreen warns — *More info → Run anyway*.
+
+**macOS:** drag `Rhema.app` to Applications first, then open it. Gatekeeper
+blocks unsigned apps that carry the browser's quarantine flag; on macOS 15 and
+newer the right-click → Open trick no longer works, so use:
+
+- **System Settings → Privacy & Security**, scroll to the blocked-app notice,
+  then **Open Anyway**, or
+- clear the quarantine flag yourself:
+
+  ```sh
+  xattr -cr /Applications/Rhema.app
+  ```
+
+Releases do **not** bundle the embedding model or the Whisper model — together
+they exceed a gigabyte. The Bible database ships inside the app, so reference
+detection and keyword search work out of the box; embedding re-ranking and local
+speech-to-text stay inactive until you build from source and run
+`bun run setup:all`. All releases are listed at
 [github.com/openbezal/rhema/releases](https://github.com/openbezal/rhema/releases).
 
 ## Features

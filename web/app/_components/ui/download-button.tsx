@@ -14,12 +14,12 @@ const COPY: Record<
   "mac" | "windows" | "linux" | "other" | "default",
   { label: string; icon: TablerIcon }
 > = {
-  // Windows is the only platform with a prebuilt installer today, so it is the
-  // only one that links straight to a file. Everyone else lands on the releases
-  // page rather than being handed a .exe they can't run.
-  mac: { label: "Download", icon: IconBrandApple },
+  // Each desktop platform links straight to its installer. "other" covers
+  // phones, tablets, and anything unrecognised, which land on the release page
+  // rather than being handed a file they cannot open.
+  mac: { label: "Download for macOS", icon: IconBrandApple },
   windows: { label: "Download for Windows", icon: IconBrandWindows },
-  linux: { label: "Download", icon: IconDownload },
+  linux: { label: "Download for Linux", icon: IconDownload },
   other: { label: "Download", icon: IconDownload },
   default: { label: "Download", icon: IconDownload },
 };

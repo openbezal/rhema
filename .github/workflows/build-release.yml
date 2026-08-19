@@ -274,23 +274,40 @@ jobs:
             \) \
             -exec cp {} release-assets/ \;
 
-          # The site's download button links to a fixed filename under
-          # /releases/latest/download (web/app/_lib/site.ts). Tauri stamps the
-          # version into every bundle name, so ship a stable-named copy of the
-          # Windows installer alongside the versioned one — otherwise that link
-          # needs a hand re-upload after every release.
-          setup=$(find release-assets -maxdepth 1 -name "*_x64-setup.exe" | head -1)
+          # The site's download buttons link to fixed filenames under
+          # /releases/latest/download so a visitor gets the right file in one
+          # click (web/app/_lib/site.ts). Tauri stamps the version into every
+          # bundle name, so ship stable-named copies alongside the versioned
+          # ones — otherwise those links need a hand re-upload every release.
+          aliases=(
+            "*_x64-setup.exe:Rhema-windows-x64-setup.exe"
+            "*_aarch64.dmg:Rhema-macos-arm64.dmg"
+            "*_amd64.AppImage:Rhema-linux-x86_64.AppImage"
+          )
 
-          if [[ -n "$setup" ]]; then
-            cp "$setup" release-assets/Rhema-windows-x64-setup.exe
-            echo "Stable alias: Rhema-windows-x64-setup.exe -> $(basename "$setup")"
-          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            echo "::error::No Windows x64 setup .exe among the artifacts. The site's" \
-                 "download link would 404. Fix the Windows build and re-run this" \
-                 "workflow — the build artifacts are retained for 7 days."
-            exit 1
-          else
-            echo "::warning::No Windows x64 setup .exe found; skipping the stable alias."
+          missing=()
+          for entry in "${aliases[@]}"; do
+            pattern="${entry%%:*}"
+            alias_name="${entry##*:}"
+            match=$(find release-assets -maxdepth 1 -name "$pattern" | head -1)
+
+            if [[ -n "$match" ]]; then
+              cp "$match" "release-assets/$alias_name"
+              echo "Stable alias: $alias_name -> $(basename "$match")"
+            else
+              missing+=("$alias_name")
+            fi
+          done
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+              echo "::error::Missing artifacts for: ${missing[*]}. The site's download" \
+                   "buttons link to those filenames and would 404. Fix the failing" \
+                   "build and re-run this workflow — build artifacts are retained" \
+                   "for 7 days."
+              exit 1
+            fi
+            echo "::warning::Skipping stable aliases, artifacts missing: ${missing[*]}"
           fi
 
           echo "Release assets:"

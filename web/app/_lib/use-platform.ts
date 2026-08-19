@@ -23,7 +23,13 @@ function detectPlatform(): Platform {
   ).userAgentData;
   const source = (uaData?.platform ?? nav.userAgent ?? "").toLowerCase();
 
-  if (/mac|darwin|iphone|ipad|ipod/.test(source)) return "mac";
+  // Phones and tablets first: the download CTA links straight to a desktop
+  // installer per platform, and "iPad" matches mac while Android's UA contains
+  // "Linux" — both would hand a mobile visitor a file they cannot open. They
+  // get the release page instead.
+  if (/iphone|ipad|ipod|android/.test(source)) return "other";
+
+  if (/mac|darwin/.test(source)) return "mac";
   if (/win/.test(source)) return "windows";
   if (/linux|x11|cros/.test(source)) return "linux";
   return "other";
