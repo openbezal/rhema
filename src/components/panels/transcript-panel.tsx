@@ -88,10 +88,19 @@ export function TranscriptPanel() {
     useDetectionStore.getState().addDetections(detections)
     mark(`addDetections done src=${detections[0]?.source ?? "?"}`)
 
-    // Auto-navigate book search + select verse for preview/live
-    const directHit = detections.find(
-      (d) => d.source === "direct" && !d.is_chapter_only
-    )
+    // Auto-navigate book search + select verse for preview/live.
+    //
+    // Take the detector's most confident reading rather than whichever
+    // landed first in the batch. One utterance can yield several direct
+    // detections, and batch order is emission order — in issue #152 a
+    // spurious match was emitted ahead of the verse the preacher actually
+    // named, so the wrong one went on air.
+    const directHit = detections
+      .filter((d) => d.source === "direct" && !d.is_chapter_only)
+      .reduce<DetectionResult | undefined>(
+        (best, d) => (best && best.confidence >= d.confidence ? best : d),
+        undefined
+      )
     if (directHit && directHit.book_number > 0) {
       const detectedVerse = {
         id: 0,
