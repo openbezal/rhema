@@ -274,18 +274,51 @@ jobs:
             \) \
             -exec cp {} release-assets/ \;
 
+          # The site's download button links to a fixed filename under
+          # /releases/latest/download (web/app/_lib/site.ts). Tauri stamps the
+          # version into every bundle name, so ship a stable-named copy of the
+          # Windows installer alongside the versioned one — otherwise that link
+          # needs a hand re-upload after every release.
+          setup=$(find release-assets -maxdepth 1 -name "*_x64-setup.exe" | head -1)
+
+          if [[ -n "$setup" ]]; then
+            cp "$setup" release-assets/Rhema-windows-x64-setup.exe
+            echo "Stable alias: Rhema-windows-x64-setup.exe -> $(basename "$setup")"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            echo "::error::No Windows x64 setup .exe among the artifacts. The site's" \
+                 "download link would 404. Fix the Windows build and re-run this" \
+                 "workflow — the build artifacts are retained for 7 days."
+            exit 1
+          else
+            echo "::warning::No Windows x64 setup .exe found; skipping the stable alias."
+          fi
+
           echo "Release assets:"
           ls -lh release-assets
 
       - name: Generate release metadata
+        id: metadata
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
+          # A tag push is a real release; workflow_dispatch builds whatever the
+          # chosen ref happens to be, so they are labelled as dev builds rather
+          # than inheriting a release title someone then edits by hand.
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            RELEASE_NAME="Rhema v${VERSION}"
+            SUMMARY="Desktop release build for macOS, Linux, and Windows."
+          else
+            RELEASE_NAME="Rhema v${VERSION} (dev build)"
+            SUMMARY="Unreleased development build from \`${GITHUB_REF_NAME}\`."
+          fi
+
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+
           {
-            echo "## Rhema v${VERSION}"
+            echo "## ${RELEASE_NAME}"
             echo ""
-            echo "Automated nightly build of Rhema."
+            echo "${SUMMARY}"
             echo ""
             echo "**Commit:** [\`${GITHUB_SHA:0:7}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})"
             echo ""
@@ -327,7 +360,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: Rhema v${{ steps.version.outputs.version }} (nightly)
+          name: ${{ steps.metadata.outputs.release_name }}
           body_path: release-notes.md
           draft: true
           prerelease: false

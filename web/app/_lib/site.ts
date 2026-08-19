@@ -17,12 +17,13 @@ export const SITE = {
     name: "rhema",
     url: "https://github.com/openbezal/rhema",
     releases: "https://github.com/openbezal/rhema/releases",
-    // `nightly` is a hand-refreshed pointer to the newest Windows installer.
-    // Whatever is uploaded there must keep this exact filename or this link
-    // breaks. `/releases/latest` is not used here: GitHub excludes
-    // prereleases from it.
+    // `/releases/latest` resolves to the newest published, non-prerelease
+    // release, so this tracks each tagged release with no hand re-upload. The
+    // release workflow ships a copy of the Windows installer under this exact
+    // stable filename (Tauri's own bundle names carry the version); keep the
+    // two in sync or this link 404s.
     downloadWindows:
-      "https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe",
+      "https://github.com/openbezal/rhema/releases/latest/download/Rhema-windows-x64-setup.exe",
     discussions: "https://github.com/openbezal/rhema/discussions",
     stars: { fallback: 221 },
   },
