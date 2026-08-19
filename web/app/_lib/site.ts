@@ -17,10 +17,10 @@ export const SITE = {
     name: "rhema",
     url: "https://github.com/openbezal/rhema",
     releases: "https://github.com/openbezal/rhema/releases",
-    // Rolling prerelease published by .github/workflows/release-windows.yml on
-    // every merge to main. The tag and filename are set by RELEASE_TAG and
-    // ASSET_NAME in that workflow — change them together or this link breaks.
-    // `/releases/latest` cannot be used here: GitHub excludes prereleases from it.
+    // `nightly` is a hand-refreshed pointer to the newest Windows installer.
+    // Whatever is uploaded there must keep this exact filename or this link
+    // breaks. `/releases/latest` is not used here: GitHub excludes
+    // prereleases from it.
     downloadWindows:
       "https://github.com/openbezal/rhema/releases/download/nightly/Rhema-windows-x64-setup.exe",
     discussions: "https://github.com/openbezal/rhema/discussions",
