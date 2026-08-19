@@ -161,10 +161,15 @@ const MODERN_LIGHT: BroadcastTheme = {
   },
 }
 
-const BROADCAST_OVERLAY: BroadcastTheme = {
+// Lower third: transparent background for NDI keying, a text band across the
+// bottom, reference top-left with the verse text underneath it.
+const LOWER_THIRDS: BroadcastTheme = {
   ...baseTheme,
+  // Id keeps its original spelling on purpose — it is persisted in every
+  // output's themeId and in user themes derived from it, so renaming it would
+  // orphan existing selections. Only the display name changed.
   id: "builtin-broadcast-overlay",
-  name: "Broadcast Overlay",
+  name: "Lower Thirds",
   background: {
     type: "transparent",
     color: "transparent",
@@ -183,7 +188,7 @@ const BROADCAST_OVERLAY: BroadcastTheme = {
     fontSize: 64,
     fontWeight: 500,
     color: "#ffffff",
-    horizontalAlign: "center",
+    horizontalAlign: "left",
     verticalAlign: "top",
     textTransform: "none",
     textDecoration: "none",
@@ -200,23 +205,23 @@ const BROADCAST_OVERLAY: BroadcastTheme = {
   },
   reference: {
     fontFamily: "Geist Variable",
-    fontSize: 43,
+    fontSize: 36,
     fontWeight: 600,
     color: "#fbbf24",
-    horizontalAlign: "center",
+    horizontalAlign: "left",
     verticalAlign: "top",
     textTransform: "none",
     textDecoration: "none",
     uppercase: false,
     letterSpacing: 1,
-    position: "below",
+    position: "above",
   },
   layout: {
     anchor: "bottom-center",
     offsetX: 0,
     offsetY: 0,
     padding: { top: 40, right: 60, bottom: 40, left: 60 },
-    textAlign: "center",
+    textAlign: "left",
     backgroundWidth: 100,
     backgroundHeight: 100,
     textAreaWidth: 90,
@@ -308,8 +313,8 @@ const BANNER_SPLIT: BroadcastTheme = {
 export const BUILTIN_THEMES: BroadcastTheme[] = [
   CLASSIC_DARK,
   MODERN_LIGHT,
-  BROADCAST_OVERLAY,
+  LOWER_THIRDS,
   BANNER_SPLIT,
 ]
 
-export { CLASSIC_DARK, BROADCAST_OVERLAY }
+export { CLASSIC_DARK, LOWER_THIRDS }

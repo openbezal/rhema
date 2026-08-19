@@ -9,7 +9,7 @@ import type {
   VerseRenderData,
 } from "@/types"
 import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel } from "@/types"
-import { BUILTIN_THEMES, BROADCAST_OVERLAY, CLASSIC_DARK } from "@/lib/builtin-themes"
+import { BUILTIN_THEMES, LOWER_THIRDS, CLASSIC_DARK } from "@/lib/builtin-themes"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
 type SelectedElement = "verse" | "reference" | null
@@ -199,9 +199,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set((s) => ({ themes: [...s.themes, newTheme] }))
   },
   createNewTheme: (layoutKind = "fullscreen") => {
-    // Lower thirds start from Broadcast Overlay (transparent background for
+    // Lower thirds start from the Lower Thirds builtin (transparent background for
     // NDI keying, text box band at the bottom); fullscreen from Classic Dark.
-    const source = layoutKind === "lower-thirds" ? BROADCAST_OVERLAY : CLASSIC_DARK
+    const source = layoutKind === "lower-thirds" ? LOWER_THIRDS : CLASSIC_DARK
     const newTheme: BroadcastTheme = {
       ...source,
       id: crypto.randomUUID(),

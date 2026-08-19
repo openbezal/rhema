@@ -172,9 +172,25 @@ describe("computeVerseLayoutMetrics — stacked mode", () => {
   })
 
   it("keeps the reference below the verse for position 'below'", () => {
-    const theme = BUILTIN_THEMES[2] // Broadcast Overlay, position "below"
+    const base = BUILTIN_THEMES[2]
+    const theme: BroadcastTheme = {
+      ...base,
+      reference: { ...base.reference, position: "below" },
+    }
     const metrics = computeVerseLayoutMetrics(stubCtx(), theme, VERSE)
     expect(metrics.referenceRect!.y).toBeGreaterThan(metrics.verseRect!.y)
+  })
+
+  it("puts the Lower Thirds reference above the verse, both flush left", () => {
+    const lowerThirds = BUILTIN_THEMES[2]
+    expect(lowerThirds.name).toBe("Lower Thirds")
+    const metrics = computeVerseLayoutMetrics(stubCtx(), lowerThirds, VERSE)
+    expect(metrics.referenceRect!.y).toBeLessThan(metrics.verseRect!.y)
+    // Both share one left edge, inset from the band by the layout padding.
+    expect(metrics.referenceRect!.x).toBe(metrics.verseRect!.x)
+    expect(metrics.referenceRect!.x).toBe(
+      metrics.textAreaRect.x + lowerThirds.layout.padding.left
+    )
   })
 
   it("reports the fitted verse font size", () => {
@@ -234,7 +250,7 @@ function recordingCtx(): {
 }
 
 function overlayFreeTheme(): BroadcastTheme {
-  const base = BUILTIN_THEMES[2] // Broadcast Overlay
+  const base = BUILTIN_THEMES[2] // Lower Thirds
   return {
     ...base,
     layout: {
@@ -247,7 +263,7 @@ function overlayFreeTheme(): BroadcastTheme {
 }
 
 describe("computeVerseLayoutMetrics — text box backdrop", () => {
-  // Broadcast Overlay: textArea 90% × 40%, anchored bottom-center →
+  // Lower Thirds: textArea 90% × 40%, anchored bottom-center →
   // {x: 96, y: 648, width: 1728, height: 432}.
   const ANCHORED_BAND = { x: 96, y: 648, width: 1728, height: 432 }
 
@@ -279,7 +295,7 @@ describe("computeVerseLayoutMetrics — text box backdrop", () => {
   it("draws the backdrop at the anchored band, not the verse box", () => {
     const { ctx, calls } = recordingCtx()
     renderVerse(ctx, overlayFreeTheme(), VERSE)
-    // roundRect starts with moveTo(x + radius, y); Broadcast Overlay radius = 12.
+    // roundRect starts with moveTo(x + radius, y); Lower Thirds radius = 12.
     const moveTos = calls.filter((c) => c.method === "moveTo")
     expect(moveTos.some((c) => c.args[0] === 96 + 12 && c.args[1] === 648)).toBe(
       true
