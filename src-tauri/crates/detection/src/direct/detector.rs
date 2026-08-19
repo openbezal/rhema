@@ -2096,4 +2096,50 @@ mod tests {
         assert_eq!(results[0].verse_ref.verse_start, 16);
         assert_eq!(results[0].verse_ref.verse_end, None);
     }
+
+    /// Issue #152: the operator manually put Ezekiel 33:15-16 on air; while the
+    /// preacher read v16 the app switched itself to Isaiah 1:16.
+    ///
+    /// Ezekiel 33:14-16 contains "that which is lawful and right", so a partial
+    /// ending on "is" matched the Isaiah alias, parked an incomplete Isaiah
+    /// reference and rewrote the context book. The next "verse sixteen"
+    /// completed it to Isaiah 1:16 at full confidence.
+    #[test]
+    fn issue_152_reading_a_verse_containing_is_does_not_become_isaiah() {
+        let mut detector = DirectDetector::new();
+        detector.detect("he hath given again that which is");
+        let after = detector.detect("verse sixteen");
+        let isaiah: Vec<_> = after
+            .iter()
+            .filter(|d| d.verse_ref.book_number == 23)
+            .collect();
+        assert!(
+            isaiah.is_empty(),
+            "the word \"is\" resolved to Isaiah: {after:?}"
+        );
+    }
+
+    /// Issue #152: announcing "our text is Ephesians 2:8" jumped to Isaiah 2.
+    ///
+    /// "is" matched Isaiah, and the parser then scanned the rest of the
+    /// utterance for numbers — finding Ephesians' own "2:8" — so Isaiah 2:8 was
+    /// emitted at confidence 1.00 *before* Ephesians 2:8. The UI presents the
+    /// first detection in the batch.
+    #[test]
+    fn issue_152_announcing_a_text_does_not_emit_isaiah_first() {
+        let mut detector = DirectDetector::new();
+        let detections = detector.detect("our text this morning is Ephesians 2:8");
+        assert!(
+            !detections.is_empty(),
+            "Ephesians 2:8 should still be detected"
+        );
+        assert!(
+            detections.iter().all(|d| d.verse_ref.book_number != 23),
+            "Isaiah leaked into the batch: {detections:?}"
+        );
+        let first = &detections[0];
+        assert_eq!(first.verse_ref.book_number, 49, "expected Ephesians");
+        assert_eq!(first.verse_ref.chapter, 2);
+        assert_eq!(first.verse_ref.verse_start, 8);
+    }
 }
