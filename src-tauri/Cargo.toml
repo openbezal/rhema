@@ -29,7 +29,7 @@ missing_panics_doc = "allow"
 
 [package]
 name = "rhema"
-version = "0.2.0"
+version = "0.3.0"
 description = "Rhema - Real-Time AI Bible Verse Detection"
 authors = ["Faithful"]
 license = "MIT"
