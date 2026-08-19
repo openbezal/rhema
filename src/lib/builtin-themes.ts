@@ -37,6 +37,7 @@ const CLASSIC_DARK: BroadcastTheme = {
     opacity: 0,
     borderRadius: 0,
     padding: 0,
+    image: null,
   },
   verseText: {
     fontFamily: "Source Serif 4 Variable",
@@ -107,6 +108,7 @@ const MODERN_LIGHT: BroadcastTheme = {
     opacity: 0,
     borderRadius: 0,
     padding: 0,
+    image: null,
   },
   verseText: {
     fontFamily: "Geist Variable",
@@ -176,12 +178,15 @@ const LOWER_THIRDS: BroadcastTheme = {
     gradient: null,
     image: null,
   },
+  // The container: the band the reference and verse both live in. Swap its
+  // colour for an image in the designer to use band artwork.
   textBox: {
     enabled: true,
     color: "#000000",
     opacity: 0.7,
     borderRadius: 12,
     padding: 24,
+    image: null,
   },
   verseText: {
     fontFamily: "Geist Variable",
@@ -254,6 +259,7 @@ const BANNER_SPLIT: BroadcastTheme = {
     opacity: 0,
     borderRadius: 0,
     padding: 0,
+    image: null,
   },
   verseText: {
     fontFamily: "Geist Variable",

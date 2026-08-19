@@ -10,6 +10,8 @@ import {
 } from "@chenglou/pretext/rich-inline"
 import type {
   BroadcastTheme,
+  SurfaceFill,
+  ThemeImageFill,
   VerseRenderData,
   RenderOptions,
 } from "@/types/broadcast"
@@ -104,6 +106,47 @@ export interface VerseLayoutMetrics {
   /** Free-mode element boxes in canvas px. Only set when layout.mode === "free". */
   referenceBoxRect?: VerseLayoutRect | null
   verseBoxRect?: VerseLayoutRect | null
+  /** Rect the reference's own chip is drawn at — hugs the reference text. */
+  referenceSurfaceRect?: VerseLayoutRect | null
+  /** Rect the verse's own plate is drawn at — fills the verse's area. */
+  verseSurfaceRect?: VerseLayoutRect | null
+}
+
+/** Grow a rect outwards by `padding` on every side, never past zero size. */
+function inflateRect(rect: VerseLayoutRect, padding: number): VerseLayoutRect {
+  return {
+    x: rect.x - padding,
+    y: rect.y - padding,
+    width: Math.max(0, rect.width + padding * 2),
+    height: Math.max(0, rect.height + padding * 2),
+  }
+}
+
+/**
+ * Where an element's own plate is drawn: its box when it has one (free mode),
+ * otherwise hugging the text plus the surface's padding.
+ */
+function surfaceRectFor(
+  surface: SurfaceFill | undefined,
+  textRect: VerseLayoutRect | null,
+  boxRect: VerseLayoutRect | null | undefined
+): VerseLayoutRect | null {
+  if (!surface?.enabled) return null
+  if (boxRect) return boxRect
+  if (!textRect) return null
+  return inflateRect(textRect, surface.padding)
+}
+
+/** Shrink a rect inwards by `padding` on every side, never past zero size. */
+function deflateRect(rect: VerseLayoutRect, padding: number): VerseLayoutRect {
+  const width = Math.max(0, rect.width - padding * 2)
+  const height = Math.max(0, rect.height - padding * 2)
+  return {
+    x: rect.x + Math.min(padding, rect.width / 2),
+    y: rect.y + Math.min(padding, rect.height / 2),
+    width,
+    height,
+  }
 }
 
 export function wrapText(
@@ -437,80 +480,126 @@ function drawBackground(
       break
     }
 
-    case "image": {
-      if (!bg.image) {
-        ctx.fillStyle = "#000"
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
-        break
-      }
-      const img = imageCache?.get(bg.image.url)
-      if (!img) {
-        // Use a deterministic fallback while image is still loading.
-        ctx.fillStyle = bg.image.tint ?? "#000"
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
-        break
-      }
-
-      ctx.save()
-      ctx.beginPath()
-      ctx.rect(rect.x, rect.y, rect.width, rect.height)
-      ctx.clip()
-
-      if (bg.image.blur > 0) {
-        ctx.filter = `blur(${bg.image.blur}px) brightness(${bg.image.brightness / 100})`
-      } else if (bg.image.brightness !== 100) {
-        ctx.filter = `brightness(${bg.image.brightness / 100})`
-      }
-
-      let drawX = rect.x
-      let drawY = rect.y
-      let drawW = rect.width
-      let drawH = rect.height
-
-      const imgRatio = img.naturalWidth / img.naturalHeight
-      const rectRatio = rect.width / rect.height
-
-      switch (bg.image.fit) {
-        case "cover":
-          if (imgRatio > rectRatio) {
-            drawH = rect.height
-            drawW = rect.height * imgRatio
-            drawX = rect.x + (rect.width - drawW) / 2
-          } else {
-            drawW = rect.width
-            drawH = rect.width / imgRatio
-            drawY = rect.y + (rect.height - drawH) / 2
-          }
-          break
-        case "contain":
-          if (imgRatio > rectRatio) {
-            drawW = rect.width
-            drawH = rect.width / imgRatio
-            drawY = rect.y + (rect.height - drawH) / 2
-          } else {
-            drawH = rect.height
-            drawW = rect.height * imgRatio
-            drawX = rect.x + (rect.width - drawW) / 2
-          }
-          break
-        case "stretch":
-          break
-      }
-
-      ctx.drawImage(img, drawX, drawY, drawW, drawH)
-      ctx.restore()
-
-      if (bg.image.tint) {
-        ctx.fillStyle = bg.image.tint
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
-      }
+    case "image":
+      drawImageFill(ctx, bg.image, rect, 0, imageCache)
       break
-    }
 
     case "transparent":
       ctx.clearRect(0, 0, width, height)
       break
   }
+}
+
+/**
+ * Paint an image so it fills `rect`, clipped to `radius`. Shared by the frame
+ * background and every surface fill, so a picture behaves the same wherever it
+ * is used. While the image is still loading a deterministic flat fill stands in.
+ */
+function drawImageFill(
+  ctx: CanvasRenderingContext2D,
+  image: ThemeImageFill | null,
+  rect: VerseLayoutRect,
+  radius: number,
+  imageCache?: Map<string, HTMLImageElement>
+): void {
+  if (!image) {
+    ctx.fillStyle = "#000"
+    fillRoundRect(ctx, rect, radius)
+    return
+  }
+  const img = imageCache?.get(image.url)
+  if (!img) {
+    ctx.fillStyle = image.tint ?? "#000"
+    fillRoundRect(ctx, rect, radius)
+    return
+  }
+
+  ctx.save()
+  // Rounded clip so an image respects the surface's corner radius, and so the
+  // tint below can be painted inside it rather than over the rect's edges.
+  roundRect(ctx, rect.x, rect.y, rect.width, rect.height, radius)
+  ctx.clip()
+
+  if (image.blur > 0) {
+    ctx.filter = `blur(${image.blur}px) brightness(${image.brightness / 100})`
+  } else if (image.brightness !== 100) {
+    ctx.filter = `brightness(${image.brightness / 100})`
+  }
+
+  let drawX = rect.x
+  let drawY = rect.y
+  let drawW = rect.width
+  let drawH = rect.height
+
+  const imgRatio = img.naturalWidth / img.naturalHeight
+  const rectRatio = rect.width / rect.height
+
+  switch (image.fit) {
+    case "cover":
+      if (imgRatio > rectRatio) {
+        drawH = rect.height
+        drawW = rect.height * imgRatio
+        drawX = rect.x + (rect.width - drawW) / 2
+      } else {
+        drawW = rect.width
+        drawH = rect.width / imgRatio
+        drawY = rect.y + (rect.height - drawH) / 2
+      }
+      break
+    case "contain":
+      if (imgRatio > rectRatio) {
+        drawW = rect.width
+        drawH = rect.width / imgRatio
+        drawY = rect.y + (rect.height - drawH) / 2
+      } else {
+        drawH = rect.height
+        drawW = rect.height * imgRatio
+        drawX = rect.x + (rect.width - drawW) / 2
+      }
+      break
+    case "stretch":
+      break
+  }
+
+  ctx.drawImage(img, drawX, drawY, drawW, drawH)
+  ctx.filter = "none"
+
+  if (image.tint) {
+    ctx.fillStyle = image.tint
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
+  }
+  ctx.restore()
+}
+
+function fillRoundRect(
+  ctx: CanvasRenderingContext2D,
+  rect: VerseLayoutRect,
+  radius: number
+): void {
+  roundRect(ctx, rect.x, rect.y, rect.width, rect.height, radius)
+  ctx.fill()
+}
+
+/**
+ * Paint one surface — the container behind a block of text: a colour wash and
+ * then, if set, an image filling the same rect.
+ */
+function drawSurface(
+  ctx: CanvasRenderingContext2D,
+  surface: SurfaceFill | undefined,
+  rect: VerseLayoutRect,
+  baseOpacity: number,
+  imageCache?: Map<string, HTMLImageElement>
+): void {
+  if (!surface?.enabled) return
+  ctx.save()
+  ctx.globalAlpha = baseOpacity * surface.opacity
+  ctx.fillStyle = surface.color
+  fillRoundRect(ctx, rect, surface.borderRadius)
+  if (surface.image) {
+    drawImageFill(ctx, surface.image, rect, surface.borderRadius, imageCache)
+  }
+  ctx.restore()
 }
 
 function drawReference(
@@ -712,6 +801,12 @@ function buildScaledTheme(
       width: theme.resolution.width * scale,
       height: theme.resolution.height * scale,
     },
+    background: {
+      ...theme.background,
+      image: theme.background.image
+        ? { ...theme.background.image, blur: theme.background.image.blur * scale }
+        : null,
+    },
     verseText: {
       ...theme.verseText,
       fontSize: theme.verseText.fontSize * scale,
@@ -730,6 +825,7 @@ function buildScaledTheme(
             width: theme.verseText.outline.width * scale,
           }
         : null,
+      surface: scaleSurface(theme.verseText.surface, scale),
     },
     verseNumbers: {
       ...theme.verseNumbers,
@@ -739,12 +835,28 @@ function buildScaledTheme(
       ...theme.reference,
       fontSize: theme.reference.fontSize * scale,
       letterSpacing: theme.reference.letterSpacing * scale,
+      surface: scaleSurface(theme.reference.surface, scale),
     },
-    textBox: {
-      ...theme.textBox,
-      borderRadius: theme.textBox.borderRadius * scale,
-      padding: theme.textBox.padding * scale,
-    },
+    textBox: scaleSurface(theme.textBox, scale)!,
+  }
+}
+
+/**
+ * Scale a surface's px-valued fields. Image blur counts: it is an absolute px
+ * radius, so an unscaled value over-blurs thumbnails relative to the output.
+ */
+function scaleSurface(
+  surface: SurfaceFill | undefined,
+  scale: number
+): SurfaceFill | undefined {
+  if (!surface) return undefined
+  return {
+    ...surface,
+    borderRadius: surface.borderRadius * scale,
+    padding: surface.padding * scale,
+    image: surface.image
+      ? { ...surface.image, blur: surface.image.blur * scale }
+      : null,
   }
 }
 
@@ -933,10 +1045,13 @@ export function computeVerseLayoutMetrics(
   const pos = { x: bgPos.x + innerPos.x, y: bgPos.y + innerPos.y }
 
   const pad = layout.padding
-  const textRectX = pos.x + pad.left
-  const textRectY = pos.y + pad.top
-  const textRectW = textAreaW - pad.left - pad.right
-  const textRectH = textAreaH - pad.top - pad.bottom
+  // The container's own padding insets the text too, so content wraps inside
+  // the surface rather than running to its edges.
+  const surfacePad = scaledTheme.textBox.enabled ? scaledTheme.textBox.padding : 0
+  const textRectX = pos.x + pad.left + surfacePad
+  const textRectY = pos.y + pad.top + surfacePad
+  const textRectW = textAreaW - pad.left - pad.right - surfacePad * 2
+  const textRectH = textAreaH - pad.top - pad.bottom - surfacePad * 2
   const textAreaRect: VerseLayoutRect = {
     x: pos.x,
     y: pos.y,
@@ -972,6 +1087,8 @@ export function computeVerseLayoutMetrics(
       verseRect: null,
       referenceBoxRect,
       verseBoxRect,
+      referenceSurfaceRect: null,
+      verseSurfaceRect: null,
     }
   }
 
@@ -1004,71 +1121,93 @@ export function computeVerseLayoutMetrics(
     return width
   }
 
+  // A plate on an element insets that element's text, so content sits inside
+  // the fill instead of running to its edges.
+  const referenceContentRect =
+    referenceBoxRect && scaledTheme.reference.surface?.enabled
+      ? deflateRect(referenceBoxRect, scaledTheme.reference.surface.padding)
+      : referenceBoxRect
+  const verseContentRect =
+    verseBoxRect && scaledTheme.verseText.surface?.enabled
+      ? deflateRect(verseBoxRect, scaledTheme.verseText.surface.padding)
+      : verseBoxRect
+
   if (freeMode && referenceBoxRect && verseBoxRect) {
     const fittedVerseFontSize = calculateScaledFontSize(
       ctx,
       scaledTheme,
       verse,
-      verseBoxRect.width,
-      verseBoxRect.height
+      verseContentRect!.width,
+      verseContentRect!.height
     )
     const verseMetrics = measureVerseHeight(
       ctx,
       scaledTheme,
       verse,
-      verseBoxRect.width,
+      verseContentRect!.width,
       fittedVerseFontSize
     )
     const verseY = alignY(
       resolveVerticalAlign(scaledTheme.verseText.verticalAlign),
-      verseBoxRect.y,
-      verseBoxRect.height,
+      verseContentRect!.y,
+      verseContentRect!.height,
       verseMetrics.height
     )
     const verseRect = rectForAlignedText(
       verseAlign === "justify" ? "left" : verseAlign,
       alignX(
         verseAlign === "justify" ? "left" : verseAlign,
-        verseBoxRect.x,
-        verseBoxRect.width
+        verseContentRect!.x,
+        verseContentRect!.width
       ),
       verseY,
       verseMetrics.maxLineWidth,
       verseMetrics.height,
-      verseBoxRect
+      verseContentRect!
     )
 
-    const referenceWidth = measureReferenceWidth(referenceBoxRect.width)
+    const referenceWidth = measureReferenceWidth(referenceContentRect!.width)
     const refY = alignY(
       resolveVerticalAlign(scaledTheme.reference.verticalAlign),
-      referenceBoxRect.y,
-      referenceBoxRect.height,
+      referenceContentRect!.y,
+      referenceContentRect!.height,
       referenceHeight
     )
     const referenceRect = rectForAlignedText(
       referenceAlign === "justify" ? "left" : referenceAlign,
       alignX(
         referenceAlign === "justify" ? "left" : referenceAlign,
-        referenceBoxRect.x,
-        referenceBoxRect.width
+        referenceContentRect!.x,
+        referenceContentRect!.width
       ),
       refY,
       referenceWidth,
       referenceHeight,
-      referenceBoxRect
+      referenceContentRect!
     )
 
     return {
       scaledTheme,
       backgroundRect,
       textBoxRect: textAreaRect,
-      textAreaRect: verseBoxRect,
-      textRect: verseBoxRect,
+      textAreaRect: verseContentRect!,
+      textRect: verseContentRect!,
       referenceRect,
       verseRect,
       fittedVerseFontSize,
       referenceBoxRect,
       verseBoxRect,
+      // In free mode each element owns a box, so its plate fills that box.
+      referenceSurfaceRect: surfaceRectFor(
+        scaledTheme.reference.surface,
+        referenceRect,
+        referenceBoxRect
+      ),
+      verseSurfaceRect: surfaceRectFor(
+        scaledTheme.verseText.surface,
+        verseRect,
+        verseBoxRect
+      ),
     }
   }
 
@@ -1195,6 +1334,17 @@ export function computeVerseLayoutMetrics(
     fittedVerseFontSize,
     referenceBoxRect: null,
     verseBoxRect: null,
+    // Stacked mode has no per-element boxes, so each plate hugs its own text.
+    referenceSurfaceRect: surfaceRectFor(
+      scaledTheme.reference.surface,
+      referenceRect,
+      null
+    ),
+    verseSurfaceRect: surfaceRectFor(
+      scaledTheme.verseText.surface,
+      verseRect,
+      null
+    ),
   }
 }
 
@@ -1231,21 +1381,33 @@ function renderVerseImpl(
   // Draw background
   drawBackground(ctx, scaledTheme, metrics.backgroundRect, options?.imageCache)
 
-  // Draw text box if enabled
-  if (scaledTheme.textBox.enabled) {
-    ctx.save()
-    ctx.globalAlpha = (options?.opacity ?? 1) * scaledTheme.textBox.opacity
-    ctx.fillStyle = scaledTheme.textBox.color
-    roundRect(
+  // The container behind the reference + verse block, then each element's own
+  // plate on top of it.
+  const baseOpacity = options?.opacity ?? 1
+  drawSurface(
+    ctx,
+    scaledTheme.textBox,
+    metrics.textBoxRect,
+    baseOpacity,
+    options?.imageCache
+  )
+  if (metrics.referenceSurfaceRect) {
+    drawSurface(
       ctx,
-      metrics.textBoxRect.x,
-      metrics.textBoxRect.y,
-      metrics.textBoxRect.width,
-      metrics.textBoxRect.height,
-      scaledTheme.textBox.borderRadius
+      scaledTheme.reference.surface,
+      metrics.referenceSurfaceRect,
+      baseOpacity,
+      options?.imageCache
     )
-    ctx.fill()
-    ctx.restore()
+  }
+  if (metrics.verseSurfaceRect) {
+    drawSurface(
+      ctx,
+      scaledTheme.verseText.surface,
+      metrics.verseSurfaceRect,
+      baseOpacity,
+      options?.imageCache
+    )
   }
 
   // If no verse data, just draw the background and text box

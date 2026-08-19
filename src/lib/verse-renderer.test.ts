@@ -186,10 +186,13 @@ describe("computeVerseLayoutMetrics — stacked mode", () => {
     expect(lowerThirds.name).toBe("Lower Thirds")
     const metrics = computeVerseLayoutMetrics(stubCtx(), lowerThirds, VERSE)
     expect(metrics.referenceRect!.y).toBeLessThan(metrics.verseRect!.y)
-    // Both share one left edge, inset from the band by the layout padding.
+    // Both share one left edge, inset from the band by the layout padding
+    // plus the container surface's own padding.
     expect(metrics.referenceRect!.x).toBe(metrics.verseRect!.x)
     expect(metrics.referenceRect!.x).toBe(
-      metrics.textAreaRect.x + lowerThirds.layout.padding.left
+      metrics.textAreaRect.x +
+        lowerThirds.layout.padding.left +
+        lowerThirds.textBox.padding
     )
   })
 

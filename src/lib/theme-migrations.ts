@@ -1,6 +1,7 @@
 import type {
   BroadcastTheme,
   ElementBox,
+  SurfaceFill,
   VerseRenderData,
 } from "@/types/broadcast"
 import {
@@ -24,6 +25,27 @@ const DEFAULT_VERSE_NUMBERS: BroadcastTheme["verseNumbers"] = {
   fontSize: 18,
   color: "#ffffff",
   superscript: true,
+}
+
+/**
+ * Surfaces gained an `image` fill after the first themes were saved; spread
+ * this so the renderer never has to guess whether the key exists.
+ */
+const DEFAULT_SURFACE: SurfaceFill = {
+  enabled: false,
+  color: "#000000",
+  opacity: 0.7,
+  borderRadius: 0,
+  padding: 0,
+  image: null,
+}
+
+/** Fill surface defaults, preserving whatever the saved theme already set. */
+export function normalizeSurface(
+  surface: SurfaceFill | undefined
+): SurfaceFill | undefined {
+  if (!surface) return undefined
+  return { ...DEFAULT_SURFACE, ...surface }
 }
 
 function isValidBox(box: ElementBox | undefined): box is ElementBox {
@@ -54,6 +76,15 @@ export function normalizeTheme(theme: BroadcastTheme): BroadcastTheme {
   return {
     ...theme,
     verseNumbers: { ...DEFAULT_VERSE_NUMBERS, ...theme.verseNumbers },
+    textBox: { ...DEFAULT_SURFACE, ...theme.textBox },
+    verseText: {
+      ...theme.verseText,
+      surface: normalizeSurface(theme.verseText?.surface),
+    },
+    reference: {
+      ...theme.reference,
+      surface: normalizeSurface(theme.reference?.surface),
+    },
     layout,
   }
 }
