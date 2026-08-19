@@ -126,7 +126,9 @@ function defaultMainOutput(): BroadcastOutput {
     type: "display",
     themeId: BUILTIN_THEMES[0].id,
     monitorIndex: 0,
-    ndi: defaultNdiSettings(),
+    // Keeps the pre-multi-output source name so upgrading users' NDI
+    // receivers stay bound after the migration.
+    ndi: defaultNdiSettings("Rhema Output"),
   }
 }
 
@@ -386,10 +388,16 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       }
       set((s) => ({
         themes: [...s.themes, customTheme],
-        activeThemeId: customTheme.id,
         editingThemeId: customTheme.id,
         draftTheme: customTheme,
       }))
+      // Point every output that was on the builtin at the saved copy, so the
+      // outputs and the in-app preview never disagree about what is showing.
+      for (const output of get().outputs) {
+        if (output.themeId === draftTheme.id) {
+          get().setOutputTheme(output.id, customTheme.id)
+        }
+      }
     } else {
       get().saveTheme(draftTheme)
     }

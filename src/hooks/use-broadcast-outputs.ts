@@ -1,7 +1,6 @@
 import { useEffect } from "react"
 import { listen } from "@tauri-apps/api/event"
 import { useBroadcastStore } from "@/stores"
-import { syncNdiConfigToOutput } from "@/lib/broadcast-output-control"
 
 interface OutputReadyPayload {
   outputId?: string
@@ -25,7 +24,10 @@ export function useBroadcastOutputs(): void {
 
       for (const output of outputs) {
         store.syncBroadcastOutputFor(output.id)
-        syncNdiConfigToOutput(output, store.outputStatus[output.id]?.ndiActive ?? false)
+        // Deliberately no ndi-config emit here: the output window queries
+        // get_ndi_status itself on mount, which is authoritative. Echoing this
+        // side's outputStatus would land later and could stop the frame pump of
+        // a sender that is actually live.
         // The window reports ready before its first paint settles.
         timeouts.push(
           setTimeout(() => {

@@ -94,7 +94,10 @@ export async function reconcileOutputStatus(output: BroadcastOutput): Promise<vo
   } catch {
     // Status stays false if the command fails.
   }
-  useBroadcastStore.getState().setOutputStatus(output.id, { previewOpen, ndiActive })
+  const store = useBroadcastStore.getState()
+  // The output may have been removed while these queries were in flight.
+  if (!store.outputs.some((o) => o.id === output.id)) return
+  store.setOutputStatus(output.id, { previewOpen, ndiActive })
 }
 
 /**
@@ -167,11 +170,13 @@ export async function enableOutput(output: BroadcastOutput): Promise<boolean> {
 export async function disableOutput(output: BroadcastOutput): Promise<boolean> {
   const store = useBroadcastStore.getState()
   try {
-    const ndiActive = store.outputStatus[output.id]?.ndiActive ?? false
-    if (ndiActive) {
-      await invoke("stop_ndi", { outputId: output.id })
-      syncNdiConfigToOutput(output, false)
-    }
+    // Always stop the sender rather than trusting outputStatus: that state is
+    // in-memory and only refreshed while the dialog is open, so after a main
+    // window reload it can read "inactive" while Rust still holds the session —
+    // and close_broadcast_window only hides the window while NDI is live, which
+    // would orphan a sender on the network. stop_ndi is a no-op when idle.
+    await invoke("stop_ndi", { outputId: output.id })
+    syncNdiConfigToOutput(output, false)
     await invoke("close_broadcast_window", { outputId: output.id }).catch(() => {})
     store.setOutputStatus(output.id, { previewOpen: false, ndiActive: false })
     return true

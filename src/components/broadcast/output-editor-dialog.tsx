@@ -61,7 +61,8 @@ const TYPE_OPTIONS: Array<{
   {
     value: "ndi",
     label: "NDI Feed",
-    description: "Network video source for OBS, vMix or TriCaster — supports alpha.",
+    description:
+      "Network video source for OBS, vMix or TriCaster — supports alpha.",
     icon: RadioIcon,
   },
 ]
@@ -114,14 +115,21 @@ export function OutputEditorDialog({
         return
       }
       const clash = outputs.some(
-        (o) => o.id !== form.id && o.type === "ndi" && o.ndi.sourceName.trim() === sourceName
+        (o) =>
+          o.id !== form.id &&
+          o.type === "ndi" &&
+          o.ndi.sourceName.trim() === sourceName
       )
       if (clash) {
         setError("Another NDI feed already uses that source name.")
         return
       }
     }
-    onSubmit({ ...form, name, ndi: { ...form.ndi, sourceName: sourceName || name } })
+    onSubmit({
+      ...form,
+      name,
+      ndi: { ...form.ndi, sourceName: sourceName || name },
+    })
     onOpenChange(false)
   }
 
@@ -129,7 +137,9 @@ export function OutputEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Broadcast settings" : "Add broadcast"}</DialogTitle>
+          <DialogTitle>
+            {isEditing ? "Broadcast settings" : "Add broadcast"}
+          </DialogTitle>
           <DialogDescription>
             {isEditing
               ? "Change where this output goes and how it looks."
@@ -139,7 +149,10 @@ export function OutputEditorDialog({
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="output-name" className="text-xs text-muted-foreground">
+            <label
+              htmlFor="output-name"
+              className="text-xs text-muted-foreground"
+            >
               Name
             </label>
             <Input
@@ -151,7 +164,9 @@ export function OutputEditorDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground">Broadcast type</span>
+            <span className="text-xs text-muted-foreground">
+              Broadcast type
+            </span>
             <div className="grid grid-cols-2 gap-2">
               {TYPE_OPTIONS.map(({ value, label, description, icon: Icon }) => (
                 <button
@@ -177,7 +192,9 @@ export function OutputEditorDialog({
                     <Icon className="size-3.5" />
                   </span>
                   <span className="text-sm font-semibold">{label}</span>
-                  <span className="text-xs leading-snug text-muted-foreground">{description}</span>
+                  <span className="text-xs leading-snug text-muted-foreground">
+                    {description}
+                  </span>
                 </button>
               ))}
             </div>
@@ -191,7 +208,12 @@ export function OutputEditorDialog({
             {form.type === "display" ? (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Monitor</span>
+                  <span
+                    id="monitor-label"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Monitor
+                  </span>
                   <Button
                     variant="ghost"
                     size="xs"
@@ -199,23 +221,38 @@ export function OutputEditorDialog({
                     onClick={onRefreshMonitors}
                     className="h-5 gap-1 px-1.5 text-[0.625rem] text-muted-foreground"
                   >
-                    <RefreshCwIcon className={cn("size-3", monitorsRefreshing && "animate-spin")} />
+                    <RefreshCwIcon
+                      className={cn(
+                        "size-3",
+                        monitorsRefreshing && "animate-spin"
+                      )}
+                    />
                     Refresh
                   </Button>
                 </div>
                 <Select
                   value={String(form.monitorIndex)}
-                  onValueChange={(value) => patch({ monitorIndex: Number(value) })}
+                  onValueChange={(value) =>
+                    patch({ monitorIndex: Number(value) })
+                  }
                   disabled={monitors.length === 0}
                 >
-                  <SelectTrigger className="w-full" disabled={monitors.length === 0}>
+                  <SelectTrigger
+                    aria-labelledby="monitor-label"
+                    className="w-full"
+                    disabled={monitors.length === 0}
+                  >
                     <SelectValue
-                      placeholder={monitors.length === 0 ? "No monitors detected" : "Select monitor"}
+                      placeholder={
+                        monitors.length === 0
+                          ? "No monitors detected"
+                          : "Select monitor"
+                      }
                     />
                   </SelectTrigger>
                   <SelectContent>
                     {monitors.map((m, i) => (
-                      <SelectItem key={i} value={String(i)}>
+                      <SelectItem key={m.name ?? i} value={String(i)}>
                         {m.name} ({m.size.width}&times;{m.size.height})
                       </SelectItem>
                     ))}
@@ -225,7 +262,10 @@ export function OutputEditorDialog({
             ) : (
               <>
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ndi-source" className="text-xs text-muted-foreground">
+                  <label
+                    htmlFor="ndi-source"
+                    className="text-xs text-muted-foreground"
+                  >
                     Source name
                   </label>
                   <Input
@@ -237,12 +277,22 @@ export function OutputEditorDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">Resolution</span>
+                    <span
+                      id="ndi-resolution-label"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Resolution
+                    </span>
                     <Select
                       value={form.ndi.resolution}
-                      onValueChange={(v) => patchNdi({ resolution: v as NdiResolution })}
+                      onValueChange={(v) =>
+                        patchNdi({ resolution: v as NdiResolution })
+                      }
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        aria-labelledby="ndi-resolution-label"
+                        className="w-full"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -255,12 +305,22 @@ export function OutputEditorDialog({
                     </Select>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">Frame rate</span>
+                    <span
+                      id="ndi-framerate-label"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Frame rate
+                    </span>
                     <Select
                       value={form.ndi.frameRate}
-                      onValueChange={(v) => patchNdi({ frameRate: v as NdiFrameRate })}
+                      onValueChange={(v) =>
+                        patchNdi({ frameRate: v as NdiFrameRate })
+                      }
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        aria-labelledby="ndi-framerate-label"
+                        className="w-full"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -274,12 +334,22 @@ export function OutputEditorDialog({
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs text-muted-foreground">Alpha channel</span>
+                  <span
+                    id="ndi-alpha-label"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Alpha channel
+                  </span>
                   <Select
                     value={form.ndi.alphaMode}
-                    onValueChange={(v) => patchNdi({ alphaMode: v as NdiAlphaMode })}
+                    onValueChange={(v) =>
+                      patchNdi({ alphaMode: v as NdiAlphaMode })
+                    }
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger
+                      aria-labelledby="ndi-alpha-label"
+                      className="w-full"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -295,9 +365,20 @@ export function OutputEditorDialog({
             )}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">Theme</span>
-              <Select value={form.themeId} onValueChange={(themeId) => patch({ themeId })}>
-                <SelectTrigger className="w-full">
+              <span
+                id="output-theme-label"
+                className="text-xs text-muted-foreground"
+              >
+                Theme
+              </span>
+              <Select
+                value={form.themeId}
+                onValueChange={(themeId) => patch({ themeId })}
+              >
+                <SelectTrigger
+                  aria-labelledby="output-theme-label"
+                  className="w-full"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -318,7 +399,9 @@ export function OutputEditorDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>{isEditing ? "Save changes" : "Add broadcast"}</Button>
+          <Button onClick={handleSubmit}>
+            {isEditing ? "Save changes" : "Add broadcast"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

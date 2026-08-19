@@ -158,6 +158,52 @@ describe("broadcast store sync", () => {
     )
   })
 
+  it("saving a customised builtin repoints the outputs that used it", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const builtin = useBroadcastStore.getState().themes[0]
+    const state = useBroadcastStore.getState()
+    state.addOutput({
+      id: "out-b",
+      name: "Stage",
+      type: "ndi",
+      themeId: builtin.id,
+      monitorIndex: 0,
+      ndi: ndiDefaults,
+    })
+
+    useBroadcastStore.getState().startEditing(builtin.id)
+    useBroadcastStore.getState().updateDraft({ name: "My Look" })
+    useBroadcastStore.getState().saveDraft()
+
+    const after = useBroadcastStore.getState()
+    const customId = after.themes.at(-1)!.id
+    expect(customId).not.toBe(builtin.id)
+    // The mirror and the outputs must agree, or the app preview and the
+    // projector show different themes.
+    expect(after.activeThemeId).toBe(customId)
+    expect(after.outputs.find((o) => o.id === "main")?.themeId).toBe(customId)
+    expect(after.outputs.find((o) => o.id === "out-b")?.themeId).toBe(customId)
+  })
+
+  it("removeOutput clears the removed output's runtime status", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const state = useBroadcastStore.getState()
+    state.addOutput({
+      id: "out-b",
+      name: "Stage",
+      type: "ndi",
+      themeId: state.themes[0].id,
+      monitorIndex: 0,
+      ndi: ndiDefaults,
+    })
+    state.setOutputStatus("out-b", { previewOpen: false, ndiActive: true })
+    expect(useBroadcastStore.getState().outputStatus["out-b"]).toBeDefined()
+
+    useBroadcastStore.getState().removeOutput("out-b")
+
+    expect(useBroadcastStore.getState().outputStatus["out-b"]).toBeUndefined()
+  })
+
   it("setActiveTheme updates the main output and its mirror", async () => {
     const { useBroadcastStore } = await import("./broadcast-store")
     const themeB = useBroadcastStore.getState().themes[1]

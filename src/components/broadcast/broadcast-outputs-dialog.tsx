@@ -101,18 +101,21 @@ export function BroadcastOutputsDialog({
 
   const editingOutput = editingId ? outputs.find((o) => o.id === editingId) : undefined
 
+  // The draft id doubles as the editor's form identity, so it must stay stable
+  // for as long as the editor is open — regenerating it (e.g. when a monitor is
+  // plugged in, or a remote sets the theme) would wipe what the user is typing.
+  const [draftId, setDraftId] = useState(() => crypto.randomUUID())
   const newOutputDraft = useMemo<BroadcastOutput>(() => {
     const name = nextOutputName(outputs)
     return {
-      id: crypto.randomUUID(),
+      id: draftId,
       name,
       type: "display",
       themeId: outputs.find((o) => o.id === MAIN_OUTPUT_ID)?.themeId ?? themes[0]?.id ?? "",
       monitorIndex: firstFreeMonitorIndex(outputs, monitors.length),
       ndi: defaultNdiSettings(name),
     }
-    // A fresh draft per dialog opening is enough; ids are only consumed on submit.
-  }, [outputs, themes, monitors.length])
+  }, [draftId, outputs, themes, monitors.length])
 
   const withBusy = async (id: string, action: () => Promise<unknown>) => {
     setBusyIds((ids) => [...ids, id])
@@ -141,6 +144,7 @@ export function BroadcastOutputsDialog({
 
     if (!existing) {
       store.addOutput(next)
+      setDraftId(crypto.randomUUID())
       setEditingId(null)
       return
     }

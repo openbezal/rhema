@@ -145,11 +145,6 @@ struct NdiLibrary {
     ndi_destroy: NdiDestroyFn,
 }
 
-// SAFETY: NdiLibrary only holds the loaded library and plain function
-// pointers; the NDI SDK documents these entry points as thread-safe.
-unsafe impl Send for NdiLibrary {}
-unsafe impl Sync for NdiLibrary {}
-
 impl NdiLibrary {
     fn load(search_dirs: &[PathBuf]) -> Result<Self, NdiError> {
         let library_path = resolve_library_path(search_dirs)?;
@@ -245,14 +240,17 @@ impl NdiRuntime {
         session_id: String,
         request: NdiStartRequest,
     ) -> Result<NdiSessionInfo, NdiError> {
+        log::info!("NDI[{session_id}]: starting session '{}'", request.source_name);
+        // Hold the library before dropping the old session, so restarting the
+        // only active session doesn't unload and immediately reload the runtime.
+        let library = self.shared_library()?;
+
         // Stop existing session with this ID if running
         if let Some(existing) = self.sessions.remove(&session_id) {
             log::info!("NDI[{session_id}]: shutting down existing session before restart");
             drop(existing);
         }
 
-        log::info!("NDI[{session_id}]: starting session '{}'", request.source_name);
-        let library = self.shared_library()?;
         let session = ActiveNdiSession::create(request, library)?;
         let info = session.info.clone();
         log::info!(
