@@ -229,7 +229,8 @@ const LOWER_THIRDS: BroadcastTheme = {
     textAlign: "left",
     backgroundWidth: 100,
     backgroundHeight: 100,
-    textAreaWidth: 90,
+    // Full-bleed: a lower third spans the frame, so no side margins.
+    textAreaWidth: 100,
     textAreaHeight: 40,
     referenceGap: 24,
   },
