@@ -5,16 +5,41 @@ mod state;
 
 use std::sync::Mutex;
 
+/// Roll the log at 5 MB and keep ten archives — about 50 MB, which covers a
+/// full service at the ~1-2 KB/s the transcription path produces.
+const LOG_MAX_FILE_SIZE: u128 = 5_000_000;
+const LOG_ARCHIVE_COUNT: usize = 10;
+
+/// Route panics through `log` so they reach the log file.
+///
+/// Without this a panic only reaches stderr, which is discarded in a bundled
+/// app — so the single most useful thing a crash report could contain was the
+/// one thing missing from it.
+fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info
+            .location()
+            .map_or_else(|| "unknown location".to_string(), ToString::to_string);
+        log::error!("[PANIC] at {location}: {info}");
+        previous(info);
+    }));
+}
+
 #[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load .env file — try src-tauri/.env first, then project root ../.env
     dotenvy::dotenv().ok();
     dotenvy::from_filename("../.env").ok();
+    install_panic_hook();
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(tauri_plugin_log::log::LevelFilter::Info)
+                // Memory sampling is for leak-hunting, not bug reports. Keep it
+                // on stdout in dev but out of the file users send us.
+                .level_for("rhema_lib::memstats", tauri_plugin_log::log::LevelFilter::Warn)
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
@@ -22,6 +47,35 @@ pub fn run() {
                     }),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
                 ])
+                // The stock 40 KB / KeepOne default *deletes* the previous file,
+                // which left well under an hour of history — useless for
+                // diagnosing a service that went wrong. Roll at 5 MB and keep
+                // ten archives (~50 MB) so a whole service stays exportable.
+                .max_file_size(LOG_MAX_FILE_SIZE)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(
+                    LOG_ARCHIVE_COUNT,
+                ))
+                // Our own formatter rather than `.timezone_strategy()`, which
+                // installs one that also swaps the field order. Milliseconds
+                // matter: the [LAT] marks measure detection latency, and whole
+                // seconds throw that away. Times are UTC so reports from
+                // different machines line up.
+                .format(|out, message, record| {
+                    let now = tauri_plugin_log::TimezoneStrategy::UseUtc.get_now();
+                    out.finish(format_args!(
+                        "[{:04}-{:02}-{:02}][{:02}:{:02}:{:02}.{:03}][{}][{}] {}",
+                        now.year(),
+                        u8::from(now.month()),
+                        now.day(),
+                        now.hour(),
+                        now.minute(),
+                        now.second(),
+                        now.millisecond(),
+                        record.target(),
+                        record.level(),
+                        message
+                    ));
+                })
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -46,6 +100,7 @@ pub fn run() {
             commands::bible::get_cross_references,
             commands::bible::get_active_translation,
             commands::bible::set_active_translation,
+            commands::diagnostics::export_diagnostics,
             commands::detection::detect_verses,
             commands::detection::detection_status,
             commands::detection::ui_mark,

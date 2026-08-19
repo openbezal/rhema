@@ -147,9 +147,11 @@ pub async fn start_transcription(
                 );
             }
 
+            // Never log key material: this file is exported by users for
+            // support, and a prefix is still a prefix of a secret.
             log::info!(
-                "Starting Deepgram transcription: api_key={}..., device_id={device_id:?}, gain={gain:?}",
-                truncate_safe(&resolved_api_key, 8)
+                "Starting Deepgram transcription: api_key={}, device_id={device_id:?}, gain={gain:?}",
+                if resolved_api_key.is_empty() { "missing" } else { "set" }
             );
 
             let stt_config = SttConfig {

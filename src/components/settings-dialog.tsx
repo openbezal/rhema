@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { invoke } from "@tauri-apps/api/core"
 
 import { Button } from "@/components/ui/button"
+import { DiagnosticsSection } from "@/components/settings/diagnostics-section"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -38,6 +39,7 @@ import {
   CheckIcon,
   BookOpenIcon,
   RadioIcon,
+  FileTextIcon,
   HelpCircleIcon,
   GraduationCapIcon,
   BrainCircuitIcon,
@@ -55,7 +57,15 @@ import type { DeviceInfo } from "@/types/audio"
 /*  Nav definition                                                            */
 /* -------------------------------------------------------------------------- */
 
-type NavSection = "audio" | "speech" | "bible" | "display" | "api-keys" | "remote" | "help"
+type NavSection =
+  | "audio"
+  | "speech"
+  | "bible"
+  | "display"
+  | "api-keys"
+  | "remote"
+  | "diagnostics"
+  | "help"
 
 const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
   {
@@ -87,6 +97,11 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
     name: "API Keys",
     id: "api-keys",
     icon: <KeyIcon strokeWidth={2} />,
+  },
+  {
+    name: "Diagnostics",
+    id: "diagnostics",
+    icon: <FileTextIcon strokeWidth={2} />,
   },
   {
     name: "Help",
@@ -479,6 +494,7 @@ const sectionTitles: Record<NavSection, string> = {
   display: "Display Mode",
   remote: "Remote Control",
   "api-keys": "API Keys",
+  diagnostics: "Diagnostics",
   help: "Help",
 }
 
@@ -905,6 +921,7 @@ const sectionComponents: Record<NavSection, React.FC> = {
   display: DisplayModeSection,
   remote: RemoteControlSection,
   "api-keys": ApiKeysSection,
+  diagnostics: DiagnosticsSection,
   help: HelpSection,
 }
 

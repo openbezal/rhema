@@ -1,6 +1,7 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { invoke } from "@tauri-apps/api/core"
+import { forwardConsoleToLog } from "@/lib/console-to-log"
 
 import "./index.css"
 import App from "./App.tsx"
@@ -9,6 +10,10 @@ import { TooltipProvider } from "@/components/ui/tooltip.tsx"
 import { hydrateSettings } from "@/stores/settings-store"
 import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
 import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
+
+// Frontend warnings, errors and uncaught rejections only exist in devtools
+// otherwise, so the logs a user sends us would say nothing about them.
+forwardConsoleToLog()
 
 // Webview reloads do NOT restart the Rust backend, so any STT pipeline
 // left running from the previous webview session still has

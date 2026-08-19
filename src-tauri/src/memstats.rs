@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
-const INTERVAL: Duration = Duration::from_secs(5);
+/// Sampled for leak-hunting during development. Once a minute at debug
+/// level, so it stays out of the log file users export (see the
+/// `level_for` filter in `lib.rs`) instead of drowning it.
+const INTERVAL: Duration = Duration::from_secs(60);
 
 pub fn spawn() {
     tauri::async_runtime::spawn(async move {
@@ -27,7 +30,7 @@ pub fn spawn() {
             if let Some(proc_) = sys.process(pid) {
                 let rss_mb = proc_.memory() as f64 / 1024.0 / 1024.0;
                 let virt_mb = proc_.virtual_memory() as f64 / 1024.0 / 1024.0;
-                log::info!(
+                log::debug!(
                     "[MEM] rss={:.1}MB virt={:.0}MB",
                     rss_mb,
                     virt_mb,
