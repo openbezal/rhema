@@ -10,26 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-
-function parseColorOpacity(color: string): { hex: string; opacity: number } {
-  if (color.length === 9 && color.startsWith("#")) {
-    const alphaHex = color.slice(7, 9)
-    const alpha = parseInt(alphaHex, 16) / 255
-    return { hex: color.slice(0, 7), opacity: Math.round(alpha * 100) }
-  }
-  if (color.length === 7 && color.startsWith("#")) {
-    return { hex: color, opacity: 100 }
-  }
-  return { hex: color || "#000000", opacity: 100 }
-}
-
-function buildColorWithOpacity(hex: string, opacity: number): string {
-  if (opacity >= 100) return hex
-  const alphaHex = Math.round((opacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0")
-  return `${hex}${alphaHex}`
-}
+import { SurfaceControls } from "@/components/broadcast/surface-properties"
+import { buildColorWithOpacity, parseColorOpacity } from "@/lib/color-utils"
 
 function SolidSection() {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
@@ -331,107 +313,6 @@ function TransparentSection() {
   )
 }
 
-function TextBoxSection() {
-  const draftTheme = useBroadcastStore((s) => s.draftTheme)
-  const update = useBroadcastStore((s) => s.updateDraftNested)
-
-  if (!draftTheme) return null
-
-  const textBox = draftTheme.textBox
-  const { hex: boxColorHex } = parseColorOpacity(textBox.color)
-
-  return (
-    <div className="flex flex-col gap-3 border-t pt-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold">Text Box</h4>
-        <input
-          type="checkbox"
-          checked={textBox.enabled}
-          onChange={(e) => {
-            update("textBox.enabled", e.target.checked)
-            if (e.target.checked && textBox.opacity === 0) {
-              update("textBox.opacity", 0.5)
-            }
-          }}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-      </div>
-
-      {textBox.enabled && (
-        <div className="flex flex-col gap-3">
-          {/* Color */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Color</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={boxColorHex}
-                onChange={(e) => update("textBox.color", e.target.value)}
-                className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
-              />
-              <Input
-                value={boxColorHex}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                    update("textBox.color", v)
-                  }
-                }}
-                className="w-20 font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Opacity */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Opacity</label>
-              <span className="text-xs tabular-nums text-muted-foreground">{Math.round(textBox.opacity * 100)}%</span>
-            </div>
-            <Slider
-              min={0}
-              max={100}
-              step={1}
-              value={[Math.round(textBox.opacity * 100)]}
-              onValueChange={([v]) => update("textBox.opacity", v / 100)}
-            />
-          </div>
-
-          {/* Border Radius */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Border Radius</label>
-              <span className="text-xs tabular-nums text-muted-foreground">{textBox.borderRadius}px</span>
-            </div>
-            <Slider
-              min={0}
-              max={50}
-              step={1}
-              value={[textBox.borderRadius]}
-              onValueChange={([v]) => update("textBox.borderRadius", v)}
-            />
-          </div>
-
-          {/* Padding */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Padding</label>
-              <span className="text-xs tabular-nums text-muted-foreground">{textBox.padding}px</span>
-            </div>
-            <Slider
-              min={0}
-              max={100}
-              step={1}
-              value={[textBox.padding]}
-              onValueChange={([v]) => update("textBox.padding", v)}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function BackgroundProperties() {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const update = useBroadcastStore((s) => s.updateDraftNested)
@@ -489,8 +370,12 @@ export function BackgroundProperties() {
       {bgType === "image" && <ImageSection />}
       {bgType === "transparent" && <TransparentSection />}
 
-      {/* Text Box - always visible */}
-      <TextBoxSection />
+      {/* The container the reference + verse sit in — always available. */}
+      <SurfaceControls
+        prefix="textBox"
+        title="Text Container"
+        description="The box the reference and verse sit in"
+      />
     </div>
   )
 }

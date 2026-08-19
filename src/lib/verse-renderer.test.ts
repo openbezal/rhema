@@ -306,6 +306,136 @@ describe("computeVerseLayoutMetrics — text box backdrop", () => {
   })
 })
 
+describe("surface fills", () => {
+  const BAND_IMAGE = "data:image/png;base64,band"
+
+  function stubImage(): HTMLImageElement {
+    return { naturalWidth: 1920, naturalHeight: 300 } as HTMLImageElement
+  }
+
+  function themeWithContainerImage(): BroadcastTheme {
+    const base = BUILTIN_THEMES[2] // Lower Thirds
+    return {
+      ...base,
+      textBox: {
+        ...base.textBox,
+        image: {
+          url: BAND_IMAGE,
+          fit: "cover",
+          blur: 0,
+          brightness: 100,
+          tint: null,
+        },
+      },
+    }
+  }
+
+  it("draws a container image into the container rect, not the background rect", () => {
+    const { ctx, calls } = recordingCtx()
+    const theme = themeWithContainerImage()
+    renderVerse(ctx, theme, VERSE, {
+      imageCache: new Map([[BAND_IMAGE, stubImage()]]),
+    })
+
+    const draws = calls.filter((c) => c.method === "drawImage")
+    expect(draws).toHaveLength(1)
+    // "cover" on a 1920x300 image in the 1728x432 band: scaled to the band's
+    // height and centred horizontally, so it starts left of the band's x.
+    const [, , , width, height] = draws[0].args as number[]
+    expect(height).toBe(432)
+    expect(width).toBeCloseTo(432 * (1920 / 300), 5)
+  })
+
+  it("clips the container image to the surface, not the whole frame", () => {
+    const { ctx, calls } = recordingCtx()
+    renderVerse(ctx, themeWithContainerImage(), VERSE, {
+      imageCache: new Map([[BAND_IMAGE, stubImage()]]),
+    })
+    expect(calls.some((c) => c.method === "clip")).toBe(true)
+    // The rounded clip path starts at the band's own corner radius.
+    const moveTos = calls.filter((c) => c.method === "moveTo")
+    expect(moveTos.some((c) => c.args[0] === 96 + 12 && c.args[1] === 648)).toBe(
+      true
+    )
+  })
+
+  it("insets the text by the container's padding", () => {
+    const base = BUILTIN_THEMES[2]
+    const padded = computeVerseLayoutMetrics(stubCtx(), base, VERSE)
+    const unpadded = computeVerseLayoutMetrics(
+      stubCtx(),
+      { ...base, textBox: { ...base.textBox, padding: 0 } },
+      VERSE
+    )
+    expect(padded.textRect.x - unpadded.textRect.x).toBe(base.textBox.padding)
+    expect(padded.textRect.width).toBe(
+      unpadded.textRect.width - base.textBox.padding * 2
+    )
+  })
+
+  it("ignores container padding when the container is disabled", () => {
+    const base = BUILTIN_THEMES[2]
+    const off = computeVerseLayoutMetrics(
+      stubCtx(),
+      { ...base, textBox: { ...base.textBox, enabled: false } },
+      VERSE
+    )
+    const zeroPad = computeVerseLayoutMetrics(
+      stubCtx(),
+      { ...base, textBox: { ...base.textBox, enabled: false, padding: 0 } },
+      VERSE
+    )
+    expect(off.textRect).toEqual(zeroPad.textRect)
+  })
+
+  it("leaves per-element surfaces off when the theme does not define them", () => {
+    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[2], VERSE)
+    expect(metrics.referenceSurfaceRect).toBeNull()
+    expect(metrics.verseSurfaceRect).toBeNull()
+  })
+
+  it("hugs the reference text when the reference has its own plate", () => {
+    const base = BUILTIN_THEMES[2]
+    const theme: BroadcastTheme = {
+      ...base,
+      reference: {
+        ...base.reference,
+        surface: {
+          enabled: true,
+          color: "#000000",
+          opacity: 1,
+          borderRadius: 4,
+          padding: 10,
+          image: null,
+        },
+      },
+    }
+    const metrics = computeVerseLayoutMetrics(stubCtx(), theme, VERSE)
+    const chip = metrics.referenceSurfaceRect!
+    const text = metrics.referenceRect!
+    expect(chip.x).toBe(text.x - 10)
+    expect(chip.width).toBe(text.width + 20)
+    // A chip hugs its text, so it must be narrower than the whole band.
+    expect(chip.width).toBeLessThan(metrics.textBoxRect.width)
+  })
+
+  it("scales surface radius, padding and image blur with the render scale", () => {
+    const base = themeWithContainerImage()
+    const theme: BroadcastTheme = {
+      ...base,
+      textBox: { ...base.textBox, image: { ...base.textBox.image!, blur: 8 } },
+    }
+    const metrics = computeVerseLayoutMetrics(stubCtx(), theme, VERSE, {
+      scale: 0.5,
+    })
+    expect(metrics.scaledTheme.textBox.borderRadius).toBe(
+      theme.textBox.borderRadius * 0.5
+    )
+    expect(metrics.scaledTheme.textBox.padding).toBe(theme.textBox.padding * 0.5)
+    expect(metrics.scaledTheme.textBox.image!.blur).toBe(4)
+  })
+})
+
 describe("computeVerseLayoutMetrics — background region", () => {
   it("covers the full canvas at 100% × 100%", () => {
     const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[0], VERSE)

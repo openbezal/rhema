@@ -326,3 +326,48 @@ describe("migrateLegacyOutputs", () => {
     expect(outputs).toHaveLength(1)
   })
 })
+
+describe("updateDraftNested deep paths", () => {
+  beforeEach(async () => {
+    emitToMock.mockReset()
+    emitToMock.mockResolvedValue(undefined)
+    vi.resetModules()
+  })
+
+  it("creates missing intermediates, so a whole surface must be written at once", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+    useBroadcastStore.getState().startEditing(theme.id)
+
+    // Writing a leaf under an absent object creates the object with only that
+    // key — which is why the surface panel writes the whole object first.
+    useBroadcastStore.getState().updateDraftNested("reference.surface.color", "#123456")
+    expect(useBroadcastStore.getState().draftTheme?.reference.surface).toEqual({
+      color: "#123456",
+    })
+
+    useBroadcastStore.getState().updateDraftNested("reference.surface", {
+      enabled: true,
+      color: "#000000",
+      opacity: 0.7,
+      borderRadius: 12,
+      padding: 24,
+      image: null,
+    })
+    const surface = useBroadcastStore.getState().draftTheme?.reference.surface
+    expect(surface?.enabled).toBe(true)
+    expect(surface?.image).toBeNull()
+  })
+
+  it("does not mutate the saved theme while editing a draft", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+    useBroadcastStore.getState().startEditing(theme.id)
+    useBroadcastStore.getState().updateDraftNested("textBox.padding", 99)
+
+    expect(useBroadcastStore.getState().draftTheme?.textBox.padding).toBe(99)
+    expect(useBroadcastStore.getState().themes[0].textBox.padding).toBe(
+      theme.textBox.padding
+    )
+  })
+})

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react"
 import { onThemeFontsLoaded, renderVerse } from "@/lib/verse-renderer"
+import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { cn } from "@/lib/utils"
 
@@ -16,7 +17,6 @@ export const CanvasVerse = memo(function CanvasVerse({
 }: CanvasVerseProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [containerWidth, setContainerWidth] = useState(0)
 
   // Measure container width with ResizeObserver
@@ -52,30 +52,14 @@ export const CanvasVerse = memo(function CanvasVerse({
     const scale = displayW / theme.resolution.width
     renderVerse(ctx, theme, verse, {
       scale,
-      imageCache: imageCacheRef.current,
+      imageCache: themeImageCache(),
     })
   }, [theme, verse, containerWidth])
 
-  // Preload background image so the renderer can find it in the cache.
+  // Preload every image the theme uses so the renderer finds them in the cache.
   useEffect(() => {
-    const bg = theme.background
-    if (bg.type !== "image" || !bg.image?.url) return
-    const url = bg.image.url
-    const cache = imageCacheRef.current
-    if (cache.has(url)) return
-
-    const img = new Image()
-    img.onload = () => {
-      cache.set(url, img)
-      draw()
-    }
-    img.onerror = () => {
-      console.warn("[canvas-verse] failed to load background image", {
-        url: url.slice(0, 100),
-      })
-    }
-    img.src = url
-  }, [theme.background, draw])
+    preloadThemeImages(theme, draw)
+  }, [theme, draw])
 
   // Redraw whenever theme, verse, or container size changes.
   useEffect(() => {

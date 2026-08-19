@@ -3,6 +3,7 @@ import { useRef, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { onThemeFontsLoaded, renderVerse } from "@/lib/verse-renderer"
+import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
 import { normalizeTheme } from "@/lib/theme-migrations"
 import "./broadcast-fonts.css"
 import type { BroadcastTheme, VerseRenderData } from "@/types/broadcast"
@@ -34,7 +35,6 @@ interface BroadcastPayload {
 function BroadcastCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestData = useRef<BroadcastPayload | null>(null)
-  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const ndiConfigRef = useRef<NdiConfigEventPayload>({
     active: false,
     fps: 24,
@@ -44,6 +44,7 @@ function BroadcastCanvas() {
   const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const lastPushRef = useRef(0)
   const pushingRef = useRef(false)
+  const pushNdiBurstRef = useRef<(() => void) | null>(null)
 
   const logDebug = useCallback((message: string, meta?: unknown) => {
     if (!import.meta.env.DEV) return
@@ -73,7 +74,7 @@ function BroadcastCanvas() {
     canvas.height = theme.resolution.height
     const result = renderVerse(ctx, theme, verse, {
       scale: 1,
-      imageCache: imageCacheRef.current,
+      imageCache: themeImageCache(),
     })
     if (!result) {
       ctx.fillStyle = "#000"
@@ -82,24 +83,14 @@ function BroadcastCanvas() {
     }
   }, [logDebug])
 
-  const preloadBackgroundImage = useCallback((theme: BroadcastTheme) => {
-    const bg = theme.background
-    if (bg.type !== "image" || !bg.image?.url) return
-
-    const url = bg.image.url
-    const cache = imageCacheRef.current
-    if (cache.has(url)) return
-
-    const img = new Image()
-    img.onload = () => {
-      cache.set(url, img)
-      logDebug("Background image loaded", { url })
+  // Redraw once a theme's images land. The burst matters: without it NDI
+  // receivers keep the flat fallback frame until the 2s keepalive fires.
+  const preloadThemeAssets = useCallback((theme: BroadcastTheme) => {
+    preloadThemeImages(theme, () => {
+      logDebug("Theme images loaded")
       draw()
-    }
-    img.onerror = () => {
-      console.warn("[broadcast-output] failed to load background image", { url })
-    }
-    img.src = url
+      pushNdiBurstRef.current?.()
+    })
   }, [draw, logDebug])
 
   const pushNdiFrame = useCallback(async () => {
@@ -159,6 +150,13 @@ function BroadcastCanvas() {
     setTimeout(() => void pushNdiFrame(), 300)
   }, [pushNdiFrame])
 
+  // Image loads finish after the burst that followed their theme update, and
+  // the preload callback is defined above this — go through a ref so it can
+  // re-burst without a definition cycle.
+  useEffect(() => {
+    pushNdiBurstRef.current = pushNdiBurst
+  }, [pushNdiBurst])
+
   useEffect(() => {
     // Set initial canvas size
     const canvas = canvasRef.current
@@ -179,7 +177,7 @@ function BroadcastCanvas() {
         ...event.payload,
         theme: normalizeTheme(event.payload.theme),
       }
-      preloadBackgroundImage(event.payload.theme)
+      preloadThemeAssets(event.payload.theme)
       logDebug("Received broadcast:verse-update", {
         hasVerse: Boolean(event.payload.verse),
         themeId: event.payload.theme.id,
@@ -231,7 +229,7 @@ function BroadcastCanvas() {
       unlisten.then((fn) => fn())
       unlistenNdiConfig.then((fn) => fn())
     }
-  }, [draw, logDebug, preloadBackgroundImage, pushNdiFrame, pushNdiBurst])
+  }, [draw, logDebug, preloadThemeAssets, pushNdiFrame, pushNdiBurst])
 
   // Slow keepalive: push one frame every 2s if idle (prevents NDI receivers from dropping the source)
   useEffect(() => {

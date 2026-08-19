@@ -7,6 +7,7 @@ import {
   type VerseLayoutMetrics,
 } from "@/lib/verse-renderer"
 import { seedFreeBoxesFromMetrics, SAMPLE_VERSE } from "@/lib/theme-migrations"
+import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
 import { Button } from "@/components/ui/button"
 import {
   SearchIcon,
@@ -27,8 +28,6 @@ export function DesignCanvas() {
   const fabricRef = useRef<fabric.Canvas | null>(null)
   const latestThemeRef = useRef<BroadcastTheme | null>(null)
   const rafIdRef = useRef<number | null>(null)
-  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
-  const imageRequestsRef = useRef<Map<string, Promise<HTMLImageElement>>>(new Map())
   const objectsRef = useRef<{
     workspace: fabric.Rect | null
     referenceRegion: fabric.Rect | null
@@ -50,8 +49,6 @@ export function DesignCanvas() {
       latestTheme,
       objectsRef,
       canvas,
-      imageCacheRef.current,
-      imageRequestsRef.current,
       undefined,
       latestMetricsRef,
       draggingRef.current
@@ -285,8 +282,6 @@ export function DesignCanvas() {
         latest,
         objectsRef,
         latestCanvas,
-        imageCacheRef.current,
-        imageRequestsRef.current,
         () => {
           const current = latestThemeRef.current
           const currentCanvas = fabricRef.current
@@ -295,8 +290,6 @@ export function DesignCanvas() {
             current,
             objectsRef,
             currentCanvas,
-            imageCacheRef.current,
-            imageRequestsRef.current,
             undefined,
             latestMetricsRef,
             draggingRef.current
@@ -410,8 +403,6 @@ async function syncThemeToCanvas(
     verseRegion: fabric.Rect | null
   }>,
   canvas: fabric.Canvas,
-  imageCache: Map<string, HTMLImageElement>,
-  imageRequests: Map<string, Promise<HTMLImageElement>>,
   onImageReady?: () => void,
   metricsRef?: React.MutableRefObject<VerseLayoutMetrics | null>,
   dragging?: "reference" | "verse" | null
@@ -421,19 +412,10 @@ async function syncThemeToCanvas(
   const verseRegion = objectsRef.current.verseRegion
   if (!ws || !refRegion || !verseRegion) return
 
-  if (theme.background.type === "image" && theme.background.image?.url) {
-    const img = imageCache.get(theme.background.image.url)
-    if (!img) {
-      ensureImage(
-        theme.background.image.url,
-        imageCache,
-        imageRequests,
-        onImageReady
-      )
-    }
-  }
+  // Covers the frame background and every surface fill.
+  preloadThemeImages(theme, onImageReady)
 
-  const { bitmap, metrics } = renderThemeBitmap(theme, imageCache)
+  const { bitmap, metrics } = renderThemeBitmap(theme)
   ws.set({
     fill: new fabric.Pattern({
       source: bitmap,
@@ -524,38 +506,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
-function ensureImage(
-  url: string,
-  cache: Map<string, HTMLImageElement>,
-  pending: Map<string, Promise<HTMLImageElement>>,
-  onReady?: () => void
-) {
-  if (cache.has(url) || pending.has(url)) return
-  const request = loadImage(url)
-    .then((img) => {
-      cache.set(url, img)
-      onReady?.()
-      return img
-    })
-    .catch((error) => {
-      console.warn("[theme-designer] failed to load background image", { url: url.slice(0, 100), error })
-      throw error
-    })
-    .finally(() => {
-      pending.delete(url)
-    })
-  pending.set(url, request)
-}
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`Failed to load image: ${url}`))
-    img.src = url
-  })
-}
-
 /** Editor-only checkerboard so transparent backgrounds read as such (output stays truly transparent). */
 function drawTransparencyCheckerboard(ctx: CanvasRenderingContext2D): void {
   const size = 40
@@ -576,7 +526,6 @@ function drawTransparencyCheckerboard(ctx: CanvasRenderingContext2D): void {
 
 function renderThemeBitmap(
   theme: BroadcastTheme,
-  imageCache: Map<string, HTMLImageElement>
 ): { bitmap: HTMLCanvasElement; metrics: ReturnType<typeof renderVerse> } {
   const offscreen = document.createElement("canvas")
   offscreen.width = WS_WIDTH
@@ -584,7 +533,9 @@ function renderThemeBitmap(
   const ctx = offscreen.getContext("2d")
   if (!ctx) return { bitmap: offscreen, metrics: null }
 
-  const metrics = renderVerse(ctx, theme, SAMPLE_VERSE, { imageCache })
+  const metrics = renderVerse(ctx, theme, SAMPLE_VERSE, {
+    imageCache: themeImageCache(),
+  })
   if (theme.background.type === "transparent") {
     drawTransparencyCheckerboard(ctx)
   }

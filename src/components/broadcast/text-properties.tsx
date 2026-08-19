@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { ChevronsUpDownIcon, CheckIcon } from "lucide-react"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { SurfaceControls } from "@/components/broadcast/surface-properties"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -401,6 +402,12 @@ function ReferenceProperties() {
         />
       </div>
 
+      <SurfaceControls
+        prefix="reference.surface"
+        title="Reference Plate"
+        description="A chip behind the reference alone"
+      />
+
       {/* Reference Position (stacked mode only — free mode positions by box) */}
       {draftTheme.layout.mode !== "free" && (
         <div className="flex flex-col gap-1.5">
@@ -714,6 +721,12 @@ function VerseProperties() {
           </div>
         )}
       </div>
+
+      <SurfaceControls
+        prefix="verseText.surface"
+        title="Verse Plate"
+        description="A plate behind the verse text alone"
+      />
     </div>
   )
 }

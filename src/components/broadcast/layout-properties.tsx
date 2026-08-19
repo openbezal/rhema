@@ -88,8 +88,11 @@ export function LayoutProperties() {
 
   const bgWidthPx = Math.round((layout.backgroundWidth / 100) * resolution.width)
   const bgHeightPx = Math.round((layout.backgroundHeight / 100) * resolution.height)
-  const textWidthPx = Math.round((layout.textAreaWidth / 100) * resolution.width)
-  const textHeightPx = Math.round((layout.textAreaHeight / 100) * resolution.height)
+  // The text area is a percentage of the background region, not of the frame
+  // (verse-renderer.ts computes it against bgW/bgH), so the readout has to
+  // nest the same way or it lies whenever the background is not full-bleed.
+  const textWidthPx = Math.round((layout.textAreaWidth / 100) * bgWidthPx)
+  const textHeightPx = Math.round((layout.textAreaHeight / 100) * bgHeightPx)
 
   const toggleFreeMode = (enabled: boolean) => {
     if (!enabled) {

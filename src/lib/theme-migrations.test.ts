@@ -6,6 +6,55 @@ import type { VerseLayoutMetrics } from "./verse-renderer"
 
 const stackedBase = BUILTIN_THEMES[0]
 
+describe("normalizeTheme — surfaces", () => {
+  it("fills in the container's image key for themes saved before surfaces", () => {
+    const legacy = {
+      ...stackedBase,
+      textBox: {
+        enabled: true,
+        color: "#111111",
+        opacity: 0.5,
+        borderRadius: 8,
+        padding: 12,
+      },
+    } as unknown as BroadcastTheme
+
+    const normalized = normalizeTheme(legacy)
+    expect(normalized.textBox.image).toBeNull()
+    // Everything the theme did specify survives.
+    expect(normalized.textBox).toMatchObject({
+      enabled: true,
+      color: "#111111",
+      opacity: 0.5,
+      borderRadius: 8,
+      padding: 12,
+    })
+  })
+
+  it("leaves per-element surfaces undefined when absent", () => {
+    const normalized = normalizeTheme(stackedBase)
+    expect(normalized.reference.surface).toBeUndefined()
+    expect(normalized.verseText.surface).toBeUndefined()
+  })
+
+  it("fills defaults into a partially specified element surface", () => {
+    const theme = {
+      ...stackedBase,
+      reference: {
+        ...stackedBase.reference,
+        surface: { enabled: true, color: "#222222" },
+      },
+    } as unknown as BroadcastTheme
+
+    const surface = normalizeTheme(theme).reference.surface!
+    expect(surface.enabled).toBe(true)
+    expect(surface.color).toBe("#222222")
+    expect(surface.image).toBeNull()
+    expect(typeof surface.borderRadius).toBe("number")
+    expect(typeof surface.padding).toBe("number")
+  })
+})
+
 describe("normalizeTheme", () => {
   it("defaults layout.mode to stacked for legacy themes", () => {
     const legacy = {
