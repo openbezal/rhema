@@ -1,0 +1,33 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "chore/bump-0.3.1",
+    "feat/update-available-notice",
+    "fix/gh-release-edit-needs-repo",
+    "fix/macos-hardened-runtime-entitlements",
+    "fix/release-notes-sync-on-rerun",
+    "fix/release-workflow-resilience",
+    "main",
+    "origin"
+  ],
+  "parent": {
+    "chore/bump-0.3.1": "main",
+    "feat/update-available-notice": "main",
+    "fix/gh-release-edit-needs-repo": "main",
+    "fix/macos-hardened-runtime-entitlements": "main",
+    "fix/release-notes-sync-on-rerun": "main",
+    "fix/release-workflow-resilience": "main",
+    "main": null,
+    "origin": "main"
+  },
+  "order": [
+    "main",
+    "chore/bump-0.3.1",
+    "feat/update-available-notice",
+    "fix/gh-release-edit-needs-repo",
+    "fix/macos-hardened-runtime-entitlements",
+    "fix/release-notes-sync-on-rerun",
+    "fix/release-workflow-resilience",
+    "origin"
+  ]
+}
