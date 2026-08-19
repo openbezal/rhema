@@ -40,6 +40,12 @@ pub fn run() {
                 // Memory sampling is for leak-hunting, not bug reports. Keep it
                 // on stdout in dev but out of the file users send us.
                 .level_for("rhema_lib::memstats", tauri_plugin_log::log::LevelFilter::Warn)
+                // ONNX Runtime logs one line per tensor allocation while
+                // loading the embedder ("Reserving memory in BFCArena for Cpu
+                // size: N"). That was 93% of the very first real export — 670 KB
+                // of allocator trace burying 46 KB of signal. Warnings and
+                // errors from it still come through.
+                .level_for("ort", tauri_plugin_log::log::LevelFilter::Warn)
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {

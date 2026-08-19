@@ -14,6 +14,9 @@ use tauri::Manager;
 /// Rotated archives are `rhema_<date>.log` alongside it.
 const LOG_STEM: &str = "rhema";
 
+/// Width of the `[YYYY-MM-DD][HH:MM:SS.mmm]` stamp the formatter writes.
+const TIMESTAMP_LEN: usize = 26;
+
 /// Timestamp prefix written by our formatter: `[YYYY-MM-DD][HH:MM:SS.mmm]`.
 /// Anything not starting with this is a continuation of the line before it.
 fn parse_line_timestamp(line: &str) -> Option<(i64, u32, u32, u32, u32, u32)> {
@@ -192,8 +195,8 @@ pub fn export_diagnostics(
         app.package_info().version.to_string().as_str(),
         &window,
         files.len(),
-        first.map(|l| &l[..l.len().min(24)]),
-        last.map(|l| &l[..l.len().min(24)]),
+        first.map(|l| &l[..l.len().min(TIMESTAMP_LEN)]),
+        last.map(|l| &l[..l.len().min(TIMESTAMP_LEN)]),
     );
 
     log::info!(
@@ -319,4 +322,13 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+
+    #[test]
+    fn header_shows_whole_timestamps() {
+        let head = header("0.2.0", "last 60 minutes", 1, Some(T1), Some(T3));
+        assert!(
+            head.contains("[2026-08-19][10:00:00.000]"),
+            "the stamp must not be cut mid-millisecond: {head}"
+        );
+    }
 }
