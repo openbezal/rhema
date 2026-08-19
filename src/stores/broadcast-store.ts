@@ -276,7 +276,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   removeOutput: (id) => {
     if (id === MAIN_OUTPUT_ID) return
     set((s) => {
-      const { [id]: _removed, ...outputStatus } = s.outputStatus
+      const outputStatus = Object.fromEntries(
+        Object.entries(s.outputStatus).filter(([statusId]) => statusId !== id)
+      )
       return {
         outputs: s.outputs.filter((o) => o.id !== id),
         outputStatus,

@@ -6,7 +6,7 @@ import { MicIcon, PaletteIcon, CastIcon, SunIcon, MoonIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { ThemeDesigner } from "@/components/broadcast/theme-designer"
-import { BroadcastSettings } from "@/components/broadcast/broadcast-settings"
+import { BroadcastOutputsDialog } from "@/components/broadcast/broadcast-outputs-dialog"
 import { useAudioStore, useTranscriptStore, useBroadcastStore } from "@/stores"
 import { useTheme } from "@/components/theme-provider"
 
@@ -59,7 +59,7 @@ export function TransportBar() {
         >
           <CastIcon className="size-3.5" />
         </Button>
-        <BroadcastSettings open={broadcastOpen} onOpenChange={setBroadcastOpen} />
+        <BroadcastOutputsDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
         <Button
           variant="ghost"
           size="icon-sm"

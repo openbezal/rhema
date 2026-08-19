@@ -220,7 +220,7 @@ function BroadcastCanvas() {
       pushNdiBurst()
     })
 
-    void currentWindow.emitTo("main", "broadcast:output-ready").then(() => {
+    void currentWindow.emitTo("main", "broadcast:output-ready", { outputId: OUTPUT_ID }).then(() => {
       logDebug("Sent broadcast:output-ready")
     }).catch(() => {
       console.warn("[broadcast-output] failed to send output-ready event")
