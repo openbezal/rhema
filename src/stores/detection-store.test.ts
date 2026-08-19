@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest"
-import { useDetectionStore } from "./detection-store"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { DISMISS_SUPPRESSION_MS, useDetectionStore } from "./detection-store"
 import type { DetectionResult } from "@/types"
 
 function detection(overrides: Partial<DetectionResult>): DetectionResult {
@@ -95,5 +95,110 @@ describe("detection store addDetections", () => {
       .detections.filter((d) => d.source === "direct")
     expect(direct.map((d) => d.verse_ref)).toEqual(["Hebrews 12:14", "John 3:16"])
     expect(direct[0].confidence).toBe(1.0)
+  })
+})
+
+describe("detection store dismissDetection", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    useDetectionStore.setState({ detections: [], dismissed: {} })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("removes the dismissed detection from the list", () => {
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "direct", confidence: 1.0 }),
+      detection({ verse_ref: "John 3:16", source: "direct", confidence: 0.9 }),
+    ])
+
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
+    expect(refs).toEqual(["John 3:16"])
+  })
+
+  it("leaves the same reference in the other source column", () => {
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "direct", confidence: 1.0 }),
+      detection({ verse_ref: "Psalm 23:1", source: "semantic", confidence: 0.7 }),
+    ])
+
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    const remaining = useDetectionStore.getState().detections
+    expect(remaining.map((d) => d.source)).toEqual(["semantic"])
+  })
+
+  it("suppresses a re-detection of a dismissed reference", () => {
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "direct", confidence: 1.0 }),
+    ])
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    vi.advanceTimersByTime(1000)
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "direct", confidence: 1.0 }),
+    ])
+
+    expect(useDetectionStore.getState().detections).toEqual([])
+  })
+
+  it("allows the reference again once the suppression window expires", () => {
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    vi.advanceTimersByTime(DISMISS_SUPPRESSION_MS)
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "direct", confidence: 1.0 }),
+    ])
+
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
+    expect(refs).toEqual(["Psalm 23:1"])
+  })
+
+  it("suppresses only the dismissed source, not the same ref from elsewhere", () => {
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "semantic", confidence: 0.7 }),
+    ])
+
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
+    expect(refs).toEqual(["Psalm 23:1"])
+  })
+
+  it("reports whether a reference is currently dismissed", () => {
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    expect(useDetectionStore.getState().isDismissed("Psalm 23:1", "direct")).toBe(true)
+    expect(useDetectionStore.getState().isDismissed("Psalm 23:1", "semantic")).toBe(false)
+
+    vi.advanceTimersByTime(DISMISS_SUPPRESSION_MS)
+    expect(useDetectionStore.getState().isDismissed("Psalm 23:1", "direct")).toBe(false)
+  })
+
+  it("clears suppression when all detections are cleared", () => {
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    useDetectionStore.getState().clearDetections()
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "Psalm 23:1", source: "direct", confidence: 1.0 }),
+    ])
+
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
+    expect(refs).toEqual(["Psalm 23:1"])
+  })
+
+  it("drops expired entries from the suppression map", () => {
+    useDetectionStore.getState().dismissDetection("Psalm 23:1", "direct")
+
+    vi.advanceTimersByTime(DISMISS_SUPPRESSION_MS)
+    useDetectionStore.getState().addDetections([
+      detection({ verse_ref: "John 3:16", source: "direct", confidence: 1.0 }),
+    ])
+
+    expect(useDetectionStore.getState().dismissed).toEqual({})
   })
 })

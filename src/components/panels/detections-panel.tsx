@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
-import { PlayIcon, PlusIcon } from "lucide-react"
+import { PlayIcon, PlusIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { bibleActions } from "@/hooks/use-bible"
@@ -40,12 +40,27 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   }
 
   return (
-    <div className="border-b border-border p-3 last:border-0">
+    <div className="group border-b border-border p-3 last:border-0">
       <div className="flex items-center gap-2">
         <ConfidenceDot confidence={detection.confidence} />
-        <span className="text-sm font-semibold text-foreground">
+        <span className="flex-1 truncate text-sm font-semibold text-foreground">
           {detection.verse_ref}
         </span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Dismiss ${detection.verse_ref}`}
+          title="Dismiss"
+          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          onClick={() =>
+            detectionActions.dismissDetection(
+              detection.verse_ref,
+              detection.source
+            )
+          }
+        >
+          <XIcon className="size-2.5" />
+        </Button>
       </div>
 
       {detection.verse_text && (

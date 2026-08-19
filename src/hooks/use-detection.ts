@@ -23,6 +23,8 @@ export const detectionActions = {
   clearDetections: () => useDetectionStore.getState().clearDetections(),
   removeDetection: (verseRef: string) =>
     useDetectionStore.getState().removeDetection(verseRef),
+  dismissDetection: (verseRef: string, source: DetectionResult["source"]) =>
+    useDetectionStore.getState().dismissDetection(verseRef, source),
 }
 
 export function useDetection() {

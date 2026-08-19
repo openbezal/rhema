@@ -17,6 +17,7 @@ import { useTranscription } from "@/hooks/use-transcription"
 import { bibleActions } from "@/hooks/use-bible"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { mark, observeLongTasks } from "@/lib/latency-marks"
+import { pickAutoPresentTarget } from "@/lib/auto-present-target"
 import type { DetectionResult, ReadingAdvance } from "@/types"
 
 /**
@@ -88,19 +89,12 @@ export function TranscriptPanel() {
     useDetectionStore.getState().addDetections(detections)
     mark(`addDetections done src=${detections[0]?.source ?? "?"}`)
 
-    // Auto-navigate book search + select verse for preview/live.
-    //
-    // Take the detector's most confident reading rather than whichever
-    // landed first in the batch. One utterance can yield several direct
-    // detections, and batch order is emission order — in issue #152 a
-    // spurious match was emitted ahead of the verse the preacher actually
-    // named, so the wrong one went on air.
-    const directHit = detections
-      .filter((d) => d.source === "direct" && !d.is_chapter_only)
-      .reduce<DetectionResult | undefined>(
-        (best, d) => (best && best.confidence >= d.confidence ? best : d),
-        undefined
-      )
+    // Auto-navigate book search + select verse for preview/live. Picks the
+    // most confident direct hit and skips operator-dismissed references —
+    // see pickAutoPresentTarget for why.
+    const directHit = pickAutoPresentTarget(detections, (verseRef) =>
+      useDetectionStore.getState().isDismissed(verseRef, "direct")
+    )
     if (directHit && directHit.book_number > 0) {
       const detectedVerse = {
         id: 0,
