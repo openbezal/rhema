@@ -553,6 +553,28 @@ impl DirectDetector {
     /// Detect Bible references in the given transcript text.
     ///
     /// Returns a list of Detection objects for each reference found.
+    /// Whether `text` names a book together with a chapter and verse of its own.
+    ///
+    /// A reference parked from an earlier partial must not complete itself using
+    /// numbers that belong to a newly stated one. Saying "Psalm" (which parks
+    /// Psalms 1) and then "Psalm 103 verse 5" means Psalms 103:5 — but the
+    /// continuation path saw only "verse 5" and produced Psalms 1:5. Likewise a
+    /// partial trailing into "…Psalm 13" made the next "Psalm 15 verse 4" land
+    /// on Psalms 13:4.
+    ///
+    /// Deliberately narrow: text with no book name in it — "verse 22", or a
+    /// bare "22 20" correction — is not a complete reference, so genuine
+    /// continuations still work.
+    fn text_names_complete_reference(&self, text: &str) -> bool {
+        self.matcher.find_books(text).iter().any(|book_match| {
+            parser::parse_reference(text, book_match).is_some_and(|r| {
+                r.verse_start > 0
+                    && is_valid_reference(r.book_number, r.chapter)
+                    && versification::is_valid_verse(r.book_number, r.chapter, r.verse_start)
+            })
+        })
+    }
+
     pub fn detect(&mut self, text: &str) -> Vec<Detection> {
         // Step 0: Clean filler phrases from the transcript
         let cleaned = clean_transcript(text);
@@ -572,6 +594,11 @@ impl DirectDetector {
             let elapsed = incomplete.timestamp.elapsed().as_millis();
             if elapsed > INCOMPLETE_REF_TIMEOUT_MS {
                 // Timeout: clean up pending state (EDGE-02).
+                self.incomplete = None;
+            } else if self.text_names_complete_reference(text) {
+                // The speaker has named a whole reference in this utterance, so
+                // one parked from an earlier partial is stale. Drop it and let
+                // the book matcher below read what was actually said.
                 self.incomplete = None;
             } else if let Some(cont) =
                 parser::try_extract_continuation(text, incomplete.chapter_is_default)
@@ -2211,5 +2238,45 @@ mod tests {
             out.iter().all(|d| d.verse_ref.chapter != 99),
             "invented a chapter: {out:?}"
         );
+    }
+
+
+    /// A bare book name in a partial parks a reference with chapter 1. When the
+    /// speaker then states the whole thing, that parked reference used to
+    /// swallow the new verse number: "Psalm" then "Psalm 103 verse 5" gave
+    /// Psalms 1:5 instead of 103:5.
+    #[test]
+    fn a_parked_reference_does_not_hijack_a_newly_stated_one() {
+        let mut detector = DirectDetector::new();
+        detector.detect("Psalm");
+        let out = detector.detect("Psalm 103 verse 5.");
+        assert_eq!(out.len(), 1, "{out:?}");
+        assert_eq!(out[0].verse_ref.chapter, 103);
+        assert_eq!(out[0].verse_ref.verse_start, 5);
+    }
+
+    /// A partial that runs into the next citation parks it; the final then
+    /// settles on only the first sentence. "…Psalm 13" followed by
+    /// "Psalm 15 verse 4" used to be detected as Psalms 13:4.
+    #[test]
+    fn a_reference_trailing_from_a_partial_does_not_win_over_the_final() {
+        let mut detector = DirectDetector::new();
+        detector.detect("Psalm 15 verse 4. Psalm 13");
+        let out = detector.detect("Psalm 15 verse 4.");
+        assert_eq!(out[0].verse_ref.chapter, 15);
+        assert_eq!(out[0].verse_ref.verse_start, 4);
+    }
+
+    /// The guard must only fire when the new text is self-sufficient, or the
+    /// late-callout and self-correction handling from #142 would break.
+    #[test]
+    fn book_less_continuations_still_complete_a_parked_reference() {
+        let mut detector = DirectDetector::new();
+        detector.detect("Let us turn to Romans chapter 8");
+        let out = detector.detect("verse 28");
+        assert_eq!(out.len(), 1, "the late verse callout was lost: {out:?}");
+        assert_eq!(out[0].verse_ref.book_number, 45, "Romans");
+        assert_eq!(out[0].verse_ref.chapter, 8);
+        assert_eq!(out[0].verse_ref.verse_start, 28);
     }
 }
