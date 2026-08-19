@@ -67,8 +67,10 @@ jobs:
 
           echo "::error::${TAG} is missing ${missing[*]}, which the website's" \
                "download buttons link to. Reverting the release to draft so" \
-               "/releases/latest stays on the last complete release. Re-run the" \
-               "failed build job in 'Build, Bundle and Release', then publish again."
+               "/releases/latest stays on the last complete release. To fix: open" \
+               "the 'Build, Bundle and Release' run for ${TAG}, choose 'Re-run" \
+               "failed jobs' (not 'Re-run all jobs' — that discards the artifacts" \
+               "the other platforms already built), then publish again."
 
           gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
             -F draft=true > /dev/null
