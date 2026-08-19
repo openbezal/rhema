@@ -1,5 +1,11 @@
 {
   "title": "Reference",
   "icon": "BookText",
-  "pages": ["scripts", "environment-variables", "security", "remote-control-api"]
+  "pages": [
+    "scripts",
+    "environment-variables",
+    "security",
+    "remote-control-api",
+    "diagnostics"
+  ]
 }

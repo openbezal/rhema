@@ -1,0 +1,76 @@
+---
+title: Diagnostics & Logs
+description: Export a log file for a bug report, what it contains, and where logs live on disk.
+icon: FileText
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+Rhema keeps a rolling log of what it does — audio devices, transcripts,
+verse detections, broadcast output changes and errors. When something goes
+wrong during a service, that log is usually the difference between a bug we
+can fix and one we can only guess at.
+
+## Exporting logs for a bug report
+
+1. Open **Settings** → **Diagnostics**.
+2. Choose a **time range** that covers when the problem happened. **Last hour**
+   is usually right; use **Everything** if you are not sure.
+3. Click **Save logs…** and choose where to put the file.
+4. Attach the saved `.log` file to your
+   [GitHub issue](https://github.com/openbezal/rhema/issues/new/choose).
+
+The same screen shows your app version and the folder the logs live in.
+
+## What the file contains
+
+The export opens with a short header — app version, platform, the time range
+covered — followed by the log lines themselves, oldest first. Timestamps are
+**UTC**, so reports from different machines can be compared directly.
+
+Because verse detection works from speech, the log records **short fragments
+of what was said** (40-80 characters per line). That is deliberate: for a
+detection problem it is the only way to see why the app matched the verse it
+did. Have a look through the file before sharing it if the service content is
+sensitive.
+
+Your **API keys are never included**. Neither are your themes or settings
+files.
+
+## Where logs live
+
+<Callout type="info">
+  You only need these paths if you cannot open Settings — otherwise use the
+  export above, which also filters by time.
+</Callout>
+
+| Platform | Location |
+| --- | --- |
+| macOS | `~/Library/Logs/com.openbezal.rhema/` |
+| Windows | `%LOCALAPPDATA%\com.openbezal.rhema\logs\` |
+| Linux | `~/.local/share/com.openbezal.rhema/logs/` |
+
+The active log is `rhema.log`. Older logs are rotated alongside it as
+`rhema_<date>.log`, and the oldest are dropped once the folder reaches its
+size limit — so export while the problem is fresh rather than days later.
+
+## Reading a log line
+
+```
+[2026-08-19][17:16:51.068][rhema_lib::commands::stt][INFO] [LAT] partial "Let's open our Bibles to Psalms chapter 1"
+```
+
+| Part | Meaning |
+| --- | --- |
+| `[2026-08-19][17:16:51.068]` | UTC date and time, to the millisecond |
+| `rhema_lib::commands::stt` | which part of the app wrote it |
+| `INFO` | severity |
+
+Tags worth knowing when reporting a detection problem:
+
+- `[LAT] partial` / `[LAT] final` — what the transcriber heard. Partials update
+  live as someone speaks; finals are the settled text.
+- `[DET-DIRECT]` — a verse matched from a spoken reference, with its confidence.
+- `[DET-SEMANTIC]` — a verse matched from the sense of the words rather than a
+  citation.
+- `[READING]` — reading mode following along through a passage.

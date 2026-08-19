@@ -62,12 +62,27 @@ body:
       render: markdown
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: |
+        ### Attaching logs
+
+        Logs are the fastest way for us to see what actually happened — they
+        carry the transcript and the detections that led to the problem.
+
+        In Rhema, open **Settings → Diagnostics**, choose a time range that
+        covers when the issue happened (**Last hour** is usually right), and
+        click **Save logs…**. Drag the saved `.log` file onto this issue.
+
+        The file contains short fragments of speech picked up by
+        transcription, so give it a glance before sharing. It never contains
+        your API keys.
   - type: textarea
     id: logs
     attributes:
       label: Logs
       description: |
-        If applicable, include relevant log output. For frontend issues, open browser dev tools (Cmd+Option+I / Ctrl+Shift+I) and copy console output. For backend issues, check the Tauri log file.
+        Attach the file from Settings → Diagnostics (see above), or paste relevant output here. If you can't reach Settings, the log file lives in `~/Library/Logs/com.openbezal.rhema/` on macOS and `%LOCALAPPDATA%\com.openbezal.rhema\logs\` on Windows.
       render: shell
   - type: textarea
     id: screenshots
