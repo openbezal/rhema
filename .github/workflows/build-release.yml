@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -52,11 +52,29 @@ jobs:
         with:
           bun-version: "1.2.21"
 
+      # Bounded on purpose. An apt mirror stalling here has twice eaten the
+      # whole 45-minute job budget before Rust ever compiled (v0.2.0 and
+      # v0.3.1), which marks the job cancelled and skips the release. Ten
+      # minutes is ~4x the normal duration; the connection timeouts turn a hung
+      # mirror into an error instead of a hang, and the retry rides out a single
+      # flaky mirror.
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          APT_OPTS: >-
+            -o Acquire::Retries=3
+            -o Acquire::http::Timeout=20
+            -o Acquire::https::Timeout=20
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get update $APT_OPTS || {
+            echo "::warning::apt-get update failed, retrying once"
+            sleep 5
+            sudo apt-get update $APT_OPTS
+          }
+
+          sudo apt-get install -y $APT_OPTS \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             librsvg2-dev \
@@ -226,6 +244,13 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
+    # Assemble a release from whatever platforms did build. `needs: build` alone
+    # skipped this job whenever one matrix leg failed or timed out, so a single
+    # stalled apt mirror threw away two good platform builds (v0.2.0, v0.3.1).
+    # The release is a draft and the notes list any missing platform, so a human
+    # decides whether to publish or re-run. `!cancelled()` still respects a
+    # manual cancel of the whole run.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
 
     steps:
@@ -256,6 +281,7 @@ jobs:
           echo "Rhema version: $VERSION"
 
       - name: Prepare release assets
+        id: assets
         shell: bash
         run: |
           mkdir -p release-assets
@@ -299,16 +325,17 @@ jobs:
             fi
           done
 
+          # Record rather than fail: the release is a draft, and half a release
+          # beats none when one platform's build stalls. The notes carry the
+          # warning so nobody publishes a 404-ing download button by accident.
+          # Re-running the failed build and this job fills the gap in place
+          # (overwrite_files is on).
           if [[ ${#missing[@]} -gt 0 ]]; then
-            if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-              echo "::error::Missing artifacts for: ${missing[*]}. The site's download" \
-                   "buttons link to those filenames and would 404. Fix the failing" \
-                   "build and re-run this workflow — build artifacts are retained" \
-                   "for 7 days."
-              exit 1
-            fi
-            echo "::warning::Skipping stable aliases, artifacts missing: ${missing[*]}"
+            echo "::warning::Missing artifacts, no stable alias for: ${missing[*]}." \
+                 "The site's download buttons link to those filenames. Re-run the" \
+                 "failed build before publishing — artifacts are kept for 7 days."
           fi
+          echo "missing=${missing[*]}" >> "$GITHUB_OUTPUT"
 
           echo "Release assets:"
           ls -lh release-assets
@@ -316,6 +343,8 @@ jobs:
       - name: Generate release metadata
         id: metadata
         shell: bash
+        env:
+          MISSING_ALIASES: ${{ steps.assets.outputs.missing }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
@@ -337,6 +366,17 @@ jobs:
             echo ""
             echo "${SUMMARY}"
             echo ""
+
+            # Loud, in the draft, where the person clicking Publish will see it.
+            if [[ -n "${MISSING_ALIASES}" ]]; then
+              echo "> [!WARNING]"
+              echo "> Platform builds missing from this release:" \
+                   "\`${MISSING_ALIASES}\`."
+              echo "> The website's download buttons link to those filenames and"
+              echo "> will 404. Re-run the failed build job before publishing."
+              echo ""
+            fi
+
             echo "**Commit:** [\`${GITHUB_SHA:0:7}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})"
             echo ""
             echo "### Downloads"

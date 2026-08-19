@@ -1,0 +1,77 @@
+name: Release Download Guard
+
+# The website's download buttons link to fixed filenames under
+# /releases/latest/download (web/app/_lib/site.ts), and the site is a static
+# export — it cannot check at runtime whether those files exist. GitHub resolves
+# /latest to the newest published, non-prerelease release, so publishing a
+# release that is missing one of those files silently breaks that platform's
+# download button for everyone.
+#
+# This runs the moment a release is published and reverts an incomplete one to
+# draft, which puts /latest back on the last complete release. Nothing is lost:
+# re-run the failed build job, then publish again.
+
+on:
+  release:
+    # Deliberately not `edited`: this job edits the release, which would
+    # retrigger itself.
+    types: [published, released]
+
+permissions:
+  contents: write
+
+jobs:
+  verify-download-targets:
+    name: Verify site download targets
+    # Prereleases are excluded from /releases/latest, so they cannot break the
+    # site's links.
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check every platform the site links to
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+          RELEASE_ID: ${{ github.event.release.id }}
+        run: |
+          # Keep in sync with the `aliases` list in build-release.yml and the
+          # download* URLs in web/app/_lib/site.ts.
+          required=(
+            Rhema-windows-x64-setup.exe
+            Rhema-macos-arm64.dmg
+            Rhema-linux-x86_64.AppImage
+          )
+
+          # Never act on a failed lookup: an API hiccup would otherwise read as
+          # "every asset is missing" and unpublish a perfectly good release.
+          if ! assets=$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets" \
+            --paginate --jq '.[].name'); then
+            echo "::error::Could not list assets for ${TAG}. Leaving the release" \
+                 "as published and failing this check instead of guessing."
+            exit 1
+          fi
+
+          echo "Assets on ${TAG}:"
+          echo "${assets}" | sed 's/^/  /'
+
+          missing=()
+          for name in "${required[@]}"; do
+            grep -qxF "$name" <<< "${assets}" || missing+=("$name")
+          done
+
+          if [[ ${#missing[@]} -eq 0 ]]; then
+            echo "All ${#required[@]} site download targets present on ${TAG}."
+            exit 0
+          fi
+
+          echo "::error::${TAG} is missing ${missing[*]}, which the website's" \
+               "download buttons link to. Reverting the release to draft so" \
+               "/releases/latest stays on the last complete release. Re-run the" \
+               "failed build job in 'Build, Bundle and Release', then publish again."
+
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            -F draft=true > /dev/null
+
+          echo "${TAG} reverted to draft."
+          exit 1
