@@ -231,7 +231,9 @@ const LOWER_THIRDS: BroadcastTheme = {
     backgroundHeight: 100,
     // Full-bleed: a lower third spans the frame, so no side margins.
     textAreaWidth: 100,
-    textAreaHeight: 40,
+    // Bottom-anchored, so shrinking this lowers the band's top edge and
+    // leaves it sitting on the bottom of the frame.
+    textAreaHeight: 32,
     referenceGap: 24,
   },
   transition: {

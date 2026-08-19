@@ -78,6 +78,17 @@ function stubCtx(): CanvasRenderingContext2D {
   } as unknown as CanvasRenderingContext2D
 }
 
+// Lower Thirds' band, derived from the theme so tuning the builtin's
+// proportions doesn't invalidate what these tests actually check: that the
+// backdrop sits at the anchored text area and never follows element boxes.
+const LOWER_THIRDS = BUILTIN_THEMES[2]
+const ANCHORED_BAND = {
+  x: 0,
+  y: 1080 - (LOWER_THIRDS.layout.textAreaHeight / 100) * 1080,
+  width: (LOWER_THIRDS.layout.textAreaWidth / 100) * 1920,
+  height: (LOWER_THIRDS.layout.textAreaHeight / 100) * 1080,
+}
+
 const VERSE: VerseRenderData = {
   reference: "Genesis 1:1 (KJV)",
   segments: [
@@ -266,9 +277,6 @@ function overlayFreeTheme(): BroadcastTheme {
 }
 
 describe("computeVerseLayoutMetrics — text box backdrop", () => {
-  // Lower Thirds: textArea 100% × 40%, anchored bottom-center → a
-  // full-bleed band {x: 0, y: 648, width: 1920, height: 432}.
-  const ANCHORED_BAND = { x: 0, y: 648, width: 1920, height: 432 }
 
   it("equals the anchored text area in stacked mode", () => {
     const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[2], VERSE)
@@ -300,7 +308,11 @@ describe("computeVerseLayoutMetrics — text box backdrop", () => {
     renderVerse(ctx, overlayFreeTheme(), VERSE)
     // roundRect starts with moveTo(x + radius, y); Lower Thirds radius = 12.
     const moveTos = calls.filter((c) => c.method === "moveTo")
-    expect(moveTos.some((c) => c.args[0] === 0 + 12 && c.args[1] === 648)).toBe(
+    expect(
+      moveTos.some(
+        (c) => c.args[0] === ANCHORED_BAND.x + 12 && c.args[1] === ANCHORED_BAND.y
+      )
+    ).toBe(
       true
     )
   })
@@ -343,10 +355,10 @@ describe("surface fills", () => {
     // artwork's own bounds, the destination is the container.
     const [, sx, sy, sw, sh, , , dw, dh] = draws[0].args as number[]
     expect([sx, sy, sw, sh]).toEqual([0, 0, 1920, 300])
-    // "cover" on a 1920x300 image in the 1920x432 band: scaled to the band's
-    // height and centred horizontally, so it overflows the band's width.
-    expect(dh).toBe(432)
-    expect(dw).toBeCloseTo(432 * (1920 / 300), 5)
+    // "cover" on a 1920x300 image in the band: scaled to the band's height
+    // and centred horizontally, so it overflows the band's width.
+    expect(dh).toBe(ANCHORED_BAND.height)
+    expect(dw).toBeCloseTo(ANCHORED_BAND.height * (1920 / 300), 5)
   })
 
   it("fits the artwork's bounds, ignoring transparent margins", async () => {
@@ -375,7 +387,11 @@ describe("surface fills", () => {
     expect(calls.some((c) => c.method === "clip")).toBe(true)
     // The rounded clip path starts at the band's own corner radius.
     const moveTos = calls.filter((c) => c.method === "moveTo")
-    expect(moveTos.some((c) => c.args[0] === 0 + 12 && c.args[1] === 648)).toBe(
+    expect(
+      moveTos.some(
+        (c) => c.args[0] === ANCHORED_BAND.x + 12 && c.args[1] === ANCHORED_BAND.y
+      )
+    ).toBe(
       true
     )
   })
