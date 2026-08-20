@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Rhema",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "com.openbezal.rhema",
   "build": {
     "frontendDist": "../build",
@@ -31,7 +31,9 @@
     "active": true,
     "targets": "all",
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "entitlements": "entitlements.plist",
+      "infoPlist": "Info.plist"
     },
     "icon": [
       "icons/32x32.png",
