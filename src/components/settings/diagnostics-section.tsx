@@ -6,7 +6,9 @@ import { getVersion } from "@tauri-apps/api/app"
 import { appLogDir } from "@tauri-apps/api/path"
 import { save } from "@tauri-apps/plugin-dialog"
 import { writeTextFile } from "@tauri-apps/plugin-fs"
+import { openUrl } from "@tauri-apps/plugin-opener"
 import { Button } from "@/components/ui/button"
+import { useUpdateCheck } from "@/hooks/use-update-check"
 import {
   Select,
   SelectContent,
@@ -33,6 +35,10 @@ export function DiagnosticsSection() {
   const [saving, setSaving] = useState(false)
   const [version, setVersion] = useState("")
   const [logDir, setLogDir] = useState("")
+  const update = useUpdateCheck()
+  // Narrowing on `update.status` does not survive into a callback, so bind the
+  // available release to a local the closure can capture.
+  const available = update.status?.isNewer ? update.status : null
 
   useEffect(() => {
     void getVersion().then(setVersion).catch(() => {})
@@ -123,6 +129,46 @@ export function DiagnosticsSection() {
             <span className="truncate font-mono text-[0.6875rem]" title={logDir}>
               {logDir || "—"}
             </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-2">
+            <span className="text-xs text-muted-foreground">
+              {update.checking
+                ? "Checking for updates…"
+                : available
+                  ? `Rhema ${available.latest} is available`
+                  : update.status
+                    ? "Up to date"
+                    : "Update check unavailable"}
+            </span>
+
+            {available ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 shrink-0 px-2 text-xs"
+                onClick={() => {
+                  void openUrl(available.url).catch((error: unknown) => {
+                    toast.error("Could not open the release page", {
+                      description: String(error),
+                    })
+                  })
+                }}
+              >
+                <DownloadIcon className="mr-1 size-3" />
+                Download
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 shrink-0 px-2 text-xs"
+                disabled={update.checking}
+                onClick={() => void update.recheck()}
+              >
+                Check again
+              </Button>
+            )}
           </div>
         </div>
       </div>
