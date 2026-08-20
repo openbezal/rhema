@@ -444,7 +444,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # --repo is required: this job never checks out the repo (it only
+          # downloads artifacts), so gh has no git remote to infer from and
+          # fails with "not a git repository".
           gh release edit "v${{ steps.version.outputs.version }}" \
+            --repo "${GITHUB_REPOSITORY}" \
             --notes-file release-notes.md
 
           echo "Release notes synced for v${{ steps.version.outputs.version }}."
