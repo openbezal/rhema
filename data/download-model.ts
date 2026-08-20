@@ -14,11 +14,7 @@
  */
 
 import { join } from "node:path"
-import {
-  ensurePythonEnv,
-  getVenvBin,
-  PROJECT_ROOT,
-} from "./lib/python-env"
+import { ensurePythonEnv, getVenvBin, PROJECT_ROOT } from "./lib/python-env"
 
 const MODELS_DIR = join(PROJECT_ROOT, "models", "qwen3-embedding-0.6b")
 const MODELS_DIR_INT8 = join(
@@ -59,8 +55,6 @@ async function main() {
       "--task",
       "feature-extraction",
       MODELS_DIR,
-      "--library-name",
-      "transformers"
     ],
     {
       stdout: "inherit",
@@ -91,8 +85,6 @@ async function main() {
       "--arm64",
       "-o",
       MODELS_DIR_INT8,
-      "--library-name",
-      "transformers"
     ],
     {
       stdout: "inherit",
