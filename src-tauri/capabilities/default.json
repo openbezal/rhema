@@ -12,6 +12,14 @@
     "dialog:default",
     "fs:default",
     "fs:allow-write-text-file",
-    "log:default"
+    "log:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/openbezal/rhema/*"
+        }
+      ]
+    }
   ]
 }

@@ -55,6 +55,10 @@ log.workspace = true
 tokio.workspace = true
 tauri = { version = "2.10.3", features = [] }
 tauri-plugin-log = "2"
+# Update-available check (commands/updates.rs). Same major as the stt crate's
+# client so the dependency tree keeps one reqwest.
+reqwest = { version = "0.12", features = ["json"] }
+tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 rhema-audio = { path = "crates/audio" }
 rhema-bible = { path = "crates/bible" }
