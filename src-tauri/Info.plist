@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Merged into the generated Info.plist by the macOS bundler. Apple
+	     requires a purpose string for microphone access; it is the text shown
+	     in the permission prompt and in System Settings > Privacy & Security. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Rhema listens to the message so it can follow along and put the scripture being read on screen.</string>
+</dict>
+</plist>

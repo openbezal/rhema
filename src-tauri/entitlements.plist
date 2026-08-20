@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Signing the bundle turns on the hardened runtime (Tauri's
+	     bundle.macOS.hardenedRuntime defaults to true), which denies both of
+	     these unless the entitlement is present. Without this file the app
+	     launches and looks healthy while its two core features are dead. -->
+
+	<!-- Microphone. Denied without this, and denied *silently*: TCC never
+	     prompts, CoreAudio still hands us a running input stream, and every
+	     frame is zeroes. Capture logs "started", the no-frames watchdog never
+	     trips, Deepgram accepts the silence and returns nothing, so the only
+	     symptom is a transcript that never appears. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+
+	<!-- NDI. libndi.dylib is signed by NDI's team (W8U66ET244); library
+	     validation refuses to map a dylib whose Team ID differs from the
+	     process's, and dlopen fails with "different Team IDs". Ad-hoc
+	     re-signing the dylib does not help — two ad-hoc signatures still
+	     count as different teams — so the entitlement is the only way to
+	     load a third-party dylib we do not sign ourselves. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
