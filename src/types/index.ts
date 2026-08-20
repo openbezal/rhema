@@ -24,3 +24,4 @@ export type {
   NdiSessionInfo,
   NdiStartRequest,
 } from "./ndi"
+export type { UpdateStatus } from "./updates"

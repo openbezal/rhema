@@ -6,3 +6,4 @@ pub mod diagnostics;
 pub mod fonts;
 pub mod remote;
 pub mod stt;
+pub mod updates;
