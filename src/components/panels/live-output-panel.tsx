@@ -1,9 +1,9 @@
-import { useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { useBroadcastStore, useBibleStore } from "@/stores"
+import { useBroadcastStore, useBibleStore, useSettingsStore } from "@/stores"
 import { presentVerse, toVerseRenderData } from "@/hooks/use-broadcast"
 import { bibleActions } from "@/hooks/use-bible"
 
@@ -13,6 +13,7 @@ export function LiveOutputPanel() {
   const liveVerse = useBroadcastStore((s) => s.liveVerse)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const idleFadeMs = useSettingsStore((s) => s.idleFadeMs)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
@@ -20,6 +21,24 @@ export function LiveOutputPanel() {
   // The live output renders only what was explicitly presented — it no longer
   // follows the preview selection, so detections can't override the operator.
   const verseData = isLive ? liveVerse : null
+
+  // Mirror the broadcast output's idle fade in the in-app preview.
+  const [faded, setFaded] = useState(false)
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
+    setFaded(false)
+    if (verseData) {
+      idleTimerRef.current = setTimeout(() => setFaded(true), idleFadeMs)
+    }
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+  }, [verseData, idleFadeMs])
 
   // Refetch the live verse when the translation changes so the live output
   // text follows the new translation. Updates the live output only — the
@@ -99,8 +118,9 @@ export function LiveOutputPanel() {
 
       <div
         className={cn(
-          "flex min-h-0 flex-1 items-center justify-center p-3 transition-opacity",
-          !isLive && "opacity-40"
+          "flex min-h-0 flex-1 items-center justify-center p-3 transition-opacity duration-700",
+          !isLive && "opacity-40",
+          faded && "opacity-0"
         )}
       >
         <CanvasVerse theme={activeTheme} verse={verseData} />
