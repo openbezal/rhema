@@ -1,4 +1,6 @@
 import { useEffect } from "react"
+import { toast } from "sonner"
+import { getAllWindows } from "@tauri-apps/api/window"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
@@ -6,6 +8,12 @@ import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { presentVerse, toVerseRenderData } from "@/hooks/use-broadcast"
 import { bibleActions } from "@/hooks/use-bible"
+
+async function hasOpenBroadcastWindow(): Promise<boolean> {
+  const windows = await getAllWindows()
+  // Output windows are labeled `broadcast-${outputId}` (see outputWindowLabel).
+  return windows.some((w) => w.label.startsWith("broadcast-"))
+}
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
@@ -49,6 +57,16 @@ export function LiveOutputPanel() {
     if (checked && !useBroadcastStore.getState().liveVerse) {
       const selected = useBibleStore.getState().selectedVerse
       if (selected) void presentVerse(selected)
+    }
+    if (checked) {
+      void hasOpenBroadcastWindow().then((open) => {
+        if (!open) {
+          toast.warning("No broadcast window open", {
+            description:
+              "Go live won't be visible to the congregation until you open a broadcast window in Broadcast Settings.",
+          })
+        }
+      })
     }
   }
 
