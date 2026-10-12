@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { ChevronsUpDownIcon, CheckIcon } from "lucide-react"
 import { useBroadcastStore } from "@/stores/broadcast-store"
-import { SurfaceControls } from "@/components/broadcast/surface-properties"
+import { SurfaceControls, type SurfacePrefix } from "@/components/broadcast/surface-properties"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -152,13 +152,19 @@ function SectionHeader({ title, description }: { title: string; description: str
   )
 }
 
-function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
+function FontControls({ prefix }: { prefix: "verseText" | "secondaryVerseText" | "reference" }) {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const update = useBroadcastStore((s) => s.updateDraftNested)
 
   if (!draftTheme) return null
 
-  const data = prefix === "verseText" ? draftTheme.verseText : draftTheme.reference
+  const isVerseText = prefix !== "reference"
+  const verseData = isVerseText
+    ? prefix === "secondaryVerseText"
+      ? draftTheme.secondaryVerseText ?? draftTheme.verseText
+      : draftTheme.verseText
+    : null
+  const data = verseData ?? draftTheme.reference
   const { hex: colorHex, opacity: colorOpacity } = parseColorOpacity(data.color)
   const horizontalAlign = data.horizontalAlign ?? draftTheme.layout.textAlign
   const verticalAlign = data.verticalAlign ?? "top"
@@ -226,18 +232,18 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
       </div>
 
       {/* Line Height — only for verse text, reference type doesn't have lineHeight */}
-      {prefix === "verseText" && (
+      {isVerseText && verseData && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-muted-foreground">Line Height</label>
-            <span className="text-xs tabular-nums text-muted-foreground">{(draftTheme.verseText.lineHeight).toFixed(2)}</span>
+            <span className="text-xs tabular-nums text-muted-foreground">{verseData.lineHeight.toFixed(2)}</span>
           </div>
           <Slider
             min={0.5}
             max={3.0}
             step={0.05}
-            value={[draftTheme.verseText.lineHeight]}
-            onValueChange={([v]) => update("verseText.lineHeight", v)}
+            value={[verseData.lineHeight]}
+            onValueChange={([v]) => update(`${prefix}.lineHeight`, v)}
           />
         </div>
       )}
@@ -269,7 +275,7 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
           </SelectTrigger>
           <SelectContent>
             {HORIZONTAL_ALIGN_OPTIONS
-              .filter((option) => prefix === "verseText" || option.value !== "justify")
+              .filter((option) => isVerseText || option.value !== "justify")
               .map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -434,11 +440,17 @@ function ReferenceProperties() {
 function VerseProperties() {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const update = useBroadcastStore((s) => s.updateDraftNested)
+  const [language, setLanguage] = useState<"primary" | "secondary">("primary")
 
   if (!draftTheme) return null
 
-  const shadow = draftTheme.verseText.shadow
-  const outline = draftTheme.verseText.outline
+  const stylePath = language === "secondary" ? "secondaryVerseText" : "verseText"
+  const style = language === "secondary"
+    ? draftTheme.secondaryVerseText ?? draftTheme.verseText
+    : draftTheme.verseText
+  const surfacePrefix: SurfacePrefix = `${stylePath}.surface`
+  const shadow = style.shadow
+  const outline = style.outline
 
   const shadowColor = shadow ? parseColorOpacity(shadow.color) : { hex: "#000000", opacity: 100 }
   const outlineColor = outline ? parseColorOpacity(outline.color) : { hex: "#000000", opacity: 100 }
@@ -446,16 +458,46 @@ function VerseProperties() {
   const verseNumbers = draftTheme.verseNumbers
   const verseNumberColor = parseColorOpacity(verseNumbers.color)
   const superscriptSizePct = Math.round(
-    (verseNumbers.fontSize / draftTheme.verseText.fontSize) * 100
+    (verseNumbers.fontSize / style.fontSize) * 100
   )
 
   return (
     <div className="flex flex-col gap-3">
-      <SectionHeader title="Verse Text" description="Customize how verse text appears" />
-      <FontControls prefix="verseText" />
+      <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1" role="tablist" aria-label="Verse language">
+        <Button
+          type="button"
+          size="sm"
+          variant={language === "primary" ? "secondary" : "ghost"}
+          onClick={() => setLanguage("primary")}
+          role="tab"
+          aria-selected={language === "primary"}
+        >
+          Primary
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={language === "secondary" ? "secondary" : "ghost"}
+          onClick={() => setLanguage("secondary")}
+          role="tab"
+          aria-selected={language === "secondary"}
+        >
+          Secondary
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {language === "secondary" && !draftTheme.secondaryVerseText
+          ? "Secondary inherits primary styling until you change a setting."
+          : "Edit the styling used by this language in the live verse."}
+      </p>
+      <SectionHeader
+        title={language === "primary" ? "Primary Language Text" : "Secondary Language Text"}
+        description="Customize how this language appears"
+      />
+      <FontControls prefix={stylePath} />
 
       {/* Verse Numbers */}
-      <div className="flex flex-col gap-3 border-t pt-3">
+      {language === "primary" && <div className="flex flex-col gap-3 border-t pt-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-semibold">Verse Numbers</label>
           <input
@@ -492,7 +534,7 @@ function VerseProperties() {
                   step={1}
                   value={[superscriptSizePct]}
                   onValueChange={([v]) => {
-                    const newFontSize = Math.round((v / 100) * draftTheme.verseText.fontSize)
+                    const newFontSize = Math.round((v / 100) * style.fontSize)
                     update("verseNumbers.fontSize", newFontSize)
                   }}
                 />
@@ -544,7 +586,7 @@ function VerseProperties() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Text Shadow */}
       <div className="flex flex-col gap-3 border-t pt-3">
@@ -555,9 +597,9 @@ function VerseProperties() {
             checked={shadow !== null}
             onChange={(e) => {
               if (e.target.checked) {
-                update("verseText.shadow", { color: "#00000080", blur: 4, x: 2, y: 2 })
+                update(`${stylePath}.shadow`, { color: "#00000080", blur: 4, x: 2, y: 2 })
               } else {
-                update("verseText.shadow", null)
+                update(`${stylePath}.shadow`, null)
               }
             }}
             className="h-4 w-4 rounded border-input accent-primary"
@@ -577,7 +619,7 @@ function VerseProperties() {
                 max={50}
                 step={1}
                 value={[shadow.x]}
-                onValueChange={([v]) => update("verseText.shadow.x", v)}
+                onValueChange={([v]) => update(`${stylePath}.shadow.x`, v)}
               />
             </div>
 
@@ -592,7 +634,7 @@ function VerseProperties() {
                 max={50}
                 step={1}
                 value={[shadow.y]}
-                onValueChange={([v]) => update("verseText.shadow.y", v)}
+                onValueChange={([v]) => update(`${stylePath}.shadow.y`, v)}
               />
             </div>
 
@@ -607,7 +649,7 @@ function VerseProperties() {
                 max={50}
                 step={1}
                 value={[shadow.blur]}
-                onValueChange={([v]) => update("verseText.shadow.blur", v)}
+                onValueChange={([v]) => update(`${stylePath}.shadow.blur`, v)}
               />
             </div>
 
@@ -620,7 +662,7 @@ function VerseProperties() {
                   value={shadowColor.hex}
                   onChange={(e) =>
                     update(
-                      "verseText.shadow.color",
+                      `${stylePath}.shadow.color`,
                       buildColorWithOpacity(e.target.value, shadowColor.opacity)
                     )
                   }
@@ -632,7 +674,7 @@ function VerseProperties() {
                     const v = e.target.value
                     if (/^#[0-9a-fA-F]{6}$/.test(v)) {
                       update(
-                        "verseText.shadow.color",
+                        `${stylePath}.shadow.color`,
                         buildColorWithOpacity(v, shadowColor.opacity)
                       )
                     }
@@ -651,7 +693,7 @@ function VerseProperties() {
                 value={[shadowColor.opacity]}
                 onValueChange={([v]) =>
                   update(
-                    "verseText.shadow.color",
+                    `${stylePath}.shadow.color`,
                     buildColorWithOpacity(shadowColor.hex, v)
                   )
                 }
@@ -670,9 +712,9 @@ function VerseProperties() {
             checked={outline !== null}
             onChange={(e) => {
               if (e.target.checked) {
-                update("verseText.outline", { color: "#000000", width: 1 })
+                update(`${stylePath}.outline`, { color: "#000000", width: 1 })
               } else {
-                update("verseText.outline", null)
+                update(`${stylePath}.outline`, null)
               }
             }}
             className="h-4 w-4 rounded border-input accent-primary"
@@ -692,7 +734,7 @@ function VerseProperties() {
                 max={20}
                 step={0.5}
                 value={[outline.width]}
-                onValueChange={([v]) => update("verseText.outline.width", v)}
+                onValueChange={([v]) => update(`${stylePath}.outline.width`, v)}
               />
             </div>
 
@@ -703,7 +745,7 @@ function VerseProperties() {
                 <input
                   type="color"
                   value={outlineColor.hex}
-                  onChange={(e) => update("verseText.outline.color", e.target.value)}
+                  onChange={(e) => update(`${stylePath}.outline.color`, e.target.value)}
                   className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
                 />
                 <Input
@@ -711,7 +753,7 @@ function VerseProperties() {
                   onChange={(e) => {
                     const v = e.target.value
                     if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                      update("verseText.outline.color", v)
+                        update(`${stylePath}.outline.color`, v)
                     }
                   }}
                   className="w-20 font-mono"
@@ -723,9 +765,9 @@ function VerseProperties() {
       </div>
 
       <SurfaceControls
-        prefix="verseText.surface"
-        title="Verse Plate"
-        description="A plate behind the verse text alone"
+        prefix={surfacePrefix}
+        title={language === "primary" ? "Primary Verse Plate" : "Secondary Verse Plate"}
+        description="A plate behind this language alone"
       />
     </div>
   )

@@ -19,6 +19,7 @@ interface PendingNavigation {
 interface BibleState {
   translations: Translation[]
   activeTranslationId: number
+  secondaryTranslationId: number | null
   books: Book[]
   searchResults: Verse[]
   semanticResults: SemanticSearchResult[]
@@ -40,6 +41,7 @@ interface BibleState {
 
   setTranslations: (translations: Translation[]) => void
   setActiveTranslation: (id: number) => void
+  setSecondaryTranslation: (id: number | null) => void
   setBooks: (books: Book[]) => void
   setSearchResults: (results: Verse[]) => void
   setSemanticResults: (results: SemanticSearchResult[]) => void
@@ -53,6 +55,7 @@ interface BibleState {
 export const useBibleStore = create<BibleState>((set) => ({
   translations: [],
   activeTranslationId: 1, // KJV default
+  secondaryTranslationId: null,
   books: [],
   searchResults: [],
   semanticResults: [],
@@ -64,7 +67,21 @@ export const useBibleStore = create<BibleState>((set) => ({
   revealBlock: "nearest",
 
   setTranslations: (translations) => set({ translations }),
-  setActiveTranslation: (activeTranslationId) => set({ activeTranslationId }),
+  setActiveTranslation: (activeTranslationId) =>
+    set((state) => ({
+      activeTranslationId,
+      secondaryTranslationId:
+        state.secondaryTranslationId === activeTranslationId
+          ? null
+          : state.secondaryTranslationId,
+    })),
+  setSecondaryTranslation: (secondaryTranslationId) =>
+    set((state) => ({
+      secondaryTranslationId:
+        secondaryTranslationId === state.activeTranslationId
+          ? null
+          : secondaryTranslationId,
+    })),
   setBooks: (books) => set({ books }),
   setSearchResults: (searchResults) => set({ searchResults }),
   setSemanticResults: (semanticResults) => set({ semanticResults }),
@@ -76,14 +93,27 @@ export const useBibleStore = create<BibleState>((set) => ({
     set((s) => ({ revealRequest: s.revealRequest + 1, revealBlock })),
 }))
 
-/** Load persisted activeTranslationId from disk into Zustand, then sync to Rust backend. */
+/** Load persisted translation selections from disk into Zustand, then sync the primary to Rust. */
 export async function hydrateBibleStore(): Promise<void> {
   try {
     const store = await load("bible.json", { autoSave: false, defaults: {} })
-    const value = await store.get<number>("activeTranslationId")
-    if (typeof value === "number") {
-      useBibleStore.getState().setActiveTranslation(value)
-    }
+    const [activeValue, secondaryValue] = await Promise.all([
+      store.get<number>("activeTranslationId"),
+      store.get<number | null>("secondaryTranslationId"),
+    ])
+    const activeTranslationId =
+      typeof activeValue === "number"
+        ? activeValue
+        : useBibleStore.getState().activeTranslationId
+    useBibleStore.getState().setActiveTranslation(activeTranslationId)
+    useBibleStore
+      .getState()
+      .setSecondaryTranslation(
+        typeof secondaryValue === "number" &&
+          secondaryValue !== activeTranslationId
+          ? secondaryValue
+          : null
+      )
     await invoke("set_active_translation", {
       translationId: useBibleStore.getState().activeTranslationId,
     })
@@ -92,20 +122,35 @@ export async function hydrateBibleStore(): Promise<void> {
   }
 }
 
-/** Subscribe to activeTranslationId changes and persist to disk with debounce. */
+/** Subscribe to translation selection changes and persist them with debounce. */
 export async function initBiblePersistence(): Promise<void> {
   try {
     const store = await load("bible.json", { autoSave: false, defaults: {} })
     let timer: ReturnType<typeof setTimeout> | null = null
-    let prev = useBibleStore.getState().activeTranslationId
+    let prev = {
+      activeTranslationId: useBibleStore.getState().activeTranslationId,
+      secondaryTranslationId: useBibleStore.getState().secondaryTranslationId,
+    }
 
     useBibleStore.subscribe((state) => {
-      const id = state.activeTranslationId
-      if (id === prev) return
-      prev = id
+      if (
+        state.activeTranslationId === prev.activeTranslationId &&
+        state.secondaryTranslationId === prev.secondaryTranslationId
+      ) {
+        return
+      }
+      prev = {
+        activeTranslationId: state.activeTranslationId,
+        secondaryTranslationId: state.secondaryTranslationId,
+      }
       if (timer) clearTimeout(timer)
       timer = setTimeout(async () => {
-        await store.set("activeTranslationId", id)
+        const current = useBibleStore.getState()
+        await store.set("activeTranslationId", current.activeTranslationId)
+        await store.set(
+          "secondaryTranslationId",
+          current.secondaryTranslationId
+        )
         await store.save()
       }, 500)
     })

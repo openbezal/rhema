@@ -15,6 +15,7 @@ import type {
   ThemeImageFill,
   VerseRenderData,
   RenderOptions,
+  VerseTextStyle,
 } from "@/types/broadcast"
 
 // Pretext lazily creates one internal measurement context, preferring
@@ -67,6 +68,9 @@ function ensureThemeFontsLoaded(theme: BroadcastTheme): void {
   const specs = [
     `${theme.verseText.fontWeight} 16px "${theme.verseText.fontFamily}"`,
     `${theme.reference.fontWeight} 16px "${theme.reference.fontFamily}"`,
+    ...(theme.secondaryVerseText
+      ? [`${theme.secondaryVerseText.fontWeight} 16px "${theme.secondaryVerseText.fontFamily}"`]
+      : []),
   ]
   for (const spec of specs) {
     if (requestedFontSpecs.has(spec)) continue
@@ -195,9 +199,10 @@ export interface VerseInlineHandle {
 export function prepareVerseInline(
   theme: BroadcastTheme,
   verse: VerseRenderData,
-  effectiveFontSize: number
+  effectiveFontSize: number,
+  style: VerseTextStyle = theme.verseText
 ): VerseInlineHandle | null {
-  const vt = theme.verseText
+  const vt = style
   const vn = theme.verseNumbers
   const transform = resolveTextTransform(vt.textTransform)
   const ratio = vt.fontSize > 0 ? effectiveFontSize / vt.fontSize : 1
@@ -228,7 +233,12 @@ export function prepareVerseInline(
   }
   if (!items.length) return null
 
-  return { prepared: prepareRichInline(items), kinds, wordFont, verseNumFont }
+  return {
+    prepared: prepareRichInline(items),
+    kinds,
+    wordFont,
+    verseNumFont,
+  }
 }
 
 function layoutVerseLines(
@@ -670,9 +680,10 @@ function drawVerseText(
   textRectX: number,
   textRectWidth: number,
   startY: number,
-  scaledFontSize?: number
+  scaledFontSize?: number,
+  style?: VerseTextStyle
 ): number {
-  const vt = theme.verseText
+  const vt = style ?? theme.verseText
   const vn = theme.verseNumbers
   const verseAlign = resolveHorizontalAlign(
     vt.horizontalAlign,
@@ -682,6 +693,32 @@ function drawVerseText(
   const verseDecoration = resolveTextDecoration(vt.textDecoration)
   const actualFontSize = scaledFontSize ?? vt.fontSize
   const lineHeightPx = actualFontSize * vt.lineHeight
+
+  if (verse.translationLines && verse.translationLines.length > 1) {
+    const primaryStyle = theme.verseText
+    const secondaryStyle = theme.secondaryVerseText ?? primaryStyle
+    const baseFontSize = scaledFontSize ?? primaryStyle.fontSize
+    const primaryScale = primaryStyle.fontSize > 0
+      ? baseFontSize / primaryStyle.fontSize
+      : 1
+    let currentY = startY
+    for (const [index, text] of verse.translationLines.entries()) {
+      if (index > 0) currentY += baseFontSize * primaryStyle.lineHeight
+      const lineStyle = index === 0 ? primaryStyle : secondaryStyle
+      const lineFontSize = lineStyle.fontSize * primaryScale
+      currentY += drawVerseText(
+        ctx,
+        theme,
+        { reference: verse.reference, segments: [{ text }] },
+        textRectX,
+        textRectWidth,
+        currentY,
+        lineFontSize,
+        lineStyle
+      )
+    }
+    return currentY - startY
+  }
 
   ctx.save()
   ctx.textBaseline = "top"
@@ -695,7 +732,7 @@ function drawVerseText(
     }
   }
 
-  const handle = prepareVerseInline(theme, verse, actualFontSize)
+  const handle = prepareVerseInline(theme, verse, actualFontSize, vt)
   if (!handle) {
     ctx.restore()
     return 0
@@ -808,29 +845,16 @@ function buildScaledTheme(
     background: {
       ...theme.background,
       image: theme.background.image
-        ? { ...theme.background.image, blur: theme.background.image.blur * scale }
-        : null,
-    },
-    verseText: {
-      ...theme.verseText,
-      fontSize: theme.verseText.fontSize * scale,
-      letterSpacing: theme.verseText.letterSpacing * scale,
-      shadow: theme.verseText.shadow
         ? {
-            ...theme.verseText.shadow,
-            blur: theme.verseText.shadow.blur * scale,
-            x: theme.verseText.shadow.x * scale,
-            y: theme.verseText.shadow.y * scale,
+            ...theme.background.image,
+            blur: theme.background.image.blur * scale,
           }
         : null,
-      outline: theme.verseText.outline
-        ? {
-            ...theme.verseText.outline,
-            width: theme.verseText.outline.width * scale,
-          }
-        : null,
-      surface: scaleSurface(theme.verseText.surface, scale),
     },
+    verseText: scaleVerseText(theme.verseText, scale),
+    secondaryVerseText: theme.secondaryVerseText
+      ? scaleVerseText(theme.secondaryVerseText, scale)
+      : undefined,
     verseNumbers: {
       ...theme.verseNumbers,
       fontSize: theme.verseNumbers.fontSize * scale,
@@ -842,6 +866,29 @@ function buildScaledTheme(
       surface: scaleSurface(theme.reference.surface, scale),
     },
     textBox: scaleSurface(theme.textBox, scale)!,
+  }
+}
+
+function scaleVerseText(style: VerseTextStyle, scale: number): VerseTextStyle {
+  return {
+    ...style,
+    fontSize: style.fontSize * scale,
+    letterSpacing: style.letterSpacing * scale,
+    shadow: style.shadow
+      ? {
+          ...style.shadow,
+          blur: style.shadow.blur * scale,
+          x: style.shadow.x * scale,
+          y: style.shadow.y * scale,
+        }
+      : null,
+    outline: style.outline
+      ? {
+          ...style.outline,
+          width: style.outline.width * scale,
+        }
+      : null,
+    surface: scaleSurface(style.surface, scale),
   }
 }
 
@@ -894,15 +941,15 @@ function calculateMaxAvailableVerseHeight(
   }
 }
 
-/** 
+/**
  * Returns the largest verse font size that fits within the available height without overflowing, using binary search.
- * 
- * @param ctx 
- * @param theme 
- * @param verse 
- * @param textRectWidth 
- * @param maxHeight 
- * @returns 
+ *
+ * @param ctx
+ * @param theme
+ * @param verse
+ * @param textRectWidth
+ * @param maxHeight
+ * @returns
  */
 function calculateScaledFontSize(
   ctx: CanvasRenderingContext2D,
@@ -946,9 +993,10 @@ export function measureVerseHeight(
   theme: BroadcastTheme,
   verse: VerseRenderData,
   textRectWidth: number,
-  fontSizeOverride?: number
+  fontSizeOverride?: number,
+  style: VerseTextStyle = theme.verseText
 ): { height: number; maxLineWidth: number } {
-  const vt = theme.verseText
+  const vt = style
   const verseAlign = resolveHorizontalAlign(
     vt.horizontalAlign,
     theme.layout.textAlign,
@@ -956,18 +1004,49 @@ export function measureVerseHeight(
   )
   const effectiveFontSize = fontSizeOverride ?? vt.fontSize
   const lineHeightPx = effectiveFontSize * vt.lineHeight
-  const handle = prepareVerseInline(theme, verse, effectiveFontSize)
+
+  if (verse.translationLines && verse.translationLines.length > 1) {
+    const primaryStyle = theme.verseText
+    const secondaryStyle = theme.secondaryVerseText ?? primaryStyle
+    const baseFontSize = fontSizeOverride ?? primaryStyle.fontSize
+    const primaryScale = primaryStyle.fontSize > 0
+      ? baseFontSize / primaryStyle.fontSize
+      : 1
+    let height = 0
+    let maxLineWidth = 1
+    for (const [index, text] of verse.translationLines.entries()) {
+      if (index > 0) height += baseFontSize * primaryStyle.lineHeight
+      const lineStyle = index === 0 ? primaryStyle : secondaryStyle
+      const lineFontSize = lineStyle.fontSize * primaryScale
+      const metrics = measureVerseHeight(
+        _ctx,
+        theme,
+        { reference: verse.reference, segments: [{ text }] },
+        textRectWidth,
+        lineFontSize,
+        lineStyle
+      )
+      height += metrics.height
+      maxLineWidth = Math.max(maxLineWidth, metrics.maxLineWidth)
+    }
+    return { height, maxLineWidth }
+  }
+
+  const handle = prepareVerseInline(theme, verse, effectiveFontSize, vt)
   if (!handle) {
     return { height: lineHeightPx, maxLineWidth: 1 }
   }
-  const stats = measureRichInlineStats(handle.prepared, Math.max(1, textRectWidth))
+  const stats = measureRichInlineStats(
+    handle.prepared,
+    Math.max(1, textRectWidth)
+  )
   const maxLineWidth =
     verseAlign === "justify" && stats.lineCount > 1
       ? textRectWidth
       : stats.maxLineWidth
   return {
     height: Math.max(1, stats.lineCount) * lineHeightPx,
-    maxLineWidth: Math.max(1, maxLineWidth),
+    maxLineWidth,
   }
 }
 
@@ -1045,13 +1124,23 @@ export function computeVerseLayoutMetrics(
   // Text area is anchored within the background region (offsets are already
   // applied to the region itself). At 100% × 100% this matches anchoring to
   // the canvas directly.
-  const innerPos = anchorPosition(layout.anchor, textAreaW, textAreaH, bgW, bgH, 0, 0)
+  const innerPos = anchorPosition(
+    layout.anchor,
+    textAreaW,
+    textAreaH,
+    bgW,
+    bgH,
+    0,
+    0
+  )
   const pos = { x: bgPos.x + innerPos.x, y: bgPos.y + innerPos.y }
 
   const pad = layout.padding
   // The container's own padding insets the text too, so content wraps inside
   // the surface rather than running to its edges.
-  const surfacePad = scaledTheme.textBox.enabled ? scaledTheme.textBox.padding : 0
+  const surfacePad = scaledTheme.textBox.enabled
+    ? scaledTheme.textBox.padding
+    : 0
   const textRectX = pos.x + pad.left + surfacePad
   const textRectY = pos.y + pad.top + surfacePad
   const textRectW = textAreaW - pad.left - pad.right - surfacePad * 2
