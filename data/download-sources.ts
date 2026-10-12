@@ -33,6 +33,7 @@ const EXPECTED_TRANSLATIONS = [
 ]
 
 const CROSS_REFS_URL = "https://a.openbible.info/data/cross-references.zip"
+const YORUBA_SOURCE_URL = "https://ebible.org/Scriptures/yor_vpl.zip"
 
 async function downloadFile(url: string, dest: string): Promise<void> {
   console.log(`  Downloading ${url}...`)
@@ -59,8 +60,14 @@ async function unzip(
   destDir: string,
   exclude: string[] = []
 ): Promise<void> {
-  const args = ["unzip", "-o", zipPath, "-d", destDir]
-  if (exclude.length > 0) args.push("-x", ...exclude)
+  // `unzip` is available on macOS/Linux but not on a stock Windows runner.
+  // Windows includes bsdtar, which can extract the same archives directly.
+  const args = process.platform === "win32"
+    ? ["tar", "-xf", zipPath, "-C", destDir]
+    : ["unzip", "-o", zipPath, "-d", destDir]
+  if (process.platform !== "win32" && exclude.length > 0) {
+    args.push("-x", ...exclude)
+  }
   const proc = Bun.spawn(args, { stdout: "inherit", stderr: "inherit" })
   const exitCode = await proc.exited
   if (exitCode !== 0) {
@@ -126,12 +133,50 @@ async function downloadCrossRefs(): Promise<void> {
   await rm(zipDest, { force: true })
 }
 
+async function downloadYorubaSource(): Promise<void> {
+  const output = join(SOURCES_DIR, "OYCB.json")
+  if (existsSync(output)) {
+    console.log("  ⏭ OYCB.json already present, skipping")
+    return
+  }
+
+  const stagingDir = join(DATA_DIR, "yoruba-source")
+  const zipPath = join(stagingDir, "yor_vpl.zip")
+  await mkdir(stagingDir, { recursive: true })
+  await downloadFile(YORUBA_SOURCE_URL, zipPath)
+  const head = new Uint8Array(await Bun.file(zipPath).slice(0, 4).arrayBuffer())
+  if (!isZip(head)) {
+    await rm(stagingDir, { recursive: true, force: true })
+    throw new Error("eBible returned a non-zip response for the Yoruba source")
+  }
+
+  await unzip(zipPath, stagingDir)
+  const vplPath = join(stagingDir, "yor_vpl.txt")
+  if (!existsSync(vplPath)) {
+    await rm(stagingDir, { recursive: true, force: true })
+    throw new Error("Yoruba archive did not contain yor_vpl.txt")
+  }
+
+  const converter = Bun.spawn(
+    [process.execPath, "run", join(DATA_DIR, "convert-yoruba-vpl.ts"), vplPath, output],
+    { stdout: "inherit", stderr: "inherit" },
+  )
+  if ((await converter.exited) !== 0) {
+    await rm(stagingDir, { recursive: true, force: true })
+    throw new Error("Failed to convert the official Yoruba VPL source")
+  }
+  await rm(stagingDir, { recursive: true, force: true })
+}
+
 async function main() {
   await mkdir(SOURCES_DIR, { recursive: true })
   await mkdir(CROSS_REFS_DIR, { recursive: true })
 
   console.log("\n📖 Downloading Bible translations (pre-built zip)...\n")
   await downloadSourcesZip()
+
+  console.log("\n📖 Downloading Yoruba Bible (official eBible source)...\n")
+  await downloadYorubaSource()
 
   console.log("\n🔗 Downloading cross-references...\n")
   await downloadCrossRefs()
