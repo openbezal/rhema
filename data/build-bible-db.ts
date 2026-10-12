@@ -195,6 +195,13 @@ const TRANSLATIONS_META: Array<{
     license: "Lockman Foundation",
   },
   {
+    file: "OYCB.json",
+    abbreviation: "OYCB",
+    title: "Open Yoruba Contemporary Bible",
+    language: "yo",
+    license: "CC BY-SA 4.0 (Biblica, Inc.)",
+  },
+  {
     file: "AMPC.json",
     abbreviation: "AMPC",
     title: "Amplified Bible Classic",
