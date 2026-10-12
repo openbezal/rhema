@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button"
 import type { BroadcastTheme, SurfaceFill, ThemeImageFill } from "@/types/broadcast"
 
 /** Dotted path to a SurfaceFill within a theme. */
-export type SurfacePrefix = "textBox" | "reference.surface" | "verseText.surface"
+export type SurfacePrefix =
+  | "textBox"
+  | "reference.surface"
+  | "verseText.surface"
+  | "secondaryVerseText.surface"
 
 const DEFAULT_IMAGE: ThemeImageFill = {
   url: "",
@@ -44,6 +48,8 @@ function surfaceAt(
       return theme.reference.surface
     case "verseText.surface":
       return theme.verseText.surface
+    case "secondaryVerseText.surface":
+      return theme.secondaryVerseText?.surface
   }
 }
 

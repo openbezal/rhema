@@ -107,6 +107,19 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
   return result
 }
 
+function seedSecondaryVerseStyle(
+  theme: BroadcastTheme,
+  path: string
+): BroadcastTheme {
+  if (!path.startsWith("secondaryVerseText.") || theme.secondaryVerseText) {
+    return theme
+  }
+  return {
+    ...theme,
+    secondaryVerseText: { ...theme.verseText },
+  }
+}
+
 function emitDraftToBroadcast(state: BroadcastState): void {
   if (!state.draftTheme) return
   const verse = state.isLive ? state.liveVerse : null
@@ -368,7 +381,11 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   updateDraftNested: (path, value) => {
     set((s) => ({
       draftTheme: s.draftTheme
-        ? (setNestedValue(s.draftTheme as unknown as Record<string, unknown>, path, value) as unknown as BroadcastTheme)
+        ? (setNestedValue(
+            seedSecondaryVerseStyle(s.draftTheme, path) as unknown as Record<string, unknown>,
+            path,
+            value
+          ) as unknown as BroadcastTheme)
         : null,
     }))
     emitDraftToBroadcast(get())

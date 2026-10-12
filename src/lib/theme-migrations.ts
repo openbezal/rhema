@@ -81,6 +81,13 @@ export function normalizeTheme(theme: BroadcastTheme): BroadcastTheme {
       ...theme.verseText,
       surface: normalizeSurface(theme.verseText?.surface),
     },
+    secondaryVerseText: theme.secondaryVerseText
+      ? {
+          ...theme.verseText,
+          ...theme.secondaryVerseText,
+          surface: normalizeSurface(theme.secondaryVerseText.surface),
+        }
+      : undefined,
     reference: {
       ...theme.reference,
       surface: normalizeSurface(theme.reference?.surface),
