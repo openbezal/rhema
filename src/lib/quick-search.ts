@@ -31,12 +31,13 @@ export function numberToRoman(num: number): string {
 }
 
 /**
- * Normalize input: convert leading numbers to Roman numerals for matching
- * Examples: "1 S" -> "I S", "2 C" -> "II C", "3 J" -> "III J"
+ * Normalize numbered-book input to the Roman form used by some Bible data
+ * sources. This keeps matching tolerant of Arabic, Roman, and ordinal
+ * prefixes: "1 S", "I S", and "1st S" all become "I S".
  */
 export function normalizeInput(input: string): string {
   const trimmed = input.trim()
-  const leadingNumberMatch = trimmed.match(/^(\d+)\s*(.*)$/)
+  const leadingNumberMatch = trimmed.match(/^(\d+)(?:st|nd|rd|th)?\s*(.*)$/i)
 
   if (leadingNumberMatch) {
     const num = parseInt(leadingNumberMatch[1])
@@ -51,11 +52,11 @@ export function normalizeInput(input: string): string {
  * Find matching book by name or abbreviation (case insensitive)
  */
 export function findMatchingBook(bookInput: string, books: Book[]): Book | undefined {
-  const normalized = bookInput.toLowerCase()
+  const normalized = normalizeInput(bookInput).toLowerCase()
   return books.find(
     b =>
-      b.name.toLowerCase().startsWith(normalized) ||
-      b.abbreviation.toLowerCase().startsWith(normalized)
+      normalizeInput(b.name).toLowerCase().startsWith(normalized) ||
+      normalizeInput(b.abbreviation).toLowerCase().startsWith(normalized)
   )
 }
 
@@ -75,13 +76,12 @@ export function getAutocompleteSuggestion(
   const normalizedInput = normalizeInput(trimmed)
 
   // Check if it's just a number (for numbered books like "1", "2", "3")
-  if (/^\d+$/.test(trimmed)) {
-    const matchingBook = books.find(b => b.name.startsWith(normalizedInput + " "))
+  if (/^\d+(?:st|nd|rd|th)?$/i.test(trimmed)) {
+    const matchingBook = findMatchingBook(trimmed, books)
 
     if (matchingBook) {
-      const remainder = matchingBook.name.slice(normalizedInput.length)
       return {
-        suggestion: normalizedInput + remainder + " 1:1",
+        suggestion: matchingBook.name + " 1:1",
         matchedBook: matchingBook,
         chapter: 1,
         verse: 1,
@@ -211,7 +211,7 @@ export function getTabNavigationResult(
   const suggestionTrimmed = currentSuggestion.trim()
 
   // Extract the full book name from the suggestion
-  const bookNameMatch = suggestionTrimmed.match(/^(([IVX]+\s+)?[a-zA-Z\s]+)\s+\d+:\d+$/)
+  const bookNameMatch = suggestionTrimmed.match(/^(((?:\d+|[IVX]+)\s+)?[a-zA-Z\s]+)\s+\d+:\d+$/i)
 
   if (bookNameMatch) {
     const fullBookName = bookNameMatch[1]
@@ -232,7 +232,7 @@ export function getTabNavigationResult(
 
     // Stage 2: Has chapter -> advance to chapter with colon
     if (hasChapter) {
-      const chapterMatch = suggestionTrimmed.match(/^(([IVX]+\s+)?[a-zA-Z\s]+\s+\d+):\d+$/)
+      const chapterMatch = suggestionTrimmed.match(/^(((?:\d+|[IVX]+)\s+)?[a-zA-Z\s]+\s+\d+):\d+$/i)
       if (chapterMatch) {
         return chapterMatch[1] + ":"
       }
