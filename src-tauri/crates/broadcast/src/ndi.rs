@@ -1,6 +1,6 @@
 use std::ffi::{c_void, CString};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex};
 
 use crate::frame_pump::{FramePump, FrameSender, FrameStats, VideoFrame};
 use libloading::{Library, Symbol};
@@ -145,10 +145,9 @@ pub enum NdiError {
 
 /// The loaded NDI runtime library plus the function pointers resolved from it.
 ///
-/// Exactly one `NdiLibrary` exists while any NDI session is alive: sessions
-/// hold an `Arc<NdiLibrary>` and `NdiRuntime` keeps only a `Weak`, so
-/// `NDIlib_initialize`/`NDIlib_destroy` run once per load — not once per
-/// session — and the library unloads when the last session drops.
+/// One lazily initialized library is retained for the runtime lifetime. This
+/// prevents a last-sender destroy racing a new output initialize while SDK
+/// teardown runs outside the output registry. Each sender also owns an Arc.
 struct NdiLibrary {
     _library: Library,
     send_create: NdiSendCreateFn,
@@ -205,7 +204,7 @@ impl NdiLibrary {
 
 impl Drop for NdiLibrary {
     fn drop(&mut self) {
-        log::info!("NDI: last session closed — destroying NDI runtime");
+        log::info!("NDI: runtime released — destroying NDI runtime");
         // SAFETY: NDIlib_initialize succeeded in load(); this is the sole
         // NDIlib_destroy call site and runs once, when the last Arc drops.
         unsafe { (self.ndi_destroy)() };
@@ -215,9 +214,9 @@ impl Drop for NdiLibrary {
 #[derive(Default)]
 pub struct NdiRuntime {
     sessions: std::collections::HashMap<String, ActiveNdiSession>,
-    /// Weak handle to the shared library so concurrent sessions reuse one
-    /// load/initialize, while an idle runtime holds nothing alive.
-    library: Weak<NdiLibrary>,
+    library: LibraryCache,
+    lifecycles: std::collections::HashMap<String, Arc<OutputLifecycle>>,
+    pending_starts: std::collections::HashMap<String, u64>,
     /// Directories searched (in order) for the NDI runtime library before the
     /// compile-time dev fallback. In production this is the Tauri resource dir.
     library_search_dirs: Vec<PathBuf>,
@@ -228,9 +227,14 @@ impl std::fmt::Debug for NdiRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NdiRuntime")
             .field("active_sessions", &self.sessions.len())
-            .field("library_loaded", &(self.library.strong_count() > 0))
+            .field(
+                "library_loaded",
+                &self.library.lock().is_ok_and(|library| library.is_some()),
+            )
             .field("library_search_dirs", &self.library_search_dirs)
             .field("next_generation", &self.next_generation)
+            .field("lifecycle_count", &self.lifecycles.len())
+            .field("pending_starts", &self.pending_starts)
             .finish()
     }
 }
@@ -242,17 +246,8 @@ impl NdiRuntime {
         self.library_search_dirs = dirs;
     }
 
-    /// Reuse the already-loaded NDI library, or load and initialize it fresh
-    /// when no session currently holds it.
-    fn shared_library(&mut self) -> Result<Arc<NdiLibrary>, NdiError> {
-        if let Some(library) = self.library.upgrade() {
-            return Ok(library);
-        }
-        let mut search_dirs = self.library_search_dirs.clone();
-        search_dirs.push(dev_fallback_dir());
-        let library = Arc::new(NdiLibrary::load(&search_dirs)?);
-        self.library = Arc::downgrade(&library);
-        Ok(library)
+    fn shared_library(&self) -> Result<Arc<NdiLibrary>, NdiError> {
+        load_cached_library(&self.library, &self.library_search_dirs)
     }
 
     /// Check if a specific session is active.
@@ -313,12 +308,20 @@ impl NdiRuntime {
     }
 
     pub fn stop_all(&mut self) {
+        self.pending_starts.clear();
+        for lifecycle in self.lifecycles.values() {
+            drain_retired(lifecycle);
+        }
         for session in self.sessions.values() {
             session.pump.request_stop();
         }
         for (id, _session) in self.sessions.drain() {
             log::info!("NDI[{id}]: stopping session");
         }
+    }
+
+    pub fn output_ids(&self) -> Vec<String> {
+        self.sessions.keys().cloned().collect()
     }
 
     pub fn current_info(&self, session_id: &str) -> Option<NdiSessionInfo> {
@@ -421,7 +424,7 @@ impl NdiSender {
             log::error!(
                 "NDI: NDIlib_send_create returned null for '{source_name}' (last OS error: {os_err})"
             );
-            // NDIlib_destroy fires via the Arc<NdiLibrary> drop if this was the only holder.
+            // Runtime cache retains the initialized library; no sender was created.
             return Err(NdiError::SenderCreateFailed);
         }
 
@@ -539,8 +542,8 @@ impl FrameSender for NdiSender {
         if self.last_frame != Some(key) {
             self.frame_metadata = Some(
                 CString::new(format!(
-                    "<rhema-frame renderer=\"{}\" revision=\"{}\"/>",
-                    frame.epoch, frame.revision
+                    "<rhema-frame generation=\"{}\" renderer=\"{}\" revision=\"{}\"/>",
+                    self.info.generation, frame.epoch, frame.revision
                 ))
                 .map_err(|error| error.to_string())?,
             );
@@ -561,7 +564,7 @@ impl Drop for NdiSender {
     fn drop(&mut self) {
         // SAFETY: sender was created by NDIlib_send_create and is non-null (validated in create()).
         // send_destroy is a valid function pointer kept alive by the Arc<NdiLibrary>, which drops
-        // after this struct's fields — running NDIlib_destroy only once the last session is gone.
+        // after the runtime cache and all sender references release it.
         let sender = self.sender;
         unsafe {
             (self.library.send_destroy)(sender);
@@ -692,3 +695,11 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "ndi_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
+#[path = "ndi_lifecycle.rs"]
+mod lifecycle;
+use lifecycle::{drain_retired, load_cached_library, LibraryCache, OutputLifecycle};

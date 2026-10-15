@@ -43,3 +43,6 @@ export const defaultNdiSettings = (sourceName = "Rhema"): BroadcastOutputNdiSett
   frameRate: "fps24",
   alphaMode: "straightAlpha",
 })
+
+/** An active sender with no renderer cannot consume presentation/clear events. */
+export const MISSING_OUTPUT_RENDERER_ERROR = "Output renderer unavailable; stop this output in Settings."

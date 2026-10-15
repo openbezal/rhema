@@ -205,9 +205,34 @@ impl Drop for FramePump {
         self.stop();
     }
 }
+/// Scheduling math is separate from waits so wakeups/delays can be checked
+/// with a controlled monotonic clock at every supported integer frame rate.
+struct FrameCadence {
+    period: Duration,
+    deadline: Duration,
+}
+impl FrameCadence {
+    fn new(fps: u32) -> Self {
+        Self {
+            period: Duration::from_nanos(1_000_000_000 / u64::from(fps)),
+            deadline: Duration::ZERO,
+        }
+    }
+    fn reset(&mut self, now: Duration) {
+        self.deadline = now;
+    }
+    fn remaining(&self, now: Duration) -> Option<Duration> {
+        self.deadline
+            .checked_sub(now)
+            .filter(|duration| !duration.is_zero())
+    }
+    fn completed(&mut self, now: Duration) {
+        self.deadline = (self.deadline + self.period).max(now);
+    }
+}
 fn run(shared: &Shared, fps: u32, mut sender: impl FrameSender) {
-    let period = Duration::from_nanos(1_000_000_000 / u64::from(fps));
-    let mut deadline = Instant::now();
+    let clock = Instant::now();
+    let mut cadence = FrameCadence::new(fps);
     let mut cached: Option<VideoFrame> = None;
     loop {
         let mut state = shared.lock();
@@ -220,8 +245,8 @@ fn run(shared: &Shared, fps: u32, mut sender: impl FrameSender) {
                     .wake
                     .wait(state)
                     .unwrap_or_else(std::sync::PoisonError::into_inner);
-                deadline = Instant::now();
-            } else if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
+                cadence.reset(clock.elapsed());
+            } else if let Some(remaining) = cadence.remaining(clock.elapsed()) {
                 state = shared
                     .wake
                     .wait_timeout(state, remaining)
@@ -263,13 +288,34 @@ fn run(shared: &Shared, fps: u32, mut sender: impl FrameSender) {
         }
         // Never catch up with a burst after a stalled send. Reuse only one
         // cached bitmap, with one pending replacement, at the configured rate.
-        deadline = (deadline + period).max(Instant::now());
+        cadence.completed(clock.elapsed());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{FramePump, FrameSender, VideoFrame};
+    use super::{FrameCadence, FramePump, FrameSender, VideoFrame};
+
+    #[test]
+    fn controlled_cadence_preserves_deadlines_across_wakeups_without_catchup_bursts() {
+        for fps in [24, 30, 60] {
+            let mut cadence = FrameCadence::new(fps);
+            let period = Duration::from_nanos(1_000_000_000 / u64::from(fps));
+            assert_eq!(cadence.remaining(Duration::ZERO), None);
+            cadence.completed(Duration::ZERO);
+            assert_eq!(
+                cadence.remaining(period / 4),
+                Some(period.checked_sub(period / 4).unwrap())
+            );
+            assert_eq!(cadence.remaining(period), None);
+            cadence.completed(period * 10);
+            assert_eq!(cadence.remaining(period * 10), None);
+            cadence.completed(period * 10);
+            assert_eq!(cadence.remaining(period * 10), Some(period));
+            cadence.reset(period * 100);
+            assert_eq!(cadence.remaining(period * 100), None);
+        }
+    }
     use std::sync::{Arc, Condvar, Mutex};
     use std::time::{Duration, Instant};
 

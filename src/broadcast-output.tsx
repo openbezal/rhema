@@ -115,7 +115,7 @@ export function BroadcastCanvas() {
         : undefined
       if (renderedTrace)
         markBroadcastTrace(renderedTrace, "canvas_rendered", OUTPUT_ID)
-      delivery.request(++renderRevision, capture)
+      if (latest) delivery.request(++renderRevision, capture)
     }
     async function connect() {
       const ticket = ++negotiation

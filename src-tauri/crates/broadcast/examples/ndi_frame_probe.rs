@@ -7,11 +7,15 @@ use rhema_broadcast::ndi::{
 use std::time::Duration;
 
 fn pixels(width: u32, height: u32, value: u8) -> Vec<u8> {
-    let mut pixels = vec![0; usize::try_from(width * height * 4).expect("supported dimensions")];
-    for pixel in pixels.chunks_exact_mut(4) {
-        pixel.copy_from_slice(&[value, 80, 160, 128]);
+    // Eight wide black/white bars independently encode the revision. Sample
+    // centers tolerate codec edges without confusing adjacent revision values.
+    let mut row = vec![0; usize::try_from(width * 4).expect("supported width")];
+    for (x, pixel) in row.chunks_exact_mut(4).enumerate() {
+        let bit = x * 8 / usize::try_from(width).expect("supported width");
+        let level = if value & (1 << bit) == 0 { 0 } else { 255 };
+        pixel.copy_from_slice(&[level, level, level, 128]);
     }
-    pixels
+    row.repeat(usize::try_from(height).expect("supported height"))
 }
 struct Options {
     fps: NdiFrameRate,
@@ -104,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             println!(
                 "{}",
-                serde_json::json!({ "stage": "submitted", "output": id, "revision": revision, "acceptedMs": accepted })
+                serde_json::json!({ "stage": "submitted", "output": id, "revision": revision, "acceptedMs": accepted, "generation": info.generation, "renderer": lease.split_once(':').expect("renderer lease").1, "width": info.width, "height": info.height })
             );
         }
         // Ten warmup changes (the first allows discovery), then 100 samples,

@@ -35,7 +35,16 @@ int main(int argc, char** argv) {
     NDIlib_video_frame_v2_t frame;
     if (NDIlib_recv_capture_v2(receiver, &frame, nullptr, nullptr, 100) == NDIlib_frame_type_video) {
       auto epoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-      std::cout << "{\"receivedMs\":" << epoch << ",\"width\":" << frame.xres << ",\"height\":" << frame.yres << ",\"rateN\":" << frame.frame_rate_N << ",\"rateD\":" << frame.frame_rate_D << ",\"pixel\":[" << int(frame.p_data[0]) << "," << int(frame.p_data[1]) << "," << int(frame.p_data[2]) << "," << int(frame.p_data[3]) << "],\"metadata\":" << std::quoted(frame.p_metadata ? frame.p_metadata : "") << "}" << std::endl;
+      std::string pattern;
+      const char* hex = "0123456789abcdef";
+      for (int bit = 0; bit < 8; ++bit) {
+        int x = (2 * bit + 1) * frame.xres / 16;
+        const auto* pixel = frame.p_data + (frame.yres / 2) * frame.line_stride_in_bytes + x * 4;
+        for (int channel = 0; channel < 4; ++channel) {
+          pattern += hex[pixel[channel] >> 4]; pattern += hex[pixel[channel] & 15];
+        }
+      }
+      std::cout << "{\"samples\":" << std::quoted(pattern) << ",\"receivedMs\":" << epoch << ",\"width\":" << frame.xres << ",\"height\":" << frame.yres << ",\"rateN\":" << frame.frame_rate_N << ",\"rateD\":" << frame.frame_rate_D << ",\"pixel\":[" << int(frame.p_data[0]) << "," << int(frame.p_data[1]) << "," << int(frame.p_data[2]) << "," << int(frame.p_data[3]) << "],\"metadata\":" << std::quoted(frame.p_metadata ? frame.p_metadata : "") << "}" << std::endl;
       terminalFrames = frame.p_metadata && std::strstr(frame.p_metadata, "revision=\"111\"") ? terminalFrames + 1 : 0;
       NDIlib_recv_free_video_v2(receiver, &frame);
       if (terminalFrames >= 5) break;

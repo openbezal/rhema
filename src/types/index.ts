@@ -26,6 +26,7 @@ export type {
   BroadcastOutputType,
 } from "./broadcast-output"
 export {
+  MISSING_OUTPUT_RENDERER_ERROR,
   MAIN_OUTPUT_ID,
   defaultNdiSettings,
   outputWindowLabel,

@@ -97,6 +97,20 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 describe("mounted binary output delivery", () => {
+  it("holds retained native pixels until a reloaded renderer receives an authoritative snapshot", async () => {
+    mocks.active = true
+    await act(async () => {
+      event("broadcast:ndi-config", { active: true })
+      await settle()
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    expect(mocks.invoke.mock.calls.filter(([name]) => name === "push_ndi_frame")).toHaveLength(0)
+    await act(async () => {
+      event("broadcast:verse-update", { theme, verse: null, clearMode: "transparent" })
+      await settle()
+    })
+    expect(mocks.invoke.mock.calls.filter(([name]) => name === "push_ndi_frame")).toHaveLength(1)
+  })
   it("flushes the newest clear immediately after a slow frame without resending unchanged IPC pixels", async () => {
     let release!: () => void
     const blocked = new Promise<void>((resolve) => {
@@ -111,6 +125,9 @@ describe("mounted binary output delivery", () => {
     )
     mocks.active = true
     await act(async () => {
+      event("broadcast:verse-update", {
+        theme, verse: { reference: "John 3:15", segments: [{ text: "Initial" }] },
+      })
       event("broadcast:ndi-config", {
         active: true,
         width: 1,

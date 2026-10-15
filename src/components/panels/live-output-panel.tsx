@@ -10,9 +10,12 @@ import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore } from "@/stores"
+import { MISSING_OUTPUT_RENDERER_ERROR } from "@/types"
 import { operatorActions } from "@/lib/operator-actions"
 
 export function LiveOutputPanel() {
+  const canClear = useBroadcastStore((s) => !Object.values(s.outputStatus).some((status) => status.error === MISSING_OUTPUT_RENDERER_ERROR))
+  const recovery = useBroadcastStore((s) => s.presentationRecovery)
   const isLive = useBroadcastStore((s) => s.isLive)
   const autoLive = useBroadcastStore((s) => s.autoLive)
   const clearMode = useBroadcastStore((s) => s.clearMode)
@@ -48,12 +51,14 @@ export function LiveOutputPanel() {
             Auto
           </span>
           <Switch
+            disabled={recovery !== "ready"}
             checked={autoLive}
             onCheckedChange={operatorActions.setAutoLive}
           />
         </label>
         <DropdownMenu>
           <DropdownMenuTrigger
+            disabled={!canClear}
             aria-label="Clear live content"
             title="Clear live content without stopping outputs"
             className="rounded p-1 text-muted-foreground hover:text-foreground"
@@ -79,9 +84,10 @@ export function LiveOutputPanel() {
               isLive ? "text-emerald-400" : "text-muted-foreground"
             )}
           >
-            {isLive ? "Live" : "Go live"}
+            {recovery !== "ready" ? "Status unknown" : isLive ? "Live" : "Go live"}
           </span>
           <Switch
+            disabled={recovery !== "ready"}
             checked={isLive}
             onCheckedChange={operatorActions.toggleOnAir}
             className="data-[state=checked]:bg-emerald-500"
@@ -89,17 +95,20 @@ export function LiveOutputPanel() {
         </label>
       </PanelHeader>
 
+      {recovery !== "ready" && <p role="status" className="px-3 pt-2 text-xs text-amber-400">
+        {canClear ? "Output content could not be restored. Existing output is held. Use Clear to establish known content, or stop the output in Settings." : "Output renderer is unavailable. Stop the affected output in Settings before presenting new content."}
+      </p>}
       <div
         className={cn(
           "flex min-h-0 flex-1 items-center justify-center p-3 transition-opacity",
           !isLive && "opacity-40"
         )}
       >
-        <CanvasVerse
+        {recovery === "ready" ? <CanvasVerse
           theme={activeTheme}
           verse={verseData}
           clearMode={clearMode}
-        />
+        /> : <span className="text-sm text-muted-foreground">Preview unavailable</span>}
       </div>
     </div>
   )

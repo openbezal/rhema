@@ -83,6 +83,7 @@ export async function presentVerse(
     !isPresentationIntentCurrent(options.intentRevision)
   )
     return
+  if (useBroadcastStore.getState().presentationRecovery !== "ready") return
   const selected = selection()
   if (!selected || !validReference(verse)) return
   // A manual selection takes ownership from unfinished automatic browsing.
@@ -114,6 +115,7 @@ export async function presentVerse(
     const now = selection()
     return (
       ticket === revision &&
+      useBroadcastStore.getState().presentationRecovery === "ready" &&
       (!intent.automatic || useBroadcastStore.getState().autoLive) &&
       now?.id === selected.id &&
       now.code === selected.code &&

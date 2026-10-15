@@ -9,7 +9,7 @@ mod frame_protocol;
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
 use serde::Serialize;
 use tauri::State;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Map `output_id` to its Tauri window label (`broadcast-{id}`).
 ///
@@ -219,23 +219,72 @@ pub async fn close_broadcast_window(
 }
 
 #[tauri::command]
-pub fn start_ndi(
+pub async fn start_ndi(
+    app: tauri::AppHandle,
     output_id: String,
-    runtime: State<'_, Mutex<NdiRuntime>>,
     request: NdiStartRequest,
 ) -> Result<NdiSessionInfo, String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime.start(output_id, request).map_err(|e| {
-        log::error!("start_ndi failed: {e}");
-        e.to_string()
+    let worker_app = app.clone();
+    let worker_id = output_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let runtime = worker_app.state::<Mutex<NdiRuntime>>();
+        NdiRuntime::start_shared(&runtime, &worker_id, request).map_err(|error| error.to_string())
     })
+    .await
+    .map_err(|error| error.to_string())
+    .and_then(std::convert::identity);
+    let _ = app.emit_to(
+        "main",
+        "broadcast:native-output-status",
+        serde_json::json!({ "outputId": output_id }),
+    );
+    result
 }
 
 #[tauri::command]
-pub fn stop_ndi(output_id: String, runtime: State<'_, Mutex<NdiRuntime>>) -> Result<(), String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime.stop(&output_id);
-    Ok(())
+pub async fn stop_ndi(app: tauri::AppHandle, output_id: String) -> Result<(), String> {
+    let worker_app = app.clone();
+    let worker_id = output_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let runtime = worker_app.state::<Mutex<NdiRuntime>>();
+        NdiRuntime::stop_shared(&runtime, &worker_id).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())
+    .and_then(std::convert::identity);
+    let _ = app.emit_to(
+        "main",
+        "broadcast:native-output-status",
+        serde_json::json!({ "outputId": output_id }),
+    );
+    result
+}
+
+/// A boot discriminator, not an authentication token. A restored `WebKit` session
+/// must not restore on-air content across native process restarts.
+#[tauri::command]
+pub fn get_broadcast_process_identity() -> String {
+    static IDENTITY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    IDENTITY
+        .get_or_init(|| {
+            format!(
+                "{}:{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos()
+            )
+        })
+        .clone()
+}
+
+#[tauri::command]
+pub fn get_ndi_output_ids(runtime: State<'_, Mutex<NdiRuntime>>) -> Result<Vec<String>, String> {
+    Ok(runtime
+        .lock()
+        .map_err(|error| error.to_string())?
+        .output_ids())
 }
 
 #[derive(Serialize)]

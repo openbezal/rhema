@@ -9,11 +9,16 @@ import type {
   Verse,
   VerseRenderData,
 } from "@/types"
-import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel } from "@/types"
+import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel, MISSING_OUTPUT_RENDERER_ERROR } from "@/types"
 import { BUILTIN_THEMES, LOWER_THIRDS, CLASSIC_DARK } from "@/lib/builtin-themes"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
 import { createBroadcastTrace, markBroadcastTrace, type BroadcastTrace } from "@/lib/broadcast-trace"
+
+import { readBroadcastSession, writeBroadcastSession, forgetBroadcastSession } from "@/lib/broadcast-session-snapshot"
+
+const restoredSession = readBroadcastSession()
+export const hasBroadcastSessionSnapshot = restoredSession !== null
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -27,6 +32,7 @@ interface BroadcastState {
   outputs: BroadcastOutput[]
   /** Runtime on-air state per output id. Not persisted. */
   outputStatus: Record<string, BroadcastOutputStatus>
+  presentationRecovery: "restoring" | "ready" | "unknown"
   isLive: boolean
   liveVerse: VerseRenderData | null
   liveTrace: BroadcastTrace | null
@@ -115,7 +121,7 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
 }
 
 function emitDraftToBroadcast(state: BroadcastState): void {
-  if (!state.draftTheme) return
+  if (!state.draftTheme || state.presentationRecovery !== "ready") return
   const verse = state.isLive ? state.liveVerse : null
   for (const output of state.outputs) {
     if (output.themeId !== state.editingThemeId) continue
@@ -167,6 +173,7 @@ export function migrateLegacyOutputs(
 }
 
 export const useBroadcastStore = create<BroadcastState>((set, get) => ({
+  presentationRecovery: "ready",
   themes: [...BUILTIN_THEMES],
   activeThemeId: BUILTIN_THEMES[0].id,
   outputs: [defaultMainOutput()],
@@ -183,6 +190,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   renamingThemeId: null,
   draftTheme: null,
   selectedElement: null,
+  ...restoredSession,
 
   loadThemes: () => {
     set({ themes: [...BUILTIN_THEMES] })
@@ -252,9 +260,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     })),
   syncBroadcastOutputFor: (outputId: string) => {
     const s = get()
+    if (s.presentationRecovery !== "ready") return
     const output = s.outputs.find((o) => o.id === outputId)
     if (!output) return
-    const theme = s.themes.find((t) => t.id === output.themeId) ?? s.themes[0]
+    const theme = (s.editingThemeId === output.themeId ? s.draftTheme : null) ?? s.themes.find((t) => t.id === output.themeId) ?? s.themes[0]
     if (!theme) return
 
     const trace = s.liveTrace ?? createBroadcastTrace()
@@ -342,16 +351,21 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       return { outputStatus: { ...s.outputStatus, [id]: status } }
     }),
   setLive: (isLive) => {
+    if (get().presentationRecovery !== "ready") return
     const trace = createBroadcastTrace()
     markBroadcastTrace(trace, "intent_accepted")
     set({ isLive, liveTrace: trace })
     get().syncBroadcastOutput()
   },
   setLiveVerse: (liveVerse, source = null, clearMode = "background", trace = createBroadcastTrace()) => {
-    set({ liveTrace: trace, liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null })
+    if (liveVerse !== null && get().presentationRecovery !== "ready") return
+    if (Object.values(get().outputStatus).some((status) => status.error === MISSING_OUTPUT_RENDERER_ERROR)) return
+    const recovering = get().presentationRecovery !== "ready"
+    set({ liveTrace: trace, liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null,
+      presentationRecovery: "ready", ...(recovering ? { isLive: false } : {}) })
     get().syncBroadcastOutput()
   },
-  setAutoLive: (autoLive) => set({ autoLive }),
+  setAutoLive: (autoLive) => { if (get().presentationRecovery === "ready") set({ autoLive }) },
 
   // Designer
   setDesignerOpen: (isDesignerOpen) => {
@@ -430,6 +444,13 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   setRenamingTheme: (id) => set({ renamingThemeId: id }),
 }))
 
+// Synchronous session write precedes each action's output fanout, including
+// output configuration/draft changes that have not reached debounced disk save.
+useBroadcastStore.subscribe((state) => {
+  if (state.presentationRecovery === "ready") writeBroadcastSession(state)
+  else if (state.presentationRecovery === "unknown") forgetBroadcastSession()
+})
+
 // ── Theme persistence via tauri-plugin-store ──
 
 let tauriStore: Store | null = null
@@ -465,6 +486,14 @@ export function hydrateBroadcastThemes(): Promise<void> {
       if (main) patch.activeThemeId = main.themeId
       if (typeof autoLive === "boolean") patch.autoLive = autoLive
 
+      if (restoredSession) {
+        patch.outputs = restoredSession.outputs
+        patch.activeThemeId = restoredSession.activeThemeId
+        patch.autoLive = restoredSession.autoLive
+        const themes = new Map((patch.themes ?? BUILTIN_THEMES).map((theme) => [theme.id, theme]))
+        restoredSession.themes.forEach((theme) => themes.set(theme.id, theme))
+        patch.themes = [...themes.values()]
+      }
       useBroadcastStore.setState(patch)
 
       // Auto-persist on changes (debounced)
