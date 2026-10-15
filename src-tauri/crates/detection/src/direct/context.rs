@@ -1,13 +1,12 @@
+use crate::clock::{DetectionClock, SystemClock};
 use crate::types::VerseRef;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Tracks recent Bible reference context so partial references
 /// (e.g., "verse 17" without a book/chapter) can be resolved.
-#[expect(
-    clippy::struct_field_names,
-    reason = "last_ prefix conveys temporal context clearly"
-)]
 pub struct ReferenceContext {
+    clock: Arc<dyn DetectionClock>,
     last_book: Option<i32>,
     last_book_name: Option<String>,
     last_chapter: Option<i32>,
@@ -20,7 +19,12 @@ const CONTEXT_TIMEOUT_SECS: u64 = 90;
 
 impl ReferenceContext {
     pub fn new() -> Self {
+        Self::with_clock(Arc::new(SystemClock))
+    }
+
+    pub(crate) fn with_clock(clock: Arc<dyn DetectionClock>) -> Self {
         ReferenceContext {
+            clock,
             last_book: None,
             last_book_name: None,
             last_chapter: None,
@@ -31,7 +35,9 @@ impl ReferenceContext {
     /// Check if context is still valid (within timeout).
     fn is_valid(&self) -> bool {
         match self.last_timestamp {
-            Some(ts) => ts.elapsed().as_secs() < CONTEXT_TIMEOUT_SECS,
+            Some(ts) => {
+                self.clock.now().saturating_duration_since(ts).as_secs() < CONTEXT_TIMEOUT_SECS
+            }
             None => false,
         }
     }
@@ -77,9 +83,14 @@ impl ReferenceContext {
     /// (e.g. bare "N:M" corrections).
     pub fn is_fresh(&self, within_secs: u64) -> bool {
         match self.last_timestamp {
-            Some(ts) => ts.elapsed().as_secs() < within_secs,
+            Some(ts) => self.clock.now().saturating_duration_since(ts).as_secs() < within_secs,
             None => false,
         }
+    }
+
+    /// Expiry prevents resolution; it must not turn later bare names into fresh authority.
+    pub(crate) fn has_reference(&self) -> bool {
+        self.last_book.is_some()
     }
 
     /// The last book heard, if context is still valid.
@@ -101,16 +112,24 @@ impl ReferenceContext {
         }
     }
 
+    /// A rejected chapter must not inherit an older chapter, even in the same book.
+    pub(crate) fn clear_chapter(&mut self) {
+        self.last_chapter = None;
+    }
+
     /// Update context with the latest detection.
     pub fn update(&mut self, verse_ref: &VerseRef) {
         if verse_ref.book_number != 0 {
+            if self.last_book != Some(verse_ref.book_number) {
+                self.clear_chapter();
+            }
             self.last_book = Some(verse_ref.book_number);
             self.last_book_name = Some(verse_ref.book_name.clone());
         }
         if verse_ref.chapter != 0 {
             self.last_chapter = Some(verse_ref.chapter);
         }
-        self.last_timestamp = Some(Instant::now());
+        self.last_timestamp = Some(self.clock.now());
     }
 }
 

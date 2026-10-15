@@ -1,0 +1,13 @@
+# Native transcription session boundaries
+
+Each successful start receives a distinct cancellation token. Stopping a run cancels that token permanently. Audio fanout, provider shutdown, transcript events and queued detection work carry the token that created them. An old provider finishing cannot clear the replacement run's status.
+
+A shared session boundary serializes start/reset, stop and effects from transcript/detection workers. Stop waits for an in-flight effect to finish; queued work from the stopped run cannot mutate context or emit afterward. Blocking event/detection work and provider completion execute outside the async runtime threads. This boundary can add contention while a detection owns the database; native latency measurement remains necessary.
+
+Startup resets direct context and loaded reading state, and clears merger cooldown while preserving configured thresholds. Audio capture ownership serializes transcription fanout threads so a replacement waits for its predecessor to release the device. Existing audio-test preemption remains separate.
+
+Reading handoff comes from the confidence-ordered emitted results after active-translation resolution/filtering. It requires real confidence of at least 0.90 and nonempty text. It never substitutes detector history or fabricated confidence. The first eligible emitted result owns the passage; explicit navigation to another verse in the same chapter updates the reading position. A failed emission cannot establish new reading context. An accepted citation is consumed once: the raw utterance is not reinterpreted as a second chapter/verse command. Invalid chapter navigation also holds existing reading state without falling back to a verse in the old chapter.
+
+Native unit tests include the full accepted-handoff/reading/advance sequence for previous-verse navigation, multiple citations, a rejected citation plus correction, and invalid chapter fallback. They also exercise cancellation across stop/start, obsolete provider completion, concurrent start rejection, failed initialization, provider cancellation notification before/after waiting, current status flags, in-flight/queued ordering, capture ownership, and restart with actual DirectDetector/ReadingMode/DetectionMerger components. Handoff tests cover differing candidates, lower-confidence survivors, missing text, nonfinite confidence and same-chapter navigation.
+
+This slice does not certify microphone/Deepgram/Whisper device behavior, late IPC events already emitted before stop, a frontend archive/new-session reset, full sermon transcription, or whole-app memory/latency. Those acceptance checks remain open. No normal installed user profile or microphone was used for these unit checks.

@@ -2,6 +2,7 @@ mod commands;
 mod events;
 mod memstats;
 mod state;
+mod transcription_session;
 
 use std::sync::Mutex;
 

@@ -15,6 +15,7 @@
 //! - `onnx` — enables ONNX Runtime for local embedding inference
 //! - `vector-search` — enables HNSW vector index for similarity search
 
+pub mod clock;
 pub mod direct;
 pub mod error;
 pub mod fusion;

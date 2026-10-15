@@ -1,4 +1,6 @@
+use crate::clock::{DetectionClock, SystemClock};
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::Serialize;
@@ -11,6 +13,9 @@ const READING_MODE_TIMEOUT_MS: u128 = 180_000;
 
 /// Minimum word overlap ratio to consider a transcript matching a verse.
 const MIN_WORD_OVERLAP: f64 = 0.40;
+
+/// Retain recent matching text without allowing repeated narration to grow for hours.
+const MAX_ACCUMULATED_TEXT_BYTES: usize = 8_192;
 
 /// A verse loaded for reading mode tracking.
 #[derive(Debug, Clone)]
@@ -64,6 +69,7 @@ enum BareNumberContext {
 /// the remaining verses in the chapter. On each transcript, compares
 /// word overlap against the current and next verse to detect advancement.
 pub struct ReadingMode {
+    clock: Arc<dyn DetectionClock>,
     active: bool,
     book_number: i32,
     book_name: String,
@@ -83,6 +89,11 @@ pub struct ReadingMode {
 impl ReadingMode {
     /// Create an inactive reading mode instance.
     pub fn new() -> Self {
+        Self::with_clock(Arc::new(SystemClock))
+    }
+
+    /// Inject the same monotonic clock as direct detection for session replay.
+    pub fn with_clock(clock: Arc<dyn DetectionClock>) -> Self {
         Self {
             active: false,
             book_number: 0,
@@ -90,8 +101,9 @@ impl ReadingMode {
             chapter: 0,
             current_index: 0,
             verses: Vec::new(),
-            last_match_time: Instant::now(),
-            accumulated_text: String::new(),
+            last_match_time: clock.now(),
+            clock,
+            accumulated_text: String::with_capacity(MAX_ACCUMULATED_TEXT_BYTES),
             bare_number_context: BareNumberContext::None,
         }
     }
@@ -145,7 +157,7 @@ impl ReadingMode {
         self.chapter = chapter;
         self.current_index = start_index;
         self.verses = loaded;
-        self.last_match_time = Instant::now();
+        self.last_match_time = self.clock.now();
         self.accumulated_text.clear();
     }
 
@@ -163,7 +175,7 @@ impl ReadingMode {
     pub fn resume(&mut self) {
         if !self.verses.is_empty() {
             self.active = true;
-            self.last_match_time = Instant::now();
+            self.last_match_time = self.clock.now();
             let verse = self
                 .verses
                 .get(self.current_index)
@@ -357,6 +369,38 @@ impl ReadingMode {
         })
     }
 
+    /// Bytes retained for multi-fragment reading matches (diagnostics/replay).
+    pub fn buffered_text_bytes(&self) -> usize {
+        self.accumulated_text.len()
+    }
+
+    fn append_recent_text(&mut self, text: &str) {
+        // Slice before appending so even one very large fragment cannot grow
+        // the retained allocation. All cuts preserve UTF-8 boundaries.
+        if text.len() >= MAX_ACCUMULATED_TEXT_BYTES {
+            let mut start = text.len() - MAX_ACCUMULATED_TEXT_BYTES;
+            while !text.is_char_boundary(start) {
+                start += 1;
+            }
+            self.accumulated_text.clear();
+            self.accumulated_text.push_str(&text[start..]);
+            return;
+        }
+        let separator = usize::from(!self.accumulated_text.is_empty());
+        let required = self.accumulated_text.len() + separator + text.len();
+        if required > MAX_ACCUMULATED_TEXT_BYTES {
+            let mut start = required - MAX_ACCUMULATED_TEXT_BYTES;
+            while !self.accumulated_text.is_char_boundary(start) {
+                start += 1;
+            }
+            self.accumulated_text.drain(..start);
+        }
+        if !self.accumulated_text.is_empty() {
+            self.accumulated_text.push(' ');
+        }
+        self.accumulated_text.push_str(text);
+    }
+
     /// Process a transcript fragment and check if the reader has advanced.
     ///
     /// Returns `Some(ReadingAdvance)` if the reader has moved to a new verse.
@@ -364,13 +408,20 @@ impl ReadingMode {
     ///
     /// Automatically deactivates after timeout.
     pub fn check_transcript(&mut self, text: &str) -> Option<ReadingAdvance> {
-        if !self.active || self.verses.is_empty() {
+        if self.verses.is_empty() {
             return None;
         }
 
         // Check timeout — but don't clear verses, just pause.
         // This allows "verse N" references to re-activate.
-        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS && self.active {
+        if self
+            .clock
+            .now()
+            .saturating_duration_since(self.last_match_time)
+            .as_millis()
+            > READING_MODE_TIMEOUT_MS
+            && self.active
+        {
             log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
             self.active = false;
         }
@@ -388,20 +439,7 @@ impl ReadingMode {
             return None;
         }
 
-        // Accumulate text for multi-fragment matching
-        if !self.accumulated_text.is_empty() {
-            self.accumulated_text.push(' ');
-        }
-        self.accumulated_text.push_str(text);
-
-        // [DIAG] Watch accumulated_text growth — only cleared on advance_to,
-        // so if matches never trigger, this grows until timeout pauses us.
-        if self.accumulated_text.len() > 4096 {
-            log::warn!(
-                "[READING] accumulated_text large: {} bytes (no advance since last clear)",
-                self.accumulated_text.len(),
-            );
-        }
+        self.append_recent_text(text);
 
         let transcript_words = text_to_word_set(&self.accumulated_text);
 
@@ -423,7 +461,7 @@ impl ReadingMode {
                 }
 
                 // Still on current verse, reset match timer
-                self.last_match_time = Instant::now();
+                self.last_match_time = self.clock.now();
                 return None;
             }
         }
@@ -532,7 +570,7 @@ impl ReadingMode {
         let verse_text = verse.text.clone();
 
         self.current_index = index;
-        self.last_match_time = Instant::now();
+        self.last_match_time = self.clock.now();
         self.accumulated_text.clear();
 
         let reference = format!("{} {}:{verse_number}", self.book_name, self.chapter);

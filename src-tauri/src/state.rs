@@ -6,8 +6,8 @@ use rhema_bible::BibleDb;
 pub struct AppState {
     pub bible_db: Option<BibleDb>,
     pub active_translation_id: i64,
-    pub audio_active: Arc<AtomicBool>,
     pub stt_active: Arc<AtomicBool>,
+    pub(crate) transcription_sessions: Arc<crate::transcription_session::SessionController>,
     pub audio_test_active: Arc<AtomicBool>,
     #[expect(dead_code, reason = "reserved for future Deepgram key injection")]
     pub deepgram_api_key: Option<String>,
@@ -19,11 +19,18 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        let stt_active = Arc::new(AtomicBool::new(false));
+        let audio_active = Arc::new(AtomicBool::new(false));
+        let transcription_sessions =
+            Arc::new(crate::transcription_session::SessionController::new(
+                stt_active.clone(),
+                audio_active.clone(),
+            ));
         Self {
             bible_db: None,
             active_translation_id: 1, // Default to first translation (KJV)
-            audio_active: Arc::new(AtomicBool::new(false)),
-            stt_active: Arc::new(AtomicBool::new(false)),
+            stt_active,
+            transcription_sessions,
             audio_test_active: Arc::new(AtomicBool::new(false)),
             deepgram_api_key: None,
             embedding_warning: None,

@@ -1,5 +1,6 @@
+use crate::clock::{DetectionClock, SystemClock};
 use std::collections::VecDeque;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use regex::Regex;
@@ -449,6 +450,9 @@ struct IncompleteRef {
     /// When true, the chapter field is a default (1), not explicitly spoken.
     /// Bare numbers should be interpreted as chapter, not verse.
     chapter_is_default: bool,
+    /// A name without an address cannot take verse-only continuations away
+    /// from established context; fuzzy names need address confirmation too.
+    ambiguous_book: bool,
 }
 
 /// Main orchestrator for direct Bible reference detection.
@@ -458,9 +462,9 @@ struct IncompleteRef {
 /// context for resolving partial references.
 ///
 /// Supports incomplete reference handling: when a chapter-only reference
-/// is detected (e.g., "Genesis 3"), it's held for up to 5 seconds waiting
-/// for a verse completion (e.g., "verse 16"). If no completion arrives,
-/// the chapter-only reference is emitted defaulting to verse 1.
+/// is detected (e.g., "Genesis 3"), it's held for up to 15 seconds waiting
+/// for a verse completion (e.g., "verse 16"). Incomplete references expire
+/// without being emitted.
 /// Phrases that indicate the user wants to go back to a previous verse.
 const PREVIOUS_VERSE_PHRASES: &[&str] = &[
     "previous verse",
@@ -473,6 +477,7 @@ const PREVIOUS_VERSE_PHRASES: &[&str] = &[
 ];
 
 pub struct DirectDetector {
+    clock: Arc<dyn DetectionClock>,
     matcher: BookMatcher,
     context: ReferenceContext,
     /// Pending incomplete reference waiting for verse completion.
@@ -483,9 +488,15 @@ pub struct DirectDetector {
 
 impl DirectDetector {
     pub fn new() -> Self {
+        Self::with_clock(Arc::new(SystemClock))
+    }
+
+    /// Inject monotonic time for ordered session replay.
+    pub fn with_clock(clock: Arc<dyn DetectionClock>) -> Self {
         DirectDetector {
+            context: ReferenceContext::with_clock(Arc::clone(&clock)),
+            clock,
             matcher: BookMatcher::new(),
-            context: ReferenceContext::new(),
             incomplete: None,
             recent_detections: VecDeque::with_capacity(5),
         }
@@ -553,7 +564,8 @@ impl DirectDetector {
     /// Detect Bible references in the given transcript text.
     ///
     /// Returns a list of Detection objects for each reference found.
-    /// Whether `text` names a book together with a chapter and verse of its own.
+    /// Whether `text` names a book together with an address of its own, including
+    /// invalid addresses that must reach validation rather than an older continuation.
     ///
     /// A reference parked from an earlier partial must not complete itself using
     /// numbers that belong to a newly stated one. Saying "Psalm" (which parks
@@ -565,13 +577,9 @@ impl DirectDetector {
     /// Deliberately narrow: text with no book name in it — "verse 22", or a
     /// bare "22 20" correction — is not a complete reference, so genuine
     /// continuations still work.
-    fn text_names_complete_reference(&self, text: &str) -> bool {
+    fn text_names_address(&self, text: &str) -> bool {
         self.matcher.find_books(text).iter().any(|book_match| {
-            parser::parse_reference(text, book_match).is_some_and(|r| {
-                r.verse_start > 0
-                    && is_valid_reference(r.book_number, r.chapter)
-                    && versification::is_valid_verse(r.book_number, r.chapter, r.verse_start)
-            })
+            parser::parse_reference(text, book_match).is_some_and(|r| r.verse_start > 0)
         })
     }
 
@@ -595,11 +603,15 @@ impl DirectDetector {
         // Step 0c: Check if there's a pending incomplete reference.
         // Try to complete it with chapter/verse continuation, or expire on timeout.
         if let Some(ref incomplete) = self.incomplete.clone() {
-            let elapsed = incomplete.timestamp.elapsed().as_millis();
+            let elapsed = self
+                .clock
+                .now()
+                .saturating_duration_since(incomplete.timestamp)
+                .as_millis();
             if elapsed > INCOMPLETE_REF_TIMEOUT_MS {
                 // Timeout: clean up pending state (EDGE-02).
                 self.incomplete = None;
-            } else if self.text_names_complete_reference(text) {
+            } else if self.text_names_address(text) {
                 // The speaker has named a whole reference in this utterance, so
                 // one parked from an earlier partial is stale. Drop it and let
                 // the book matcher below read what was actually said.
@@ -607,82 +619,98 @@ impl DirectDetector {
             } else if let Some(cont) =
                 parser::try_extract_continuation(text, incomplete.chapter_is_default)
             {
-                match cont {
-                    parser::Continuation::ChapterAndVerse(ch, v) => {
-                        let mut completed = incomplete.verse_ref.clone();
-                        completed.chapter = ch;
-                        completed.verse_start = v;
-                        if is_valid_reference(completed.book_number, completed.chapter)
-                            && versification::is_valid_verse(
-                                completed.book_number,
-                                completed.chapter,
-                                completed.verse_start,
-                            )
-                        {
-                            clamp_verse_end(&mut completed);
-                            detections.push(self.make_direct_detection(
-                                &completed,
-                                compute_confidence(&completed, &completed),
-                                text,
-                                0,
-                                text.len(),
-                            ));
-                            self.push_recent(&completed);
-                            self.context.update(&completed);
-                            self.incomplete = None;
-                        } else {
-                            // The naive completion doesn't exist — the text
-                            // may be a correction ("22 20" after "Revelation
-                            // 20"), so retry it contextually.
-                            self.remember_rejected(&completed);
-                            self.incomplete = None;
-                            if let Some(d) = self.try_contextual_detection(text) {
-                                detections.push(d);
+                let confirms_address = match cont {
+                    parser::Continuation::ChapterAndVerse(_, _) => matches!(
+                        parser::parse_contextual(text),
+                        Some(parser::ContextualRef::ChapterVerse { .. })
+                    ),
+                    parser::Continuation::ChapterOnly(_) => text
+                        .split_whitespace()
+                        .any(|word| word.eq_ignore_ascii_case("chapter")),
+                    parser::Continuation::VerseOnly(_) => false,
+                };
+                if incomplete.ambiguous_book && !confirms_address {
+                    // Let the current authoritative context resolve this verse.
+                    self.incomplete = None;
+                } else {
+                    match cont {
+                        parser::Continuation::ChapterAndVerse(ch, v) => {
+                            let mut completed = incomplete.verse_ref.clone();
+                            completed.chapter = ch;
+                            completed.verse_start = v;
+                            if is_valid_reference(completed.book_number, completed.chapter)
+                                && versification::is_valid_verse(
+                                    completed.book_number,
+                                    completed.chapter,
+                                    completed.verse_start,
+                                )
+                            {
+                                clamp_verse_end(&mut completed);
+                                detections.push(self.make_direct_detection(
+                                    &completed,
+                                    compute_confidence(&completed, &completed),
+                                    text,
+                                    0,
+                                    text.len(),
+                                ));
+                                self.push_recent(&completed);
+                                self.context.update(&completed);
+                                self.incomplete = None;
+                            } else {
+                                // The naive completion doesn't exist — the text
+                                // may be a correction ("22 20" after "Revelation
+                                // 20"), so retry it contextually.
+                                self.remember_rejected(&completed);
+                                self.incomplete = None;
+                                if let Some(d) = self.try_contextual_detection(text) {
+                                    detections.push(d);
+                                }
                             }
+                            return detections;
                         }
-                        return detections;
-                    }
-                    parser::Continuation::VerseOnly(v) => {
-                        let mut completed = incomplete.verse_ref.clone();
-                        completed.verse_start = v;
-                        if is_valid_reference(completed.book_number, completed.chapter)
-                            && versification::is_valid_verse(
-                                completed.book_number,
-                                completed.chapter,
-                                completed.verse_start,
-                            )
-                        {
-                            clamp_verse_end(&mut completed);
-                            detections.push(self.make_direct_detection(
-                                &completed,
-                                compute_confidence(&completed, &completed),
-                                text,
-                                0,
-                                text.len(),
-                            ));
-                            self.push_recent(&completed);
-                            self.context.update(&completed);
-                            self.incomplete = None;
-                        } else {
-                            self.remember_rejected(&completed);
-                            self.incomplete = None;
-                            if let Some(d) = self.try_contextual_detection(text) {
-                                detections.push(d);
+                        parser::Continuation::VerseOnly(v) => {
+                            let mut completed = incomplete.verse_ref.clone();
+                            completed.verse_start = v;
+                            if is_valid_reference(completed.book_number, completed.chapter)
+                                && versification::is_valid_verse(
+                                    completed.book_number,
+                                    completed.chapter,
+                                    completed.verse_start,
+                                )
+                            {
+                                clamp_verse_end(&mut completed);
+                                detections.push(self.make_direct_detection(
+                                    &completed,
+                                    compute_confidence(&completed, &completed),
+                                    text,
+                                    0,
+                                    text.len(),
+                                ));
+                                self.push_recent(&completed);
+                                self.context.update(&completed);
+                                self.incomplete = None;
+                            } else {
+                                self.remember_rejected(&completed);
+                                self.incomplete = None;
+                                if let Some(d) = self.try_contextual_detection(text) {
+                                    detections.push(d);
+                                }
                             }
+                            return detections;
                         }
-                        return detections;
-                    }
-                    parser::Continuation::ChapterOnly(ch) => {
-                        // Update chapter, reset timeout, keep waiting for verse.
-                        let mut updated = incomplete.verse_ref.clone();
-                        updated.chapter = ch;
-                        self.incomplete = Some(IncompleteRef {
-                            verse_ref: updated.clone(),
-                            timestamp: Instant::now(),
-                            chapter_is_default: false,
-                        });
-                        self.context.update(&updated);
-                        // Fall through to book matcher (text may also contain a new book)
+                        parser::Continuation::ChapterOnly(ch) => {
+                            // Update chapter, reset timeout, keep waiting for verse.
+                            let mut updated = incomplete.verse_ref.clone();
+                            updated.chapter = ch;
+                            self.incomplete = Some(IncompleteRef {
+                                verse_ref: updated.clone(),
+                                timestamp: self.clock.now(),
+                                chapter_is_default: false,
+                                ambiguous_book: false,
+                            });
+                            self.context.update(&updated);
+                            // Fall through to book matcher (text may also contain a new book)
+                        }
                     }
                 }
             }
@@ -693,7 +721,8 @@ impl DirectDetector {
 
         // Step 1b: If the automaton found nothing, try fuzzy matching as fallback
         let fuzzy_matches: Vec<BookMatch>;
-        let effective_matches: &[BookMatch] = if book_matches.is_empty() {
+        let used_fuzzy = book_matches.is_empty();
+        let effective_matches: &[BookMatch] = if used_fuzzy {
             fuzzy_matches = fuzzy::fuzzy_find_books(text)
                 .into_iter()
                 .map(|fm| BookMatch {
@@ -710,6 +739,7 @@ impl DirectDetector {
 
         // Step 2 & 3: Parse references and resolve context
         let mut rejected_reference = false;
+        let mut unanchored_book = false;
         for book_match in effective_matches {
             if let Some(verse_ref) = parser::parse_reference(text, book_match) {
                 // Resolve any partial references using context
@@ -736,14 +766,20 @@ impl DirectDetector {
                 if resolved.verse_start == 0 {
                     // Detect if chapter was explicitly spoken or defaulted.
                     let after_book = text[book_match.end..].trim();
-                    let has_explicit_chapter = after_book.starts_with(|c: char| c.is_ascii_digit())
-                        || after_book.to_lowercase().starts_with("chapter");
+                    let has_explicit_chapter = parser::has_explicit_chapter(after_book);
+                    let ambiguous_book =
+                        !has_explicit_chapter && (used_fuzzy || self.context.has_reference());
                     self.incomplete = Some(IncompleteRef {
                         verse_ref: resolved.clone(),
-                        timestamp: Instant::now(),
+                        timestamp: self.clock.now(),
                         chapter_is_default: !has_explicit_chapter,
+                        ambiguous_book,
                     });
-                    self.context.update(&resolved);
+                    if has_explicit_chapter {
+                        self.context.update(&resolved);
+                    } else {
+                        unanchored_book = true;
+                    }
                     continue;
                 }
 
@@ -803,16 +839,30 @@ impl DirectDetector {
 
                 detections.push(detection);
                 self.context.update(&resolved);
+            } else {
+                unanchored_book = true;
             }
         }
+
+        // An unparsed named book cannot lend its following address to an older book.
+        // A preceding verse command ("verse 6 ... Ahab said to Obadiah") remains contextual.
+        let contextual_text = if unanchored_book && !rejected_reference {
+            effective_matches
+                .first()
+                .map_or(text.as_str(), |book| &text[..book.start])
+        } else {
+            text.as_str()
+        };
 
         // Step 4: Try to resolve a book-less reference ("22 20", "verse 5",
         // "chapter 22 verse 20") against the last book heard (issue #141).
         // Runs when the text has no book name at all, or when every parsed
         // reference was rejected as non-existent — the trailing numbers may
         // be a correction ("Revelation 20 22. 22 20.").
-        if detections.is_empty() && (effective_matches.is_empty() || rejected_reference) {
-            if let Some(detection) = self.try_contextual_detection(text) {
+        if detections.is_empty()
+            && (effective_matches.is_empty() || rejected_reference || unanchored_book)
+        {
+            if let Some(detection) = self.try_contextual_detection(contextual_text) {
                 detections.push(detection);
             }
         }
@@ -836,6 +886,11 @@ impl DirectDetector {
             // corrections with a colon). Same tight window as bare colons;
             // the last pair that exists in the context book wins.
             if !self.context.is_fresh(BARE_COLON_CONTEXT_WINDOW_SECS) {
+                return None;
+            }
+            let books = self.matcher.find_books(text);
+            let correction = books.last().map_or(text, |book| &text[book.end..]);
+            if !parser::is_numeric_correction(correction) {
                 return None;
             }
             let (chapter, verse) = parser::extract_adjacent_number_pairs(text)
@@ -889,6 +944,7 @@ impl DirectDetector {
             ),
             parser::ContextualRef::ChapterOnly(chapter) => {
                 if !is_valid_reference(book_number, chapter) {
+                    self.invalidate_chapter();
                     return None;
                 }
                 let verse_ref = VerseRef {
@@ -901,16 +957,19 @@ impl DirectDetector {
                 self.context.update(&verse_ref);
                 self.incomplete = Some(IncompleteRef {
                     verse_ref,
-                    timestamp: Instant::now(),
+                    timestamp: self.clock.now(),
                     chapter_is_default: false,
+                    ambiguous_book: false,
                 });
                 return None;
             }
         };
 
-        if !is_valid_reference(book_number, chapter)
-            || !versification::is_valid_verse(book_number, chapter, verse)
-        {
+        if !is_valid_reference(book_number, chapter) {
+            self.invalidate_chapter();
+            return None;
+        }
+        if !versification::is_valid_verse(book_number, chapter, verse) {
             return None;
         }
 
@@ -925,6 +984,11 @@ impl DirectDetector {
         self.context.update(&verse_ref);
         self.incomplete = None;
         Some(self.make_direct_detection(&verse_ref, confidence, text, 0, text.len()))
+    }
+
+    fn invalidate_chapter(&mut self) {
+        self.context.clear_chapter();
+        self.incomplete = None;
     }
 
     /// Book numbers explicitly named in the text (after transcript cleaning).
@@ -948,6 +1012,7 @@ impl DirectDetector {
         ctx_ref.verse_end = None;
         if !is_valid_reference(ctx_ref.book_number, ctx_ref.chapter) {
             ctx_ref.chapter = 0;
+            self.context.clear_chapter();
         }
         self.context.update(&ctx_ref);
     }
@@ -1346,6 +1411,7 @@ mod tests {
                 .checked_sub(std::time::Duration::from_secs(20))
                 .unwrap(),
             chapter_is_default: detector.incomplete.as_ref().unwrap().chapter_is_default,
+            ambiguous_book: detector.incomplete.as_ref().unwrap().ambiguous_book,
         });
 
         // Next detect call should clean up without emitting
