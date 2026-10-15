@@ -1,3 +1,5 @@
+mod reading;
+
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -854,229 +856,47 @@ fn should_start_reading(
         || reading.current_verse() != Some(reference.verse_start)
 }
 
-/// Check reading mode: if active, test transcript against expected verse.
-/// If direct detection just found a new verse, start/restart reading mode.
-/// Returns `true` when reading mode handled the transcript (suppresses semantic).
-#[expect(
-    clippy::too_many_lines,
-    reason = "sequential state-machine logic is clearer in one flow"
-)]
+/// Apply one reading transition while the caller retains the native session boundary.
 fn check_reading_mode(
     app: &AppHandle,
     transcript: &str,
     accepted: Option<&rhema_detection::VerseRef>,
 ) -> bool {
-    use rhema_detection::ReadingMode;
-
-    // Only the actual resolved, emitted high-confidence result can own reading context.
-    if let Some(recent) = accepted {
-        let should_start = {
-            let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-            rm_managed
-                .lock()
-                .is_ok_and(|rm| should_start_reading(&rm, recent))
-        };
-        if should_start {
-            let chapter_data = {
-                let t_db = std::time::Instant::now();
-                let app_managed: State<'_, Mutex<crate::state::AppState>> = app.state();
-                // Blocking lock is OK — we're inside spawn_blocking, not on the async runtime.
-                let Ok(app_state) = app_managed.lock() else {
-                    log::error!("[READING] AppState lock poisoned");
-                    return false;
-                };
-                let result = match &app_state.bible_db {
-                    Some(db) => db
-                        .get_chapter(
-                            app_state.active_translation_id,
-                            recent.book_number,
-                            recent.chapter,
-                        )
-                        .ok(),
-                    None => None,
-                };
-                log::info!("[READING] get_chapter took {:?}", t_db.elapsed());
-                result
-            };
-
-            if let Some(chapter_verses) = chapter_data {
-                let verses: Vec<(i32, String)> = chapter_verses
-                    .into_iter()
-                    .map(|v| (v.verse, v.text))
-                    .collect();
-
-                let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-                if let Ok(mut rm) = rm_managed.lock() {
-                    rm.start(
-                        recent.book_number,
-                        &recent.book_name,
-                        recent.chapter,
-                        recent.verse_start,
-                        verses,
-                    );
-
-                    // Check if transcript contains "chapter" keyword - if so, expect chapter number next
-                    // This handles "Genesis chapter" → pause → "5" → go to chapter 5
-                    let lower = transcript.to_lowercase();
-                    if lower.contains("chapter")
-                        && !lower.contains("next")
-                        && !lower.contains("previous")
-                    {
-                        rm.set_expecting_chapter();
-                    }
-                }
-            }
-        }
-    }
-
-    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-
-    // If the utterance explicitly names a book that differs from the one
-    // being read, it's a spoken reference (possibly one direct detection
-    // rejected as non-existent), not an in-book navigation command. Reading
-    // mode must not reinterpret its numbers against its own book — that's
-    // how "Revelation chapter 20 verse 22" while reading Hebrews 12 ended
-    // up presenting Hebrews 12:22 (issue #141).
-    {
-        let rm_book = {
-            let Ok(rm) = rm_managed.lock() else {
-                return false;
-            };
-            if rm.is_active() || rm.has_verses() {
-                rm.current_book()
-            } else {
-                0
-            }
-        };
-        if rm_book != 0 {
-            let detector_state: State<'_, Mutex<rhema_detection::DirectDetector>> = app.state();
-            let mentioned = match detector_state.lock() {
-                Ok(d) => d.mentioned_books(transcript),
-                Err(_) => Vec::new(),
-            };
-            if !mentioned.is_empty() && !mentioned.contains(&rm_book) {
-                log::info!(
-                    "[READING] Skipping — utterance names a different book than the one being read"
-                );
-                return false;
-            }
-        }
-    }
-
-    // Check for chapter navigation commands (e.g., "let's go to chapter seven").
-    {
-        let chapter_change = {
-            let Ok(mut rm) = rm_managed.lock() else {
-                return false;
-            };
-            if !rm.is_active() && !rm.has_verses() {
-                None
-            } else {
-                log::info!("[READING] Checking chapter command for: {transcript:?}");
-                rm.check_chapter_command(transcript)
-            }
-        };
-
-        if let Some(change) = chapter_change {
-            let chapter_data = {
-                let t_db = std::time::Instant::now();
-                let app_managed: State<'_, Mutex<crate::state::AppState>> = app.state();
-                // Blocking lock is OK — we're inside spawn_blocking, not on the async runtime.
-                let Ok(app_state) = app_managed.lock() else {
-                    log::error!("[READING] AppState lock poisoned (chapter nav)");
-                    return false;
-                };
-                let result = match &app_state.bible_db {
-                    Some(db) => db
-                        .get_chapter(
-                            app_state.active_translation_id,
-                            change.book_number,
-                            change.new_chapter,
-                        )
-                        .ok(),
-                    None => None,
-                };
-                log::info!("[READING] get_chapter (nav) took {:?}", t_db.elapsed());
-                result
-            };
-
-            if let Some(chapter_verses) = chapter_data {
-                if !chapter_verses.is_empty() {
-                    let start_verse = change.start_verse.unwrap_or(1);
-
-                    // Never navigate to a verse that doesn't exist in the
-                    // chapter (e.g. "chapter 12 verse 64") — presenting
-                    // verse 1's text under a wrong reference is worse than
-                    // ignoring the command (issue #141).
-                    let Some(start_verse_text) = chapter_verses
-                        .iter()
-                        .find(|v| v.verse == start_verse)
-                        .map(|v| v.text.clone())
-                    else {
-                        log::warn!(
-                            "[READING] Ignoring chapter change — verse {start_verse} not in {} {}",
-                            change.book_name,
-                            change.new_chapter
-                        );
-                        return false;
-                    };
-
-                    let verses: Vec<(i32, String)> = chapter_verses
-                        .into_iter()
-                        .map(|v| (v.verse, v.text))
-                        .collect();
-
-                    if let Ok(mut rm) = rm_managed.lock() {
-                        rm.start(
-                            change.book_number,
-                            &change.book_name,
-                            change.new_chapter,
-                            start_verse,
-                            verses,
-                        );
-                    }
-
-                    // Emit the starting verse of the new chapter
-                    let reference = format!(
-                        "{} {}:{}",
-                        change.book_name, change.new_chapter, start_verse
-                    );
-                    let advance = rhema_detection::ReadingAdvance {
-                        book_number: change.book_number,
-                        book_name: change.book_name.clone(),
-                        chapter: change.new_chapter,
-                        verse: start_verse,
-                        verse_text: start_verse_text.clone(),
-                        reference: reference.clone(),
-                        confidence: 1.0,
-                    };
-                    let _ = app.emit("reading_mode_verse", &advance);
-
-                    return true;
-                }
-            }
-        }
-    }
-
-    // Check reading mode for verse advancement.
-    // Allow check even when paused (has_verses but !active) so "verse N"
-    // commands can re-activate reading mode after timeout.
-    let advance = {
-        let Ok(mut rm) = rm_managed.lock() else {
-            return false;
-        };
-        if !rm.is_active() && !rm.has_verses() {
-            return false;
-        }
-        rm.check_transcript(transcript)
+    let mentioned = app
+        .state::<Mutex<rhema_detection::DirectDetector>>()
+        .lock()
+        .map(|detector| detector.mentioned_books(transcript))
+        .unwrap_or_default();
+    let reading_state = app.state::<Mutex<rhema_detection::ReadingMode>>();
+    let Ok(mut reading) = reading_state.lock() else {
+        return false;
     };
-
+    let advance = reading::apply_reading_transcript(
+        &mut reading,
+        accepted,
+        transcript,
+        &mentioned,
+        |book, chapter| {
+            let state = app.state::<Mutex<AppState>>();
+            let state = state.lock().ok()?;
+            Some(
+                state
+                    .bible_db
+                    .as_ref()?
+                    .get_chapter(state.active_translation_id, book, chapter)
+                    .ok()?
+                    .into_iter()
+                    .map(|verse| (verse.verse, verse.text))
+                    .collect(),
+            )
+        },
+    );
+    drop(reading);
     if let Some(advance) = advance {
         let _ = app.emit("reading_mode_verse", &advance);
         return true;
     }
-
-    false
+    accepted.is_some()
 }
 
 /// Check for voice translation commands like "read in NIV", "switch to ESV".
