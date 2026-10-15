@@ -1,6 +1,8 @@
 use super::automaton::BookMatch;
 use crate::types::VerseRef;
 
+const CORRECTION_WORDS: &[&str] = &["sorry", "rather", "meant", "mean"];
+
 /// Result of attempting to extract a continuation from text for an incomplete reference.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Continuation {
@@ -37,14 +39,14 @@ pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
         });
     }
 
-    // Try pattern: chapter:verse or chapter:verse-end
-    if let Some(result) = try_colon_pattern(tokens, book_match) {
-        return Some(result);
-    }
-
     // Try pattern: corrections like "verse 5 sorry chapter 3" or "chapter 3 verse 5 sorry verse 7"
     // Handles mid-speech corrections with keywords like "sorry", "rather", "I mean"
     if let Some(result) = try_correction_pattern(tokens, book_match) {
+        return Some(result);
+    }
+
+    // Try pattern: chapter:verse or chapter:verse-end
+    if let Some(result) = try_colon_pattern(tokens, book_match) {
         return Some(result);
     }
 
@@ -116,6 +118,7 @@ fn anchored_reference_tokens(tokens: &[Token]) -> Option<&[Token]> {
         &["gospel"],
         &["epistle"],
         &["letter"],
+        &["in"],
     ];
     let skip = INTRODUCTIONS
         .iter()
@@ -242,14 +245,11 @@ fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRe
 /// - "chapter 3 verse 5 sorry verse 7" → chapter 3, verse 7
 /// - "chapter 3 verse 5 I mean chapter 4 verse 7" → chapter 4, verse 7
 fn try_correction_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
-    // Correction keywords
-    let correction_words = ["sorry", "rather", "meant", "mean"];
-
     // Find if there's a correction keyword
     let mut correction_idx = None;
     for (i, token) in tokens.iter().enumerate() {
         if let Token::Word(w) = token {
-            if correction_words.contains(&w.as_str()) {
+            if CORRECTION_WORDS.contains(&w.as_str()) {
                 correction_idx = Some(i);
                 break;
             }
@@ -261,6 +261,11 @@ fn try_correction_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
     // Parse before correction (initial statement)
     let mut initial_chapter = None;
     let mut initial_verse = None;
+
+    if let Some(initial) = try_colon_pattern(&tokens[..correction_idx], book_match) {
+        initial_chapter = Some(initial.chapter);
+        initial_verse = Some(initial.verse_start);
+    }
 
     // Look for chapter/verse before correction
     for i in 0..correction_idx {
@@ -989,19 +994,11 @@ pub fn is_numeric_correction(text: &str) -> bool {
         match token {
             Token::Number(_) => numbers += 1,
             Token::Word(word)
-                if matches!(
-                    word.as_str(),
-                    "oh" | "sorry"
-                        | "rather"
-                        | "i"
-                        | "mean"
-                        | "no"
-                        | "please"
-                        | "chapter"
-                        | "chapters"
-                        | "verse"
-                        | "verses"
-                ) => {}
+                if CORRECTION_WORDS.contains(&word.as_str())
+                    || matches!(
+                        word.as_str(),
+                        "oh" | "i" | "no" | "please" | "chapter" | "chapters" | "verse" | "verses"
+                    ) => {}
             _ => return false,
         }
     }

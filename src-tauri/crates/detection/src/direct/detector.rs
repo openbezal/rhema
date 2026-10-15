@@ -564,7 +564,8 @@ impl DirectDetector {
     /// Detect Bible references in the given transcript text.
     ///
     /// Returns a list of Detection objects for each reference found.
-    /// Whether `text` names a book together with a chapter and verse of its own.
+    /// Whether `text` names a book together with an address of its own, including
+    /// invalid addresses that must reach validation rather than an older continuation.
     ///
     /// A reference parked from an earlier partial must not complete itself using
     /// numbers that belong to a newly stated one. Saying "Psalm" (which parks
@@ -576,13 +577,9 @@ impl DirectDetector {
     /// Deliberately narrow: text with no book name in it — "verse 22", or a
     /// bare "22 20" correction — is not a complete reference, so genuine
     /// continuations still work.
-    fn text_names_complete_reference(&self, text: &str) -> bool {
+    fn text_names_address(&self, text: &str) -> bool {
         self.matcher.find_books(text).iter().any(|book_match| {
-            parser::parse_reference(text, book_match).is_some_and(|r| {
-                r.verse_start > 0
-                    && is_valid_reference(r.book_number, r.chapter)
-                    && versification::is_valid_verse(r.book_number, r.chapter, r.verse_start)
-            })
+            parser::parse_reference(text, book_match).is_some_and(|r| r.verse_start > 0)
         })
     }
 
@@ -614,7 +611,7 @@ impl DirectDetector {
             if elapsed > INCOMPLETE_REF_TIMEOUT_MS {
                 // Timeout: clean up pending state (EDGE-02).
                 self.incomplete = None;
-            } else if self.text_names_complete_reference(text) {
+            } else if self.text_names_address(text) {
                 // The speaker has named a whole reference in this utterance, so
                 // one parked from an earlier partial is stale. Drop it and let
                 // the book matcher below read what was actually said.
@@ -847,6 +844,16 @@ impl DirectDetector {
             }
         }
 
+        // An unparsed named book cannot lend its following address to an older book.
+        // A preceding verse command ("verse 6 ... Ahab said to Obadiah") remains contextual.
+        let contextual_text = if unanchored_book && !rejected_reference {
+            effective_matches
+                .first()
+                .map_or(text.as_str(), |book| &text[..book.start])
+        } else {
+            text.as_str()
+        };
+
         // Step 4: Try to resolve a book-less reference ("22 20", "verse 5",
         // "chapter 22 verse 20") against the last book heard (issue #141).
         // Runs when the text has no book name at all, or when every parsed
@@ -855,7 +862,7 @@ impl DirectDetector {
         if detections.is_empty()
             && (effective_matches.is_empty() || rejected_reference || unanchored_book)
         {
-            if let Some(detection) = self.try_contextual_detection(text) {
+            if let Some(detection) = self.try_contextual_detection(contextual_text) {
                 detections.push(detection);
             }
         }
@@ -937,6 +944,7 @@ impl DirectDetector {
             ),
             parser::ContextualRef::ChapterOnly(chapter) => {
                 if !is_valid_reference(book_number, chapter) {
+                    self.invalidate_chapter();
                     return None;
                 }
                 let verse_ref = VerseRef {
@@ -957,9 +965,11 @@ impl DirectDetector {
             }
         };
 
-        if !is_valid_reference(book_number, chapter)
-            || !versification::is_valid_verse(book_number, chapter, verse)
-        {
+        if !is_valid_reference(book_number, chapter) {
+            self.invalidate_chapter();
+            return None;
+        }
+        if !versification::is_valid_verse(book_number, chapter, verse) {
             return None;
         }
 
@@ -974,6 +984,11 @@ impl DirectDetector {
         self.context.update(&verse_ref);
         self.incomplete = None;
         Some(self.make_direct_detection(&verse_ref, confidence, text, 0, text.len()))
+    }
+
+    fn invalidate_chapter(&mut self) {
+        self.context.clear_chapter();
+        self.incomplete = None;
     }
 
     /// Book numbers explicitly named in the text (after transcript cleaning).

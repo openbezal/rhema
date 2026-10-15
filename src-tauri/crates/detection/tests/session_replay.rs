@@ -379,3 +379,113 @@ fn an_invalid_chapter_cannot_borrow_a_previously_confirmed_chapter() {
         );
     }
 }
+
+#[test]
+fn explicit_navigation_never_falls_back_to_the_previous_book() {
+    let mut detector = DirectDetector::new();
+    detector.detect("John 3:16");
+    let found = detector.detect("Turn to Mark in chapter 2 verse 5");
+    assert_eq!(found.len(), 1);
+    assert_eq!(
+        (
+            found[0].verse_ref.book_number,
+            found[0].verse_ref.chapter,
+            found[0].verse_ref.verse_start
+        ),
+        (41, 2, 5)
+    );
+    let next = detector.detect("verse 6");
+    assert_eq!(
+        (next[0].verse_ref.book_number, next[0].verse_ref.chapter),
+        (41, 2)
+    );
+    let unsupported = detector.detect("Turn to Luke over at chapter 4 verse 2");
+    assert!(
+        unsupported.is_empty(),
+        "unsupported book navigation acquired old book: {unsupported:?}"
+    );
+    let next = detector.detect("verse 7");
+    assert_eq!(
+        (next[0].verse_ref.book_number, next[0].verse_ref.chapter),
+        (41, 2)
+    );
+}
+#[test]
+fn meant_corrections_work_across_partial_boundaries() {
+    let mut detector = DirectDetector::new();
+    assert!(detector.detect("Revelation 20:22").is_empty());
+    let repaired = detector.detect("I meant 22 20");
+    assert_eq!(repaired.len(), 1);
+    assert_eq!(
+        (
+            repaired[0].verse_ref.chapter,
+            repaired[0].verse_ref.verse_start
+        ),
+        (22, 20)
+    );
+    let cumulative = detector.detect("Revelation 20:22 I meant 22 20");
+    assert_eq!(
+        (
+            cumulative[0].verse_ref.chapter,
+            cumulative[0].verse_ref.verse_start
+        ),
+        (22, 20)
+    );
+}
+#[test]
+fn invalid_bookless_chapters_revoke_previous_chapter_authority() {
+    for invalid in ["chapter 30 verse 1", "chapter 30"] {
+        let mut detector = DirectDetector::new();
+        detector.detect("John 3:16");
+        assert!(detector.detect(invalid).is_empty());
+        assert!(
+            detector.detect("verse 5").is_empty(),
+            "stale chapter after {invalid}"
+        );
+        let repaired = detector.detect("3:5");
+        assert_eq!(
+            (
+                repaired[0].verse_ref.book_number,
+                repaired[0].verse_ref.chapter
+            ),
+            (43, 3)
+        );
+    }
+}
+#[test]
+fn newly_named_invalid_address_cannot_complete_an_older_pending_book() {
+    let mut detector = DirectDetector::new();
+    detector.detect("John 3:16");
+    assert!(detector.detect("Mark 3").is_empty());
+    assert!(detector.detect("Luke 40:1").is_empty());
+    let repaired = detector.detect("3:5");
+    assert_eq!(
+        (
+            repaired[0].verse_ref.book_number,
+            repaired[0].verse_ref.chapter,
+            repaired[0].verse_ref.verse_start
+        ),
+        (42, 3, 5)
+    );
+}
+
+#[test]
+fn colon_corrections_retain_unmodified_parts_of_the_address() {
+    let mut detector = DirectDetector::new();
+    let corrected = detector.detect("John 3:16 I meant verse 17");
+    assert_eq!(
+        (
+            corrected[0].verse_ref.chapter,
+            corrected[0].verse_ref.verse_start
+        ),
+        (3, 17)
+    );
+    let unchanged = detector.detect("John 3:16 sorry");
+    assert_eq!(
+        (
+            unchanged[0].verse_ref.chapter,
+            unchanged[0].verse_ref.verse_start
+        ),
+        (3, 16)
+    );
+}
