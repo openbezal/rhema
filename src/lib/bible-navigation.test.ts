@@ -21,8 +21,8 @@ const navigate = (chapter: number) => useBibleStore.getState().setPendingNavigat
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 beforeEach(() => {
   mockChapter.mockReset().mockImplementation((args) => Promise.resolve([verse(args.chapter)]))
-  mockInvoke.mockReset().mockImplementation((command, args) => command === "get_chapter" ? mockChapter(args) : Promise.resolve(null))
-  useBibleStore.setState({ books: [{ id: 43, translation_id: 1, book_number: 43, name: "John", abbreviation: "Jn", testament: "NT" }], currentChapter: [verse(3)], selectedVerse: verse(3), activeTranslationId: 1, pendingNavigation: null, revealRequest: 0 })
+  mockInvoke.mockReset().mockImplementation((command, args) => command === "get_chapter" ? mockChapter(args) : Promise.resolve(command === "get_verse" && args.bookNumber === 43 ? verse(args.chapter, args.verse) : null))
+  useBibleStore.setState({ books: [{ id: 43, translation_id: 1, book_number: 43, name: "John", abbreviation: "Jn", testament: "NT" }], currentChapter: [verse(3)], selectedVerse: verse(3), activeTranslationId: 1, activeTranslationCode: "KJV", translationSelectionStatus: "ready", translations: [{ id: 1, abbreviation: "KJV", title: "King James Version", language: "en", is_downloaded: true, is_copyrighted: false }], pendingNavigation: null, revealRequest: 0 })
   useBroadcastStore.setState({ liveVerse: null, liveSourceVerse: null })
 })
 afterEach(() => cleanups.splice(0).forEach((stop) => stop()))

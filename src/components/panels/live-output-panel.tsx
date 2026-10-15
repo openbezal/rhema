@@ -1,48 +1,31 @@
-import { useEffect } from "react"
+import { EraserIcon } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import { clearLive } from "@/lib/presentation-controller"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { useBroadcastStore, useBibleStore } from "@/stores"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { useBroadcastStore } from "@/stores"
 import { remoteActions } from "@/lib/remote-actions"
-import { bibleActions } from "@/hooks/use-bible"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const autoLive = useBroadcastStore((s) => s.autoLive)
+  const clearMode = useBroadcastStore((s) => s.clearMode)
   const liveVerse = useBroadcastStore((s) => s.liveVerse)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
-  const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
 
   // The live output renders only what was explicitly presented — it no longer
   // follows the preview selection, so detections can't override the operator.
   const verseData = isLive ? liveVerse : null
-
-  // Refetch the live verse when the translation changes so the live output
-  // text follows the new translation. Updates the live output only — the
-  // preview keeps whatever the operator is browsing.
-  useEffect(() => {
-    const source = useBroadcastStore.getState().liveSourceVerse
-    if (!source) return
-    bibleActions
-      .fetchVerse(source.book_number, source.chapter, source.verse)
-      .then((v) => {
-        if (!v) return
-        const bible = useBibleStore.getState()
-        const abbreviation =
-          bible.translations.find((t) => t.id === bible.activeTranslationId)
-            ?.abbreviation ?? "KJV"
-        useBroadcastStore
-          .getState()
-          .setLiveVerse(toVerseRenderData(v, abbreviation), v)
-      })
-      .catch(() => {})
-  }, [activeTranslationId])
-
 
   return (
     <div
@@ -59,7 +42,7 @@ export function LiveOutputPanel() {
         >
           <span
             className={cn(
-              "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
+              "text-[0.625rem] font-medium tracking-wider uppercase transition-colors",
               autoLive ? "text-foreground" : "text-muted-foreground"
             )}
           >
@@ -70,10 +53,30 @@ export function LiveOutputPanel() {
             onCheckedChange={remoteActions.setAutoLive}
           />
         </label>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Clear live content"
+            title="Clear live content without stopping outputs"
+            className="rounded p-1 text-muted-foreground hover:text-foreground"
+          >
+            <EraserIcon className="size-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => clearLive("transparent")}>
+              Transparent
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => clearLive("black")}>
+              Black
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => clearLive("background")}>
+              Background only
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <label className="ml-2 flex items-center gap-2">
           <span
             className={cn(
-              "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
+              "text-[0.625rem] font-medium tracking-wider uppercase transition-colors",
               isLive ? "text-emerald-400" : "text-muted-foreground"
             )}
           >
@@ -93,7 +96,11 @@ export function LiveOutputPanel() {
           !isLive && "opacity-40"
         )}
       >
-        <CanvasVerse theme={activeTheme} verse={verseData} />
+        <CanvasVerse
+          theme={activeTheme}
+          verse={verseData}
+          clearMode={clearMode}
+        />
       </div>
     </div>
   )

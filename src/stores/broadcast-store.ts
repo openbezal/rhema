@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
 import type {
+  OutputClearMode,
   BroadcastOutput,
   BroadcastOutputStatus,
   BroadcastTheme,
@@ -26,6 +27,7 @@ interface BroadcastState {
   outputStatus: Record<string, BroadcastOutputStatus>
   isLive: boolean
   liveVerse: VerseRenderData | null
+  clearMode: OutputClearMode
   // The Verse the live output was presented from, kept so it can be
   // re-presented (e.g. after a translation change). Preview selection never
   // writes this — only an explicit present does.
@@ -51,7 +53,7 @@ interface BroadcastState {
   togglePinTheme: (id: string) => void
   setActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
-  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null) => void
+  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null, clearMode?: OutputClearMode) => void
   setAutoLive: (auto: boolean) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
@@ -115,6 +117,7 @@ function emitDraftToBroadcast(state: BroadcastState): void {
     void emitTo(outputWindowLabel(output.id), "broadcast:verse-update", {
       theme: state.draftTheme,
       verse,
+      clearMode: state.clearMode,
     }).catch(() => {})
   }
 }
@@ -164,6 +167,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   outputStatus: {},
   isLive: false,
   liveVerse: null,
+  clearMode: "background",
   liveSourceVerse: null,
   autoLive: true,
   isDesignerOpen: false,
@@ -248,6 +252,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     void emitTo(outputWindowLabel(outputId), "broadcast:verse-update", {
       theme,
       verse: s.isLive ? s.liveVerse : null,
+      clearMode: s.clearMode,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {
@@ -329,8 +334,8 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set({ isLive })
     get().syncBroadcastOutput()
   },
-  setLiveVerse: (liveVerse, source = null) => {
-    set({ liveVerse, liveSourceVerse: source })
+  setLiveVerse: (liveVerse, source = null, clearMode = "background") => {
+    set({ liveVerse, liveSourceVerse: source, clearMode })
     get().syncBroadcastOutput()
   },
   setAutoLive: (autoLive) => set({ autoLive }),

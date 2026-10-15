@@ -1,3 +1,4 @@
+import { usePresentationController } from "@/hooks/use-presentation-controller"
 import { Dashboard } from "@/components/layout/dashboard"
 import { useBroadcastOutputs } from "@/hooks/use-broadcast-outputs"
 import { useBibleNavigation } from "@/hooks/use-bible-navigation"
@@ -7,6 +8,7 @@ import { TranslationSelectionDialog } from "@/components/translation-selection-d
 import { Toaster } from "sonner"
 
 export function App() {
+  usePresentationController()
   useBibleNavigation()
   useRemoteControl()
   useBroadcastOutputs()

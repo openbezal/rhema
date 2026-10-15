@@ -58,6 +58,7 @@ export function OutputCard({
 }: OutputCardProps) {
   const themes = useBroadcastStore((s) => s.themes)
   const isLive = useBroadcastStore((s) => s.isLive)
+  const clearMode = useBroadcastStore((s) => s.clearMode)
   const liveVerse = useBroadcastStore((s) => s.liveVerse)
   const renameOutput = useBroadcastStore((s) => s.renameOutput)
 
@@ -82,6 +83,7 @@ export function OutputCard({
           <CanvasVerse
             theme={theme}
             verse={isLive && onAir ? liveVerse : null}
+            clearMode={onAir ? clearMode : "background"}
             className={cn("aspect-video w-full", !onAir && "opacity-45 saturate-50")}
           />
         ) : (

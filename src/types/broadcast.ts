@@ -1,3 +1,5 @@
+export type OutputClearMode = "transparent" | "black" | "background"
+
 export interface VerseSegment {
   verseNumber?: number
   text: string

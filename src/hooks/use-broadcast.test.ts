@@ -16,7 +16,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 const sampleVerse: Verse = {
   id: 1,
-  translation_id: 1,
+  translation_id: 2,
   book_number: 1,
   book_name: "Genesis",
   book_abbreviation: "Gen",
@@ -43,6 +43,7 @@ describe("presentVerse", () => {
       selectedVerse: null,
       translationSelectionStatus: "ready",
       activeTranslationId: 2,
+      activeTranslationCode: "NKJV",
       translations: [
         {
           id: 2,
@@ -108,26 +109,22 @@ describe("presentVerse", () => {
     })
   })
 
-  it("falls back to the passed verse when the lookup returns null", async () => {
+  it("retains the prior content when the lookup returns null", async () => {
     mockInvoke.mockResolvedValue(null)
 
     await presentVerse(sampleVerse)
 
-    expect(useBibleStore.getState().selectedVerse).toEqual(sampleVerse)
-    expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
-      sampleVerse.text,
-    )
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
   })
 
-  it("falls back to the passed verse when the lookup rejects", async () => {
+  it("retains the prior content when the lookup rejects", async () => {
     mockInvoke.mockRejectedValue(new Error("db unavailable"))
 
     await expect(presentVerse(sampleVerse)).resolves.toBeUndefined()
 
-    expect(useBibleStore.getState().selectedVerse).toEqual(sampleVerse)
-    expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
-      sampleVerse.text,
-    )
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
   })
 
   it("records the presented verse as the live source verse", async () => {
@@ -172,11 +169,10 @@ describe("presentVerse", () => {
   it("ignores a stale refetch that resolves after a newer present call", async () => {
     const older: Verse = { ...sampleVerse, verse: 1, text: "In the beginning" }
     let resolveOlder: (v: Verse) => void = () => {}
-    mockInvoke
-      .mockImplementationOnce(
-        () => new Promise<Verse>((resolve) => (resolveOlder = resolve)),
-      )
-      .mockResolvedValueOnce(sampleVerse)
+    mockInvoke.mockImplementation((command, args) => {
+      if (command !== "get_verse") return Promise.resolve(null)
+      return args.verse === 1 ? new Promise<Verse>(resolve => { resolveOlder = resolve }) : Promise.resolve(sampleVerse)
+    })
 
     const first = presentVerse(older)
     await presentVerse(sampleVerse)

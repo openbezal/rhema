@@ -54,10 +54,18 @@ function queueItemFor(verse: Verse) {
 
 beforeEach(() => {
   mockInvoke.mockReset()
-  mockInvoke.mockResolvedValue(null)
+  // The presentation boundary requires a verified database row, not a cached fallback.
+  mockInvoke.mockImplementation(async (command, args) => {
+    if (command !== "get_verse") return null
+    return [...useBibleStore.getState().currentChapter, johnThreeSixteen, genesisOneOne].find(row =>
+      row.translation_id === args.translationId && row.book_number === args.bookNumber && row.chapter === args.chapter && row.verse === args.verse) ?? null
+  })
   useBibleStore.setState({
     selectedVerse: null,
     activeTranslationId: 1,
+    activeTranslationCode: "KJV",
+    translationSelectionStatus: "ready",
+    currentChapter: [],
     translations: [
       {
         id: 1,

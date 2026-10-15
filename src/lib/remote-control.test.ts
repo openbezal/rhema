@@ -35,6 +35,7 @@ beforeEach(() => {
     return Promise.resolve(unlisten)
   })
   mockInvoke.mockReset().mockResolvedValue(null)
+  useBibleStore.setState({ activeTranslationId: 1, activeTranslationCode: "KJV", translationSelectionStatus: "ready", translations: [{ id: 1, abbreviation: "KJV", title: "King James Version", language: "en", is_downloaded: true, is_copyrighted: false }], currentChapter: [], selectedVerse: null, pendingNavigation: null })
   useBroadcastStore.setState({ autoLive: false, isLive: false, liveVerse: null, liveSourceVerse: null })
 })
 afterEach(() => { cleanups.splice(0).forEach((cleanup) => cleanup()) })
@@ -71,6 +72,7 @@ describe("app-owned remote control", () => {
   it("presents a remote next verse through the actual event and action", async () => {
     const first: Verse = { id: 1, translation_id: 1, book_number: 1, book_name: "Genesis", book_abbreviation: "Gen", chapter: 1, verse: 1, text: "First verse" }
     const second = { ...first, id: 2, verse: 2, text: "Second verse" }
+    mockInvoke.mockImplementation(async (command, args) => command === "get_verse" ? [first, second].find(row => row.verse === args.verse) ?? null : null)
     useBibleStore.setState({ currentChapter: [first, second], selectedVerse: first, pendingNavigation: null })
     await connect()
     send("remote:bible_next")
@@ -90,6 +92,7 @@ describe("app-owned remote control", () => {
     let finish!: () => void
     let firstProbe = true
     mockInvoke.mockImplementation((command, args) => {
+      if (command === "get_verse") return Promise.resolve(chapters.get(args.chapter)?.find(row => row.verse === args.verse) ?? null)
       if (command !== "get_chapter") return Promise.resolve(null)
       const rows = chapters.get(args.chapter) ?? []
       if (!firstProbe) return Promise.resolve(rows)

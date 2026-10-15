@@ -2,11 +2,12 @@ import { createRoot } from "react-dom/client"
 import { useRef, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { onThemeFontsLoaded, renderVerse } from "@/lib/verse-renderer"
+import { onThemeFontsLoaded } from "@/lib/verse-renderer"
+import { renderPresentationFrame } from "@/lib/presentation-frame"
 import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
 import { normalizeTheme } from "@/lib/theme-migrations"
 import "./broadcast-fonts.css"
-import type { BroadcastTheme, VerseRenderData } from "@/types/broadcast"
+import type { BroadcastTheme, VerseRenderData, OutputClearMode } from "@/types/broadcast"
 import type { NdiConfigEventPayload, NdiFrameRequest } from "@/types"
 
 /** Convert Uint8Array/Uint8ClampedArray to base64 using Function.apply (avoids spread stack overflow) */
@@ -30,6 +31,7 @@ const OUTPUT_ID = new URLSearchParams(window.location.search).get("output") ?? "
 interface BroadcastPayload {
   theme: BroadcastTheme
   verse: VerseRenderData | null
+  clearMode?: OutputClearMode
 }
 
 export function BroadcastCanvas() {
@@ -72,16 +74,11 @@ export function BroadcastCanvas() {
     const { theme, verse } = data
     canvas.width = theme.resolution.width
     canvas.height = theme.resolution.height
-    const result = renderVerse(ctx, theme, verse, {
+    renderPresentationFrame(ctx, theme, verse, data.clearMode ?? "background", {
       scale: 1,
       imageCache: themeImageCache(),
     })
-    if (!result) {
-      ctx.fillStyle = "#000"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      logDebug("renderVerse returned null; drew fallback frame")
-    }
-  }, [logDebug])
+  }, [])
 
   // Redraw once a theme's images land. The burst matters: without it NDI
   // receivers keep the flat fallback frame until the 2s keepalive fires.

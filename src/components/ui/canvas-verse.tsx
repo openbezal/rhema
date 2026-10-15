@@ -1,18 +1,21 @@
 import { useRef, useEffect, useState, useCallback, memo } from "react"
-import { onThemeFontsLoaded, renderVerse } from "@/lib/verse-renderer"
+import { onThemeFontsLoaded } from "@/lib/verse-renderer"
+import { renderPresentationFrame } from "@/lib/presentation-frame"
 import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
-import type { BroadcastTheme, VerseRenderData } from "@/types"
+import type { BroadcastTheme, VerseRenderData, OutputClearMode } from "@/types"
 import { cn } from "@/lib/utils"
 
 interface CanvasVerseProps {
   theme: BroadcastTheme
   verse: VerseRenderData | null
+  clearMode?: OutputClearMode
   className?: string
 }
 
 export const CanvasVerse = memo(function CanvasVerse({
   theme,
   verse,
+  clearMode = "background",
   className,
 }: CanvasVerseProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -50,11 +53,11 @@ export const CanvasVerse = memo(function CanvasVerse({
 
     ctx.scale(dpr, dpr)
     const scale = displayW / theme.resolution.width
-    renderVerse(ctx, theme, verse, {
+    renderPresentationFrame(ctx, theme, verse, clearMode, {
       scale,
       imageCache: themeImageCache(),
     })
-  }, [theme, verse, containerWidth])
+  }, [theme, verse, clearMode, containerWidth])
 
   // Preload every image the theme uses so the renderer finds them in the cache.
   useEffect(() => {
