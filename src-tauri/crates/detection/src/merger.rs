@@ -115,6 +115,11 @@ impl DetectionMerger {
         results
     }
 
+    /// Clear only per-session cooldown; keep operator-configured thresholds.
+    pub fn reset_session(&mut self) {
+        self.last_auto_display = None;
+    }
+
     /// Update the minimum confidence threshold.
     pub fn set_confidence_threshold(&mut self, threshold: f64) {
         self.confidence_threshold = threshold;
