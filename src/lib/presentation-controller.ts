@@ -201,6 +201,9 @@ export async function presentVerse(
     )
       useBibleStore.getState().selectVerse(full)
     if (!current()) return
+    // Preview permission belongs only to the unfinished primary lookup. The
+    // optional response may enrich this presentation, never reclaim browsing.
+    if (pendingIntent === intent) pendingIntent = null
     useBroadcastStore
       .getState()
       .setLiveVerse(
@@ -212,17 +215,15 @@ export async function presentVerse(
     const second = await optional
     if (current() && selected.secondary) {
       if (matchesResolvedVerse(second, reference, selected.secondary.id)) {
-        useBroadcastStore
-          .getState()
-          .setLiveVerse(
-            toVerseRenderData(full, selected.code, {
-              verse: second,
-              code: selected.secondary.code,
-            }),
-            full,
-            "background",
-            trace
-          )
+        useBroadcastStore.getState().setLiveVerse(
+          toVerseRenderData(full, selected.code, {
+            verse: second,
+            code: selected.secondary.code,
+          }),
+          full,
+          "background",
+          trace
+        )
       } else
         toast.warning("Secondary verse unavailable", {
           id: "presentation-secondary",
@@ -289,15 +290,18 @@ export function connectPresentationController(): () => void {
       const languages = selection()
       const live = useBroadcastStore.getState()
       if (
-        languages &&
-        !languages.secondary &&
-        live.liveVerse?.secondary &&
-        live.liveSourceVerse?.translation_id === languages.id
+        !useBibleStore.getState().secondaryTranslationCode &&
+        live.liveVerse?.secondary
       ) {
-        live.setLiveVerse(
-          toVerseRenderData(live.liveSourceVerse, languages.code),
-          live.liveSourceVerse
-        )
+        // None applies to the committed pixels immediately, even if a newly
+        // selected primary is still loading. Keep the committed primary label.
+        const primaryOnly = { ...live.liveVerse }
+        const suffix = ` · ${live.liveVerse.secondary.translationCode})`
+        if (primaryOnly.reference.endsWith(suffix))
+          primaryOnly.reference =
+            primaryOnly.reference.slice(0, -suffix.length) + ")"
+        delete primaryOnly.secondary
+        live.setLiveVerse(primaryOnly, live.liveSourceVerse)
       }
       if (languages) void refreshLiveVerse()
     })

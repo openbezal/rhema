@@ -32,7 +32,9 @@ For reproduction, copy [the retained TSX source](fixtures/bilingual-browser-fixt
 
 ## Automated gates
 
-The regression matrix covers stable-code rebinding and paired preference writes; deferred primary/secondary ordering and selection invalidation; preview source identity; inherited/nested style migration; real text fragments including Yoruba combining marks; two resolutions; stacked/free/reference placements; plate padding/wrap/fit; alignment; signed letter spacing; delayed font readiness; independent designer controls; free-box round trip; and draft discard/close/switch output resync. Tests were first observed failing for the newly fixed behaviors. Baseline monolingual renderer/migration cases remain in the suite.
+The regression matrix covers stable-code rebinding and paired preference writes; deferred primary/secondary ordering and selection invalidation; preview source identity; inherited/nested style migration; real text fragments including Yoruba combining marks; two resolutions; stacked/free/reference placements; plate padding/wrap/fit; alignment; signed letter spacing; delayed font readiness; independent designer controls; free-box round trip; and draft discard/close/switch output resync. Tests were first observed failing for the newly fixed behaviors. The final review additionally reproduced None during a different pending primary (both missing-row and rejected lookup), and newer browsing while the committed primary still awaited optional text. These four regressions, including the inert Inline spacing control, now pass. None strips optional data from the committed payload while preserving its original primary label; preview ownership ends at primary commit. Reference spacing is shown only for placements where it has an effect. Baseline monolingual renderer/migration cases remain in the suite.
+
+Final local verification: **461 frontend tests in 43 files**, typecheck, lint, production build, **394 Rust tests in each configuration**, strict Clippy, formatting and diff checks passed. No Rust source changed in the review fix pass.
 
 Run the branch's regular gates:
 

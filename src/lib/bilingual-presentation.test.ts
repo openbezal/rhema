@@ -196,13 +196,85 @@ it("does not resurrect disabled optional text after primary has already committe
   expect(useBroadcastStore.getState().liveVerse?.secondary).toBeUndefined()
 })
 it("removes an already displayed secondary immediately without waiting for a fresh primary lookup", async () => {
-  mocks.invoke.mockImplementation((_command, args) => Promise.resolve(args.translationId === 2 ? primary : secondary))
-  disconnect = connectPresentationController(); await presentVerse(primary)
+  mocks.invoke.mockImplementation((_command, args) =>
+    Promise.resolve(args.translationId === 2 ? primary : secondary)
+  )
+  disconnect = connectPresentationController()
+  await presentVerse(primary)
   expect(useBroadcastStore.getState().liveVerse?.secondary).toBeDefined()
   const slow = deferred<Verse>()
   mocks.invoke.mockImplementation(() => slow.promise)
   useBibleStore.getState().setSecondaryTranslation(null)
   expect(useBroadcastStore.getState().liveVerse?.secondary).toBeUndefined()
-  expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(primary.text)
-  slow.resolve(primary); await settle()
+  expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
+    primary.text
+  )
+  slow.resolve(primary)
+  await settle()
+})
+it.each([null, "reject"])(
+  "removes secondary immediately while a different primary is pending and later fails: %j",
+  async (failure) => {
+    mocks.invoke.mockImplementation((_command, args) =>
+      Promise.resolve(args.translationId === 2 ? primary : secondary)
+    )
+    disconnect = connectPresentationController()
+    await presentVerse(primary)
+    const replacement = deferred<Verse | null>()
+    mocks.invoke.mockImplementation((_command, args) =>
+      args.translationId === 3
+        ? replacement.promise.then((value) => {
+            if (failure === "reject")
+              throw new Error("Replacement primary unavailable")
+            return value
+          })
+        : Promise.resolve(secondary)
+    )
+    useBibleStore.setState({
+      translations: [
+        ...useBibleStore.getState().translations,
+        {
+          id: 3,
+          abbreviation: "NIV",
+          title: "Fixture",
+          language: "en",
+          is_downloaded: true,
+          is_copyrighted: false,
+        },
+      ],
+    })
+    useBibleStore.getState().setActiveTranslation(3)
+    useBibleStore.getState().setSecondaryTranslation(null)
+    expect(useBroadcastStore.getState().liveVerse?.secondary).toBeUndefined()
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "John 3:16 (ESV)"
+    )
+    expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
+      primary.text
+    )
+    replacement.resolve(null)
+    await settle()
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "John 3:16 (ESV)"
+    )
+    expect(useBroadcastStore.getState().liveVerse?.secondary).toBeUndefined()
+  }
+)
+it("does not borrow preview permission from a committed primary awaiting optional text", async () => {
+  const optional = deferred<Verse>()
+  mocks.invoke.mockImplementation((_command, args) =>
+    args.translationId === 2 ? Promise.resolve(primary) : optional.promise
+  )
+  disconnect = connectPresentationController()
+  const task = presentVerse(primary)
+  await settle()
+  const browsed = { ...primary, id: 17, verse: 17, text: "Browsed verse" }
+  useBibleStore.getState().selectVerse(browsed)
+  useBibleStore.getState().setSecondaryTranslation(null)
+  await settle()
+  expect(useBibleStore.getState().selectedVerse).toBe(browsed)
+  expect(useBroadcastStore.getState().liveSourceVerse).toEqual(primary)
+  optional.resolve(secondary)
+  await task
+  expect(useBibleStore.getState().selectedVerse).toBe(browsed)
 })

@@ -110,3 +110,19 @@ it("edits the secondary free box without moving the primary box", async () => {
     layout.verseBox
   )
 })
+it("hides reference spacing for Inline placement instead of exposing an inert control", async () => {
+  const reference = {
+    ...useBroadcastStore.getState().draftTheme!.reference,
+    position: "inline" as const,
+  }
+  await act(async () => useBroadcastStore.getState().updateDraft({ reference }))
+  expect(container.textContent).not.toContain("Verse / Reference")
+  await act(async () =>
+    useBroadcastStore
+      .getState()
+      .updateDraft({ reference: { ...reference, position: "above" } })
+  )
+  expect(
+    container.querySelector('[aria-label="Verse / Reference spacing"]')
+  ).not.toBeNull()
+})

@@ -361,23 +361,26 @@ export function LayoutProperties() {
             <h4 className="text-xs font-semibold">Element Spacing</h4>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">
-                Verse / Reference
-              </label>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {referenceGap}px
-              </span>
+          {draftTheme.reference.position !== "inline" && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Verse / Reference
+                </label>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {referenceGap}px
+                </span>
+              </div>
+              <Slider
+                aria-label="Verse / Reference spacing"
+                min={0}
+                max={200}
+                step={1}
+                value={[referenceGap]}
+                onValueChange={([v]) => update("layout.referenceGap", v)}
+              />
             </div>
-            <Slider
-              min={0}
-              max={200}
-              step={1}
-              value={[referenceGap]}
-              onValueChange={([v]) => update("layout.referenceGap", v)}
-            />
-          </div>
+          )}
 
           {/* Display Options */}
           <div className="flex flex-col gap-0.5 border-t pt-3 pb-1">
