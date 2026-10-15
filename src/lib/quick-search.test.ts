@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  getAutocompleteSuffix,
   numberToRoman,
   normalizeInput,
   findMatchingBook,
@@ -403,5 +404,22 @@ describe("ordinal boundaries", () => {
     for (const input of ["Fourth John 1:2", "Firstborn John 1:2", "First John", "First John 1", "First John 0:2"]) {
       expect(parseTypedReference(input, books)).toBeNull()
     }
+  })
+})
+
+
+describe("visible alias completion", () => {
+  it.each([
+    ["First J", "I John 1:1", "First John 1:1"],
+    ["First John", "1 John 1:1", "First John 1:1"],
+    ["III John", "3 John 1:1", "III John 1:1"],
+    ["First ", "I Samuel 1:1", "First Samuel 1:1"],
+    ["SECOND  s", "II Samuel 1:1", "SECOND  samuel 1:1"],
+    ["1Cor", "I Corinthians 1:1", "1Corinthians 1:1"],
+  ])("draws a valid completion after %s", (input, suggestion, display) => {
+    expect(input + getAutocompleteSuffix(input, suggestion)).toBe(display)
+  })
+  it("does not splice unrelated names into an alias", () => {
+    expect(getAutocompleteSuffix("Jn", "John 1:1")).toBeNull()
   })
 })

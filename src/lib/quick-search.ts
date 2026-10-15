@@ -247,3 +247,18 @@ export function getTabNavigationResult(
   // Default: accept full suggestion
   return currentSuggestion
 }
+
+/** Text drawn after the typed alias in the autocomplete overlay. */
+export function getAutocompleteSuffix(input: string, suggestion: string): string | null {
+  const normalized = normalizeInput(input).toLowerCase()
+  if (!normalized) return null
+  // Find the equivalent prefix in the stored spelling; its length can differ
+  // from the typed alias ("First J" versus "I J" or "1 J").
+  for (let end = 1; end <= suggestion.length; end++) {
+    if (normalizeInput(suggestion.slice(0, end)).toLowerCase() === normalized) {
+      const suffix = suggestion.slice(end)
+      return /\s$/.test(input) ? suffix.trimStart() : suffix
+    }
+  }
+  return null
+}
