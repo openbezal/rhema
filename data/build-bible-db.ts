@@ -744,12 +744,13 @@ export function buildBibleDatabase(): void {
     }
     db.exec("CREATE TABLE rhema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
     db.query("INSERT INTO rhema_metadata (key, value) VALUES (?, ?)").run("source_manifest", JSON.stringify(manifest))
-    db.close()
+    // Release every prepared statement before Windows can rename the file.
+    db.close(true)
     closed = true
     renameSync(stagingPath, DB_PATH)
     console.log(`✅ Bible database installed at ${DB_PATH}`)
   } finally {
-    if (!closed) db.close()
+    if (!closed) db.close(true)
     rmSync(stagingPath, { force: true })
   }
 }

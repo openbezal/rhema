@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process"
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 import { afterEach, describe, expect, it } from "vitest"
 
 const folders: string[] = []
@@ -56,6 +57,20 @@ describe("Bible database upgrades", () => {
     await writeFile(join(directory, "sources", "ESV.json"), JSON.stringify(omitted))
     build(directory)
     expect(query(directory, "SELECT verse, text FROM verses WHERE verse = 17")).toEqual([{ verse: 17, text: "" }])
+  })
+
+  it("releases prepared statements before replacing the database file", async () => {
+    const directory = await fixture()
+    await writeFile(join(directory, "sources", "KJV.json"), JSON.stringify(source))
+    const url = pathToFileURL(resolve("data/build-bible-db.ts")).href
+    const script = `import {Database} from "bun:sqlite";
+      const prepare=Database.prototype.prepare; let held;
+      Database.prototype.prepare=function(...args){held ??= prepare.call(this,"SELECT 1");return prepare.apply(this,args)};
+      process.argv.push("--data-dir",${JSON.stringify(directory)});
+      const {buildBibleDatabase}=await import(${JSON.stringify(url)});buildBibleDatabase();
+      try {held.get();console.log("HANDLE:open")} catch(error) {console.log("HANDLE:"+error.message)}`
+    const output = execFileSync("bun", ["-e", script], { encoding: "utf8", stdio: "pipe" })
+    expect(output).toContain("HANDLE:Database has closed")
   })
 
   it("retains the working database when a rebuild input is invalid", async () => {
