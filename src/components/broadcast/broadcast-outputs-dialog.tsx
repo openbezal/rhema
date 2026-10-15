@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { createMonitorLoader } from "@/lib/monitor-loader"
+import { useEffect, useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import { info as logInfo, error as logError } from "@tauri-apps/plugin-log"
@@ -60,22 +61,23 @@ export function BroadcastOutputsDialog({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busyIds, setBusyIds] = useState<string[]>([])
 
-  const fetchMonitors = useCallback(() =>
-    availableMonitors()
-      .then((result) => {
-        void logInfo(
-          `[broadcast-ui] availableMonitors -> ${result.length}: ${result
-            .map((m) => `${m.name ?? "?"} ${m.size.width}x${m.size.height}`)
-            .join(", ")}`,
-        )
-        setMonitors(result)
-      })
-      .catch((error: unknown) => {
-        void logError(`[broadcast-ui] availableMonitors FAILED: ${String(error)}`)
-        toast.error("Could not list monitors", { description: String(error) })
-        setMonitors([])
-      })
-      .finally(() => setMonitorsRefreshing(false)), [])
+  const fetchMonitors = useMemo(() => createMonitorLoader(
+    async () => {
+      const result = await availableMonitors()
+      void logInfo(
+        `[broadcast-ui] availableMonitors -> ${result.length}: ${result
+          .map((m) => `${m.name ?? "?"} ${m.size.width}x${m.size.height}`)
+          .join(", ")}`,
+      )
+      return result
+    },
+    setMonitors,
+    setMonitorsRefreshing,
+    (error) => {
+      void logError(`[broadcast-ui] availableMonitors FAILED: ${String(error)}`)
+      toast.error("Could not list monitors", { description: String(error) })
+    },
+  ), [])
 
   useEffect(() => {
     if (open) void fetchMonitors()
@@ -248,10 +250,7 @@ export function BroadcastOutputsDialog({
         draft={newOutputDraft}
         monitors={monitors}
         monitorsRefreshing={monitorsRefreshing}
-        onRefreshMonitors={() => {
-          setMonitorsRefreshing(true)
-          void fetchMonitors()
-        }}
+        onRefreshMonitors={() => void fetchMonitors()}
         onSubmit={handleEditorSubmit}
       />
     </>
