@@ -199,13 +199,15 @@ The focused controller tests and real NDI start/cancel/stop smoke do not establi
 
 **Produces:** A single settled reference with valid primary and optional secondary text, separate per-language layout/plate metrics, and an offline designer sample that exercises both.
 
-- [ ] Add deferred tests for the first-present settings race, optional-secondary rejection, and old-refresh/new-present ordering. Primary content must survive optional lookup failure; obsolete selection snapshots cannot commit.
-- [ ] Resolve translations through the shared controller; validate reference and current translation codes at commit. Do not relabel cached content from another translation after failed lookup.
-- [ ] Add canvas tests that emit actual text fragments and record draw coordinates/styles. A secondary-only plate must add geometry and draw calls; its padding affects wrapping/fit. Either implement vertical alignment in a defined language region or remove the inert control.
-- [ ] Use a deliberate dual-language designer sample for render and selection metrics. Test that editing Secondary visibly changes the sample with live output off, while Primary stays unchanged.
-- [ ] Exercise Yoruba combining marks, long/short asymmetric text, different font sizes, delayed fonts/images, inherited secondary style, stacked/free mode, no-fit limits and reference placement.
+- [x] Add deferred tests for the first-present settings race, optional-secondary rejection, and old-refresh/new-present ordering. Primary content must survive optional lookup failure; obsolete selection snapshots cannot commit.
+- [x] Resolve translations through the shared controller; validate reference and current translation codes at commit. Do not relabel cached content from another translation after failed lookup.
+- [x] Add canvas tests that emit actual text fragments and record draw coordinates/styles. A secondary-only plate must add geometry and draw calls; its padding affects wrapping/fit. Either implement vertical alignment in a defined language region or remove the inert control.
+- [x] Use a deliberate dual-language designer sample for render and selection metrics. Test that editing Secondary visibly changes the sample with live output off, while Primary stays unchanged.
+- [x] Exercise Yoruba combining marks, long/short asymmetric text, different font sizes, delayed fonts/images, inherited secondary style, stacked/free mode, no-fit limits and reference placement.
 - [ ] Test old-theme import, save/cancel, restart, secondary=None, primary=secondary normalization, partial translations, two output themes/resolutions, and an output opened after the last presentation.
 - [ ] Run the full frontend suite and native projector/NDI checks before integrating our fresh dual-language implementation. Existing 227 passing tests on the reviewed head do not replace these regressions.
+
+Our fresh [draft #197](https://github.com/openbezal/rhema/pull/197), head `91c505d`, is based on #196. Local gates: 461 frontend tests / 43 files, typecheck/lint/build, 394 Rust tests in each configuration, strict Clippy/fmt/diff check passed. One whole-branch review found overlapping primary/secondary/preview races and an inert Inline control; four regressions were observed RED then GREEN in one fix pass. Production browser Canvas/Fabric checks include independent style/plate/padding/drag/no-fit, a late simulated 720p output, full credits, 1024×600 layout and same-webview reload. Mocked Tauri/DB/window routing is explicit; integrated packaged native preference/window restart, platform visuals and physical receiver acceptance remain open. CI is running.
 
 **Done when:** Every visible secondary control has verified output behavior, designer preview matches rendering, language settings survive upgrade, and asynchronous selection/presentation races are covered.
 
