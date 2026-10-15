@@ -42,14 +42,29 @@ function selection() {
     translationCode(metadata) !== bible.activeTranslationCode
   )
     return null
-  return { id: metadata.id, code: translationCode(metadata) }
+  const optional = bible.translations.filter(
+    (item) =>
+      item.is_downloaded &&
+      translationCode(item) === bible.secondaryTranslationCode &&
+      translationCode(item) !== bible.activeTranslationCode
+  )
+  return {
+    id: metadata.id,
+    code: translationCode(metadata),
+    secondary:
+      optional.length === 1
+        ? { id: optional[0].id, code: translationCode(optional[0]) }
+        : null,
+  }
 }
-function selectionKey() {
-  const bible = useBibleStore.getState()
+function selectionKey(bible = useBibleStore.getState()) {
   const metadata = bible.translations.find(
     (item) => item.id === bible.activeTranslationId
   )
-  return `${bible.activeTranslationId}|${bible.activeTranslationCode}|${bible.translationSelectionStatus}|${metadata?.abbreviation}|${metadata?.is_downloaded}`
+  return `${bible.activeTranslationId}|${bible.activeTranslationCode}|${bible.translationSelectionStatus}|${metadata?.abbreviation}|${metadata?.is_downloaded}|${bible.secondaryTranslationCode}|${bible.translations
+    .filter((item) => translationCode(item) === bible.secondaryTranslationCode)
+    .map((item) => `${item.id}:${item.abbreviation}:${item.is_downloaded}`)
+    .join(",")}`
 }
 function validReference(verse: Verse) {
   return (
@@ -65,12 +80,42 @@ function validReference(verse: Verse) {
 
 export function toVerseRenderData(
   verse: Verse,
-  translation: string
+  translation: string,
+  secondary?: { verse: Verse; code: string } | null
 ): VerseRenderData {
   return {
-    reference: `${verse.book_name} ${verse.chapter}:${verse.verse} (${translation})`,
+    reference: `${verse.book_name} ${verse.chapter}:${verse.verse} (${translation}${secondary ? ` · ${secondary.code}` : ""})`,
     segments: [{ verseNumber: verse.verse, text: verse.text }],
+    ...(secondary
+      ? {
+          secondary: {
+            translationCode: secondary.code,
+            segments: [
+              {
+                verseNumber: secondary.verse.verse,
+                text: secondary.verse.text,
+              },
+            ],
+          },
+        }
+      : {}),
   }
+}
+
+export function matchesResolvedVerse(
+  row: Verse | null,
+  reference: Verse,
+  translationId: number
+): row is Verse {
+  return Boolean(
+    row &&
+    row.translation_id === translationId &&
+    row.book_number === reference.book_number &&
+    row.chapter === reference.chapter &&
+    row.verse === reference.verse &&
+    typeof row.text === "string" &&
+    row.text.trim()
+  )
 }
 
 /** Only text verified against the current translation/reference can commit. */
@@ -85,6 +130,7 @@ export async function presentVerse(
     return
   if (useBroadcastStore.getState().presentationRecovery !== "ready") return
   const selected = selection()
+  const selectedKey = selectionKey()
   if (!selected || !validReference(verse)) return
   // A manual selection takes ownership from unfinished automatic browsing.
   if (
@@ -115,6 +161,7 @@ export async function presentVerse(
     const now = selection()
     return (
       ticket === revision &&
+      selectionKey() === selectedKey &&
       useBroadcastStore.getState().presentationRecovery === "ready" &&
       (!intent.automatic || useBroadcastStore.getState().autoLive) &&
       now?.id === selected.id &&
@@ -123,6 +170,7 @@ export async function presentVerse(
     )
   }
   const reference = intent.reference
+  const optional = lookupSecondaryVerse(reference, selected.secondary)
   mark(
     `presentVerse start ${reference.book_name} ${reference.chapter}:${reference.verse}`
   )
@@ -138,15 +186,7 @@ export async function presentVerse(
     )
     markBroadcastTrace(trace, "resolved")
     if (!current()) return
-    if (
-      !full ||
-      full.translation_id !== selected.id ||
-      full.book_number !== reference.book_number ||
-      full.chapter !== reference.chapter ||
-      full.verse !== reference.verse ||
-      typeof full.text !== "string" ||
-      !full.text.trim()
-    ) {
+    if (!matchesResolvedVerse(full, reference, selected.id)) {
       toast.error("Verse unavailable in the selected translation", {
         id: "presentation-lookup",
         description: "The previous live content has been retained.",
@@ -169,6 +209,26 @@ export async function presentVerse(
         "background",
         trace
       )
+    const second = await optional
+    if (current() && selected.secondary) {
+      if (matchesResolvedVerse(second, reference, selected.secondary.id)) {
+        useBroadcastStore
+          .getState()
+          .setLiveVerse(
+            toVerseRenderData(full, selected.code, {
+              verse: second,
+              code: selected.secondary.code,
+            }),
+            full,
+            "background",
+            trace
+          )
+      } else
+        toast.warning("Secondary verse unavailable", {
+          id: "presentation-secondary",
+          description: "The verified primary translation is retained.",
+        })
+    }
     mark(`presentVerse end ${full.book_name} ${full.chapter}:${full.verse}`)
   } catch (error) {
     if (current())
@@ -226,7 +286,20 @@ export function connectPresentationController(): () => void {
       if (next === key) return
       key = next
       revision++
-      if (selection()) void refreshLiveVerse()
+      const languages = selection()
+      const live = useBroadcastStore.getState()
+      if (
+        languages &&
+        !languages.secondary &&
+        live.liveVerse?.secondary &&
+        live.liveSourceVerse?.translation_id === languages.id
+      ) {
+        live.setLiveVerse(
+          toVerseRenderData(live.liveSourceVerse, languages.code),
+          live.liveSourceVerse
+        )
+      }
+      if (languages) void refreshLiveVerse()
     })
     const broadcast = useBroadcastStore.subscribe((state, previous) => {
       if (
@@ -250,4 +323,27 @@ export function connectPresentationController(): () => void {
       disconnect = null
     }
   }
+}
+
+/** Shared optional resolver for live presentation and browsed preview. */
+export async function lookupSecondaryVerse(
+  reference: Verse,
+  selected: { id: number; code: string } | null
+): Promise<Verse | null> {
+  if (!selected) return null
+  try {
+    const row = await invoke<Verse | null>("get_verse", {
+      translationId: selected.id,
+      bookNumber: reference.book_number,
+      chapter: reference.chapter,
+      verse: reference.verse,
+    })
+    return matchesResolvedVerse(row, reference, selected.id) ? row : null
+  } catch {
+    return null
+  }
+}
+export {
+  selection as currentPresentationSelection,
+  selectionKey as presentationSelectionKey,
 }

@@ -1,3 +1,5 @@
+import { useActiveBroadcastTheme } from "@/hooks/use-broadcast"
+import { BroadcastLanguageSelector } from "@/components/broadcast/broadcast-language-selector"
 import { EraserIcon } from "lucide-react"
 import {
   DropdownMenu,
@@ -20,10 +22,8 @@ export function LiveOutputPanel() {
   const autoLive = useBroadcastStore((s) => s.autoLive)
   const clearMode = useBroadcastStore((s) => s.clearMode)
   const liveVerse = useBroadcastStore((s) => s.liveVerse)
-  const themes = useBroadcastStore((s) => s.themes)
-  const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
 
-  const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
+  const activeTheme = useActiveBroadcastTheme()
 
   // The live output renders only what was explicitly presented — it no longer
   // follows the preview selection, so detections can't override the operator.
@@ -94,6 +94,7 @@ export function LiveOutputPanel() {
           />
         </label>
       </PanelHeader>
+      <BroadcastLanguageSelector />
 
       {recovery !== "ready" && <p role="status" className="px-3 pt-2 text-xs text-amber-400">
         {canClear ? "Output content could not be restored. Existing output is held. Use Clear to establish known content, or stop the output in Settings." : "Output renderer is unavailable. Stop the affected output in Settings before presenting new content."}

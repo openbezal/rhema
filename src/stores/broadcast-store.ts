@@ -11,6 +11,8 @@ import type {
 } from "@/types"
 import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel, MISSING_OUTPUT_RENDERER_ERROR } from "@/types"
 import { BUILTIN_THEMES, LOWER_THIRDS, CLASSIC_DARK } from "@/lib/builtin-themes"
+import { effectiveBroadcastTheme } from "@/lib/effective-broadcast-theme"
+import { secondaryVerseStyle } from "@/lib/bilingual-theme"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
 import { createBroadcastTrace, markBroadcastTrace, type BroadcastTrace } from "@/lib/broadcast-trace"
@@ -20,7 +22,7 @@ import { readBroadcastSession, writeBroadcastSession, forgetBroadcastSession } f
 const restoredSession = readBroadcastSession()
 export const hasBroadcastSessionSnapshot = restoredSession !== null
 
-type SelectedElement = "verse" | "reference" | null
+type SelectedElement = "verse" | "secondary" | "reference" | null
 
 export type NewThemeLayoutKind = "fullscreen" | "lower-thirds"
 
@@ -118,6 +120,11 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
   ;(current as Record<string, unknown> | unknown[])[lastIndex as keyof typeof current] = value as never
 
   return result
+}
+
+function resyncThemeOutputs(state: BroadcastState, themeId: string | null): void {
+  if (!themeId) return
+  for (const output of state.outputs) if (output.themeId === themeId) state.syncBroadcastOutputFor(output.id)
 }
 
 function emitDraftToBroadcast(state: BroadcastState): void {
@@ -263,7 +270,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     if (s.presentationRecovery !== "ready") return
     const output = s.outputs.find((o) => o.id === outputId)
     if (!output) return
-    const theme = (s.editingThemeId === output.themeId ? s.draftTheme : null) ?? s.themes.find((t) => t.id === output.themeId) ?? s.themes[0]
+    const theme = effectiveBroadcastTheme(s, output.themeId)
     if (!theme) return
 
     const trace = s.liveTrace ?? createBroadcastTrace()
@@ -370,12 +377,15 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   // Designer
   setDesignerOpen: (isDesignerOpen) => {
     if (!isDesignerOpen) {
+      const previous = get().editingThemeId
       set({ isDesignerOpen, editingThemeId: null, draftTheme: null, selectedElement: null })
+      resyncThemeOutputs(get(), previous)
     } else {
       set({ isDesignerOpen })
     }
   },
   startEditing: (themeId) => {
+    const previous = get().editingThemeId
     const theme = get().themes.find((t) => t.id === themeId)
     if (!theme) return
     set({
@@ -383,13 +393,17 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       draftTheme: { ...theme, updatedAt: Date.now() },
       selectedElement: null,
     })
+    if (previous !== themeId) resyncThemeOutputs(get(), previous)
+    emitDraftToBroadcast(get())
   },
   stopEditing: () => {
+    const previous = get().editingThemeId
     set({
       editingThemeId: null,
       draftTheme: null,
       selectedElement: null,
     })
+    resyncThemeOutputs(get(), previous)
   },
   updateDraft: (updates) => {
     set((s) => ({
@@ -400,7 +414,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   updateDraftNested: (path, value) => {
     set((s) => ({
       draftTheme: s.draftTheme
-        ? (setNestedValue(s.draftTheme as unknown as Record<string, unknown>, path, value) as unknown as BroadcastTheme)
+        ? (setNestedValue((path.startsWith("secondaryVerseText.")
+          ? { ...s.draftTheme, secondaryVerseText: secondaryVerseStyle(s.draftTheme) }
+          : s.draftTheme) as unknown as Record<string, unknown>, path, value) as unknown as BroadcastTheme)
         : null,
     }))
     emitDraftToBroadcast(get())

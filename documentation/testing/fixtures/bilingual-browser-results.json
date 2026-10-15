@@ -1,0 +1,82 @@
+{
+  "scope": "Production Vite UI/fonts/Canvas/Fabric with mocked Tauri/database/window routing. Local browser only; not a native or physical receiver result.",
+  "viewport_sizes": [
+    [
+      1280,
+      720
+    ],
+    [
+      1024,
+      600
+    ]
+  ],
+  "source": "Our official OYCB import, Genesis 1:1 and 1:2; KJV; full OYCB notice bundled in Sample credits.",
+  "checks": [
+    {
+      "action": "Choose OYCB and present Genesis 1:1 while off-air",
+      "observed": "Cached bilingual presentation; remains off-air."
+    },
+    {
+      "action": "Go live and open late simulated 720p output",
+      "observed": "Both 1920x1080 and 1280x720 payload consumers show the current bilingual verse."
+    },
+    {
+      "action": "Optional lookup failure on Genesis 1:2",
+      "observed": "New KJV primary remains, optional text absent, warning toast."
+    },
+    {
+      "action": "1200ms optional delay, Genesis 1:1 to 1:2 within 534ms",
+      "observed": "Final primary and secondary are both Genesis 1:2."
+    },
+    {
+      "action": "Disable secondary within 308ms of pending optional lookup",
+      "observed": "None and primary-only still present 9.347s later."
+    },
+    {
+      "action": "Open Designer while off-air and secondary None",
+      "observed": "Offline KJV/OYCB sample remains editable."
+    },
+    {
+      "action": "Edit secondary font/color/vertical alignment/image plate/padding",
+      "observed": "Changes affect only secondary sample; primary unchanged."
+    },
+    {
+      "action": "Discard and close",
+      "observed": "72px inherited white style and no optional plate restored in emitted payload."
+    },
+    {
+      "action": "Enable free positioning; select Primary and Secondary in Fabric canvas",
+      "observed": "Correct independent element selection, no initial position jump."
+    },
+    {
+      "action": "Drag Secondary from [600,490] to [630,500] at 1280x720 viewport",
+      "observed": "Secondary X14.16 to19.2, Y55.92 to58.91; Primary X14.16/Y25.18 unchanged."
+    },
+    {
+      "action": "Set Secondary height to0.5 percent then restore28.52",
+      "observed": "No-fit warning and clipping within secondary box; primary unchanged."
+    },
+    {
+      "action": "Save, close, reopen, inspect full credits",
+      "observed": "Saved boxes retained; full5205-character notice contains copyright and license URI. Credits Escape closes independently."
+    },
+    {
+      "action": "Designer at1024x600; select 1280x720 theme",
+      "observed": "Footer wraps; sample and editing status visible; typography and hit geometry use scaled workspace."
+    },
+    {
+      "action": "Choose OYCB, present Genesis1:2, go live, reload same webview",
+      "observed": "Stable optional code, on-air flag, cached verse and both simulated output payloads restored."
+    },
+    {
+      "action": "Cleanup",
+      "observed": "Off-air; browser tab closed, viewport reset, preview server stopped, temporary build input and root fixture removed."
+    }
+  ],
+  "limits": [
+    "Native packaged optional preference storage/window fanout not exercised here.",
+    "No Windows/Linux visual or physical NDI receiver result.",
+    "Delayed font/image safety covered by deterministic tests; browser used actual loaded fonts and image decode.",
+    "Task7 acceptance remains open pending integrated native/platform smoke."
+  ]
+}

@@ -122,12 +122,14 @@ export function themeImageUrls(theme: {
   textBox?: { image?: { url: string } | null }
   reference?: { surface?: { image?: { url: string } | null } }
   verseText?: { surface?: { image?: { url: string } | null } }
+  secondaryVerseText?: { surface?: { image?: { url: string } | null } }
 }): string[] {
   const urls = [
     theme.background?.image?.url,
     theme.textBox?.image?.url,
     theme.reference?.surface?.image?.url,
     theme.verseText?.surface?.image?.url,
+    theme.secondaryVerseText?.surface?.image?.url,
   ]
   return urls.filter((url): url is string => Boolean(url))
 }

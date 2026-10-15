@@ -20,6 +20,8 @@ export function PropertiesPanel() {
   const subtitle =
     selectedElement === "verse"
       ? "Editing verse properties"
+      : selectedElement === "secondary"
+        ? "Editing secondary verse properties"
       : selectedElement === "reference"
         ? "Editing reference properties"
         : "Select an element or use tabs below"
