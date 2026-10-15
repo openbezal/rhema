@@ -61,7 +61,13 @@ export const CanvasVerse = memo(function CanvasVerse({
 
   // Preload every image the theme uses so the renderer finds them in the cache.
   useEffect(() => {
-    preloadThemeImages(theme, draw)
+    let disposed = false
+    preloadThemeImages(theme, () => {
+      if (!disposed) draw()
+    })
+    return () => {
+      disposed = true
+    }
   }, [theme, draw])
 
   // Redraw whenever theme, verse, or container size changes.

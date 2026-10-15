@@ -8,6 +8,8 @@ import type { Verse, VerseRenderData, OutputClearMode } from "@/types"
 
 interface PresentOptions {
   selectPreview?: boolean
+  /** A caller may reserve intent before its chapter/reference lookup. */
+  intentRevision?: number
 }
 interface Intent {
   reference: Verse
@@ -65,6 +67,11 @@ export async function presentVerse(
   verse: Verse,
   options: PresentOptions = {}
 ): Promise<void> {
+  if (
+    options.intentRevision !== undefined &&
+    !isPresentationIntentCurrent(options.intentRevision)
+  )
+    return
   const selected = selection()
   if (!selected || !validReference(verse)) return
   const intent: Intent = {
@@ -134,6 +141,14 @@ export async function presentVerse(
 export function invalidatePresentation(): void {
   revision++
   pendingIntent = null
+}
+/** Claim operator intent before work that precedes the final verse lookup. */
+export function reservePresentationIntent(): number {
+  invalidatePresentation()
+  return revision
+}
+export function isPresentationIntentCurrent(ticket: number): boolean {
+  return ticket === revision
 }
 export function clearLive(mode: OutputClearMode): void {
   invalidatePresentation()

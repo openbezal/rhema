@@ -28,6 +28,8 @@ interface BroadcastState {
   isLive: boolean
   liveVerse: VerseRenderData | null
   clearMode: OutputClearMode
+  /** Explicit clears must survive off/on without seeding the browsed preview. */
+  hasExplicitClear: boolean
   // The Verse the live output was presented from, kept so it can be
   // re-presented (e.g. after a translation change). Preview selection never
   // writes this — only an explicit present does.
@@ -168,6 +170,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   isLive: false,
   liveVerse: null,
   clearMode: "background",
+  hasExplicitClear: false,
   liveSourceVerse: null,
   autoLive: true,
   isDesignerOpen: false,
@@ -335,7 +338,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     get().syncBroadcastOutput()
   },
   setLiveVerse: (liveVerse, source = null, clearMode = "background") => {
-    set({ liveVerse, liveSourceVerse: source, clearMode })
+    set({ liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null })
     get().syncBroadcastOutput()
   },
   setAutoLive: (autoLive) => set({ autoLive }),

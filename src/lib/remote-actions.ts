@@ -95,7 +95,7 @@ export const remoteActions = {
 
   toggleOnAir: async (active: boolean) => {
     if (!await requestOnAir(active) || !active || !useBroadcastStore.getState().isLive) return
-    if (!useBroadcastStore.getState().liveVerse) {
+    if (!useBroadcastStore.getState().liveVerse && !useBroadcastStore.getState().hasExplicitClear) {
       const selected = useBibleStore.getState().selectedVerse
       if (selected) await presentVerse(selected).catch(error => console.warn("[remote-actions] on-air preview failed:", error))
     }

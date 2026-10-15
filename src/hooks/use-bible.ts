@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
 import { useBibleStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
+import { reservePresentationIntent, isPresentationIntentCurrent } from "@/lib/presentation-controller"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
 
@@ -171,6 +172,8 @@ export async function stepVerse(
   // correction lands and the crossing it replaced arrives afterwards.
   stepSeq += 1
   const ticket = stepSeq
+  const presentationRevision = options?.present ? reservePresentationIntent() : undefined
+  const current = () => ticket === stepSeq && (presentationRevision === undefined || isPresentationIntentCurrent(presentationRevision))
 
   const state = useBibleStore.getState()
   const offset = direction === "next" ? 1 : -1
@@ -188,7 +191,7 @@ export async function stepVerse(
         : state.currentChapter[state.currentChapter.length - 1]
     if (!entry) return
     state.selectVerse(entry)
-    if (options?.present) void presentVerse(entry)
+    if (options?.present) void presentVerse(entry, { intentRevision: presentationRevision })
     state.requestVerseReveal("nearest")
     return
   }
@@ -199,7 +202,7 @@ export async function stepVerse(
     const loaded = findLoadedVerse(state.currentChapter, target)
     if (loaded) {
       state.selectVerse(loaded)
-      if (options?.present) void presentVerse(loaded)
+      if (options?.present) void presentVerse(loaded, { intentRevision: presentationRevision })
       state.requestVerseReveal("nearest")
       return
     }
@@ -207,10 +210,10 @@ export async function stepVerse(
 
   try {
     const cursorChapter = await resolveChapter(state.currentChapter, cursor)
-    if (ticket !== stepSeq) return
+    if (!current()) return
 
     if (cursorChapter.some((v) => v.verse === target.verse)) {
-      useBibleStore.getState().setPendingNavigation({ ...target, present: options?.present })
+      useBibleStore.getState().setPendingNavigation({ ...target, present: options?.present, ...(presentationRevision === undefined ? {} : { presentationRevision }) })
       return
     }
 
@@ -218,7 +221,7 @@ export async function stepVerse(
     if (crossingChapter < 1) return
 
     const crossing = await fetchChapter(cursor.bookNumber, crossingChapter)
-    if (ticket !== stepSeq) return
+    if (!current()) return
     if (crossing.length === 0) return
 
     const landing = direction === "next" ? crossing[0] : crossing[crossing.length - 1]
@@ -227,6 +230,7 @@ export async function stepVerse(
       chapter: crossingChapter,
       verse: landing.verse,
       present: options?.present,
+      ...(presentationRevision === undefined ? {} : { presentationRevision }),
     })
   } catch (e) {
     console.warn("[bible] stepVerse chapter lookup failed:", e)

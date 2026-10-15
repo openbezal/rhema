@@ -1,5 +1,6 @@
 import { fetchChapter, findLoadedVerse } from "@/hooks/use-bible"
 import { presentVerse } from "@/hooks/use-broadcast"
+import { reservePresentationIntent, isPresentationIntentCurrent } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { mark } from "@/lib/latency-marks"
 
@@ -23,9 +24,15 @@ export function connectBibleNavigation(): () => void {
       return
     }
     const translationId = state.activeTranslationId
-    const isCurrent = () => !stopped && ticket === revision &&
+    const presentationRevision = present ? pending.presentationRevision ?? reservePresentationIntent() : undefined
+    const ownsRequest = () => !stopped && ticket === revision &&
       useBibleStore.getState().pendingNavigation === pending &&
       useBibleStore.getState().activeTranslationId === translationId
+    const isCurrent = () => ownsRequest() && (presentationRevision === undefined || isPresentationIntentCurrent(presentationRevision))
+    if (!isCurrent()) {
+      if (ownsRequest()) useBibleStore.getState().setPendingNavigation(null)
+      return
+    }
 
     mark(`nav loadChapter start ${bookNumber} ${chapter}:${verse}`)
     void fetchChapter(bookNumber, chapter, translationId).then((verses) => {
@@ -35,13 +42,13 @@ export function connectBibleNavigation(): () => void {
       // A stale request must never write even the chapter rows.
       useBibleStore.getState().setCurrentChapter(verses)
       useBibleStore.getState().selectVerse(target)
-      if (present) void presentVerse(target)
+      if (present) void presentVerse(target, { intentRevision: presentationRevision })
       useBibleStore.getState().requestVerseReveal("center")
       mark(`nav loadChapter done ${bookNumber} ${chapter}:${verse}`)
     }).catch((error: unknown) => {
       if (isCurrent()) console.error("[bible] navigation failed:", error)
     }).finally(() => {
-      if (isCurrent()) useBibleStore.getState().setPendingNavigation(null)
+      if (ownsRequest()) useBibleStore.getState().setPendingNavigation(null)
     })
   }
   const unsubscribe = useBibleStore.subscribe(handle)

@@ -213,7 +213,7 @@ describe("remoteActions bible navigation", () => {
     await remoteActions.bibleNext()
 
     expect(useBibleStore.getState().pendingNavigation).toEqual({
-      bookNumber: 43, chapter: 4, verse: 1, present: true,
+      bookNumber: 43, chapter: 4, verse: 1, present: true, presentationRevision: expect.any(Number),
     })
   })
 

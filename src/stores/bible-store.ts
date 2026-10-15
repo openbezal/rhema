@@ -15,6 +15,8 @@ interface PendingNavigation {
    * Auto toggle stays the sole gate for detection-driven presents.
    */
   present?: boolean
+  /** Reserved before a manual step performs asynchronous chapter probes. */
+  presentationRevision?: number
 }
 
 interface BibleState {
