@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Fumadocs generates these files during postinstall.
+    ".source/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
