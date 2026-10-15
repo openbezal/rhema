@@ -152,7 +152,7 @@ let stepSeq = 0
  * A target already in the loaded chapter is selected synchronously. Anything
  * else — a chapter boundary, or a verse picked from a context search in a
  * chapter the panel never loaded — goes through `pendingNavigation`, the
- * panel's existing load-then-select path.
+ * app-owned load-then-select controller.
  *
  * Both boundary directions probe before navigating, and the probe never writes
  * the store: the end of a book, the start of Genesis, and a chapter missing
@@ -160,8 +160,7 @@ let stepSeq = 0
  * panel showing exactly what it was showing.
  *
  * `options.present` sends the landed verse to the live output. The panel's
- * arrow keys pass it; the remote `bible_next` / `bible_prev` commands don't —
- * they stay preview-only, with the remote's `send_to_live` as the commit.
+ * arrow keys and remote `bible_next` / `bible_prev` commands both pass it.
  */
 export async function stepVerse(
   direction: "next" | "prev",

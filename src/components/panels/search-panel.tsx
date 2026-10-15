@@ -35,7 +35,6 @@ import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
-import { mark } from "@/lib/latency-marks"
 
 type SearchTab = "book" | "context"
 
@@ -106,14 +105,14 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   )
 }
 
-// Monotonic ticket so an older chapter load that resolves late can neither
-// select its verse nor clear a newer navigation's pending target.
-let navSeq = 0
-
 export function SearchPanel() {
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
-  const [chapter, setChapter] = useState(1)
+  const [selectedBook, setSelectedBook] = useState<Book | null>(() => {
+    const state = useBibleStore.getState()
+    const bookNumber = state.currentChapter[0]?.book_number
+    return state.books.find((book) => book.book_number === bookNumber) ?? null
+  })
+  const [chapter, setChapter] = useState(() => useBibleStore.getState().currentChapter[0]?.chapter ?? 1)
   const [contextQuery, setContextQuery] = useState("")
 
   // EasyWorship-style autocomplete
@@ -146,17 +145,20 @@ export function SearchPanel() {
   useEffect(() => {
     bibleActions.loadTranslations().catch(console.error)
     bibleActions.loadBooks().then(() => {
-      useBibleStore.getState().setPendingNavigation({
-        bookNumber: 1,
-        chapter: 1,
-        verse: 1,
-      })
+      const state = useBibleStore.getState()
+      if (!state.selectedVerse && !state.pendingNavigation) {
+        state.setPendingNavigation({ bookNumber: 1, chapter: 1, verse: 1 })
+      }
     }).catch(console.error)
   }, [])
 
   // Load chapter when book + chapter are set
   useEffect(() => {
     if (selectedBookNumber && chapter >= 1) {
+      const state = useBibleStore.getState()
+      const loaded = state.currentChapter[0]
+      if (state.pendingNavigation || (loaded?.book_number === selectedBookNumber &&
+          loaded.chapter === chapter && loaded.translation_id === activeTranslationId)) return
       bibleActions.loadChapter(selectedBookNumber, chapter).catch(console.error)
     }
   }, [selectedBookNumber, chapter, activeTranslationId])
@@ -229,57 +231,16 @@ export function SearchPanel() {
     []
   )
 
-  // Auto-navigate when a detection or "Present" click sets pendingNavigation
-  useEffect(() => {
-    let lastHandledKey: string | null = null
-
-    const unsubscribe = useBibleStore.subscribe((state) => {
-      const pendingNavigation = state.pendingNavigation
-      if (!pendingNavigation) {
-        lastHandledKey = null
-        return
-      }
-
-      const { bookNumber, chapter: navChapter, verse: navVerse, present } = pendingNavigation
-      const pendingKey = `${bookNumber}:${navChapter}:${navVerse}:${present ? "live" : ""}`
-      if (pendingKey === lastHandledKey) return
-
-      const book = state.books.find((b) => b.book_number === bookNumber)
-      if (!book) {
-        // Unreachable navigation — clear it, or every later step chains off a
-        // target that can never land. Reachable with no Bible database, where
-        // the book list stays empty indefinitely.
-        useBibleStore.getState().setPendingNavigation(null)
-        return
-      }
-
-      lastHandledKey = pendingKey
-      applyNavigationSelection(book, navChapter)
-
-      navSeq += 1
-      const ticket = navSeq
-
-      // Load chapter explicitly, then select + reveal the verse.
-      mark(`nav loadChapter start ${bookNumber} ${navChapter}:${navVerse}`)
-      bibleActions.loadChapter(bookNumber, navChapter).then((verses) => {
-        mark(`nav loadChapter done ${bookNumber} ${navChapter}:${navVerse} n=${verses.length}`)
-        if (ticket !== navSeq) return
-        const target = verses.find((v) => v.verse === navVerse)
-        if (target) {
-          bibleActions.selectVerse(target)
-          if (present) void presentVerse(target)
-          useBibleStore.getState().requestVerseReveal("center")
-        }
-        panelRef.current?.focus()
-      }).catch(console.error).finally(() => {
-        // Only the newest load may clear the pending target; a stale one would
-        // wipe the cursor the next step is chaining off.
-        if (ticket === navSeq) useBibleStore.getState().setPendingNavigation(null)
-      })
-    })
-
-    return unsubscribe
-  }, [applyNavigationSelection])
+  // The app controller loads and selects; this subscriber only follows its
+  // completed reveal requests in the visible panel.
+  useEffect(() => useBibleStore.subscribe((state, previous) => {
+    if (state.revealRequest === previous.revealRequest || state.revealBlock !== "center") return
+    const target = state.selectedVerse
+    const book = state.books.find((book) => book.book_number === target?.book_number)
+    if (!target || !book) return
+    applyNavigationSelection(book, target.chapter)
+    panelRef.current?.focus()
+  }), [applyNavigationSelection])
 
   const handleVerseClick = useCallback((verse: Verse) => {
     bibleActions.selectVerse(verse)

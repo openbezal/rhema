@@ -73,6 +73,8 @@ struct AppState<S: CommandSink> {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StatusSnapshot {
     pub on_air: bool,
+    #[serde(default)]
+    pub auto_broadcast: bool,
     pub active_theme: Option<String>,
     pub live_verse: Option<String>,
     pub queue_length: usize,
@@ -249,6 +251,20 @@ mod tests {
         }
     }
 
+    #[test]
+    fn old_status_snapshots_default_auto_broadcast_to_false() {
+        let snapshot: StatusSnapshot = serde_json::from_value(serde_json::json!({
+            "on_air": true, "active_theme": null, "live_verse": null,
+            "queue_length": 0, "confidence_threshold": 0.75,
+        }))
+        .unwrap();
+        assert!(!snapshot.auto_broadcast);
+        assert_eq!(
+            serde_json::to_value(snapshot).unwrap()["auto_broadcast"],
+            false
+        );
+    }
+
     #[tokio::test]
     async fn http_server_binds_and_stops() {
         let sink = Arc::new(MockSink::new());
@@ -332,6 +348,7 @@ mod tests {
         {
             let mut s = status.write().await;
             s.on_air = true;
+            s.auto_broadcast = true;
             s.confidence_threshold = 0.75;
         }
 
@@ -350,6 +367,7 @@ mod tests {
         let resp = raw_http_request(port, "GET", "/api/v1/status", None).await;
         assert!(resp.contains("200 OK"), "Expected 200, got: {resp}");
         assert!(resp.contains("\"on_air\":true"));
+        assert!(resp.contains("\"auto_broadcast\":true"));
         assert!(resp.contains("\"confidence_threshold\":0.75"));
 
         let mut handle = result.handle;
@@ -444,6 +462,48 @@ mod tests {
             "Sink should have received command"
         );
 
+        let mut handle = result.handle;
+        handle.stop();
+    }
+
+    #[tokio::test]
+    async fn command_endpoint_dispatches_auto_broadcast_commands() {
+        let sink = Arc::new(MockSink::new());
+        let result = start_http_server(
+            HttpConfig {
+                port: 0,
+                host: "127.0.0.1".into(),
+            },
+            sink.clone(),
+            new_shared_status(),
+        )
+        .await
+        .unwrap();
+        for (body, event) in [
+            (r#"{"command":"auto_broadcast"}"#, "remote:auto_broadcast"),
+            (
+                r#"{"command":"set_auto_broadcast","value":true}"#,
+                "remote:set_auto_broadcast",
+            ),
+            (
+                r#"{"command":"set_auto_broadcast","value":false}"#,
+                "remote:set_auto_broadcast",
+            ),
+        ] {
+            let response =
+                raw_http_request(result.bound_port, "POST", "/api/v1/command", Some(body)).await;
+            assert!(response.contains("200 OK"), "{response}");
+            assert_eq!(sink.commands.lock().unwrap().last().unwrap(), event);
+        }
+        let response = raw_http_request(
+            result.bound_port,
+            "POST",
+            "/api/v1/command",
+            Some(r#"{"command":"set_auto_broadcast","value":"yes"}"#),
+        )
+        .await;
+        assert!(response.contains("422 Unprocessable Entity"), "{response}");
+        assert_eq!(sink.command_count(), 3);
         let mut handle = result.handle;
         handle.stop();
     }

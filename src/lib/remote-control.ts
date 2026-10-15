@@ -1,0 +1,72 @@
+import { listen, type UnlistenFn } from "@tauri-apps/api/event"
+import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useSettingsStore } from "@/stores/settings-store"
+import { REMOTE_EVENTS, type RemoteEventName } from "@/lib/remote-events"
+import { remoteActions } from "@/lib/remote-actions"
+
+/** App-owned event subscriptions, independent of panel visibility. */
+export function connectRemoteControl(): () => void {
+  let cancelled = false
+  const unlisteners: UnlistenFn[] = []
+  const register = (event: RemoteEventName, handler: (payload: unknown) => void) => {
+    void listen<unknown>(event, ({ payload }) => {
+      if (!cancelled) handler(payload)
+    }).then((unlisten) => {
+      if (cancelled) unlisten()
+      else unlisteners.push(unlisten)
+    }).catch((error: unknown) => {
+      if (!cancelled) console.warn(`[remote-control] failed to listen for ${event}:`, error)
+    })
+  }
+
+  register(REMOTE_EVENTS.next, remoteActions.queueNext)
+  register(REMOTE_EVENTS.prev, remoteActions.queuePrev)
+  register(REMOTE_EVENTS.send_to_live, remoteActions.sendToLive)
+  register(REMOTE_EVENTS.add_to_queue, remoteActions.addToQueue)
+  register(REMOTE_EVENTS.bible_next, remoteActions.bibleNext)
+  register(REMOTE_EVENTS.bible_prev, remoteActions.biblePrev)
+  register(REMOTE_EVENTS.show, () => remoteActions.toggleOnAir(true))
+  register(REMOTE_EVENTS.hide, () => remoteActions.toggleOnAir(false))
+  register(REMOTE_EVENTS.auto_broadcast, remoteActions.toggleAutoLive)
+  register(REMOTE_EVENTS.set_auto_broadcast, (raw) => {
+    const active = parsePayload(raw)?.active
+    if (typeof active === "boolean") remoteActions.setAutoLive(active)
+  })
+  register(REMOTE_EVENTS.theme, (raw) => {
+    const name = parsePayload(raw)?.name
+    if (typeof name !== "string" || !name) return
+    const state = useBroadcastStore.getState()
+    const theme = state.themes.find((theme) => theme.name.toLowerCase() === name.toLowerCase())
+    if (theme) state.setActiveTheme(theme.id)
+  })
+  register(REMOTE_EVENTS.opacity, () => {
+    // The broadcast store has no opacity field; retain the existing no-op.
+  })
+  register(REMOTE_EVENTS.on_air, (raw) => {
+    const active = parsePayload(raw)?.active
+    if (typeof active === "boolean") remoteActions.toggleOnAir(active)
+  })
+  register(REMOTE_EVENTS.confidence, (raw) => {
+    const value = parsePayload(raw)?.value
+    if (typeof value === "number" && Number.isFinite(value)) {
+      useSettingsStore.getState().setConfidenceThreshold(value)
+    }
+  })
+
+  return () => {
+    if (cancelled) return
+    cancelled = true
+    unlisteners.forEach((unlisten) => unlisten())
+  }
+}
+
+function parsePayload(raw: unknown): Record<string, unknown> | null {
+  let value = raw
+  if (typeof raw === "string") {
+    try { value = JSON.parse(raw) } catch { return null }
+  }
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return null
+}

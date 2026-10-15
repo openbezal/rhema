@@ -82,9 +82,15 @@ export const remoteActions = {
   queueNext: () => stepQueue(1),
   queuePrev: () => stepQueue(-1),
 
-  /** Step the Bible Text panel one verse. Leaves the queue alone. */
-  bibleNext: () => stepVerse("next"),
-  biblePrev: () => stepVerse("prev"),
+  /** Present the next/previous Bible verse without moving the queue or going on air. */
+  bibleNext: () => stepVerse("next", { present: true }),
+  biblePrev: () => stepVerse("prev", { present: true }),
+
+  setAutoLive: (enabled: boolean) => useBroadcastStore.getState().setAutoLive(enabled),
+  toggleAutoLive: () => {
+    const state = useBroadcastStore.getState()
+    state.setAutoLive(!state.autoLive)
+  },
 
   toggleOnAir: (active: boolean) => useBroadcastStore.getState().setLive(active),
 }

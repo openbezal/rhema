@@ -6,10 +6,10 @@ Rhema provides two remote control protocols for external integration: **OSC** (O
 
 Remote control enables you to:
 - **Navigate the queue** - Advance or go back through your verse queue
-- **Read through a passage** - Step the Bible Text panel verse by verse, independently of the queue
+- **Read through a passage** - Present successive Bible verses, independently of the queue
 - **Drive the Live output** - Send the current Preview to Live
 - **Build the queue** - Add the previewed verse to the queue
-- **Control broadcast** - Show/hide output, toggle on-air status
+- **Control broadcast** - Show/hide output, toggle on-air status and Auto display mode
 - **Switch themes** - Change active broadcast theme by name
 - **Adjust settings** - Modify confidence threshold and opacity
 - **Monitor status** - Query current state via HTTP API
@@ -223,8 +223,10 @@ curl -X POST http://localhost:8080/api/v1/command \
 
 ### 10. **bible_next** — Next Verse in the Bible Text Panel
 
-Moves the **Bible Text** panel's selection forward one verse and scrolls it into view. The
-verse lands in Preview, ready for `send_to_live`.
+Moves forward one Bible verse and presents it directly to the live display, matching the
+panel's arrow navigation. It also updates Preview and reveals the verse when the panel is
+visible. This works while the panel is hidden. It leaves the on-air switch unchanged; use
+`on_air` or `show` to enable the audience output.
 
 This is separate from `next`, which moves the **Queue**. Use `bible_next` to read straight
 through a passage the AI has not picked up yet; the Queue does not move.
@@ -279,7 +281,49 @@ curl -X POST http://localhost:8080/api/v1/command \
   -d '{"command":"add_to_queue"}'
 ```
 
-> **Note on arguments:** `send_to_live`, `bible_next`, `bible_prev` and `add_to_queue` take no
+### 13. **auto_broadcast** — Toggle Auto Display Mode
+
+Each trigger switches the **Auto** control in Live display on or off. With Auto on,
+detected verses are presented automatically. It leaves the on-air switch and queue
+settings unchanged.
+
+**OSC:**
+```
+/rhema/auto_broadcast
+```
+
+**HTTP:**
+```bash
+curl -X POST http://localhost:8080/api/v1/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"auto_broadcast"}'
+```
+
+### 14. **set_auto_broadcast** — Set Auto Display Mode
+
+Use an explicit value when a controller knows the desired state. Repeating an on
+request keeps Auto on, so this command is suitable for retries.
+
+**OSC:**
+```
+/rhema/set_auto_broadcast true
+/rhema/set_auto_broadcast false
+```
+
+OSC also accepts the existing boolean coercions, such as integer `1`/`0` and string
+`"on"`/`"off"`. A missing or invalid value is rejected.
+
+**HTTP:**
+```bash
+curl -X POST http://localhost:8080/api/v1/command \
+  -H "Content-Type: application/json" \
+  -d '{"command":"set_auto_broadcast","value":true}'
+```
+
+Use `false` to disable it. HTTP requires a JSON boolean. The status response includes
+`auto_broadcast` for controller feedback; the frontend refreshes this snapshot once a second.
+
+> **Note on arguments:** `send_to_live`, `bible_next`, `bible_prev`, `add_to_queue` and `auto_broadcast` take no
 > arguments.
 >
 > Over **OSC** this is forgiving: controllers that send a value with every button press
@@ -308,6 +352,7 @@ curl http://localhost:8080/api/v1/status
 ```json
 {
   "on_air": true,
+  "auto_broadcast": false,
   "active_theme": "Classic Dark",
   "live_verse": "John 3:16",
   "queue_length": 12,

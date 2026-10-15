@@ -66,7 +66,7 @@ beforeEach(() => {
       },
     ],
   })
-  useBroadcastStore.setState({ isLive: false, liveVerse: null, liveSourceVerse: null })
+  useBroadcastStore.setState({ isLive: false, autoLive: false, liveVerse: null, liveSourceVerse: null })
   useQueueStore.setState({ items: [], activeIndex: null })
 })
 
@@ -184,12 +184,39 @@ describe("remoteActions bible navigation", () => {
     await remoteActions.bibleNext()
 
     expect(useBibleStore.getState().selectedVerse?.verse).toBe(6)
+    await vi.waitFor(() => expect(useBroadcastStore.getState().liveSourceVerse?.verse).toBe(6))
+    expect(useBroadcastStore.getState().isLive).toBe(false)
   })
 
   it("steps the Bible panel back one verse", async () => {
     await remoteActions.biblePrev()
 
     expect(useBibleStore.getState().selectedVerse?.verse).toBe(4)
+    await vi.waitFor(() => expect(useBroadcastStore.getState().liveSourceVerse?.verse).toBe(4))
+  })
+
+  it("carries presentation through a chapter boundary", async () => {
+    useBibleStore.setState({ selectedVerse: johnThree[9] })
+    mockInvoke.mockResolvedValue([{ ...johnThree[0], chapter: 4, verse: 1 }])
+
+    await remoteActions.bibleNext()
+
+    expect(useBibleStore.getState().pendingNavigation).toEqual({
+      bookNumber: 43, chapter: 4, verse: 1, present: true,
+    })
+  })
+
+  it("keeps the current live verse when chapter lookup fails", async () => {
+    useBroadcastStore.setState({ liveSourceVerse: genesisOneOne, isLive: true })
+    useBibleStore.setState({ selectedVerse: johnThree[9] })
+    mockInvoke.mockRejectedValue(new Error("database unavailable"))
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      await remoteActions.bibleNext()
+      expect(useBroadcastStore.getState().liveSourceVerse).toEqual(genesisOneOne)
+      expect(useBroadcastStore.getState().isLive).toBe(true)
+      expect(useBibleStore.getState().pendingNavigation).toBeNull()
+    } finally { warn.mockRestore() }
   })
 
   it("does not move the queue — that is the whole point of RC-04", async () => {

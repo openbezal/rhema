@@ -90,13 +90,14 @@ pub fn coerce_string(arg: &OscType) -> Result<String, CommandError> {
 
 /// Parse an OSC address + arguments into a `RemoteCommand`.
 ///
-/// Handles all 12 Rhema OSC addresses:
+/// Handles all 14 Rhema OSC addresses:
 /// - `/rhema/next`, `/rhema/prev`, `/rhema/show`, `/rhema/hide` (no arguments)
 /// - `/rhema/send_to_live`, `/rhema/bible_next`, `/rhema/bible_prev`,
 ///   `/rhema/add_to_queue` (no arguments)
 /// - `/rhema/theme` (string argument)
 /// - `/rhema/opacity`, `/rhema/confidence` (float argument, normalized to [0.0, 1.0])
-/// - `/rhema/on_air` (bool argument)
+/// - `/rhema/auto_broadcast` (toggle, no arguments)
+/// - `/rhema/on_air`, `/rhema/set_auto_broadcast` (bool argument)
 pub fn parse_osc(address: &str, args: &[OscType]) -> Result<RemoteCommand, CommandError> {
     match address {
         "/rhema/next" => Ok(RemoteCommand::Next),
@@ -107,6 +108,13 @@ pub fn parse_osc(address: &str, args: &[OscType]) -> Result<RemoteCommand, Comma
         "/rhema/bible_next" => Ok(RemoteCommand::BibleNext),
         "/rhema/bible_prev" => Ok(RemoteCommand::BiblePrev),
         "/rhema/add_to_queue" => Ok(RemoteCommand::AddToQueue),
+        "/rhema/auto_broadcast" => Ok(RemoteCommand::AutoBroadcast),
+        "/rhema/set_auto_broadcast" => {
+            let arg = args.first().ok_or_else(|| CommandError::MissingArgument {
+                address: address.into(),
+            })?;
+            Ok(RemoteCommand::SetAutoBroadcast(coerce_bool(arg)?))
+        }
         "/rhema/theme" => {
             let arg = args.first().ok_or_else(|| CommandError::MissingArgument {
                 address: address.into(),
@@ -143,6 +151,34 @@ pub fn parse_osc(address: &str, args: &[OscType]) -> Result<RemoteCommand, Comma
 mod tests {
     use super::*;
     use rosc::OscType;
+
+    #[test]
+    fn auto_broadcast_osc_addresses() {
+        assert_eq!(
+            serde_json::to_value(parse_osc("/rhema/auto_broadcast", &[]).unwrap()).unwrap(),
+            serde_json::json!({"command": "auto_broadcast"})
+        );
+        for (arg, expected) in [(OscType::Bool(true), true), (OscType::Int(0), false)] {
+            assert_eq!(
+                serde_json::to_value(parse_osc("/rhema/set_auto_broadcast", &[arg]).unwrap())
+                    .unwrap(),
+                serde_json::json!({"command": "set_auto_broadcast", "value": expected})
+            );
+        }
+    }
+
+    #[test]
+    fn auto_broadcast_set_requires_valid_boolean() {
+        assert!(matches!(
+            parse_osc("/rhema/set_auto_broadcast", &[]),
+            Err(CommandError::MissingArgument { .. })
+        ));
+        assert!(parse_osc("/rhema/set_auto_broadcast", &[OscType::Int(42)]).is_err());
+        assert!(serde_json::from_str::<RemoteCommand>(
+            r#"{"command":"set_auto_broadcast","value":"true"}"#
+        )
+        .is_err());
+    }
 
     // --- coerce_bool tests ---
 

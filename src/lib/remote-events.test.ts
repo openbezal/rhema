@@ -17,11 +17,13 @@ const EXPECTED_EVENT_NAMES = [
   "remote:bible_next",
   "remote:bible_prev",
   "remote:add_to_queue",
+  "remote:auto_broadcast",
+  "remote:set_auto_broadcast",
 ]
 
 describe("REMOTE_EVENTS", () => {
   it("has one entry per RemoteCommand variant", () => {
-    expect(Object.keys(REMOTE_EVENTS)).toHaveLength(12)
+    expect(Object.keys(REMOTE_EVENTS)).toHaveLength(14)
   })
 
   it("matches the event names the Rust dispatcher emits", () => {

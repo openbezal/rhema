@@ -237,6 +237,7 @@ pub async fn get_http_status(state: State<'_, Mutex<HttpRuntime>>) -> Result<Htt
 pub async fn update_remote_status(
     state: State<'_, Mutex<HttpRuntime>>,
     on_air: Option<bool>,
+    auto_broadcast: Option<bool>,
     active_theme: Option<String>,
     live_verse: Option<String>,
     queue_length: Option<usize>,
@@ -250,6 +251,9 @@ pub async fn update_remote_status(
     let mut snapshot = status.write().await;
     if let Some(v) = on_air {
         snapshot.on_air = v;
+    }
+    if let Some(v) = auto_broadcast {
+        snapshot.auto_broadcast = v;
     }
     if let Some(v) = active_theme {
         snapshot.active_theme = Some(v);

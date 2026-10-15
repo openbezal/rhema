@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { presentVerse, toVerseRenderData } from "@/hooks/use-broadcast"
+import { remoteActions } from "@/lib/remote-actions"
 import { bibleActions } from "@/hooks/use-bible"
 
 export function LiveOutputPanel() {
@@ -75,9 +76,7 @@ export function LiveOutputPanel() {
           </span>
           <Switch
             checked={autoLive}
-            onCheckedChange={(checked) =>
-              useBroadcastStore.getState().setAutoLive(checked)
-            }
+            onCheckedChange={remoteActions.setAutoLive}
           />
         </label>
         <label className="ml-2 flex items-center gap-2">

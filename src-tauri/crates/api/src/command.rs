@@ -21,6 +21,8 @@ pub enum RemoteCommand {
     BibleNext,
     BiblePrev,
     AddToQueue,
+    AutoBroadcast,
+    SetAutoBroadcast(bool),
 }
 
 impl fmt::Display for RemoteCommand {
@@ -38,6 +40,8 @@ impl fmt::Display for RemoteCommand {
             RemoteCommand::BibleNext => write!(f, "bible_next"),
             RemoteCommand::BiblePrev => write!(f, "bible_prev"),
             RemoteCommand::AddToQueue => write!(f, "add_to_queue"),
+            RemoteCommand::AutoBroadcast => write!(f, "auto_broadcast"),
+            RemoteCommand::SetAutoBroadcast(active) => write!(f, "set_auto_broadcast({active})"),
         }
     }
 }
@@ -178,6 +182,18 @@ mod tests {
         assert_eq!(cmd, RemoteCommand::AddToQueue);
     }
 
+    #[test]
+    fn auto_broadcast_wire_commands_roundtrip() {
+        for json in [
+            serde_json::json!({"command": "auto_broadcast"}),
+            serde_json::json!({"command": "set_auto_broadcast", "value": true}),
+            serde_json::json!({"command": "set_auto_broadcast", "value": false}),
+        ] {
+            let cmd: RemoteCommand = serde_json::from_value(json.clone()).unwrap();
+            assert_eq!(serde_json::to_value(cmd).unwrap(), json);
+        }
+    }
+
     // --- Round-trip tests ---
 
     #[test]
@@ -195,6 +211,8 @@ mod tests {
             RemoteCommand::BibleNext,
             RemoteCommand::BiblePrev,
             RemoteCommand::AddToQueue,
+            RemoteCommand::AutoBroadcast,
+            RemoteCommand::SetAutoBroadcast(false),
         ];
 
         for cmd in variants {
@@ -263,8 +281,8 @@ mod tests {
     // --- Exhaustive match test ---
 
     #[test]
-    fn enum_has_exactly_12_variants() {
-        // This test ensures all 12 variants are covered.
+    fn enum_has_exactly_14_variants() {
+        // This test ensures all 14 variants are covered.
         // If a new variant is added, this match will fail to compile.
         let cmds: Vec<RemoteCommand> = vec![
             RemoteCommand::Next,
@@ -279,6 +297,8 @@ mod tests {
             RemoteCommand::BibleNext,
             RemoteCommand::BiblePrev,
             RemoteCommand::AddToQueue,
+            RemoteCommand::AutoBroadcast,
+            RemoteCommand::SetAutoBroadcast(false),
         ];
 
         for cmd in &cmds {
@@ -294,10 +314,12 @@ mod tests {
                 | RemoteCommand::SendToLive
                 | RemoteCommand::BibleNext
                 | RemoteCommand::BiblePrev
-                | RemoteCommand::AddToQueue => {}
+                | RemoteCommand::AddToQueue
+                | RemoteCommand::AutoBroadcast
+                | RemoteCommand::SetAutoBroadcast(_) => {}
             }
         }
 
-        assert_eq!(cmds.len(), 12);
+        assert_eq!(cmds.len(), 14);
     }
 }

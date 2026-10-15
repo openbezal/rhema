@@ -17,7 +17,7 @@ pub trait CommandSink: Send + Sync {
 /// Routes `RemoteCommand` variants to the correct sink method.
 ///
 /// Frontend-bound (`emit_event`): Next, Prev, Theme, Opacity, `OnAir`,
-/// `SendToLive`, `BibleNext`, `BiblePrev`, `AddToQueue`
+/// `SendToLive`, `BibleNext`, `BiblePrev`, `AddToQueue`, `AutoBroadcast`, `SetAutoBroadcast`
 /// Backend-bound (`invoke_backend`): Show, Hide, Confidence
 pub struct CommandDispatcher;
 
@@ -42,6 +42,11 @@ impl CommandDispatcher {
             RemoteCommand::BibleNext => sink.emit_event("remote:bible_next", "{}"),
             RemoteCommand::BiblePrev => sink.emit_event("remote:bible_prev", "{}"),
             RemoteCommand::AddToQueue => sink.emit_event("remote:add_to_queue", "{}"),
+            RemoteCommand::AutoBroadcast => sink.emit_event("remote:auto_broadcast", "{}"),
+            RemoteCommand::SetAutoBroadcast(active) => {
+                let payload = serde_json::json!({ "active": active }).to_string();
+                sink.emit_event("remote:set_auto_broadcast", &payload)
+            }
             RemoteCommand::Show => sink.invoke_backend("show_broadcast", "{}"),
             RemoteCommand::Hide => sink.invoke_backend("hide_broadcast", "{}"),
             RemoteCommand::Confidence(val) => {
@@ -116,6 +121,33 @@ mod tests {
 
         fn invoke_backend(&self, _action: &str, _args: &str) -> Result<(), CommandError> {
             Err(CommandError::DispatchFailed("test error".into()))
+        }
+    }
+
+    #[test]
+    fn auto_broadcast_dispatches_to_frontend() {
+        for (json, event, payload) in [
+            (
+                serde_json::json!({"command": "auto_broadcast"}),
+                "remote:auto_broadcast",
+                serde_json::json!({}),
+            ),
+            (
+                serde_json::json!({"command": "set_auto_broadcast", "value": false}),
+                "remote:set_auto_broadcast",
+                serde_json::json!({"active": false}),
+            ),
+        ] {
+            let command: RemoteCommand = serde_json::from_value(json).unwrap();
+            let sink = MockSink::new();
+            CommandDispatcher::dispatch(&command, &sink).unwrap();
+            let emitted = sink.last_event();
+            assert_eq!(emitted.0, event);
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&emitted.1).unwrap(),
+                payload
+            );
+            assert_eq!(sink.backend_count(), 0);
         }
     }
 
@@ -257,6 +289,8 @@ mod tests {
             RemoteCommand::BibleNext,
             RemoteCommand::BiblePrev,
             RemoteCommand::AddToQueue,
+            RemoteCommand::AutoBroadcast,
+            RemoteCommand::SetAutoBroadcast(false),
         ];
 
         for cmd in &frontend_cmds {
