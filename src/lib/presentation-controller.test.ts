@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/event", () => ({ emitTo: mocks.emit }))
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }))
 import {
   presentVerse,
+  reservePresentationIntent,
   clearLive,
   invalidatePresentation,
   refreshLiveVerse,
@@ -278,4 +279,20 @@ describe("shared presentation revision", () => {
       expect.anything()
     )
   })
+})
+
+it("traces reserved operator intent before upstream chapter lookup delay", async () => {
+  vi.useFakeTimers()
+  try {
+    vi.setSystemTime(100)
+    const intentRevision = reservePresentationIntent()
+    vi.setSystemTime(600)
+    mocks.invoke.mockImplementation(async (command) =>
+      command === "get_verse" ? resolved : null
+    )
+    await presentVerse(resolved, { intentRevision })
+    expect(useBroadcastStore.getState().liveTrace?.acceptedEpochMs).toBe(100)
+  } finally {
+    vi.useRealTimers()
+  }
 })

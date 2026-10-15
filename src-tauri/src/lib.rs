@@ -127,6 +127,7 @@ pub fn run() {
             commands::broadcast::stop_ndi,
             commands::broadcast::get_ndi_status,
             commands::broadcast::push_ndi_frame,
+            commands::broadcast::begin_ndi_renderer,
             commands::fonts::list_system_fonts,
             commands::remote::start_osc,
             commands::remote::stop_osc,

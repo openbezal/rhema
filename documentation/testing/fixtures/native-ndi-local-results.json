@@ -1,0 +1,2609 @@
+{
+  "platform": "macOS Apple Silicon",
+  "cpu": "Apple M2 Max",
+  "scope": "native submit to local SDK receiver only; excludes renderer, IPC and Windows/vMix",
+  "percentileMethod": "nearest rank; revisions11\u2013110 after10warmup;111terminalclear",
+  "runs": [
+    {
+      "resolution": 720,
+      "fps": 30,
+      "outputCount": 1,
+      "alphaMode": "straight",
+      "senderBuild": "debug",
+      "outputs": [
+        {
+          "scope": "native submit to local SDK capture; excludes renderer, IPC and vMix",
+          "valid": true,
+          "output": "qa-0",
+          "samples": 100,
+          "missing": [],
+          "p50Ms": 60,
+          "p95Ms": 76,
+          "p99Ms": 83,
+          "maxMs": 84,
+          "terminalClear": true,
+          "staleAfterTerminal": false,
+          "exactRate": true,
+          "measurements": [
+            {
+              "revision": 11,
+              "submittedMs": 1792096582742,
+              "receivedMs": 1792096582799,
+              "latencyMs": 57
+            },
+            {
+              "revision": 12,
+              "submittedMs": 1792096582868,
+              "receivedMs": 1792096582912,
+              "latencyMs": 44
+            },
+            {
+              "revision": 13,
+              "submittedMs": 1792096582995,
+              "receivedMs": 1792096583053,
+              "latencyMs": 58
+            },
+            {
+              "revision": 14,
+              "submittedMs": 1792096583121,
+              "receivedMs": 1792096583195,
+              "latencyMs": 74
+            },
+            {
+              "revision": 15,
+              "submittedMs": 1792096583248,
+              "receivedMs": 1792096583305,
+              "latencyMs": 57
+            },
+            {
+              "revision": 16,
+              "submittedMs": 1792096583372,
+              "receivedMs": 1792096583451,
+              "latencyMs": 79
+            },
+            {
+              "revision": 17,
+              "submittedMs": 1792096583498,
+              "receivedMs": 1792096583562,
+              "latencyMs": 64
+            },
+            {
+              "revision": 18,
+              "submittedMs": 1792096583623,
+              "receivedMs": 1792096583671,
+              "latencyMs": 48
+            },
+            {
+              "revision": 19,
+              "submittedMs": 1792096583747,
+              "receivedMs": 1792096583818,
+              "latencyMs": 71
+            },
+            {
+              "revision": 20,
+              "submittedMs": 1792096583874,
+              "receivedMs": 1792096583927,
+              "latencyMs": 53
+            },
+            {
+              "revision": 21,
+              "submittedMs": 1792096584000,
+              "receivedMs": 1792096584071,
+              "latencyMs": 71
+            },
+            {
+              "revision": 22,
+              "submittedMs": 1792096584127,
+              "receivedMs": 1792096584181,
+              "latencyMs": 54
+            },
+            {
+              "revision": 23,
+              "submittedMs": 1792096584250,
+              "receivedMs": 1792096584294,
+              "latencyMs": 44
+            },
+            {
+              "revision": 24,
+              "submittedMs": 1792096584377,
+              "receivedMs": 1792096584439,
+              "latencyMs": 62
+            },
+            {
+              "revision": 25,
+              "submittedMs": 1792096584501,
+              "receivedMs": 1792096584549,
+              "latencyMs": 48
+            },
+            {
+              "revision": 26,
+              "submittedMs": 1792096584627,
+              "receivedMs": 1792096584691,
+              "latencyMs": 64
+            },
+            {
+              "revision": 27,
+              "submittedMs": 1792096584756,
+              "receivedMs": 1792096584802,
+              "latencyMs": 46
+            },
+            {
+              "revision": 28,
+              "submittedMs": 1792096584882,
+              "receivedMs": 1792096584948,
+              "latencyMs": 66
+            },
+            {
+              "revision": 29,
+              "submittedMs": 1792096585008,
+              "receivedMs": 1792096585059,
+              "latencyMs": 51
+            },
+            {
+              "revision": 30,
+              "submittedMs": 1792096585133,
+              "receivedMs": 1792096585204,
+              "latencyMs": 71
+            },
+            {
+              "revision": 31,
+              "submittedMs": 1792096585260,
+              "receivedMs": 1792096585322,
+              "latencyMs": 62
+            },
+            {
+              "revision": 32,
+              "submittedMs": 1792096585386,
+              "receivedMs": 1792096585432,
+              "latencyMs": 46
+            },
+            {
+              "revision": 33,
+              "submittedMs": 1792096585513,
+              "receivedMs": 1792096585578,
+              "latencyMs": 65
+            },
+            {
+              "revision": 34,
+              "submittedMs": 1792096585639,
+              "receivedMs": 1792096585688,
+              "latencyMs": 49
+            },
+            {
+              "revision": 35,
+              "submittedMs": 1792096585764,
+              "receivedMs": 1792096585836,
+              "latencyMs": 72
+            },
+            {
+              "revision": 36,
+              "submittedMs": 1792096585889,
+              "receivedMs": 1792096585946,
+              "latencyMs": 57
+            },
+            {
+              "revision": 37,
+              "submittedMs": 1792096586015,
+              "receivedMs": 1792096586059,
+              "latencyMs": 44
+            },
+            {
+              "revision": 38,
+              "submittedMs": 1792096586140,
+              "receivedMs": 1792096586207,
+              "latencyMs": 67
+            },
+            {
+              "revision": 39,
+              "submittedMs": 1792096586267,
+              "receivedMs": 1792096586319,
+              "latencyMs": 52
+            },
+            {
+              "revision": 40,
+              "submittedMs": 1792096586391,
+              "receivedMs": 1792096586468,
+              "latencyMs": 77
+            },
+            {
+              "revision": 41,
+              "submittedMs": 1792096586516,
+              "receivedMs": 1792096586581,
+              "latencyMs": 65
+            },
+            {
+              "revision": 42,
+              "submittedMs": 1792096586641,
+              "receivedMs": 1792096586689,
+              "latencyMs": 48
+            },
+            {
+              "revision": 43,
+              "submittedMs": 1792096586764,
+              "receivedMs": 1792096586836,
+              "latencyMs": 72
+            },
+            {
+              "revision": 44,
+              "submittedMs": 1792096586892,
+              "receivedMs": 1792096586948,
+              "latencyMs": 56
+            },
+            {
+              "revision": 45,
+              "submittedMs": 1792096587014,
+              "receivedMs": 1792096587058,
+              "latencyMs": 44
+            },
+            {
+              "revision": 46,
+              "submittedMs": 1792096587140,
+              "receivedMs": 1792096587202,
+              "latencyMs": 62
+            },
+            {
+              "revision": 47,
+              "submittedMs": 1792096587264,
+              "receivedMs": 1792096587318,
+              "latencyMs": 54
+            },
+            {
+              "revision": 48,
+              "submittedMs": 1792096587391,
+              "receivedMs": 1792096587464,
+              "latencyMs": 73
+            },
+            {
+              "revision": 49,
+              "submittedMs": 1792096587517,
+              "receivedMs": 1792096587574,
+              "latencyMs": 57
+            },
+            {
+              "revision": 50,
+              "submittedMs": 1792096587644,
+              "receivedMs": 1792096587720,
+              "latencyMs": 76
+            },
+            {
+              "revision": 51,
+              "submittedMs": 1792096587769,
+              "receivedMs": 1792096587833,
+              "latencyMs": 64
+            },
+            {
+              "revision": 52,
+              "submittedMs": 1792096587897,
+              "receivedMs": 1792096587943,
+              "latencyMs": 46
+            },
+            {
+              "revision": 53,
+              "submittedMs": 1792096588024,
+              "receivedMs": 1792096588089,
+              "latencyMs": 65
+            },
+            {
+              "revision": 54,
+              "submittedMs": 1792096588148,
+              "receivedMs": 1792096588202,
+              "latencyMs": 54
+            },
+            {
+              "revision": 55,
+              "submittedMs": 1792096588274,
+              "receivedMs": 1792096588348,
+              "latencyMs": 74
+            },
+            {
+              "revision": 56,
+              "submittedMs": 1792096588397,
+              "receivedMs": 1792096588461,
+              "latencyMs": 64
+            },
+            {
+              "revision": 57,
+              "submittedMs": 1792096588521,
+              "receivedMs": 1792096588573,
+              "latencyMs": 52
+            },
+            {
+              "revision": 58,
+              "submittedMs": 1792096588648,
+              "receivedMs": 1792096588731,
+              "latencyMs": 83
+            },
+            {
+              "revision": 59,
+              "submittedMs": 1792096588775,
+              "receivedMs": 1792096588859,
+              "latencyMs": 84
+            },
+            {
+              "revision": 60,
+              "submittedMs": 1792096588904,
+              "receivedMs": 1792096588975,
+              "latencyMs": 71
+            },
+            {
+              "revision": 61,
+              "submittedMs": 1792096589036,
+              "receivedMs": 1792096589093,
+              "latencyMs": 57
+            },
+            {
+              "revision": 62,
+              "submittedMs": 1792096589164,
+              "receivedMs": 1792096589239,
+              "latencyMs": 75
+            },
+            {
+              "revision": 63,
+              "submittedMs": 1792096589291,
+              "receivedMs": 1792096589355,
+              "latencyMs": 64
+            },
+            {
+              "revision": 64,
+              "submittedMs": 1792096589418,
+              "receivedMs": 1792096589473,
+              "latencyMs": 55
+            },
+            {
+              "revision": 65,
+              "submittedMs": 1792096589542,
+              "receivedMs": 1792096589593,
+              "latencyMs": 51
+            },
+            {
+              "revision": 66,
+              "submittedMs": 1792096589671,
+              "receivedMs": 1792096589746,
+              "latencyMs": 75
+            },
+            {
+              "revision": 67,
+              "submittedMs": 1792096589802,
+              "receivedMs": 1792096589859,
+              "latencyMs": 57
+            },
+            {
+              "revision": 68,
+              "submittedMs": 1792096589930,
+              "receivedMs": 1792096590011,
+              "latencyMs": 81
+            },
+            {
+              "revision": 69,
+              "submittedMs": 1792096590055,
+              "receivedMs": 1792096590124,
+              "latencyMs": 69
+            },
+            {
+              "revision": 70,
+              "submittedMs": 1792096590181,
+              "receivedMs": 1792096590237,
+              "latencyMs": 56
+            },
+            {
+              "revision": 71,
+              "submittedMs": 1792096590316,
+              "receivedMs": 1792096590389,
+              "latencyMs": 73
+            },
+            {
+              "revision": 72,
+              "submittedMs": 1792096590448,
+              "receivedMs": 1792096590501,
+              "latencyMs": 53
+            },
+            {
+              "revision": 73,
+              "submittedMs": 1792096590576,
+              "receivedMs": 1792096590648,
+              "latencyMs": 72
+            },
+            {
+              "revision": 74,
+              "submittedMs": 1792096590700,
+              "receivedMs": 1792096590766,
+              "latencyMs": 66
+            },
+            {
+              "revision": 75,
+              "submittedMs": 1792096590829,
+              "receivedMs": 1792096590878,
+              "latencyMs": 49
+            },
+            {
+              "revision": 76,
+              "submittedMs": 1792096590955,
+              "receivedMs": 1792096591021,
+              "latencyMs": 66
+            },
+            {
+              "revision": 77,
+              "submittedMs": 1792096591081,
+              "receivedMs": 1792096591134,
+              "latencyMs": 53
+            },
+            {
+              "revision": 78,
+              "submittedMs": 1792096591209,
+              "receivedMs": 1792096591280,
+              "latencyMs": 71
+            },
+            {
+              "revision": 79,
+              "submittedMs": 1792096591336,
+              "receivedMs": 1792096591391,
+              "latencyMs": 55
+            },
+            {
+              "revision": 80,
+              "submittedMs": 1792096591457,
+              "receivedMs": 1792096591501,
+              "latencyMs": 44
+            },
+            {
+              "revision": 81,
+              "submittedMs": 1792096591584,
+              "receivedMs": 1792096591646,
+              "latencyMs": 62
+            },
+            {
+              "revision": 82,
+              "submittedMs": 1792096591711,
+              "receivedMs": 1792096591755,
+              "latencyMs": 44
+            },
+            {
+              "revision": 83,
+              "submittedMs": 1792096591838,
+              "receivedMs": 1792096591901,
+              "latencyMs": 63
+            },
+            {
+              "revision": 84,
+              "submittedMs": 1792096591962,
+              "receivedMs": 1792096592011,
+              "latencyMs": 49
+            },
+            {
+              "revision": 85,
+              "submittedMs": 1792096592089,
+              "receivedMs": 1792096592158,
+              "latencyMs": 69
+            },
+            {
+              "revision": 86,
+              "submittedMs": 1792096592214,
+              "receivedMs": 1792096592270,
+              "latencyMs": 56
+            },
+            {
+              "revision": 87,
+              "submittedMs": 1792096592340,
+              "receivedMs": 1792096592414,
+              "latencyMs": 74
+            },
+            {
+              "revision": 88,
+              "submittedMs": 1792096592466,
+              "receivedMs": 1792096592527,
+              "latencyMs": 61
+            },
+            {
+              "revision": 89,
+              "submittedMs": 1792096592593,
+              "receivedMs": 1792096592637,
+              "latencyMs": 44
+            },
+            {
+              "revision": 90,
+              "submittedMs": 1792096592720,
+              "receivedMs": 1792096592780,
+              "latencyMs": 60
+            },
+            {
+              "revision": 91,
+              "submittedMs": 1792096592843,
+              "receivedMs": 1792096592889,
+              "latencyMs": 46
+            },
+            {
+              "revision": 92,
+              "submittedMs": 1792096592970,
+              "receivedMs": 1792096593032,
+              "latencyMs": 62
+            },
+            {
+              "revision": 93,
+              "submittedMs": 1792096593097,
+              "receivedMs": 1792096593141,
+              "latencyMs": 44
+            },
+            {
+              "revision": 94,
+              "submittedMs": 1792096593219,
+              "receivedMs": 1792096593287,
+              "latencyMs": 68
+            },
+            {
+              "revision": 95,
+              "submittedMs": 1792096593345,
+              "receivedMs": 1792096593397,
+              "latencyMs": 52
+            },
+            {
+              "revision": 96,
+              "submittedMs": 1792096593472,
+              "receivedMs": 1792096593542,
+              "latencyMs": 70
+            },
+            {
+              "revision": 97,
+              "submittedMs": 1792096593597,
+              "receivedMs": 1792096593652,
+              "latencyMs": 55
+            },
+            {
+              "revision": 98,
+              "submittedMs": 1792096593723,
+              "receivedMs": 1792096593794,
+              "latencyMs": 71
+            },
+            {
+              "revision": 99,
+              "submittedMs": 1792096593848,
+              "receivedMs": 1792096593905,
+              "latencyMs": 57
+            },
+            {
+              "revision": 100,
+              "submittedMs": 1792096593972,
+              "receivedMs": 1792096594015,
+              "latencyMs": 43
+            },
+            {
+              "revision": 101,
+              "submittedMs": 1792096594098,
+              "receivedMs": 1792096594162,
+              "latencyMs": 64
+            },
+            {
+              "revision": 102,
+              "submittedMs": 1792096594225,
+              "receivedMs": 1792096594274,
+              "latencyMs": 49
+            },
+            {
+              "revision": 103,
+              "submittedMs": 1792096594351,
+              "receivedMs": 1792096594419,
+              "latencyMs": 68
+            },
+            {
+              "revision": 104,
+              "submittedMs": 1792096594474,
+              "receivedMs": 1792096594529,
+              "latencyMs": 55
+            },
+            {
+              "revision": 105,
+              "submittedMs": 1792096594598,
+              "receivedMs": 1792096594642,
+              "latencyMs": 44
+            },
+            {
+              "revision": 106,
+              "submittedMs": 1792096594725,
+              "receivedMs": 1792096594787,
+              "latencyMs": 62
+            },
+            {
+              "revision": 107,
+              "submittedMs": 1792096594852,
+              "receivedMs": 1792096594900,
+              "latencyMs": 48
+            },
+            {
+              "revision": 108,
+              "submittedMs": 1792096594979,
+              "receivedMs": 1792096595048,
+              "latencyMs": 69
+            },
+            {
+              "revision": 109,
+              "submittedMs": 1792096595113,
+              "receivedMs": 1792096595159,
+              "latencyMs": 46
+            },
+            {
+              "revision": 110,
+              "submittedMs": 1792096595237,
+              "receivedMs": 1792096595301,
+              "latencyMs": 64
+            }
+          ],
+          "stats": {
+            "active": true,
+            "coalesced": 0,
+            "duplicates": 0,
+            "epoch": 1,
+            "lastError": null,
+            "lastReceivedMs": 1792096595342,
+            "lastSendDurationUs": 7182,
+            "lastSentEpoch": 1,
+            "lastSentMs": 1792096595918,
+            "lastSentRevision": 111,
+            "rejected": 0,
+            "repeated": 399,
+            "sent": 510,
+            "submitted": 111
+          }
+        }
+      ],
+      "processPeaks": {},
+      "lifecyclePassed": true,
+      "senderBinarySha256": "cd4792270f960024b133c9e05fff75ff1afc18dfd7eed4ea167890eaddf77f5d",
+      "receiverBinarySha256": "f88693fe0fcf155b6d8ee0c94e784f6eb556d23c7ced30d3508567ebcd92fa3e"
+    },
+    {
+      "resolution": 720,
+      "fps": 24,
+      "outputCount": 1,
+      "alphaMode": "opaque",
+      "senderBuild": "debug",
+      "outputs": [
+        {
+          "scope": "native submit to local SDK capture; excludes renderer, IPC and vMix",
+          "valid": true,
+          "output": "qa-0",
+          "samples": 100,
+          "missing": [],
+          "p50Ms": 54,
+          "p95Ms": 82,
+          "p99Ms": 88,
+          "maxMs": 88,
+          "terminalClear": true,
+          "staleAfterTerminal": false,
+          "exactRate": true,
+          "measurements": [
+            {
+              "revision": 11,
+              "submittedMs": 1792096714098,
+              "receivedMs": 1792096714142,
+              "latencyMs": 44
+            },
+            {
+              "revision": 12,
+              "submittedMs": 1792096714224,
+              "receivedMs": 1792096714268,
+              "latencyMs": 44
+            },
+            {
+              "revision": 13,
+              "submittedMs": 1792096714351,
+              "receivedMs": 1792096714394,
+              "latencyMs": 43
+            },
+            {
+              "revision": 14,
+              "submittedMs": 1792096714477,
+              "receivedMs": 1792096714521,
+              "latencyMs": 44
+            },
+            {
+              "revision": 15,
+              "submittedMs": 1792096714604,
+              "receivedMs": 1792096714647,
+              "latencyMs": 43
+            },
+            {
+              "revision": 16,
+              "submittedMs": 1792096714730,
+              "receivedMs": 1792096714774,
+              "latencyMs": 44
+            },
+            {
+              "revision": 17,
+              "submittedMs": 1792096714853,
+              "receivedMs": 1792096714900,
+              "latencyMs": 47
+            },
+            {
+              "revision": 18,
+              "submittedMs": 1792096714979,
+              "receivedMs": 1792096715027,
+              "latencyMs": 48
+            },
+            {
+              "revision": 19,
+              "submittedMs": 1792096715105,
+              "receivedMs": 1792096715153,
+              "latencyMs": 48
+            },
+            {
+              "revision": 20,
+              "submittedMs": 1792096715232,
+              "receivedMs": 1792096715279,
+              "latencyMs": 47
+            },
+            {
+              "revision": 21,
+              "submittedMs": 1792096715359,
+              "receivedMs": 1792096715406,
+              "latencyMs": 47
+            },
+            {
+              "revision": 22,
+              "submittedMs": 1792096715481,
+              "receivedMs": 1792096715536,
+              "latencyMs": 55
+            },
+            {
+              "revision": 23,
+              "submittedMs": 1792096715606,
+              "receivedMs": 1792096715662,
+              "latencyMs": 56
+            },
+            {
+              "revision": 24,
+              "submittedMs": 1792096715732,
+              "receivedMs": 1792096715788,
+              "latencyMs": 56
+            },
+            {
+              "revision": 25,
+              "submittedMs": 1792096715855,
+              "receivedMs": 1792096715916,
+              "latencyMs": 61
+            },
+            {
+              "revision": 26,
+              "submittedMs": 1792096715982,
+              "receivedMs": 1792096716043,
+              "latencyMs": 61
+            },
+            {
+              "revision": 27,
+              "submittedMs": 1792096716109,
+              "receivedMs": 1792096716172,
+              "latencyMs": 63
+            },
+            {
+              "revision": 28,
+              "submittedMs": 1792096716232,
+              "receivedMs": 1792096716299,
+              "latencyMs": 67
+            },
+            {
+              "revision": 29,
+              "submittedMs": 1792096716357,
+              "receivedMs": 1792096716427,
+              "latencyMs": 70
+            },
+            {
+              "revision": 30,
+              "submittedMs": 1792096716484,
+              "receivedMs": 1792096716558,
+              "latencyMs": 74
+            },
+            {
+              "revision": 31,
+              "submittedMs": 1792096716611,
+              "receivedMs": 1792096716683,
+              "latencyMs": 72
+            },
+            {
+              "revision": 32,
+              "submittedMs": 1792096716737,
+              "receivedMs": 1792096716810,
+              "latencyMs": 73
+            },
+            {
+              "revision": 33,
+              "submittedMs": 1792096716860,
+              "receivedMs": 1792096716941,
+              "latencyMs": 81
+            },
+            {
+              "revision": 34,
+              "submittedMs": 1792096716983,
+              "receivedMs": 1792096717026,
+              "latencyMs": 43
+            },
+            {
+              "revision": 35,
+              "submittedMs": 1792096717109,
+              "receivedMs": 1792096717197,
+              "latencyMs": 88
+            },
+            {
+              "revision": 36,
+              "submittedMs": 1792096717236,
+              "receivedMs": 1792096717283,
+              "latencyMs": 47
+            },
+            {
+              "revision": 37,
+              "submittedMs": 1792096717362,
+              "receivedMs": 1792096717410,
+              "latencyMs": 48
+            },
+            {
+              "revision": 38,
+              "submittedMs": 1792096717488,
+              "receivedMs": 1792096717537,
+              "latencyMs": 49
+            },
+            {
+              "revision": 39,
+              "submittedMs": 1792096717611,
+              "receivedMs": 1792096717665,
+              "latencyMs": 54
+            },
+            {
+              "revision": 40,
+              "submittedMs": 1792096717735,
+              "receivedMs": 1792096717793,
+              "latencyMs": 58
+            },
+            {
+              "revision": 41,
+              "submittedMs": 1792096717863,
+              "receivedMs": 1792096717922,
+              "latencyMs": 59
+            },
+            {
+              "revision": 42,
+              "submittedMs": 1792096717990,
+              "receivedMs": 1792096718053,
+              "latencyMs": 63
+            },
+            {
+              "revision": 43,
+              "submittedMs": 1792096718118,
+              "receivedMs": 1792096718186,
+              "latencyMs": 68
+            },
+            {
+              "revision": 44,
+              "submittedMs": 1792096718241,
+              "receivedMs": 1792096718324,
+              "latencyMs": 83
+            },
+            {
+              "revision": 45,
+              "submittedMs": 1792096718368,
+              "receivedMs": 1792096718454,
+              "latencyMs": 86
+            },
+            {
+              "revision": 46,
+              "submittedMs": 1792096718494,
+              "receivedMs": 1792096718538,
+              "latencyMs": 44
+            },
+            {
+              "revision": 47,
+              "submittedMs": 1792096718619,
+              "receivedMs": 1792096718664,
+              "latencyMs": 45
+            },
+            {
+              "revision": 48,
+              "submittedMs": 1792096718746,
+              "receivedMs": 1792096718791,
+              "latencyMs": 45
+            },
+            {
+              "revision": 49,
+              "submittedMs": 1792096718872,
+              "receivedMs": 1792096718916,
+              "latencyMs": 44
+            },
+            {
+              "revision": 50,
+              "submittedMs": 1792096718995,
+              "receivedMs": 1792096719043,
+              "latencyMs": 48
+            },
+            {
+              "revision": 51,
+              "submittedMs": 1792096719122,
+              "receivedMs": 1792096719170,
+              "latencyMs": 48
+            },
+            {
+              "revision": 52,
+              "submittedMs": 1792096719249,
+              "receivedMs": 1792096719296,
+              "latencyMs": 47
+            },
+            {
+              "revision": 53,
+              "submittedMs": 1792096719373,
+              "receivedMs": 1792096719423,
+              "latencyMs": 50
+            },
+            {
+              "revision": 54,
+              "submittedMs": 1792096719499,
+              "receivedMs": 1792096719550,
+              "latencyMs": 51
+            },
+            {
+              "revision": 55,
+              "submittedMs": 1792096719625,
+              "receivedMs": 1792096719677,
+              "latencyMs": 52
+            },
+            {
+              "revision": 56,
+              "submittedMs": 1792096719752,
+              "receivedMs": 1792096719805,
+              "latencyMs": 53
+            },
+            {
+              "revision": 57,
+              "submittedMs": 1792096719878,
+              "receivedMs": 1792096719932,
+              "latencyMs": 54
+            },
+            {
+              "revision": 58,
+              "submittedMs": 1792096720005,
+              "receivedMs": 1792096720058,
+              "latencyMs": 53
+            },
+            {
+              "revision": 59,
+              "submittedMs": 1792096720132,
+              "receivedMs": 1792096720186,
+              "latencyMs": 54
+            },
+            {
+              "revision": 60,
+              "submittedMs": 1792096720256,
+              "receivedMs": 1792096720316,
+              "latencyMs": 60
+            },
+            {
+              "revision": 61,
+              "submittedMs": 1792096720383,
+              "receivedMs": 1792096720445,
+              "latencyMs": 62
+            },
+            {
+              "revision": 62,
+              "submittedMs": 1792096720507,
+              "receivedMs": 1792096720577,
+              "latencyMs": 70
+            },
+            {
+              "revision": 63,
+              "submittedMs": 1792096720631,
+              "receivedMs": 1792096720707,
+              "latencyMs": 76
+            },
+            {
+              "revision": 64,
+              "submittedMs": 1792096720755,
+              "receivedMs": 1792096720837,
+              "latencyMs": 82
+            },
+            {
+              "revision": 65,
+              "submittedMs": 1792096720882,
+              "receivedMs": 1792096720925,
+              "latencyMs": 43
+            },
+            {
+              "revision": 66,
+              "submittedMs": 1792096721007,
+              "receivedMs": 1792096721052,
+              "latencyMs": 45
+            },
+            {
+              "revision": 67,
+              "submittedMs": 1792096721130,
+              "receivedMs": 1792096721178,
+              "latencyMs": 48
+            },
+            {
+              "revision": 68,
+              "submittedMs": 1792096721257,
+              "receivedMs": 1792096721305,
+              "latencyMs": 48
+            },
+            {
+              "revision": 69,
+              "submittedMs": 1792096721383,
+              "receivedMs": 1792096721431,
+              "latencyMs": 48
+            },
+            {
+              "revision": 70,
+              "submittedMs": 1792096721509,
+              "receivedMs": 1792096721559,
+              "latencyMs": 50
+            },
+            {
+              "revision": 71,
+              "submittedMs": 1792096721633,
+              "receivedMs": 1792096721688,
+              "latencyMs": 55
+            },
+            {
+              "revision": 72,
+              "submittedMs": 1792096721755,
+              "receivedMs": 1792096721817,
+              "latencyMs": 62
+            },
+            {
+              "revision": 73,
+              "submittedMs": 1792096721882,
+              "receivedMs": 1792096721948,
+              "latencyMs": 66
+            },
+            {
+              "revision": 74,
+              "submittedMs": 1792096722008,
+              "receivedMs": 1792096722079,
+              "latencyMs": 71
+            },
+            {
+              "revision": 75,
+              "submittedMs": 1792096722134,
+              "receivedMs": 1792096722207,
+              "latencyMs": 73
+            },
+            {
+              "revision": 76,
+              "submittedMs": 1792096722261,
+              "receivedMs": 1792096722336,
+              "latencyMs": 75
+            },
+            {
+              "revision": 77,
+              "submittedMs": 1792096722387,
+              "receivedMs": 1792096722467,
+              "latencyMs": 80
+            },
+            {
+              "revision": 78,
+              "submittedMs": 1792096722509,
+              "receivedMs": 1792096722552,
+              "latencyMs": 43
+            },
+            {
+              "revision": 79,
+              "submittedMs": 1792096722636,
+              "receivedMs": 1792096722724,
+              "latencyMs": 88
+            },
+            {
+              "revision": 80,
+              "submittedMs": 1792096722761,
+              "receivedMs": 1792096722809,
+              "latencyMs": 48
+            },
+            {
+              "revision": 81,
+              "submittedMs": 1792096722886,
+              "receivedMs": 1792096722936,
+              "latencyMs": 50
+            },
+            {
+              "revision": 82,
+              "submittedMs": 1792096723011,
+              "receivedMs": 1792096723063,
+              "latencyMs": 52
+            },
+            {
+              "revision": 83,
+              "submittedMs": 1792096723133,
+              "receivedMs": 1792096723190,
+              "latencyMs": 57
+            },
+            {
+              "revision": 84,
+              "submittedMs": 1792096723260,
+              "receivedMs": 1792096723319,
+              "latencyMs": 59
+            },
+            {
+              "revision": 85,
+              "submittedMs": 1792096723384,
+              "receivedMs": 1792096723448,
+              "latencyMs": 64
+            },
+            {
+              "revision": 86,
+              "submittedMs": 1792096723508,
+              "receivedMs": 1792096723575,
+              "latencyMs": 67
+            },
+            {
+              "revision": 87,
+              "submittedMs": 1792096723629,
+              "receivedMs": 1792096723710,
+              "latencyMs": 81
+            },
+            {
+              "revision": 88,
+              "submittedMs": 1792096723755,
+              "receivedMs": 1792096723799,
+              "latencyMs": 44
+            },
+            {
+              "revision": 89,
+              "submittedMs": 1792096723879,
+              "receivedMs": 1792096723926,
+              "latencyMs": 47
+            },
+            {
+              "revision": 90,
+              "submittedMs": 1792096724005,
+              "receivedMs": 1792096724051,
+              "latencyMs": 46
+            },
+            {
+              "revision": 91,
+              "submittedMs": 1792096724130,
+              "receivedMs": 1792096724181,
+              "latencyMs": 51
+            },
+            {
+              "revision": 92,
+              "submittedMs": 1792096724256,
+              "receivedMs": 1792096724308,
+              "latencyMs": 52
+            },
+            {
+              "revision": 93,
+              "submittedMs": 1792096724384,
+              "receivedMs": 1792096724436,
+              "latencyMs": 52
+            },
+            {
+              "revision": 94,
+              "submittedMs": 1792096724511,
+              "receivedMs": 1792096724564,
+              "latencyMs": 53
+            },
+            {
+              "revision": 95,
+              "submittedMs": 1792096724633,
+              "receivedMs": 1792096724693,
+              "latencyMs": 60
+            },
+            {
+              "revision": 96,
+              "submittedMs": 1792096724759,
+              "receivedMs": 1792096724821,
+              "latencyMs": 62
+            },
+            {
+              "revision": 97,
+              "submittedMs": 1792096724886,
+              "receivedMs": 1792096724949,
+              "latencyMs": 63
+            },
+            {
+              "revision": 98,
+              "submittedMs": 1792096725008,
+              "receivedMs": 1792096725078,
+              "latencyMs": 70
+            },
+            {
+              "revision": 99,
+              "submittedMs": 1792096725135,
+              "receivedMs": 1792096725207,
+              "latencyMs": 72
+            },
+            {
+              "revision": 100,
+              "submittedMs": 1792096725262,
+              "receivedMs": 1792096725333,
+              "latencyMs": 71
+            },
+            {
+              "revision": 101,
+              "submittedMs": 1792096725388,
+              "receivedMs": 1792096725463,
+              "latencyMs": 75
+            },
+            {
+              "revision": 102,
+              "submittedMs": 1792096725512,
+              "receivedMs": 1792096725589,
+              "latencyMs": 77
+            },
+            {
+              "revision": 103,
+              "submittedMs": 1792096725634,
+              "receivedMs": 1792096725716,
+              "latencyMs": 82
+            },
+            {
+              "revision": 104,
+              "submittedMs": 1792096725761,
+              "receivedMs": 1792096725805,
+              "latencyMs": 44
+            },
+            {
+              "revision": 105,
+              "submittedMs": 1792096725887,
+              "receivedMs": 1792096725931,
+              "latencyMs": 44
+            },
+            {
+              "revision": 106,
+              "submittedMs": 1792096726014,
+              "receivedMs": 1792096726058,
+              "latencyMs": 44
+            },
+            {
+              "revision": 107,
+              "submittedMs": 1792096726136,
+              "receivedMs": 1792096726185,
+              "latencyMs": 49
+            },
+            {
+              "revision": 108,
+              "submittedMs": 1792096726259,
+              "receivedMs": 1792096726314,
+              "latencyMs": 55
+            },
+            {
+              "revision": 109,
+              "submittedMs": 1792096726390,
+              "receivedMs": 1792096726444,
+              "latencyMs": 54
+            },
+            {
+              "revision": 110,
+              "submittedMs": 1792096726519,
+              "receivedMs": 1792096726573,
+              "latencyMs": 54
+            }
+          ],
+          "stats": {
+            "active": true,
+            "coalesced": 0,
+            "duplicates": 0,
+            "epoch": 1,
+            "lastError": null,
+            "lastReceivedMs": 1792096726624,
+            "lastSendDurationUs": 7516,
+            "lastSentEpoch": 1,
+            "lastSentMs": 1792096727208,
+            "lastSentRevision": 111,
+            "rejected": 0,
+            "repeated": 320,
+            "sent": 431,
+            "submitted": 111
+          }
+        }
+      ],
+      "processPeaks": {
+        "receiver-0": {
+          "peakCpuPercent": 3.2,
+          "peakRssMiB": 18.7
+        },
+        "sender": {
+          "peakCpuPercent": 65.2,
+          "peakRssMiB": 30.5
+        }
+      },
+      "lifecyclePassed": true,
+      "senderBinarySha256": "cd4792270f960024b133c9e05fff75ff1afc18dfd7eed4ea167890eaddf77f5d",
+      "receiverBinarySha256": "f88693fe0fcf155b6d8ee0c94e784f6eb556d23c7ced30d3508567ebcd92fa3e"
+    },
+    {
+      "resolution": 1080,
+      "fps": 60,
+      "outputCount": 2,
+      "alphaMode": "premultiplied",
+      "senderBuild": "debug",
+      "outputs": [
+        {
+          "scope": "native submit to local SDK capture; excludes renderer, IPC and vMix",
+          "valid": true,
+          "output": "qa-0",
+          "samples": 100,
+          "missing": [],
+          "p50Ms": 112,
+          "p95Ms": 137,
+          "p99Ms": 165,
+          "maxMs": 168,
+          "terminalClear": true,
+          "staleAfterTerminal": false,
+          "exactRate": true,
+          "measurements": [
+            {
+              "revision": 11,
+              "submittedMs": 1792096894369,
+              "receivedMs": 1792096894522,
+              "latencyMs": 153
+            },
+            {
+              "revision": 12,
+              "submittedMs": 1792096894599,
+              "receivedMs": 1792096894744,
+              "latencyMs": 145
+            },
+            {
+              "revision": 13,
+              "submittedMs": 1792096894840,
+              "receivedMs": 1792096894972,
+              "latencyMs": 132
+            },
+            {
+              "revision": 14,
+              "submittedMs": 1792096895059,
+              "receivedMs": 1792096895224,
+              "latencyMs": 165
+            },
+            {
+              "revision": 15,
+              "submittedMs": 1792096895307,
+              "receivedMs": 1792096895475,
+              "latencyMs": 168
+            },
+            {
+              "revision": 16,
+              "submittedMs": 1792096895558,
+              "receivedMs": 1792096895693,
+              "latencyMs": 135
+            },
+            {
+              "revision": 17,
+              "submittedMs": 1792096895772,
+              "receivedMs": 1792096895877,
+              "latencyMs": 105
+            },
+            {
+              "revision": 18,
+              "submittedMs": 1792096895976,
+              "receivedMs": 1792096896075,
+              "latencyMs": 99
+            },
+            {
+              "revision": 19,
+              "submittedMs": 1792096896177,
+              "receivedMs": 1792096896292,
+              "latencyMs": 115
+            },
+            {
+              "revision": 20,
+              "submittedMs": 1792096896380,
+              "receivedMs": 1792096896490,
+              "latencyMs": 110
+            },
+            {
+              "revision": 21,
+              "submittedMs": 1792096896585,
+              "receivedMs": 1792096896687,
+              "latencyMs": 102
+            },
+            {
+              "revision": 22,
+              "submittedMs": 1792096896789,
+              "receivedMs": 1792096896901,
+              "latencyMs": 112
+            },
+            {
+              "revision": 23,
+              "submittedMs": 1792096896994,
+              "receivedMs": 1792096897098,
+              "latencyMs": 104
+            },
+            {
+              "revision": 24,
+              "submittedMs": 1792096897199,
+              "receivedMs": 1792096897318,
+              "latencyMs": 119
+            },
+            {
+              "revision": 25,
+              "submittedMs": 1792096897406,
+              "receivedMs": 1792096897518,
+              "latencyMs": 112
+            },
+            {
+              "revision": 26,
+              "submittedMs": 1792096897611,
+              "receivedMs": 1792096897723,
+              "latencyMs": 112
+            },
+            {
+              "revision": 27,
+              "submittedMs": 1792096897820,
+              "receivedMs": 1792096897921,
+              "latencyMs": 101
+            },
+            {
+              "revision": 28,
+              "submittedMs": 1792096898025,
+              "receivedMs": 1792096898138,
+              "latencyMs": 113
+            },
+            {
+              "revision": 29,
+              "submittedMs": 1792096898226,
+              "receivedMs": 1792096898339,
+              "latencyMs": 113
+            },
+            {
+              "revision": 30,
+              "submittedMs": 1792096898431,
+              "receivedMs": 1792096898536,
+              "latencyMs": 105
+            },
+            {
+              "revision": 31,
+              "submittedMs": 1792096898633,
+              "receivedMs": 1792096898732,
+              "latencyMs": 99
+            },
+            {
+              "revision": 32,
+              "submittedMs": 1792096898833,
+              "receivedMs": 1792096898946,
+              "latencyMs": 113
+            },
+            {
+              "revision": 33,
+              "submittedMs": 1792096899037,
+              "receivedMs": 1792096899143,
+              "latencyMs": 106
+            },
+            {
+              "revision": 34,
+              "submittedMs": 1792096899240,
+              "receivedMs": 1792096899353,
+              "latencyMs": 113
+            },
+            {
+              "revision": 35,
+              "submittedMs": 1792096899455,
+              "receivedMs": 1792096899568,
+              "latencyMs": 113
+            },
+            {
+              "revision": 36,
+              "submittedMs": 1792096899665,
+              "receivedMs": 1792096899765,
+              "latencyMs": 100
+            },
+            {
+              "revision": 37,
+              "submittedMs": 1792096899867,
+              "receivedMs": 1792096899981,
+              "latencyMs": 114
+            },
+            {
+              "revision": 38,
+              "submittedMs": 1792096900073,
+              "receivedMs": 1792096900181,
+              "latencyMs": 108
+            },
+            {
+              "revision": 39,
+              "submittedMs": 1792096900277,
+              "receivedMs": 1792096900384,
+              "latencyMs": 107
+            },
+            {
+              "revision": 40,
+              "submittedMs": 1792096900487,
+              "receivedMs": 1792096900600,
+              "latencyMs": 113
+            },
+            {
+              "revision": 41,
+              "submittedMs": 1792096900690,
+              "receivedMs": 1792096900797,
+              "latencyMs": 107
+            },
+            {
+              "revision": 42,
+              "submittedMs": 1792096900893,
+              "receivedMs": 1792096901001,
+              "latencyMs": 108
+            },
+            {
+              "revision": 43,
+              "submittedMs": 1792096901101,
+              "receivedMs": 1792096901220,
+              "latencyMs": 119
+            },
+            {
+              "revision": 44,
+              "submittedMs": 1792096901306,
+              "receivedMs": 1792096901418,
+              "latencyMs": 112
+            },
+            {
+              "revision": 45,
+              "submittedMs": 1792096901511,
+              "receivedMs": 1792096901617,
+              "latencyMs": 106
+            },
+            {
+              "revision": 46,
+              "submittedMs": 1792096901716,
+              "receivedMs": 1792096901815,
+              "latencyMs": 99
+            },
+            {
+              "revision": 47,
+              "submittedMs": 1792096901921,
+              "receivedMs": 1792096902031,
+              "latencyMs": 110
+            },
+            {
+              "revision": 48,
+              "submittedMs": 1792096902128,
+              "receivedMs": 1792096902228,
+              "latencyMs": 100
+            },
+            {
+              "revision": 49,
+              "submittedMs": 1792096902330,
+              "receivedMs": 1792096902444,
+              "latencyMs": 114
+            },
+            {
+              "revision": 50,
+              "submittedMs": 1792096902534,
+              "receivedMs": 1792096902641,
+              "latencyMs": 107
+            },
+            {
+              "revision": 51,
+              "submittedMs": 1792096902737,
+              "receivedMs": 1792096902837,
+              "latencyMs": 100
+            },
+            {
+              "revision": 52,
+              "submittedMs": 1792096902940,
+              "receivedMs": 1792096903052,
+              "latencyMs": 112
+            },
+            {
+              "revision": 53,
+              "submittedMs": 1792096903144,
+              "receivedMs": 1792096903250,
+              "latencyMs": 106
+            },
+            {
+              "revision": 54,
+              "submittedMs": 1792096903349,
+              "receivedMs": 1792096903449,
+              "latencyMs": 100
+            },
+            {
+              "revision": 55,
+              "submittedMs": 1792096903554,
+              "receivedMs": 1792096903666,
+              "latencyMs": 112
+            },
+            {
+              "revision": 56,
+              "submittedMs": 1792096903760,
+              "receivedMs": 1792096903867,
+              "latencyMs": 107
+            },
+            {
+              "revision": 57,
+              "submittedMs": 1792096903969,
+              "receivedMs": 1792096904087,
+              "latencyMs": 118
+            },
+            {
+              "revision": 58,
+              "submittedMs": 1792096904178,
+              "receivedMs": 1792096904283,
+              "latencyMs": 105
+            },
+            {
+              "revision": 59,
+              "submittedMs": 1792096904382,
+              "receivedMs": 1792096904480,
+              "latencyMs": 98
+            },
+            {
+              "revision": 60,
+              "submittedMs": 1792096904582,
+              "receivedMs": 1792096904696,
+              "latencyMs": 114
+            },
+            {
+              "revision": 61,
+              "submittedMs": 1792096904786,
+              "receivedMs": 1792096904894,
+              "latencyMs": 108
+            },
+            {
+              "revision": 62,
+              "submittedMs": 1792096904987,
+              "receivedMs": 1792096905092,
+              "latencyMs": 105
+            },
+            {
+              "revision": 63,
+              "submittedMs": 1792096905190,
+              "receivedMs": 1792096905290,
+              "latencyMs": 100
+            },
+            {
+              "revision": 64,
+              "submittedMs": 1792096905397,
+              "receivedMs": 1792096905504,
+              "latencyMs": 107
+            },
+            {
+              "revision": 65,
+              "submittedMs": 1792096905601,
+              "receivedMs": 1792096905701,
+              "latencyMs": 100
+            },
+            {
+              "revision": 66,
+              "submittedMs": 1792096905807,
+              "receivedMs": 1792096905916,
+              "latencyMs": 109
+            },
+            {
+              "revision": 67,
+              "submittedMs": 1792096906014,
+              "receivedMs": 1792096906113,
+              "latencyMs": 99
+            },
+            {
+              "revision": 68,
+              "submittedMs": 1792096906217,
+              "receivedMs": 1792096906339,
+              "latencyMs": 122
+            },
+            {
+              "revision": 69,
+              "submittedMs": 1792096906435,
+              "receivedMs": 1792096906546,
+              "latencyMs": 111
+            },
+            {
+              "revision": 70,
+              "submittedMs": 1792096906647,
+              "receivedMs": 1792096906766,
+              "latencyMs": 119
+            },
+            {
+              "revision": 71,
+              "submittedMs": 1792096906855,
+              "receivedMs": 1792096906964,
+              "latencyMs": 109
+            },
+            {
+              "revision": 72,
+              "submittedMs": 1792096907059,
+              "receivedMs": 1792096907161,
+              "latencyMs": 102
+            },
+            {
+              "revision": 73,
+              "submittedMs": 1792096907264,
+              "receivedMs": 1792096907385,
+              "latencyMs": 121
+            },
+            {
+              "revision": 74,
+              "submittedMs": 1792096907474,
+              "receivedMs": 1792096907587,
+              "latencyMs": 113
+            },
+            {
+              "revision": 75,
+              "submittedMs": 1792096907683,
+              "receivedMs": 1792096907800,
+              "latencyMs": 117
+            },
+            {
+              "revision": 76,
+              "submittedMs": 1792096907893,
+              "receivedMs": 1792096908001,
+              "latencyMs": 108
+            },
+            {
+              "revision": 77,
+              "submittedMs": 1792096908102,
+              "receivedMs": 1792096908214,
+              "latencyMs": 112
+            },
+            {
+              "revision": 78,
+              "submittedMs": 1792096908306,
+              "receivedMs": 1792096908419,
+              "latencyMs": 113
+            },
+            {
+              "revision": 79,
+              "submittedMs": 1792096908528,
+              "receivedMs": 1792096908642,
+              "latencyMs": 114
+            },
+            {
+              "revision": 80,
+              "submittedMs": 1792096908734,
+              "receivedMs": 1792096908842,
+              "latencyMs": 108
+            },
+            {
+              "revision": 81,
+              "submittedMs": 1792096908936,
+              "receivedMs": 1792096909043,
+              "latencyMs": 107
+            },
+            {
+              "revision": 82,
+              "submittedMs": 1792096909142,
+              "receivedMs": 1792096909248,
+              "latencyMs": 106
+            },
+            {
+              "revision": 83,
+              "submittedMs": 1792096909350,
+              "receivedMs": 1792096909468,
+              "latencyMs": 118
+            },
+            {
+              "revision": 84,
+              "submittedMs": 1792096909559,
+              "receivedMs": 1792096909676,
+              "latencyMs": 117
+            },
+            {
+              "revision": 85,
+              "submittedMs": 1792096909770,
+              "receivedMs": 1792096909886,
+              "latencyMs": 116
+            },
+            {
+              "revision": 86,
+              "submittedMs": 1792096909988,
+              "receivedMs": 1792096910104,
+              "latencyMs": 116
+            },
+            {
+              "revision": 87,
+              "submittedMs": 1792096910197,
+              "receivedMs": 1792096910314,
+              "latencyMs": 117
+            },
+            {
+              "revision": 88,
+              "submittedMs": 1792096910408,
+              "receivedMs": 1792096910520,
+              "latencyMs": 112
+            },
+            {
+              "revision": 89,
+              "submittedMs": 1792096910625,
+              "receivedMs": 1792096910743,
+              "latencyMs": 118
+            },
+            {
+              "revision": 90,
+              "submittedMs": 1792096910832,
+              "receivedMs": 1792096910949,
+              "latencyMs": 117
+            },
+            {
+              "revision": 91,
+              "submittedMs": 1792096911040,
+              "receivedMs": 1792096911157,
+              "latencyMs": 117
+            },
+            {
+              "revision": 92,
+              "submittedMs": 1792096911260,
+              "receivedMs": 1792096911383,
+              "latencyMs": 123
+            },
+            {
+              "revision": 93,
+              "submittedMs": 1792096911473,
+              "receivedMs": 1792096911586,
+              "latencyMs": 113
+            },
+            {
+              "revision": 94,
+              "submittedMs": 1792096911684,
+              "receivedMs": 1792096911791,
+              "latencyMs": 107
+            },
+            {
+              "revision": 95,
+              "submittedMs": 1792096911894,
+              "receivedMs": 1792096912016,
+              "latencyMs": 122
+            },
+            {
+              "revision": 96,
+              "submittedMs": 1792096912103,
+              "receivedMs": 1792096912228,
+              "latencyMs": 125
+            },
+            {
+              "revision": 97,
+              "submittedMs": 1792096912312,
+              "receivedMs": 1792096912439,
+              "latencyMs": 127
+            },
+            {
+              "revision": 98,
+              "submittedMs": 1792096912532,
+              "receivedMs": 1792096912644,
+              "latencyMs": 112
+            },
+            {
+              "revision": 99,
+              "submittedMs": 1792096912741,
+              "receivedMs": 1792096912850,
+              "latencyMs": 109
+            },
+            {
+              "revision": 100,
+              "submittedMs": 1792096912959,
+              "receivedMs": 1792096913080,
+              "latencyMs": 121
+            },
+            {
+              "revision": 101,
+              "submittedMs": 1792096913187,
+              "receivedMs": 1792096913326,
+              "latencyMs": 139
+            },
+            {
+              "revision": 102,
+              "submittedMs": 1792096913409,
+              "receivedMs": 1792096913546,
+              "latencyMs": 137
+            },
+            {
+              "revision": 103,
+              "submittedMs": 1792096913622,
+              "receivedMs": 1792096913728,
+              "latencyMs": 106
+            },
+            {
+              "revision": 104,
+              "submittedMs": 1792096913826,
+              "receivedMs": 1792096913925,
+              "latencyMs": 99
+            },
+            {
+              "revision": 105,
+              "submittedMs": 1792096914030,
+              "receivedMs": 1792096914146,
+              "latencyMs": 116
+            },
+            {
+              "revision": 106,
+              "submittedMs": 1792096914237,
+              "receivedMs": 1792096914343,
+              "latencyMs": 106
+            },
+            {
+              "revision": 107,
+              "submittedMs": 1792096914439,
+              "receivedMs": 1792096914541,
+              "latencyMs": 102
+            },
+            {
+              "revision": 108,
+              "submittedMs": 1792096914645,
+              "receivedMs": 1792096914756,
+              "latencyMs": 111
+            },
+            {
+              "revision": 109,
+              "submittedMs": 1792096914849,
+              "receivedMs": 1792096914953,
+              "latencyMs": 104
+            },
+            {
+              "revision": 110,
+              "submittedMs": 1792096915053,
+              "receivedMs": 1792096915169,
+              "latencyMs": 116
+            }
+          ],
+          "stats": {
+            "active": true,
+            "coalesced": 0,
+            "duplicates": 0,
+            "epoch": 1,
+            "lastError": null,
+            "lastReceivedMs": 1792096915207,
+            "lastSendDurationUs": 4580,
+            "lastSentEpoch": 1,
+            "lastSentMs": 1792096915803,
+            "lastSentRevision": 111,
+            "rejected": 0,
+            "repeated": 955,
+            "sent": 1066,
+            "submitted": 111
+          }
+        },
+        {
+          "scope": "native submit to local SDK capture; excludes renderer, IPC and vMix",
+          "valid": true,
+          "output": "qa-1",
+          "samples": 100,
+          "missing": [],
+          "p50Ms": 111,
+          "p95Ms": 127,
+          "p99Ms": 143,
+          "maxMs": 178,
+          "terminalClear": true,
+          "staleAfterTerminal": false,
+          "exactRate": true,
+          "measurements": [
+            {
+              "revision": 11,
+              "submittedMs": 1792096894441,
+              "receivedMs": 1792096894571,
+              "latencyMs": 130
+            },
+            {
+              "revision": 12,
+              "submittedMs": 1792096894670,
+              "receivedMs": 1792096894813,
+              "latencyMs": 143
+            },
+            {
+              "revision": 13,
+              "submittedMs": 1792096894905,
+              "receivedMs": 1792096895032,
+              "latencyMs": 127
+            },
+            {
+              "revision": 14,
+              "submittedMs": 1792096895125,
+              "receivedMs": 1792096895303,
+              "latencyMs": 178
+            },
+            {
+              "revision": 15,
+              "submittedMs": 1792096895403,
+              "receivedMs": 1792096895520,
+              "latencyMs": 117
+            },
+            {
+              "revision": 16,
+              "submittedMs": 1792096895614,
+              "receivedMs": 1792096895736,
+              "latencyMs": 122
+            },
+            {
+              "revision": 17,
+              "submittedMs": 1792096895820,
+              "receivedMs": 1792096895938,
+              "latencyMs": 118
+            },
+            {
+              "revision": 18,
+              "submittedMs": 1792096896025,
+              "receivedMs": 1792096896137,
+              "latencyMs": 112
+            },
+            {
+              "revision": 19,
+              "submittedMs": 1792096896226,
+              "receivedMs": 1792096896342,
+              "latencyMs": 116
+            },
+            {
+              "revision": 20,
+              "submittedMs": 1792096896431,
+              "receivedMs": 1792096896538,
+              "latencyMs": 107
+            },
+            {
+              "revision": 21,
+              "submittedMs": 1792096896635,
+              "receivedMs": 1792096896738,
+              "latencyMs": 103
+            },
+            {
+              "revision": 22,
+              "submittedMs": 1792096896838,
+              "receivedMs": 1792096896956,
+              "latencyMs": 118
+            },
+            {
+              "revision": 23,
+              "submittedMs": 1792096897044,
+              "receivedMs": 1792096897154,
+              "latencyMs": 110
+            },
+            {
+              "revision": 24,
+              "submittedMs": 1792096897250,
+              "receivedMs": 1792096897354,
+              "latencyMs": 104
+            },
+            {
+              "revision": 25,
+              "submittedMs": 1792096897457,
+              "receivedMs": 1792096897570,
+              "latencyMs": 113
+            },
+            {
+              "revision": 26,
+              "submittedMs": 1792096897667,
+              "receivedMs": 1792096897766,
+              "latencyMs": 99
+            },
+            {
+              "revision": 27,
+              "submittedMs": 1792096897871,
+              "receivedMs": 1792096897982,
+              "latencyMs": 111
+            },
+            {
+              "revision": 28,
+              "submittedMs": 1792096898075,
+              "receivedMs": 1792096898180,
+              "latencyMs": 105
+            },
+            {
+              "revision": 29,
+              "submittedMs": 1792096898278,
+              "receivedMs": 1792096898379,
+              "latencyMs": 101
+            },
+            {
+              "revision": 30,
+              "submittedMs": 1792096898481,
+              "receivedMs": 1792096898594,
+              "latencyMs": 113
+            },
+            {
+              "revision": 31,
+              "submittedMs": 1792096898682,
+              "receivedMs": 1792096898792,
+              "latencyMs": 110
+            },
+            {
+              "revision": 32,
+              "submittedMs": 1792096898883,
+              "receivedMs": 1792096898992,
+              "latencyMs": 109
+            },
+            {
+              "revision": 33,
+              "submittedMs": 1792096899086,
+              "receivedMs": 1792096899189,
+              "latencyMs": 103
+            },
+            {
+              "revision": 34,
+              "submittedMs": 1792096899295,
+              "receivedMs": 1792096899417,
+              "latencyMs": 122
+            },
+            {
+              "revision": 35,
+              "submittedMs": 1792096899511,
+              "receivedMs": 1792096899613,
+              "latencyMs": 102
+            },
+            {
+              "revision": 36,
+              "submittedMs": 1792096899716,
+              "receivedMs": 1792096899829,
+              "latencyMs": 113
+            },
+            {
+              "revision": 37,
+              "submittedMs": 1792096899917,
+              "receivedMs": 1792096900029,
+              "latencyMs": 112
+            },
+            {
+              "revision": 38,
+              "submittedMs": 1792096900122,
+              "receivedMs": 1792096900230,
+              "latencyMs": 108
+            },
+            {
+              "revision": 39,
+              "submittedMs": 1792096900332,
+              "receivedMs": 1792096900445,
+              "latencyMs": 113
+            },
+            {
+              "revision": 40,
+              "submittedMs": 1792096900536,
+              "receivedMs": 1792096900643,
+              "latencyMs": 107
+            },
+            {
+              "revision": 41,
+              "submittedMs": 1792096900740,
+              "receivedMs": 1792096900839,
+              "latencyMs": 99
+            },
+            {
+              "revision": 42,
+              "submittedMs": 1792096900942,
+              "receivedMs": 1792096901063,
+              "latencyMs": 121
+            },
+            {
+              "revision": 43,
+              "submittedMs": 1792096901152,
+              "receivedMs": 1792096901261,
+              "latencyMs": 109
+            },
+            {
+              "revision": 44,
+              "submittedMs": 1792096901355,
+              "receivedMs": 1792096901458,
+              "latencyMs": 103
+            },
+            {
+              "revision": 45,
+              "submittedMs": 1792096901561,
+              "receivedMs": 1792096901680,
+              "latencyMs": 119
+            },
+            {
+              "revision": 46,
+              "submittedMs": 1792096901766,
+              "receivedMs": 1792096901882,
+              "latencyMs": 116
+            },
+            {
+              "revision": 47,
+              "submittedMs": 1792096901974,
+              "receivedMs": 1792096902080,
+              "latencyMs": 106
+            },
+            {
+              "revision": 48,
+              "submittedMs": 1792096902178,
+              "receivedMs": 1792096902279,
+              "latencyMs": 101
+            },
+            {
+              "revision": 49,
+              "submittedMs": 1792096902380,
+              "receivedMs": 1792096902493,
+              "latencyMs": 113
+            },
+            {
+              "revision": 50,
+              "submittedMs": 1792096902583,
+              "receivedMs": 1792096902691,
+              "latencyMs": 108
+            },
+            {
+              "revision": 51,
+              "submittedMs": 1792096902787,
+              "receivedMs": 1792096902888,
+              "latencyMs": 101
+            },
+            {
+              "revision": 52,
+              "submittedMs": 1792096902991,
+              "receivedMs": 1792096903104,
+              "latencyMs": 113
+            },
+            {
+              "revision": 53,
+              "submittedMs": 1792096903193,
+              "receivedMs": 1792096903303,
+              "latencyMs": 110
+            },
+            {
+              "revision": 54,
+              "submittedMs": 1792096903399,
+              "receivedMs": 1792096903501,
+              "latencyMs": 102
+            },
+            {
+              "revision": 55,
+              "submittedMs": 1792096903605,
+              "receivedMs": 1792096903718,
+              "latencyMs": 113
+            },
+            {
+              "revision": 56,
+              "submittedMs": 1792096903811,
+              "receivedMs": 1792096903925,
+              "latencyMs": 114
+            },
+            {
+              "revision": 57,
+              "submittedMs": 1792096904022,
+              "receivedMs": 1792096904125,
+              "latencyMs": 103
+            },
+            {
+              "revision": 58,
+              "submittedMs": 1792096904227,
+              "receivedMs": 1792096904342,
+              "latencyMs": 115
+            },
+            {
+              "revision": 59,
+              "submittedMs": 1792096904431,
+              "receivedMs": 1792096904541,
+              "latencyMs": 110
+            },
+            {
+              "revision": 60,
+              "submittedMs": 1792096904632,
+              "receivedMs": 1792096904738,
+              "latencyMs": 106
+            },
+            {
+              "revision": 61,
+              "submittedMs": 1792096904836,
+              "receivedMs": 1792096904936,
+              "latencyMs": 100
+            },
+            {
+              "revision": 62,
+              "submittedMs": 1792096905038,
+              "receivedMs": 1792096905151,
+              "latencyMs": 113
+            },
+            {
+              "revision": 63,
+              "submittedMs": 1792096905241,
+              "receivedMs": 1792096905348,
+              "latencyMs": 107
+            },
+            {
+              "revision": 64,
+              "submittedMs": 1792096905447,
+              "receivedMs": 1792096905547,
+              "latencyMs": 100
+            },
+            {
+              "revision": 65,
+              "submittedMs": 1792096905651,
+              "receivedMs": 1792096905762,
+              "latencyMs": 111
+            },
+            {
+              "revision": 66,
+              "submittedMs": 1792096905856,
+              "receivedMs": 1792096905961,
+              "latencyMs": 105
+            },
+            {
+              "revision": 67,
+              "submittedMs": 1792096906063,
+              "receivedMs": 1792096906177,
+              "latencyMs": 114
+            },
+            {
+              "revision": 68,
+              "submittedMs": 1792096906280,
+              "receivedMs": 1792096906398,
+              "latencyMs": 118
+            },
+            {
+              "revision": 69,
+              "submittedMs": 1792096906489,
+              "receivedMs": 1792096906601,
+              "latencyMs": 112
+            },
+            {
+              "revision": 70,
+              "submittedMs": 1792096906703,
+              "receivedMs": 1792096906816,
+              "latencyMs": 113
+            },
+            {
+              "revision": 71,
+              "submittedMs": 1792096906904,
+              "receivedMs": 1792096907015,
+              "latencyMs": 111
+            },
+            {
+              "revision": 72,
+              "submittedMs": 1792096907109,
+              "receivedMs": 1792096907215,
+              "latencyMs": 106
+            },
+            {
+              "revision": 73,
+              "submittedMs": 1792096907319,
+              "receivedMs": 1792096907435,
+              "latencyMs": 116
+            },
+            {
+              "revision": 74,
+              "submittedMs": 1792096907523,
+              "receivedMs": 1792096907649,
+              "latencyMs": 126
+            },
+            {
+              "revision": 75,
+              "submittedMs": 1792096907736,
+              "receivedMs": 1792096907857,
+              "latencyMs": 121
+            },
+            {
+              "revision": 76,
+              "submittedMs": 1792096907943,
+              "receivedMs": 1792096908062,
+              "latencyMs": 119
+            },
+            {
+              "revision": 77,
+              "submittedMs": 1792096908152,
+              "receivedMs": 1792096908261,
+              "latencyMs": 109
+            },
+            {
+              "revision": 78,
+              "submittedMs": 1792096908358,
+              "receivedMs": 1792096908469,
+              "latencyMs": 111
+            },
+            {
+              "revision": 79,
+              "submittedMs": 1792096908581,
+              "receivedMs": 1792096908691,
+              "latencyMs": 110
+            },
+            {
+              "revision": 80,
+              "submittedMs": 1792096908784,
+              "receivedMs": 1792096908888,
+              "latencyMs": 104
+            },
+            {
+              "revision": 81,
+              "submittedMs": 1792096908986,
+              "receivedMs": 1792096909090,
+              "latencyMs": 104
+            },
+            {
+              "revision": 82,
+              "submittedMs": 1792096909194,
+              "receivedMs": 1792096909311,
+              "latencyMs": 117
+            },
+            {
+              "revision": 83,
+              "submittedMs": 1792096909402,
+              "receivedMs": 1792096909509,
+              "latencyMs": 107
+            },
+            {
+              "revision": 84,
+              "submittedMs": 1792096909611,
+              "receivedMs": 1792096909737,
+              "latencyMs": 126
+            },
+            {
+              "revision": 85,
+              "submittedMs": 1792096909825,
+              "receivedMs": 1792096909936,
+              "latencyMs": 111
+            },
+            {
+              "revision": 86,
+              "submittedMs": 1792096910039,
+              "receivedMs": 1792096910158,
+              "latencyMs": 119
+            },
+            {
+              "revision": 87,
+              "submittedMs": 1792096910251,
+              "receivedMs": 1792096910369,
+              "latencyMs": 118
+            },
+            {
+              "revision": 88,
+              "submittedMs": 1792096910462,
+              "receivedMs": 1792096910580,
+              "latencyMs": 118
+            },
+            {
+              "revision": 89,
+              "submittedMs": 1792096910677,
+              "receivedMs": 1792096910783,
+              "latencyMs": 106
+            },
+            {
+              "revision": 90,
+              "submittedMs": 1792096910887,
+              "receivedMs": 1792096911010,
+              "latencyMs": 123
+            },
+            {
+              "revision": 91,
+              "submittedMs": 1792096911092,
+              "receivedMs": 1792096911222,
+              "latencyMs": 130
+            },
+            {
+              "revision": 92,
+              "submittedMs": 1792096911313,
+              "receivedMs": 1792096911427,
+              "latencyMs": 114
+            },
+            {
+              "revision": 93,
+              "submittedMs": 1792096911526,
+              "receivedMs": 1792096911628,
+              "latencyMs": 102
+            },
+            {
+              "revision": 94,
+              "submittedMs": 1792096911736,
+              "receivedMs": 1792096911846,
+              "latencyMs": 110
+            },
+            {
+              "revision": 95,
+              "submittedMs": 1792096911947,
+              "receivedMs": 1792096912071,
+              "latencyMs": 124
+            },
+            {
+              "revision": 96,
+              "submittedMs": 1792096912154,
+              "receivedMs": 1792096912277,
+              "latencyMs": 123
+            },
+            {
+              "revision": 97,
+              "submittedMs": 1792096912374,
+              "receivedMs": 1792096912482,
+              "latencyMs": 108
+            },
+            {
+              "revision": 98,
+              "submittedMs": 1792096912586,
+              "receivedMs": 1792096912703,
+              "latencyMs": 117
+            },
+            {
+              "revision": 99,
+              "submittedMs": 1792096912794,
+              "receivedMs": 1792096912917,
+              "latencyMs": 123
+            },
+            {
+              "revision": 100,
+              "submittedMs": 1792096913023,
+              "receivedMs": 1792096913139,
+              "latencyMs": 116
+            },
+            {
+              "revision": 101,
+              "submittedMs": 1792096913244,
+              "receivedMs": 1792096913378,
+              "latencyMs": 134
+            },
+            {
+              "revision": 102,
+              "submittedMs": 1792096913467,
+              "receivedMs": 1792096913592,
+              "latencyMs": 125
+            },
+            {
+              "revision": 103,
+              "submittedMs": 1792096913672,
+              "receivedMs": 1792096913773,
+              "latencyMs": 101
+            },
+            {
+              "revision": 104,
+              "submittedMs": 1792096913876,
+              "receivedMs": 1792096913990,
+              "latencyMs": 114
+            },
+            {
+              "revision": 105,
+              "submittedMs": 1792096914083,
+              "receivedMs": 1792096914187,
+              "latencyMs": 104
+            },
+            {
+              "revision": 106,
+              "submittedMs": 1792096914287,
+              "receivedMs": 1792096914387,
+              "latencyMs": 100
+            },
+            {
+              "revision": 107,
+              "submittedMs": 1792096914490,
+              "receivedMs": 1792096914602,
+              "latencyMs": 112
+            },
+            {
+              "revision": 108,
+              "submittedMs": 1792096914694,
+              "receivedMs": 1792096914800,
+              "latencyMs": 106
+            },
+            {
+              "revision": 109,
+              "submittedMs": 1792096914899,
+              "receivedMs": 1792096914998,
+              "latencyMs": 99
+            },
+            {
+              "revision": 110,
+              "submittedMs": 1792096915102,
+              "receivedMs": 1792096915213,
+              "latencyMs": 111
+            }
+          ],
+          "stats": {
+            "active": true,
+            "coalesced": 0,
+            "duplicates": 0,
+            "epoch": 1,
+            "lastError": null,
+            "lastReceivedMs": 1792096915207,
+            "lastSendDurationUs": 4580,
+            "lastSentEpoch": 1,
+            "lastSentMs": 1792096915799,
+            "lastSentRevision": 111,
+            "rejected": 0,
+            "repeated": 957,
+            "sent": 1068,
+            "submitted": 111
+          }
+        }
+      ],
+      "processPeaks": {
+        "receiver-0": {
+          "peakCpuPercent": 18.3,
+          "peakRssMiB": 23.3
+        },
+        "sender": {
+          "peakCpuPercent": 193.8,
+          "peakRssMiB": 73.9
+        },
+        "receiver-1": {
+          "peakCpuPercent": 17.6,
+          "peakRssMiB": 31.2
+        }
+      },
+      "lifecyclePassed": true,
+      "senderBinarySha256": "73698e4f5f213ed3aaab282715e0a45981333b02d5a09d15e4cc6235c943498a",
+      "receiverBinarySha256": "9d901f7e54754f4b8569dcbd60bc203523c164bd4ebdc3fc0d43410c77f36284"
+    }
+  ],
+  "excludedRun": {
+    "configuration": "two outputs 1080p60",
+    "reason": "original25secondreceiverended250msbeforeclear; incompletecaptureexcluded; extendedreceiverwaitsfor5terminalframes",
+    "sampleCounts": [
+      99,
+      98
+    ],
+    "nativeFinalRevision": [
+      111,
+      111
+    ]
+  }
+}

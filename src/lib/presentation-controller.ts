@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 import { mark } from "@/lib/latency-marks"
+import {
+  createBroadcastTrace,
+  markBroadcastTrace,
+  type BroadcastTrace,
+} from "@/lib/broadcast-trace"
 import { translationCode } from "@/lib/translation-selection"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -20,6 +25,7 @@ interface Intent {
   automatic: boolean
   followRevision: number
 }
+let reservedTrace: { revision: number; trace: BroadcastTrace } | null = null
 let revision = 0
 let pendingIntent: Intent | null = null
 let connections = 0
@@ -94,7 +100,15 @@ export async function presentVerse(
       options.followRevision ?? useBibleStore.getState().followRevision,
   }
   pendingIntent = intent
+  const inheritedTrace =
+    options.intentRevision !== undefined &&
+    reservedTrace?.revision === options.intentRevision
+      ? reservedTrace.trace
+      : null
+  reservedTrace = null
   const ticket = ++revision
+  const trace = inheritedTrace ?? createBroadcastTrace()
+  if (!inheritedTrace) markBroadcastTrace(trace, "intent_accepted")
   const startedLive = useBroadcastStore.getState().isLive
   const current = () => {
     const now = selection()
@@ -120,6 +134,7 @@ export async function presentVerse(
     mark(
       `presentVerse get_verse done ${reference.book_name} ${reference.chapter}:${reference.verse}`
     )
+    markBroadcastTrace(trace, "resolved")
     if (!current()) return
     if (
       !full ||
@@ -146,7 +161,12 @@ export async function presentVerse(
     if (!current()) return
     useBroadcastStore
       .getState()
-      .setLiveVerse(toVerseRenderData(full, selected.code), full)
+      .setLiveVerse(
+        toVerseRenderData(full, selected.code),
+        full,
+        "background",
+        trace
+      )
     mark(`presentVerse end ${full.book_name} ${full.chapter}:${full.verse}`)
   } catch (error) {
     if (current())
@@ -161,20 +181,26 @@ export async function presentVerse(
 
 /** Cancel unfinished work while retaining the last valid content. */
 export function invalidatePresentation(): void {
+  reservedTrace = null
   revision++
   pendingIntent = null
 }
 /** Claim operator intent before work that precedes the final verse lookup. */
 export function reservePresentationIntent(): number {
   invalidatePresentation()
+  const trace = createBroadcastTrace()
+  markBroadcastTrace(trace, "intent_accepted")
+  reservedTrace = { revision, trace }
   return revision
 }
 export function isPresentationIntentCurrent(ticket: number): boolean {
   return ticket === revision
 }
 export function clearLive(mode: OutputClearMode): void {
+  const trace = createBroadcastTrace()
+  markBroadcastTrace(trace, "intent_accepted")
   invalidatePresentation()
-  useBroadcastStore.getState().setLiveVerse(null, null, mode)
+  useBroadcastStore.getState().setLiveVerse(null, null, mode, trace)
 }
 export function refreshLiveVerse(): Promise<void> {
   const intent = pendingIntent

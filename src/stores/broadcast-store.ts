@@ -13,6 +13,8 @@ import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel } from "@/types"
 import { BUILTIN_THEMES, LOWER_THIRDS, CLASSIC_DARK } from "@/lib/builtin-themes"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
+import { createBroadcastTrace, markBroadcastTrace, type BroadcastTrace } from "@/lib/broadcast-trace"
+
 type SelectedElement = "verse" | "reference" | null
 
 export type NewThemeLayoutKind = "fullscreen" | "lower-thirds"
@@ -27,6 +29,7 @@ interface BroadcastState {
   outputStatus: Record<string, BroadcastOutputStatus>
   isLive: boolean
   liveVerse: VerseRenderData | null
+  liveTrace: BroadcastTrace | null
   clearMode: OutputClearMode
   /** Explicit clears must survive off/on without seeding the browsed preview. */
   hasExplicitClear: boolean
@@ -55,7 +58,7 @@ interface BroadcastState {
   togglePinTheme: (id: string) => void
   setActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
-  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null, clearMode?: OutputClearMode) => void
+  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null, clearMode?: OutputClearMode, trace?: BroadcastTrace) => void
   setAutoLive: (auto: boolean) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
@@ -120,6 +123,7 @@ function emitDraftToBroadcast(state: BroadcastState): void {
       theme: state.draftTheme,
       verse,
       clearMode: state.clearMode,
+      trace: state.liveTrace ?? undefined,
     }).catch(() => {})
   }
 }
@@ -169,6 +173,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   outputStatus: {},
   isLive: false,
   liveVerse: null,
+  liveTrace: null,
   clearMode: "background",
   hasExplicitClear: false,
   liveSourceVerse: null,
@@ -252,7 +257,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     const theme = s.themes.find((t) => t.id === output.themeId) ?? s.themes[0]
     if (!theme) return
 
+    const trace = s.liveTrace ?? createBroadcastTrace()
+    markBroadcastTrace(trace, "output_event", outputId)
     void emitTo(outputWindowLabel(outputId), "broadcast:verse-update", {
+      trace,
       theme,
       verse: s.isLive ? s.liveVerse : null,
       clearMode: s.clearMode,
@@ -334,11 +342,13 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       return { outputStatus: { ...s.outputStatus, [id]: status } }
     }),
   setLive: (isLive) => {
-    set({ isLive })
+    const trace = createBroadcastTrace()
+    markBroadcastTrace(trace, "intent_accepted")
+    set({ isLive, liveTrace: trace })
     get().syncBroadcastOutput()
   },
-  setLiveVerse: (liveVerse, source = null, clearMode = "background") => {
-    set({ liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null })
+  setLiveVerse: (liveVerse, source = null, clearMode = "background", trace = createBroadcastTrace()) => {
+    set({ liveTrace: trace, liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null })
     get().syncBroadcastOutput()
   },
   setAutoLive: (autoLive) => set({ autoLive }),

@@ -4,10 +4,10 @@
 )]
 
 use std::sync::Mutex;
+mod frame_protocol;
 
-use base64::Engine;
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::State;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -37,15 +37,6 @@ pub struct MonitorInfo {
     pub name: String,
     pub width: u32,
     pub height: u32,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NdiFrameRequest {
-    pub output_id: String,
-    pub width: u32,
-    pub height: u32,
-    pub rgba_base64: String,
 }
 
 #[tauri::command]
@@ -248,47 +239,96 @@ pub fn stop_ndi(output_id: String, runtime: State<'_, Mutex<NdiRuntime>>) -> Res
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NdiStatusResponse {
     pub active: bool,
     pub width: u32,
     pub height: u32,
     pub fps: u32,
+    pub generation: String,
+    pub frame_protocol: u32,
+    pub stats: rhema_broadcast::frame_pump::FrameStats,
 }
-
 #[tauri::command]
 pub fn get_ndi_status(
     output_id: String,
     runtime: State<'_, Mutex<NdiRuntime>>,
 ) -> Result<Option<NdiStatusResponse>, String> {
-    let runtime = runtime.lock().map_err(|e| e.to_string())?;
-    match runtime.current_info(&output_id) {
-        Some(info) => Ok(Some(NdiStatusResponse {
-            active: true,
+    let runtime = runtime.lock().map_err(|error| error.to_string())?;
+    Ok(runtime
+        .current_info(&output_id)
+        .zip(runtime.frame_stats(&output_id))
+        .map(|(info, stats)| NdiStatusResponse {
+            active: stats.active,
             width: info.width,
             height: info.height,
             fps: info.fps,
-        })),
-        None => Ok(None),
+            generation: info.generation,
+            frame_protocol: info.frame_protocol,
+            stats,
+        }))
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NdiRendererLease {
+    pub lease: String,
+    pub width: u32,
+    pub height: u32,
+    pub fps: u32,
+}
+#[tauri::command]
+pub fn begin_ndi_renderer(
+    output_id: String,
+    generation: String,
+    expected_epoch: u64,
+    window: tauri::WebviewWindow,
+    runtime: State<'_, Mutex<NdiRuntime>>,
+) -> Result<NdiRendererLease, String> {
+    if window.label() != window_label(&output_id)? {
+        return Err("frame renderer must own its output window".into());
     }
+    let runtime = runtime.lock().map_err(|error| error.to_string())?;
+    let lease = runtime
+        .begin_renderer(&output_id, &generation, expected_epoch)
+        .map_err(|error| error.to_string())?;
+    let info = runtime
+        .current_info(&output_id)
+        .ok_or("NDI session ended")?;
+    Ok(NdiRendererLease {
+        lease,
+        width: info.width,
+        height: info.height,
+        fps: info.fps,
+    })
 }
 
+// Binary RGBA body; headers carry only bounded protocol metadata. The command
+// enqueues owned bytes and returns without waiting for an SDK/receiver send.
 #[tauri::command]
 pub fn push_ndi_frame(
+    request: tauri::ipc::Request<'_>,
+    window: tauri::WebviewWindow,
     runtime: State<'_, Mutex<NdiRuntime>>,
-    request: NdiFrameRequest,
 ) -> Result<(), String> {
-    let rgba_data = base64::engine::general_purpose::STANDARD
-        .decode(&request.rgba_base64)
-        .map_err(|e| format!("base64 decode error: {e}"))?;
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("frame body must be binary RGBA".into());
+    };
+    let header = |name: &str| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+    };
+    let output_id = header("x-rhema-output").ok_or("missing output id")?;
+    if window.label() != window_label(output_id)? {
+        return Err("frame renderer must own its output window".into());
+    }
+    let packet = frame_protocol::parse_packet(header, bytes)?;
     runtime
-        .send_frame_rgba(
-            &request.output_id,
-            request.width,
-            request.height,
-            &rgba_data,
-        )
-        .map_err(|e| e.to_string())
+        .lock()
+        .map_err(|error| error.to_string())?
+        .submit_frame(&packet.output_id, &packet.lease, packet.frame)
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

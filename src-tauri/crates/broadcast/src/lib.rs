@@ -11,3 +11,5 @@
 //! - [`ndi::NdiError`] — error type for NDI operations
 
 pub mod ndi;
+
+pub mod frame_pump;
