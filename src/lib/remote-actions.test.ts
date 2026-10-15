@@ -11,6 +11,9 @@ vi.mock("@tauri-apps/api/event", () => ({
   emitTo: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock("@tauri-apps/api/window", () => ({ getAllWindows: vi.fn().mockResolvedValue([]) }))
+vi.mock("@tauri-apps/plugin-dialog", () => ({ ask: vi.fn().mockResolvedValue(true) }))
+
 import { remoteActions } from "./remote-actions"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -243,11 +246,11 @@ describe("remoteActions bible navigation", () => {
 })
 
 describe("remoteActions.toggleOnAir", () => {
-  it("sets the live flag to the value it is given", () => {
-    remoteActions.toggleOnAir(true)
+  it("sets the live flag to the value it is given", async () => {
+    await remoteActions.toggleOnAir(true)
     expect(useBroadcastStore.getState().isLive).toBe(true)
 
-    remoteActions.toggleOnAir(false)
+    await remoteActions.toggleOnAir(false)
     expect(useBroadcastStore.getState().isLive).toBe(false)
   })
 })

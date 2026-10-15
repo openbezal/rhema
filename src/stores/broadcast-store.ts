@@ -320,7 +320,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   setOutputStatus: (id, status) =>
     set((s) => {
       const prev = s.outputStatus[id]
-      if (prev && prev.previewOpen === status.previewOpen && prev.ndiActive === status.ndiActive) {
+      if (prev && prev.previewOpen === status.previewOpen && prev.ndiActive === status.ndiActive && prev.error === status.error) {
         return s
       }
       return { outputStatus: { ...s.outputStatus, [id]: status } }

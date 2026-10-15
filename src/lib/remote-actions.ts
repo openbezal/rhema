@@ -1,3 +1,4 @@
+import { requestOnAir } from "./output-safety"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { stepVerse } from "@/hooks/use-bible"
 import { useBibleStore } from "@/stores/bible-store"
@@ -92,5 +93,11 @@ export const remoteActions = {
     state.setAutoLive(!state.autoLive)
   },
 
-  toggleOnAir: (active: boolean) => useBroadcastStore.getState().setLive(active),
+  toggleOnAir: async (active: boolean) => {
+    if (!await requestOnAir(active) || !active || !useBroadcastStore.getState().isLive) return
+    if (!useBroadcastStore.getState().liveVerse) {
+      const selected = useBibleStore.getState().selectedVerse
+      if (selected) await presentVerse(selected).catch(error => console.warn("[remote-actions] on-air preview failed:", error))
+    }
+  },
 }

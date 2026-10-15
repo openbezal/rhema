@@ -29,6 +29,7 @@ export interface BroadcastOutput {
 export interface BroadcastOutputStatus {
   previewOpen: boolean
   ndiActive: boolean
+  error?: string
 }
 
 /** The default output: always present, editable, never deletable. */

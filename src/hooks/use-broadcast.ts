@@ -1,3 +1,4 @@
+import { requestOnAir } from "@/lib/output-safety"
 import { invoke } from "@tauri-apps/api/core"
 import { mark } from "@/lib/latency-marks"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -80,7 +81,7 @@ export const broadcastActions = {
   setLiveVerse: (verse: VerseRenderData | null) =>
     useBroadcastStore.getState().setLiveVerse(verse),
   setLive: (live: boolean) =>
-    useBroadcastStore.getState().setLive(live),
+    requestOnAir(live),
   getActiveTheme: () => {
     const s = useBroadcastStore.getState()
     return s.themes.find((t) => t.id === s.activeThemeId) ?? s.themes[0]

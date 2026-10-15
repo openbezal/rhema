@@ -82,105 +82,118 @@ async function isPreviewWindowVisible(outputId: string): Promise<boolean> {
   }
 }
 
-/** Refresh the store's runtime status for one output from the OS. */
-export async function reconcileOutputStatus(output: BroadcastOutput): Promise<void> {
-  const previewOpen = await isPreviewWindowVisible(output.id)
-  let ndiActive = false
-  try {
-    const status = await invoke<{ active: boolean } | null>("get_ndi_status", {
-      outputId: output.id,
-    })
-    ndiActive = status?.active ?? false
-  } catch {
-    // Status stays false if the command fails.
-  }
-  const store = useBroadcastStore.getState()
-  // The output may have been removed while these queries were in flight.
-  if (!store.outputs.some((o) => o.id === output.id)) return
-  store.setOutputStatus(output.id, { previewOpen, ndiActive })
+const outputVersions = new Map<string, number>()
+const versionOf = (id: string) => outputVersions.get(id) ?? 0
+const advanceVersion = (id: string) => {
+  const version = versionOf(id) + 1
+  outputVersions.set(id, version)
+  return version
 }
 
-/**
- * Put an output on air: open its projector window (display) or start its NDI
- * sender (ndi). Returns whether the output actually came up. Errors surface
- * as toasts.
- */
-export async function enableOutput(output: BroadcastOutput): Promise<boolean> {
+export function transportChanged(before: BroadcastOutput, after: BroadcastOutput): boolean {
+  return before.type !== after.type || before.monitorIndex !== after.monitorIndex ||
+    before.ndi.sourceName !== after.ndi.sourceName || before.ndi.resolution !== after.ndi.resolution ||
+    before.ndi.frameRate !== after.ndi.frameRate || before.ndi.alphaMode !== after.ndi.alphaMode
+}
+
+/** Hidden renderers are implementation resources; only visible windows or active senders carry output. */
+export async function inspectOutput(output: BroadcastOutput) {
+  const [windowResult, ndiResult] = await Promise.allSettled([
+    (async () => {
+      const window = (await getAllWindows()).find(item => item.label === outputWindowLabel(output.id))
+      return { exists: Boolean(window), visible: window ? await window.isVisible() : false }
+    })(),
+    invoke<{ active: boolean } | null>("get_ndi_status", { outputId: output.id }),
+  ])
+  return {
+    status: {
+      previewOpen: windowResult.status === "fulfilled" && windowResult.value.visible,
+      ndiActive: ndiResult.status === "fulfilled" && (ndiResult.value?.active ?? false),
+    },
+    hasWindow: windowResult.status === "fulfilled" && windowResult.value.exists,
+    uncertain: windowResult.status === "rejected" || ndiResult.status === "rejected",
+  }
+}
+
+/** Ignore responses from a previous transport operation or replaced configuration. */
+export async function reconcileOutputStatus(output: BroadcastOutput): Promise<void> {
+  const version = versionOf(output.id)
+  const { status } = await inspectOutput(output)
   const store = useBroadcastStore.getState()
+  if (version !== versionOf(output.id) || store.outputs.find(item => item.id === output.id) !== output) return
+  store.setOutputStatus(output.id, { ...status, error: store.outputStatus[output.id]?.error })
+}
+
+function nudgeOutput(output: BroadcastOutput, version: number, ndiActive: boolean) {
+  const store = useBroadcastStore.getState()
+  const current = store.outputs.find(item => item.id === output.id)
+  const status = store.outputStatus[output.id]
+  if (version !== versionOf(output.id) || !current || transportChanged(output, current) ||
+      !(ndiActive ? status?.ndiActive : status?.previewOpen)) return
+  store.syncBroadcastOutputFor(output.id)
+  syncNdiConfigToOutput(current, ndiActive)
+}
+
+/** Start one transport. Operator-facing actions serialize and confirm changes in output-safety.ts. */
+export async function enableOutput(output: BroadcastOutput): Promise<boolean> {
+  advanceVersion(output.id)
   try {
     if (output.type === "display") {
-      await invoke("open_broadcast_window", {
-        outputId: output.id,
-        monitorIndex: output.monitorIndex,
-        title: output.name,
-      })
+      await invoke("open_broadcast_window", { outputId: output.id, monitorIndex: output.monitorIndex, title: output.name })
       const opened = await isPreviewWindowVisible(output.id)
-      void logInfo(`[broadcast-ui] open_broadcast_window '${output.id}' ok, visible=${opened}`)
-      store.setOutputStatus(output.id, { previewOpen: opened, ndiActive: false })
-      if (!opened) return false
+      if (!opened) throw new Error("Display window did not become visible")
+      const current = useBroadcastStore.getState().outputs.find(item => item.id === output.id)
+      if (!current || transportChanged(output, current)) throw new Error("Output configuration changed during startup")
+      const version = advanceVersion(output.id)
+      const store = useBroadcastStore.getState()
+      store.setOutputStatus(output.id, { previewOpen: true, ndiActive: false })
       store.syncBroadcastOutputFor(output.id)
       syncNdiConfigToOutput(output, false)
-      // The window may still be booting; re-send the verse once it settles.
-      setTimeout(() => {
-        useBroadcastStore.getState().syncBroadcastOutputFor(output.id)
-      }, 150)
+      setTimeout(() => nudgeOutput(output, version, false), 150)
       return true
     }
-
-    await invoke("ensure_broadcast_window", {
-      outputId: output.id,
-      title: `${output.name} (NDI)`,
-    })
+    await invoke("ensure_broadcast_window", { outputId: output.id, title: `${output.name} (NDI)` })
     const request: NdiStartRequest = { ...output.ndi }
-    const session = await invoke<NdiSessionInfo>("start_ndi", {
-      outputId: output.id,
-      request,
-    })
-    void logInfo(
-      `[broadcast-ui] start_ndi '${output.id}' ok: ${session.sourceName} ${session.width}x${session.height}@${session.fps}`,
-    )
+    const session = await invoke<NdiSessionInfo>("start_ndi", { outputId: output.id, request })
+    const current = useBroadcastStore.getState().outputs.find(item => item.id === output.id)
+    if (!current || transportChanged(output, current)) throw new Error("Output configuration changed during startup")
+    void logInfo(`[broadcast-ui] start_ndi '${output.id}' ok: ${session.sourceName} ${session.width}x${session.height}@${session.fps}`)
+    const version = advanceVersion(output.id)
+    const store = useBroadcastStore.getState()
     store.setOutputStatus(output.id, { previewOpen: false, ndiActive: true })
     store.syncBroadcastOutputFor(output.id)
-    void emitTo(outputWindowLabel(output.id), "broadcast:ndi-config", {
-      active: true,
-      fps: session.fps,
-      width: session.width,
-      height: session.height,
-    }).catch(() => {})
-    // The hidden window renders asynchronously; nudge it again shortly.
-    setTimeout(() => {
-      useBroadcastStore.getState().syncBroadcastOutputFor(output.id)
-      syncNdiConfigToOutput(output, true)
-    }, 300)
+    void emitTo(outputWindowLabel(output.id), "broadcast:ndi-config", { active: true, fps: session.fps, width: session.width, height: session.height }).catch(() => {})
+    setTimeout(() => nudgeOutput(output, version, true), 300)
     return true
   } catch (error) {
+    advanceVersion(output.id)
+    await invoke("stop_ndi", { outputId: output.id }).catch(() => {})
+    syncNdiConfigToOutput(output, false)
+    await invoke("close_broadcast_window", { outputId: output.id }).catch(() => {})
+    await reconcileOutputStatus(output)
+    const store = useBroadcastStore.getState()
+    if (store.outputs.some(item => item.id === output.id)) {
+      store.setOutputStatus(output.id, { ...store.outputStatus[output.id], previewOpen: store.outputStatus[output.id]?.previewOpen ?? false, ndiActive: store.outputStatus[output.id]?.ndiActive ?? false, error: String(error) })
+    }
     void logError(`[broadcast-ui] enable output '${output.id}' FAILED: ${String(error)}`)
-    toast.error(
-      output.type === "display" ? "Could not open display output" : "Could not start NDI",
-      { description: String(error) },
-    )
+    toast.error(output.type === "display" ? "Could not open display output" : "Could not start NDI", { description: String(error) })
     return false
   }
 }
 
-/**
- * Take an output off air: stop its NDI sender and/or close its window.
- * Stop NDI first — close_broadcast_window only hides while NDI is active.
- */
+/** Stop the sender before closing; a failed stop/close must retain its configuration. */
 export async function disableOutput(output: BroadcastOutput): Promise<boolean> {
-  const store = useBroadcastStore.getState()
+  advanceVersion(output.id)
   try {
-    // Always stop the sender rather than trusting outputStatus: that state is
-    // in-memory and only refreshed while the dialog is open, so after a main
-    // window reload it can read "inactive" while Rust still holds the session —
-    // and close_broadcast_window only hides the window while NDI is live, which
-    // would orphan a sender on the network. stop_ndi is a no-op when idle.
     await invoke("stop_ndi", { outputId: output.id })
     syncNdiConfigToOutput(output, false)
-    await invoke("close_broadcast_window", { outputId: output.id }).catch(() => {})
-    store.setOutputStatus(output.id, { previewOpen: false, ndiActive: false })
+    await invoke("close_broadcast_window", { outputId: output.id })
+    advanceVersion(output.id)
+    useBroadcastStore.getState().setOutputStatus(output.id, { previewOpen: false, ndiActive: false })
     return true
   } catch (error) {
+    advanceVersion(output.id)
+    await reconcileOutputStatus(output)
     void logError(`[broadcast-ui] disable output '${output.id}' FAILED: ${String(error)}`)
     toast.error("Could not stop output", { description: String(error) })
     return false

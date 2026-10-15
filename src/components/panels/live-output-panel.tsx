@@ -4,7 +4,7 @@ import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
-import { presentVerse, toVerseRenderData } from "@/hooks/use-broadcast"
+import { toVerseRenderData } from "@/hooks/use-broadcast"
 import { remoteActions } from "@/lib/remote-actions"
 import { bibleActions } from "@/hooks/use-bible"
 
@@ -43,15 +43,6 @@ export function LiveOutputPanel() {
       .catch(() => {})
   }, [activeTranslationId])
 
-  const handleGoLive = (checked: boolean) => {
-    useBroadcastStore.getState().setLive(checked)
-    // Going live with nothing presented yet: present the current preview
-    // verse so the output isn't blank.
-    if (checked && !useBroadcastStore.getState().liveVerse) {
-      const selected = useBibleStore.getState().selectedVerse
-      if (selected) void presentVerse(selected)
-    }
-  }
 
   return (
     <div
@@ -90,7 +81,7 @@ export function LiveOutputPanel() {
           </span>
           <Switch
             checked={isLive}
-            onCheckedChange={handleGoLive}
+            onCheckedChange={remoteActions.toggleOnAir}
             className="data-[state=checked]:bg-emerald-500"
           />
         </label>

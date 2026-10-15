@@ -152,11 +152,12 @@ export function OutputCard({
             <MoreHorizontalIcon className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onSelect={onEdit}>
+            <DropdownMenuItem disabled={busy} onSelect={onEdit}>
               <SettingsIcon className="size-3.5" />
               Edit settings
             </DropdownMenuItem>
             <DropdownMenuItem
+              disabled={busy}
               onSelect={() => {
                 setDraftName(output.name)
                 setRenaming(true)
@@ -165,14 +166,14 @@ export function OutputCard({
               <PencilIcon className="size-3.5" />
               Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onDuplicate}>
+            <DropdownMenuItem disabled={busy} onSelect={onDuplicate}>
               <CopyIcon className="size-3.5" />
               Duplicate
             </DropdownMenuItem>
             {!isDefault && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onSelect={onRemove}>
+                <DropdownMenuItem disabled={busy} variant="destructive" onSelect={onRemove}>
                   <Trash2Icon className="size-3.5" />
                   Remove
                 </DropdownMenuItem>
@@ -182,6 +183,7 @@ export function OutputCard({
         </DropdownMenu>
       </div>
 
+      {status?.error && <p role="status" className="px-0.5 text-xs text-destructive">{status.error}</p>}
       <div className="flex items-center justify-between px-0.5 pb-0.5">
         <span className="truncate text-[0.6875rem] text-muted-foreground">{theme?.name ?? "No theme"}</span>
         <Switch

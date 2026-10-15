@@ -13,10 +13,9 @@ import {
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  disableOutput,
-  enableOutput,
   reconcileOutputStatus,
 } from "@/lib/broadcast-output-control"
+import { setOutputEnabled, removeOutputSafely, updateOutputSafely } from "@/lib/output-safety"
 import { useBroadcastStore } from "@/stores"
 import type { BroadcastOutput } from "@/types"
 import { MAIN_OUTPUT_ID, defaultNdiSettings } from "@/types"
@@ -127,16 +126,10 @@ export function BroadcastOutputsDialog({
   }
 
   const handleToggle = (output: BroadcastOutput, enabled: boolean) =>
-    void withBusy(output.id, () => (enabled ? enableOutput(output) : disableOutput(output)))
+    void withBusy(output.id, () => setOutputEnabled(output.id, enabled))
 
   const handleRemove = (output: BroadcastOutput) =>
-    void withBusy(output.id, async () => {
-      // Stop the transport first: close_broadcast_window only hides the window
-      // while NDI is still running for that output.
-      await disableOutput(output)
-      useBroadcastStore.getState().removeOutput(output.id)
-      toast.success(`Removed ${output.name}`)
-    })
+    void withBusy(output.id, () => removeOutputSafely(output.id))
 
   const handleEditorSubmit = (next: BroadcastOutput) => {
     const store = useBroadcastStore.getState()
@@ -149,30 +142,7 @@ export function BroadcastOutputsDialog({
       return
     }
 
-    const status = store.outputStatus[next.id]
-    const wasOnAir = (status?.previewOpen ?? false) || (status?.ndiActive ?? false)
-    const transportChanged =
-      existing.type !== next.type ||
-      existing.monitorIndex !== next.monitorIndex ||
-      existing.ndi.sourceName !== next.ndi.sourceName ||
-      existing.ndi.resolution !== next.ndi.resolution ||
-      existing.ndi.frameRate !== next.ndi.frameRate ||
-      existing.ndi.alphaMode !== next.ndi.alphaMode
-
-    void withBusy(next.id, async () => {
-      if (wasOnAir && transportChanged) await disableOutput(existing)
-      useBroadcastStore.getState().updateOutput(next.id, {
-        name: next.name,
-        type: next.type,
-        themeId: next.themeId,
-        monitorIndex: next.monitorIndex,
-        ndi: next.ndi,
-      })
-      if (wasOnAir && transportChanged) {
-        const updated = useBroadcastStore.getState().outputs.find((o) => o.id === next.id)
-        if (updated) await enableOutput(updated)
-      }
-    })
+    void withBusy(next.id, () => updateOutputSafely(next))
     setEditingId(null)
   }
 

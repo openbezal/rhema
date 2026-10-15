@@ -86,6 +86,13 @@ curl -X POST http://localhost:8080/api/v1/command \
   -d '{"command":"prev"}'
 ```
 
+On-air requests from the app, OSC and HTTP share the same output check. If no
+configured visible display or active NDI sender is available, the operator must
+confirm **Go live anyway** in Rhema. A hidden renderer left after a failed start
+does not count as output. While that question is pending, an off-air command
+cancels the request. HTTP command acceptance indicates dispatch; read the status
+endpoint to observe the applied on-air state.
+
 ### 3. **show** — Show Broadcast Output
 
 Makes the broadcast output visible (sets live state to true).
