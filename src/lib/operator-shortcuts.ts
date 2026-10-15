@@ -12,6 +12,7 @@ import { useBibleStore } from "@/stores/bible-store"
 import {
   reservePresentationIntent,
   isPresentationIntentCurrent,
+  isPresentationOwnerCurrent,
 } from "./presentation-controller"
 
 type Panel =
@@ -30,7 +31,10 @@ export function focusOperatorPanel(panel: Panel): boolean {
   return document.activeElement === target
 }
 /** Probe before moving so the last/missing chapter cannot blank the browser. */
-export async function stepChapter(direction: "next" | "prev"): Promise<void> {
+export async function stepChapter(
+  direction: "next" | "prev",
+  owner?: object
+): Promise<void> {
   const state = useBibleStore.getState()
   if (state.translationSelectionStatus !== "ready") return
   const cursor =
@@ -44,7 +48,7 @@ export async function stepChapter(direction: "next" | "prev"): Promise<void> {
   if (!cursor) return
   const chapter = cursor.chapter + (direction === "next" ? 1 : -1)
   if (chapter < 1) return
-  const ticket = reservePresentationIntent()
+  const ticket = reservePresentationIntent(owner)
   try {
     const rows = await fetchChapter(
       cursor.bookNumber,
@@ -76,12 +80,22 @@ export async function stepChapter(direction: "next" | "prev"): Promise<void> {
     toast.error("Could not load chapter", { description: String(error) })
   }
 }
-let navigation = Promise.resolve()
-function enqueueNavigation(action: () => Promise<void>) {
-  navigation = navigation.then(action).catch((error: unknown) => {
-    console.warn("[keyboard] Navigation failed:", error)
-  })
-  return navigation
+let navigation: { owner: object; tail: Promise<void> } | null = null
+function enqueueNavigation(action: (owner: object) => Promise<void>) {
+  if (!navigation || !isPresentationOwnerCurrent(navigation.owner)) {
+    const owner = {}
+    reservePresentationIntent(owner)
+    navigation = { owner, tail: Promise.resolve() }
+  }
+  const batch = navigation
+  batch.tail = batch.tail
+    .then(async () => {
+      if (isPresentationOwnerCurrent(batch.owner)) await action(batch.owner)
+    })
+    .catch((error: unknown) => {
+      console.warn("[keyboard] Navigation failed:", error)
+    })
+  return batch.tail
 }
 function focusedItem(event: KeyboardEvent) {
   const target = event.target instanceof Element ? event.target : null
@@ -150,9 +164,10 @@ export async function runShortcutCommand(
   if (id === "next-verse") return enqueueNavigation(operatorActions.bibleNext)
   if (id === "previous-verse")
     return enqueueNavigation(operatorActions.biblePrev)
-  if (id === "next-chapter") return enqueueNavigation(() => stepChapter("next"))
+  if (id === "next-chapter")
+    return enqueueNavigation((owner) => stepChapter("next", owner))
   if (id === "previous-chapter")
-    return enqueueNavigation(() => stepChapter("prev"))
+    return enqueueNavigation((owner) => stepChapter("prev", owner))
   const { list, item } = focusedItem(event)
   if (!list) return
   const items = [...list.querySelectorAll<HTMLElement>("[data-operator-item]")]
@@ -187,10 +202,14 @@ export async function runShortcutCommand(
       .items.findIndex((row) => row.id === itemId)
     if (index < 0) return
     const queued = useQueueStore.getState().items[index]
-    await operatorActions.presentQueueItem(index)
+    const operation = operatorActions.presentQueueItem(index)
+    const selectionRevision = useQueueStore.getState().selectionRevision
+    const committed = await operation
     const queue = useQueueStore.getState()
     const source = useBroadcastStore.getState().liveSourceVerse
     if (
+      committed &&
+      queue.selectionRevision === selectionRevision &&
       queue.activeIndex !== null &&
       queue.items[queue.activeIndex]?.id === itemId &&
       source?.book_number === queued.verse.book_number &&

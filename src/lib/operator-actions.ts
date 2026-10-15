@@ -23,9 +23,9 @@ function findLiveQueueIndex(): number | null {
   return index >= 0 ? index : null
 }
 
-async function presentQueueItem(index: number): Promise<void> {
+async function presentQueueItem(index: number): Promise<boolean> {
   const item = useQueueStore.getState().items[index]
-  if (!item) return
+  if (!item) return false
   useQueueStore.getState().setActive(index)
   // Navigate the Bible panel to the presented verse, as detections do
   useBibleStore.getState().setPendingNavigation({
@@ -33,9 +33,13 @@ async function presentQueueItem(index: number): Promise<void> {
     chapter: item.verse.chapter,
     verse: item.verse.verse,
   })
-  await presentVerse(item.verse).catch((e) =>
-    console.warn("[remote-actions] presentQueueItem failed:", e)
-  )
+  let committed = false
+  await presentVerse(item.verse, {
+    onCommitted: () => {
+      committed = true
+    },
+  }).catch((e) => console.warn("[remote-actions] presentQueueItem failed:", e))
+  return committed
 }
 
 function stepQueue(offset: number): void {
@@ -90,8 +94,10 @@ export const operatorActions = {
   queuePrev: () => stepQueue(-1),
 
   /** Present the next/previous Bible verse without moving the queue or going on air. */
-  bibleNext: () => stepVerse("next", { present: true }),
-  biblePrev: () => stepVerse("prev", { present: true }),
+  bibleNext: (intentOwner?: object) =>
+    stepVerse("next", { present: true, intentOwner }),
+  biblePrev: (intentOwner?: object) =>
+    stepVerse("prev", { present: true, intentOwner }),
 
   clearLive,
   setFollowDetections: (enabled: boolean) =>

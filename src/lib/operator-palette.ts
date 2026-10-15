@@ -4,7 +4,6 @@ import { runShortcutCommand } from "./operator-shortcuts"
 import { useBibleStore, activateTranslation } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { translationCode } from "./translation-selection"
-import { parseTypedReference } from "./quick-search"
 import { openSettings, type SettingsSection } from "./settings-dialog"
 import {
   reservePresentationIntent,
@@ -57,30 +56,38 @@ export async function browsePaletteReference(query: string): Promise<void> {
   const state = useBibleStore.getState()
   if (state.translationSelectionStatus !== "ready")
     throw new Error("Confirm a Bible translation first")
-  const reference = parseTypedReference(query, state.books)
-  const bookText = query
+  const normalizeBook = (value: string) =>
+    value
+      .normalize("NFKC")
+      .trim()
+      .replace(
+        /^(III|II|I)\s+/iu,
+        (prefix) =>
+          ({ i: "1", ii: "2", iii: "3" })[prefix.trim().toLowerCase()]!
+      )
+      .toLowerCase()
+      .replace(/[\s.]+/gu, "")
+  const parts = query
     .trim()
-    .replace(/\s*\d+\s*[:.\s]\s*\d+\s*$/u, "")
-    .trim()
-    .toLocaleLowerCase()
-  const exact = state.books.filter((book) =>
-    [book.name, book.abbreviation].some(
-      (name) => name.toLocaleLowerCase() === bookText
-    )
-  )
-  if (
-    !reference ||
-    exact.length !== 1 ||
-    reference.book.book_number !== exact[0].book_number
-  )
+    .match(/^(.+?\D)\s*(\d{1,3})\s*[:.\s]\s*(\d{1,3})$/u)
+  const exact = parts
+    ? state.books.filter((book) =>
+        [book.name, book.abbreviation].some(
+          (name) => normalizeBook(name) === normalizeBook(parts[1])
+        )
+      )
+    : []
+  const chapter = Number(parts?.[2])
+  const verse = Number(parts?.[3])
+  if (exact.length !== 1 || chapter < 1 || verse < 1)
     throw new Error(
       "Enter a full book name and chapter:verse, for example John 3:16"
     )
   const ticket = reservePresentationIntent()
   const coordinates = {
-    book_number: reference.book.book_number,
-    chapter: reference.chapter,
-    verse: reference.verse,
+    book_number: exact[0].book_number,
+    chapter,
+    verse,
   }
   const row = await invoke<Verse | null>("get_verse", {
     translationId: state.activeTranslationId,

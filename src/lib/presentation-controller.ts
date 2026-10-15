@@ -8,6 +8,8 @@ import type { Verse, VerseRenderData, OutputClearMode } from "@/types"
 
 interface PresentOptions {
   selectPreview?: boolean
+  /** Receipt for the primary commit made by this particular operation. */
+  onCommitted?: () => void
   automatic?: boolean
   /** Keep the original preview permission across translation refreshes. */
   followRevision?: number
@@ -21,6 +23,7 @@ interface Intent {
   followRevision: number
 }
 let revision = 0
+let intentOwner: object | null = null
 let pendingIntent: Intent | null = null
 let connections = 0
 let disconnect: (() => void) | null = null
@@ -109,6 +112,7 @@ export async function presentVerse(
     followRevision:
       options.followRevision ?? useBibleStore.getState().followRevision,
   }
+  if (options.intentRevision === undefined) intentOwner = null
   pendingIntent = intent
   const ticket = ++revision
   const startedLive = useBroadcastStore.getState().isLive
@@ -155,6 +159,7 @@ export async function presentVerse(
     useBroadcastStore
       .getState()
       .setLiveVerse(toVerseRenderData(full, selected.code), full)
+    options.onCommitted?.()
     mark(`presentVerse end ${full.book_name} ${full.chapter}:${full.verse}`)
   } catch (error) {
     if (current())
@@ -171,11 +176,17 @@ export async function presentVerse(
 export function invalidatePresentation(): void {
   revision++
   pendingIntent = null
+  intentOwner = null
 }
 /** Claim operator intent before work that precedes the final verse lookup. */
-export function reservePresentationIntent(): number {
+export function reservePresentationIntent(owner: object = {}): number {
   invalidatePresentation()
+  intentOwner = owner
   return revision
+}
+/** A serialized input batch cannot acquire fresh intent after it was replaced. */
+export function isPresentationOwnerCurrent(owner: object): boolean {
+  return intentOwner === owner
 }
 export function isPresentationIntentCurrent(ticket: number): boolean {
   return ticket === revision
@@ -206,6 +217,7 @@ export function connectPresentationController(): () => void {
       if (next === key) return
       key = next
       revision++
+      intentOwner = null
       if (selection()) void refreshLiveVerse()
     })
     const broadcast = useBroadcastStore.subscribe((state, previous) => {

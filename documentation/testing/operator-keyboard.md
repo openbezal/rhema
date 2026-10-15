@@ -25,7 +25,7 @@ Pinning (`P`) is deliberately absent from commands/help until its product/state 
 
 ## Verification
 
-Local gates: **495 frontend tests / 39 files**, typecheck, lint and production build; **382 Rust tests in each configuration**, strict Clippy, formatting and diff checks. Rust source is unchanged. Native first-party artifacts were cleaned before switching the shared build cache to this branch.
+Local gates: **507 frontend tests / 40 files**, typecheck, lint and production build; **382 Rust tests in each configuration**, strict Clippy, formatting and diff checks. Rust source is unchanged. Native first-party artifacts were cleaned before switching the shared build cache to this branch.
 
 New tests cover binding/chord/focus/IME/modifier negatives; actual shared presentation actions; canonical Queue navigation and identity; chapter boundaries/stale results; stable palette translations and verified browsing; native server idempotence/failure recovery; actual mounted palette selection and focus release; Queue/list actions; input/popup typing; layered Escape; and scoped verse-reveal geometry. Browser-discovered connecting-stop, empty-input Escape and outer-scroll defects were reproduced, regressed and fixed before review.
 
@@ -43,3 +43,13 @@ New tests cover binding/chord/focus/IME/modifier negatives; actual shared presen
 Retained [TSX](fixtures/keyboard-browser-fixture.tsx.txt) and [HTML](fixtures/keyboard-browser-fixture.html.txt) are documentation fixtures, excluded from production lint/type compilation. To reproduce, copy them to `.qa-keyboard.tsx` and `.qa-keyboard.html` at the root, temporarily add `keyboardQa: path.resolve(__dirname, ".qa-keyboard.html")` to Vite's build input, build, and preview on a separate loopback origin. Remove the entry/files afterward. The tested fixture/tab/server were cleaned up and the viewport reset.
 
 Packaged native typing/IME/focus on macOS, Windows and Linux, real provider lifecycle, physical outputs and the actual integrated stack remain acceptance work. This branch is based on our Suggestions stack #195; bilingual/transport and native lifecycle siblings will be integrated and reverified separately. No existing PR or issue is merged or closed by this work.
+
+## Final branch review
+
+One fresh whole-branch review found three Important defects and no Critical/Minor findings. All three were reproduced before the single fix pass:
+
+- Buffered chapter input could acquire a new presentation ticket after a newer Clear. Navigation batches now retain an opaque controller owner; Clear, a new presentation, translation changes and other reserved intents revoke the batch. A new key after cancellation gets an independent batch so a stalled old lookup cannot block it. Regressions cover cancelled buffered input, uninterrupted rapid stepping and fresh input during the abandoned lookup.
+- Palette input `1 John 1:1` rejected Roman and numeric catalog names. Exact catalog names/abbreviations and input now use the same normalization, with a unique book match and verified database coordinates required. Numbered aliases, attached abbreviations and ambiguous normalized names are covered.
+- A stale Mod+Enter could clear a newer selection of the same Queue item. The primary presentation supplies an operation-specific commit receipt and Queue selection has a revision even when selecting the same row again. Selection clears only for the successful owning operation. Failed lookups retain selection even when old live coordinates happen to match.
+
+The four reviewer regressions failed before changes; the extended set finished 12/12. The full post-review frontend suite, typecheck, lint and production build passed. Rust source is unchanged from the previously passing native gates. No second branch review was requested.

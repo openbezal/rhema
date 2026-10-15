@@ -165,14 +165,14 @@ let stepSeq = 0
  */
 export async function stepVerse(
   direction: "next" | "prev",
-  options?: { present?: boolean }
+  options?: { present?: boolean; intentOwner?: object }
 ): Promise<void> {
   // Claim the ticket before anything else. A step that resolves synchronously
   // still has to invalidate a crossing already in flight, or the operator's
   // correction lands and the crossing it replaced arrives afterwards.
   stepSeq += 1
   const ticket = stepSeq
-  const presentationRevision = options?.present ? reservePresentationIntent() : undefined
+  const presentationRevision = options?.present ? reservePresentationIntent(options.intentOwner) : undefined
   const current = () => ticket === stepSeq && (presentationRevision === undefined || isPresentationIntentCurrent(presentationRevision))
 
   const state = useBibleStore.getState()

@@ -4,6 +4,8 @@ import type { QueueItem } from "@/types"
 interface QueueState {
   items: QueueItem[]
   activeIndex: number | null
+  /** Changes even when the operator selects the same row again. */
+  selectionRevision: number
   /** ID of the queue item currently being flash-highlighted (null = none). */
   highlightedId: string | null
 
@@ -34,6 +36,7 @@ let flashTimer: ReturnType<typeof setTimeout> | null = null
 export const useQueueStore = create<QueueState>((set, get) => ({
   items: [],
   activeIndex: null,
+  selectionRevision: 0,
   highlightedId: null,
 
   addItem: (item) =>
@@ -102,8 +105,17 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         : -1
       return { items, activeIndex: index < 0 ? null : index }
     }),
-  setActive: (activeIndex) => set({ activeIndex }),
-  clearQueue: () => set({ items: [], activeIndex: null }),
+  setActive: (activeIndex) =>
+    set((state) => ({
+      activeIndex,
+      selectionRevision: state.selectionRevision + 1,
+    })),
+  clearQueue: () =>
+    set((state) => ({
+      items: [],
+      activeIndex: null,
+      selectionRevision: state.selectionRevision + 1,
+    })),
   flashItem: (id) => {
     if (flashTimer) clearTimeout(flashTimer)
     set({ highlightedId: id })
