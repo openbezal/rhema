@@ -1,0 +1,165 @@
+# Open issue and pull request review, with proposed remediation design
+
+Reviewed on **15 October 2026 (Africa/Lagos)** for [openbezal/rhema](https://github.com/openbezal/rhema).
+
+## Owner decision after this audit
+
+Implement fixes independently in our own focused PRs. Do not copy, cherry-pick or amend the eight reviewed PR implementations. The disposition table below preserves the audit findings; recommendations to revise/integrate those branches are superseded by this decision. Existing PRs stay open while replacements are developed and verified. No merge or closure is implied.
+
+Execution started with [our quality foundation, draft PR #184](https://github.com/openbezal/rhema/pull/184). The audit evidence remains pinned to the original snapshots below.
+
+## Scope and evidence
+
+The requested outcome is a complete review of the open backlog and proposed changes, followed by an ordered fix plan that improves separation of concerns and requires rigorous testing. This document records the original review and design; subsequent implementation is tracked in the remediation plan. No merges were made during the audit.
+
+GitHub returned **10 open issues and 8 open PRs**, using a 1,000-item limit for each list. Every issue body and comment, every PR body, complete diff, file list, review record, and PR comment was read. All eight PRs have zero submitted reviews and an empty status-check rollup at this snapshot. Seven are reported mergeable; **#52 is conflicting**. An empty check rollup is not proof that a PR passes. Existing workflows have release/deployment triggers but no general pull-request validation workflow.
+
+The checkout and GitHub `main` both resolve to `b9d814ca5cd18cee3bb5eb1b501b5247b9e3e59c`. PR snapshots:
+
+| PR | Reviewed head |
+| --- | --- |
+| [#183](https://github.com/openbezal/rhema/pull/183) | `049a260a0877c68e594ba4283d7dedd8bfc4aa92` |
+| [#182](https://github.com/openbezal/rhema/pull/182) | `b0574a53a84e60e8bac40fc10bf72bc272702dc5` |
+| [#181](https://github.com/openbezal/rhema/pull/181) | `0e265cca66cb81a93d0ab82dcbcf8a599c90cbe0` |
+| [#180](https://github.com/openbezal/rhema/pull/180) | `5f2830bf543c32567a2b3b556af2665162ff6439` |
+| [#179](https://github.com/openbezal/rhema/pull/179) | `ef8e04764824f07b96f7ab631051849213df545f` |
+| [#174](https://github.com/openbezal/rhema/pull/174) | `665edfab668f169d7acd33a751c6b57b8b753134` |
+| [#173](https://github.com/openbezal/rhema/pull/173) | `3d4745b8dde8ca2e44c833d0edc5a1954d1080a0` |
+| [#52](https://github.com/openbezal/rhema/pull/52) | `51e1a0236c061af24af41a07afc52e9cfba7552c` |
+
+The log attached to #175 was downloaded and inspected: 38,941 lines, approximately 4.9 MB, spanning activity through 19:14 UTC on 20 August. Linked videos and screenshots were not exhaustively inspected; behavior conclusions below come from issue text, source, log evidence, and the specified tests. Actual vMix/NDI receiver latency, Windows/Linux execution, physical microphones, projectors, and long-service soak behavior were not tested in this review.
+
+## Baseline verification
+
+| Check on `main` | Observed result | Interpretation |
+| --- | --- | --- |
+| `bun run test --run` | **220 tests passed, 16 files** | Existing frontend unit suite is green. |
+| `bun run build` | **Passed** | Runs the real `tsc -b` check and Vite build; bundle-size and ineffective dynamic-import warnings remain. |
+| `bun run typecheck` | Exits successfully; `bunx tsc --noEmit --listFiles` lists **0 files** | False assurance: the root solution config has `files: []`. |
+| `bun run lint` | **92 errors, 5 warnings** | Includes real source findings, inappropriate Vite rules applied to Next.js, and generated Rust build files scanned as TypeScript. |
+| `cargo test --workspace --offline --locked` | **369 tests passed** | Initial sandbox run blocked 10 HTTP/OSC tests from binding loopback; rerun with local socket access passed the whole workspace. |
+| `cargo clippy --workspace --all-targets --offline --locked -- -D warnings` | **Failed** | Existing audio/API test code produces denied warnings, among other baseline findings. |
+| `cargo fmt --all -- --check` | **Failed** | Existing formatting differences, starting in the API crate. |
+
+These results do not establish native output correctness or adequate coverage of operator workflows. The PR reviews found defects despite green unit suites.
+
+## Every open issue
+
+Priority meanings: **P0** establishes trustworthy release/merge gates; **P1** protects live-service operation or saved user choices; **P2** completes useful operator capabilities; **P3** is an exploratory addition after the foundation is reliable. These are proposed priorities, not changes to GitHub labels.
+
+| Issue | Assessment against current code | Proposed action and acceptance |
+| --- | --- | --- |
+| [#175 — Log attached: Detection Improvement](https://github.com/openbezal/rhema/issues/175) | **P1, investigate with replay.** The log records Titus 1:3 after ordinary narration and Obadiah 1:6 while reading 1 Kings. Main already excludes unsafe two-letter spoken aliases and has #152 regressions, so repeating the old alias fix is insufficient. | Build ordered partial/final transcript fixtures with timestamps, reading context, corrections, and stop/restart boundaries. Require no unrelated-book switch in annotated narration cases while preserving explicit citations. Keep root cause open until the complete sequence reproduces. |
+| [#177 — 1–3s Latency on NDI Broadcast](https://github.com/openbezal/rhema/issues/177) | **P1, credible performance risk; receiver symptom unmeasured here.** Output sends three frames at 0/150/300 ms and otherwise uses a two-second keepalive. Busy pushes are discarded, and each 1080p frame becomes a roughly 11 MB base64 IPC payload. The configured FPS is not a continuous frame scheduler. | Instrument the whole path; isolate frame transport from presentation state. Use a bounded latest-frame slot with a dirty revision, explicit retry after a busy push, and a native frame pump that reuses the last frame at the configured cadence. Validate against Windows/vMix before claiming resolution. |
+| [#176 — Remote control additions](https://github.com/openbezal/rhema/issues/176) | **P1, confirmed missing behavior.** `remoteActions.bibleNext/biblePrev` call `stepVerse` without `{ present: true }`; comments explicitly describe preview-only behavior. No Auto broadcast command exists in `REMOTE_EVENTS`. | Route HTTP/OSC/keyboard through one operator command registry. Make Bible navigation present the landed verse as requested; add `auto_broadcast` toggle plus an explicit set operation for reliable automation. Preserve `send_to_live`. Test backend parsing through frontend execution and resulting live payload. |
+| [#145 — Semantic Workflow Update](https://github.com/openbezal/rhema/issues/145) | **P1, confirmed replacement behavior.** The store accepts up to 25 semantic results but replaces the previous semantic batch; the live FTS-derived producer typically emits seven. Direct/semantic columns already exist. There is no interaction freeze or history expiry policy. | Extract a Suggestions panel backed by bounded candidate history, default 25 entries and 60-second retention. Freeze the visible ordering during pointer, keyboard, and scroll interaction while ingestion continues. Show pending additions and apply them deliberately; dedupe by source, translation, and verse coordinates. |
+| [#139 — Bible Display](https://github.com/openbezal/rhema/issues/139) | **P1, partly delivered.** Single-click presentation is present and acknowledged by the maintainer. Scrolling now uses explicit reveal requests, but `TranscriptPanel` still pushes automatic pending navigation that can change the browsed chapter. Null live verse is not a clear-screen contract because themes can render backgrounds. | Verify the delivered click behavior; add a separate Follow detections control and explicit content modes: verse, background-only, transparent clear, black. Automatic detection must not move a manually held browser. Close only the verified subrequests; retain the unresolved parts. |
+| [#140 — Save and Export](https://github.com/openbezal/rhema/issues/140) | **P2, partly delivered.** Theme import/export already exists; transcript, queue, detection-session export, and portable settings migration do not. | Reuse theme serialization. Add a Session archive drawer and versioned export/import service: transcript TXT/JSON, queues and detections JSON, portable preferences/themes JSON. Default exports exclude API credentials and machine-specific device/monitor IDs. Test round trips, validation, cancellations, write failures, and migration. |
+| [#138 — Bible Books and Display](https://github.com/openbezal/rhema/issues/138) | **P2, split across presentation and navigation.** Book naming comes from translation data; reference formatting is currently assembled as one string. Quick-search already handles references/autocomplete but #181 only addresses numbered-prefix matching. | Add display-name overrides keyed by canonical book number without editing canonical IDs or detection vocabulary. Add independent reference verse-number visibility. Cover `JA 2 2`, ambiguous prefixes, and uniqueness-based completion. Keep aliases used for speech parsing separate from display names. |
+| [#106 — Include Local Bible](https://github.com/openbezal/rhema/issues/106) | **P2, partly addressed by #182.** That PR adds Yoruba, not Hausa and Igbo. A comment provides an Igbo source; availability is not evidence of redistribution permission or schema quality. | Fix translation identity and setup upgrade behavior before Yoruba integration. Validate language metadata, 66-book mapping, Unicode, verse coverage, license/attribution, and installed-bundle inclusion per translation. Track Hausa/Igbo independently; #182 cannot close the whole request. |
+| [#49 — Keyboard shortcuts](https://github.com/openbezal/rhema/issues/49) | **P2, partially prepared.** Shared remote actions and Bible stepping exist, but no complete registry, command palette, chord navigation, or shortcut discovery overlay exists. | Build one registry shared with remotes, then verbs/help, panel chords, palette, and focused-list navigation in separate reviewable slices. Respect editable targets, IME composition, open dialogs, repeated keys, OS modifiers, and native shortcut ownership. Define pinning behavior before exposing the requested `P` action. |
+| [#178 — Support for OMT](https://github.com/openbezal/rhema/issues/178) | **P3, separate backend transport project.** This is not only frontend UI work. OMT's official materials describe cross-platform libraries and alpha-capable video; Rhema has no OMT backend. | After #177 establishes the frame boundary, run a small sender/receiver compatibility probe. Verify loading, packaging, discovery, alpha, frame cadence, receiver support, reconnection, and CPU/memory cost on supported platforms. Add OMT as another output adapter only after the probe meets acceptance; it must not delay diagnosing NDI. |
+
+### Detection and latency evidence that changes the plan
+
+In the #175 log, “Ahab said to Obadiah” is followed by `Obadiah 1:6`, and later verse-only speech yields `Obadiah 1:21`. This suggests contaminated context but does not isolate the original cause. A temporary probe against current main correctly kept 1 Kings context for three small Obadiah/Samaria/“is” sequences. Therefore the review does **not** claim the logged fault is reproduced on current main, nor that it is fixed.
+
+The same log contains 5,316 reported UI long tasks. A specific direct event was emitted at timestamp `1787248992717` and received by the UI at `1787248994592`, a **1,875 ms** gap. This proves at least one substantial application event delay in that recording; it does not measure the NDI receiver. Performance work must measure detection-to-UI and UI-to-receiver independently.
+
+The live “semantic” producer uses FTS5 ranking and rank-derived confidence constants (`commands/stt.rs:643`), rather than a cosine score for each utterance. A redesigned Suggestions panel should label the actual match method and must not represent a rank-derived number as a calibrated probability or semantic similarity percentage.
+
+## Every open PR: disposition
+
+“Candidate” below means suitable after stated gates, not approval to merge now.
+
+| PR | Recommendation | What must happen before integration |
+| --- | --- | --- |
+| [#181 — Numbered-prefix Bible matching](https://github.com/openbezal/rhema/pull/181) | **Small candidate after fixing or narrowing its stated scope.** | All 56 focused quick-search tests pass, but the promised “First Samuel” form still fails. Add word-ordinal coverage or correct the stated scope before integration. Does not complete #138 or #49. |
+| [#174 — Update available notice](https://github.com/openbezal/rhema/pull/174) | **Candidate after reliability/quality hardening.** | Its real typecheck fix belongs in the first quality-gate task. Preserve Rust-side network checks, bounded timeouts, scoped opener permissions, offline silence, and one notice per launch. Recheck API errors, malformed versions, and URL scoping on the rebased branch; supply the requested visible UI evidence. |
+| [#180 — Live output guards](https://github.com/openbezal/rhema/pull/180) | **Revise, then integrate with output controls.** | Protect all stop/delete/disable paths and distinguish visible projector, active NDI sender, hidden renderer, and disabled configuration. Confirm destructive actions against current state, not stale toast state. A hidden renderer alone is not an audience output. |
+| [#182 — Open Yoruba Contemporary Bible](https://github.com/openbezal/rhema/pull/182) | **Changes required: saved translation identity can change.** | Persist a stable translation code and migrate existing IDs; fix warm setup/DB upgrade and release asset inclusion. Validate the actual downloaded corpus and ship attribution. Remains partial fulfillment of #106. |
+| [#183 — Dual-language broadcast and theme styling](https://github.com/openbezal/rhema/pull/183) | **Changes required: rendering and async-state contracts.** | Implement or remove inert secondary controls; show dual-language content in designer preview; make secondary lookup failure nonfatal to primary content; invalidate outstanding presents when translation selection changes. Integrate after stable translation identity. |
+| [#179 — Idle fade](https://github.com/openbezal/rhema/pull/179) | **Hold for behavior redesign and rendering fixes.** | Default-on expiry changes live-service behavior, while #175 explicitly values retaining the last verse. Make expiry disabled by default and opt-in. Fix compositing, use a consistent presentation clock, test real NDI frames, and preserve operator override. |
+| [#173 — Model export commands](https://github.com/openbezal/rhema/pull/173) | **Split or revise; no behavior-neutral merge.** | Removing an unsupported flag from quantization is separate from changing export library autodetection. Prior similar changes were reverted. Pin the intended exporter behavior or prove graph/pooling/runtime/provenance parity before changing it. |
+| [#52 — Verse prediction v2](https://github.com/openbezal/rhema/pull/52) | **Hold; port the useful idea onto current boundaries.** | Resolve conflicts through a fresh port, fix compilation/imports, connect predictor state to real accepted references, return actual verse text, and use one Suggestions section. Never let a prediction auto-present or mutate reading context. |
+
+### Concrete PR findings and reproduction evidence
+
+All links in this section pin the reviewed PR head and use new-file line numbers.
+
+**#182 — P1: adding a translation changes saved language identity.** [New metadata is inserted ahead of existing translations](https://github.com/openbezal/rhema/blob/b0574a53a84e60e8bac40fc10bf72bc272702dc5/data/build-bible-db.ts#L197-L203). The builder recreates AUTOINCREMENT IDs, while the app persists a numeric selection. Building the same input set before/after produced ESV `2→3`, KJV `3→4`, and NIV `5→6`; saved ESV ID 2 becomes Yoruba. Existing generated DBs also have order-dependent identities, so simply appending OYCB is not a complete upgrade strategy. Warm setup was separately reproduced exiting successfully while skipping the new translation, and the installed bundle configuration includes the DB without the new full attribution notice. Fix identity, freshness and packaged notices before integration. Real conversion/build with the reviewed official Yoruba corpus succeeded: 66 books and 31,087 verses.
+
+**#183 — P2: secondary style controls lack complete render/preview behavior.** The [Secondary Verse Plate controls](https://github.com/openbezal/rhema/blob/049a260a0877c68e594ba4283d7dedd8bfc4aa92/src/components/broadcast/text-properties.tsx#L767-L770) write style data with no secondary surface drawing path. Secondary vertical alignment is likewise unused. The [language selector](https://github.com/openbezal/rhema/blob/049a260a0877c68e594ba4283d7dedd8bfc4aa92/src/components/broadcast/text-properties.tsx#L477-L485) changes controls, but the designer renders a fixed single-language sample, so secondary styling cannot be inspected offline. Three recording-canvas regressions with actual text fragments fail for plate drawing, secondary alignment and sample appearance.
+
+**#183 — P2: language settings and presentation can settle inconsistently.** [Presentation captures translation IDs](https://github.com/openbezal/rhema/blob/049a260a0877c68e594ba4283d7dedd8bfc4aa92/src/hooks/use-broadcast.ts#L71-L80) but only invalidates on another present. Starting the first present, disabling secondary while its response is pending, and releasing the response still commits dual text. Separately, [the live refresh uses fail-fast parallel lookup](https://github.com/openbezal/rhema/blob/049a260a0877c68e594ba4283d7dedd8bfc4aa92/src/components/panels/live-output-panel.tsx#L43-L52): rejecting the optional secondary request leaves old primary text despite a successful new primary lookup. Both were reproduced with deferred promises. A third reproduced race lets an old refresh overwrite a newer presented reference; its primary-only root cause already exists on main and is expanded by this PR, rather than newly introduced.
+
+**#179 — P2: fade rendering and NDI delivery disagree.** [Fade alpha is set outside the renderer](https://github.com/openbezal/rhema/blob/ef8e04764824f07b96f7ab631051849213df545f/src/broadcast-output.tsx#L98-L103), which resets surface alpha from its own opacity option. A renderer regression confirms the Lower Thirds band remains at 0.7 when fade alpha is zero. The [animation loop draws without submitting frames](https://github.com/openbezal/rhema/blob/ef8e04764824f07b96f7ab631051849213df545f/src/broadcast-output.tsx#L125-L137); a fake-clock/component transport test records over 30 redraws but zero NDI submissions during one second of fading. Timeout edits are not propagated consistently, and the exponential interpolation does not finish in the documented 800 ms. Fix compositing, frame delivery and a shared deadline; make the feature opt-in.
+
+**#180 — P2: a hidden failed renderer suppresses the warning.** The [availability helper counts any `broadcast-*` window](https://github.com/openbezal/rhema/blob/5f2830bf543c32567a2b3b556af2665162ff6439/src/components/panels/live-output-panel.tsx#L12-L16). Enabling NDI creates a hidden window before attempting sender startup. If startup fails, a hidden window can remain without a visible display or active sender, yet Go Live does not warn. This is established by tracing the helper through existing startup/error handling; it was not reproduced on native hardware in this review.
+
+**#52 — P1: compilation and unsafe content/staging block integration.** The [new predictor state field/constructor](https://github.com/openbezal/rhema/blob/51e1a0236c061af24af41a07afc52e9cfba7552c/src-tauri/src/state.rs#L13) lacks its import; an isolated scope check emits Rust E0425/E0433. Project checking also confirms newly added missing type exports and incomplete `Verse` objects. [The command maps book name into verse text](https://github.com/openbezal/rhema/blob/51e1a0236c061af24af41a07afc52e9cfba7552c/src-tauri/src/commands/detection.rs#L316-L323), so a valid John lookup produces “John” instead of Scripture. [Add directly changes live output](https://github.com/openbezal/rhema/blob/51e1a0236c061af24af41a07afc52e9cfba7552c/src/components/panels/preview-panel.tsx#L104-L115) before queuing. Sequential context is never updated by application code, and chapter-end arithmetic offers nonexistent verses. Runtime scenarios are conditional on repairing compilation; these data/action defects are source-confirmed, not claimed native executions.
+
+**#181 — P2 scope gap, not a new regression.** The [normalizer handles digit ordinals](https://github.com/openbezal/rhema/blob/0e265cca66cb81a93d0ab82dcbcf8a599c90cbe0/src/lib/quick-search.ts#L40), but direct calls for `First Samuel 1:1` return no suggestion/reference. Arabic, Roman and `1st` forms work. The PR description specifically promises the word form; implement it or narrow that promise.
+
+**#173 — intentional behavior decision required.** Removing the export selector at [the export call](https://github.com/openbezal/rhema/blob/3d4745b8dde8ca2e44c833d0edc5a1954d1080a0/data/download-model.ts#L55-L57) changes Optimum autodetection to a sentence-transformers route when installed. Both tiny Qwen3 export probes succeeded, but graph inputs/outputs and pooling routes differed; this is not evidence of a reproduced exporter crash. The quantize parser lacks that flag, so its removal there is justified separately. Validate production model/provenance/search behavior before approving the export change.
+
+**#174 — no merge-blocking defect found in the static/focused review.** Its real project typecheck and two focused frontend tests pass. Keep native update/no-update and scoped-opener checks as merge requirements. Multiple hook consumers can repeat the initial check; sharing the launch result is a nonblocking follow-up, while the mounted App toast already maintains its own announcement guard. The PR author's historical native/signed-bundle claims were not independently rerun here.
+
+### Additional verification scope
+
+PR #183's unchanged submitted suite passes **227 tests in 16 files**; six distinct review regression expectations expose the rendering/async gaps above, including the pre-existing race. PR #179's relevant submitted/existing tests pass **61**, while two additional review regressions fail. PR #181 passes **56** focused tests, #182 passes **2**, and #174 passes **2** plus the real project check. These are isolated PR runs with overlapping tests, so counts must not be added to the main baseline as a unique total. Review harnesses mock canvas/IPC/scheduling and do not replace native receiver testing. The old #52 Rust suite could not run offline because its old lockfile requires an uncached dependency; the isolated compile failures and source findings remain separately established.
+
+## Proposed architecture and UI responsibilities
+
+### Options considered
+
+1. **Incremental extraction and targeted panels — recommended.** Keep React/Zustand/Tauri and existing Rust crates. Extract lifecycle, navigation, presentation, and frame delivery from UI components; add only panels needed by concrete workflows. This permits small, testable PRs.
+2. **Patch the existing panels only.** Lower initial effort, but preserves the coupling responsible for detection overriding manual navigation and for panel mounting controlling application behavior. Appropriate for urgent isolated fixes, insufficient as the whole program.
+3. **Rewrite the dashboard and state management together.** Large regression surface and little evidence that the framework is the limiting factor. Defer; the backlog does not justify it.
+
+### App-owned controllers
+
+Mount detection subscriptions, reading-mode events, Bible navigation coordination, and output synchronization once at the application root. `TranscriptPanel` currently owns detection/auto-presentation side effects; `SearchPanel` owns navigation loading and selection completion. Moving either into tabs without extracting those effects can stop behavior when a panel unmounts. Controllers must remain active independently of panel visibility.
+
+Use one operator command registry for UI, HTTP, OSC, keyboard, and palette. Keep the existing `remoteActions` facade while consolidating behavior so wire compatibility can be tested. A command acceptance response and an actually presented output are different events; tests must observe the resulting live revision, not only HTTP 200.
+
+### Separate state ownership
+
+- **Manual Bible browser:** browsed book/chapter, selection and reveal intent; changes only on operator action or explicit Follow detections mode.
+- **Detection session:** accepted references, reading context, source-ranked suggestions, history and dismissal state; candidates do not become commands implicitly.
+- **Preview:** the staged verse/content chosen for inspection.
+- **Live presentation:** immutable content snapshot and increasing revision; only presentation/clear commands commit it. Auto live is an explicit policy that issues those same commands.
+- **Output sessions:** each projector/network output's desired config and observed readiness/failure state; window existence alone is insufficient.
+
+Avoid three competing “Auto” states. Define and label auto queue, auto live, and follow detections separately, migrate existing settings, and remove unused duplicates only after every caller is traced.
+
+### Panels and drawers
+
+- Keep **Bible**, **Preview**, **Live**, **Queue**, and **Transcript** as operator concepts.
+- Extract **Suggestions** with stable semantic/quotation history and a separately labeled prediction section. Preserve direct detections as a distinct view; the current two-column separation is useful and should not be duplicated unnecessarily.
+- Add a **Session archive drawer** for saved sessions, exports and restore. Archiving is separate from choosing what goes live.
+- Reuse **Broadcast outputs** for configuration/status and **Theme Designer** for primary/secondary styling. Do not create another competing output manager.
+- Use responsive tabs/drawers on constrained screens; ensure keyboard focus, tutorial anchors, and accessibility survive the extraction. Verify 1280×720, 1366×768, and 1920×1080 layouts before fixing a minimum supported controller size.
+
+### Output boundary
+
+Presentation produces a revisioned render payload. Rendering produces a frame once per content/animation change. A bounded frame transport owns pacing, output lifecycle, backpressure, and last-frame repetition. Preserve control messages when coalescing frame content: a clear/stop must not be displaced by an older verse. Keep NDI and a future OMT adapter behind this boundary. Prefer measurement-led binary transport work over scaling the existing base64 path to continuous full-resolution frames.
+
+### Data and portability
+
+Translation identity uses stable codes independent of database insertion order. Per-translation display names and typography stay separate from canonical book numbers and detection aliases. Session exports are versioned, validate before mutation, preview import changes, and write atomically. Export credentials only through a separately designed explicit mechanism; ordinary migration exports exclude them. Do not embed the public issue's raw sermon log in the repository.
+
+## Release acceptance
+
+1. Every mapped issue/subrequest has a regression or acceptance test and a recorded outcome; partially implemented umbrella issues stay open for the remaining scope.
+2. Frontend unit/component tests, real TypeScript checking, lint, Rust tests, strict Clippy, formatting and a production build run as PR checks. Resolve baseline findings so green means green; do not hide first-party errors with broad disables.
+3. Native smoke tests cover packaged macOS, Windows and Linux builds; Windows/vMix is required for #177. Browser mocks alone cannot close hardware/output defects.
+4. Proposed latency budget on a documented reference Windows/vMix LAN setup: **p95 ≤250 ms, p99 ≤500 ms** from accepted presentation command to first correct receiver frame over at least 100 alternating changes after warmup. These are targets to validate, not measured achievements or universal hardware guarantees.
+5. A two-hour recorded-sermon session, including silence, prayers, narration, partial corrections, reconnects and manual interventions, completes with no crash, unbounded queues, stale overwrites, or unexpected clear/presentation. Record memory after warmup and at 30/60/120 minutes; investigate any sustained growth rather than choosing an arbitrary universal RAM ceiling.
+6. Hold the last manually presented verse by default. Auto fade, follow detections, auto live and auto queue are separate operator choices.
+
+## Sources and implementation handoff
+
+The linked GitHub issues/PRs and pinned commit heads are the primary review inputs. Code references above describe this snapshot, not future branch heads. The [OMT project's official overview](https://github.com/openmediatransport) supports treating OMT as a transport with libraries and alpha handling. The [current Tauri WebDriver guide](https://v2.tauri.app/develop/tests/webdriver/) describes native automation options, including an embedded WebdriverIO service for all three desktop platforms; any test bridge must be restricted to test builds.
+
+The executable work sequence is proposed in [the remediation plan](../plans/2026-10-15-repository-remediation.md). No GitHub issue labels, comments, reviews, merges or releases were changed by this audit.
