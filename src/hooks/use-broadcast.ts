@@ -30,12 +30,15 @@ let presentSeq = 0
 export async function presentVerse(verse: Verse): Promise<void> {
   presentSeq += 1
   const ticket = presentSeq
+  const initial = useBibleStore.getState()
+  if (initial.translationSelectionStatus !== "ready") return
+  const translationId = initial.activeTranslationId
   mark(`presentVerse start ${verse.book_name} ${verse.chapter}:${verse.verse}`)
 
   let verseToPresent = verse
   try {
     const fullVerse = await invoke<Verse | null>("get_verse", {
-      translationId: useBibleStore.getState().activeTranslationId,
+      translationId,
       bookNumber: verse.book_number,
       chapter: verse.chapter,
       verse: verse.verse,
@@ -47,7 +50,8 @@ export async function presentVerse(verse: Verse): Promise<void> {
   mark(`presentVerse get_verse done ${verse.book_name} ${verse.chapter}:${verse.verse}`)
 
   // A newer present started while we were refetching — let it win.
-  if (ticket !== presentSeq) return
+  if (ticket !== presentSeq || useBibleStore.getState().translationSelectionStatus !== "ready" ||
+      useBibleStore.getState().activeTranslationId !== translationId) return
 
   // Never present a verse with no text (e.g. a citation that doesn't exist
   // in the active translation) — keep whatever is currently live instead.

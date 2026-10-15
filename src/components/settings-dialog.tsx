@@ -528,11 +528,9 @@ function BibleSection() {
   const handleChange = async (value: string) => {
     const id = parseInt(value)
     try {
-      await invoke("set_active_translation", { translationId: id })
+      const { activateTranslation } = await import("@/stores/bible-store")
+      await activateTranslation(id)
       setActiveId(id)
-      // Update frontend stores so all panels use the new translation
-      const { useBibleStore } = await import("@/stores")
-      useBibleStore.getState().setActiveTranslation(id)
     } catch (e) {
       console.error("Failed to set translation:", e)
     }

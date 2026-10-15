@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useBible, bibleActions, findLoadedVerse } from "@/hooks/use-bible"
 import { presentVerse } from "@/hooks/use-broadcast"
+import { activateTranslation } from "@/stores/bible-store"
 import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
@@ -556,8 +557,7 @@ export function SearchPanel() {
               onValueChange={async (v) => {
                 const id = Number(v)
                 try {
-                  await invoke("set_active_translation", { translationId: id })
-                  useBibleStore.getState().setActiveTranslation(id)
+                  await activateTranslation(id)
                 } catch (err) { console.error(err) }
               }}
             >
@@ -586,8 +586,7 @@ export function SearchPanel() {
                 onValueChange={async (v) => {
                   const id = Number(v)
                   try {
-                    await invoke("set_active_translation", { translationId: id })
-                    useBibleStore.getState().setActiveTranslation(id)
+                    await activateTranslation(id)
                   } catch (err) { console.error(err) }
                 }}
               >

@@ -41,6 +41,7 @@ describe("presentVerse", () => {
     mockInvoke.mockReset()
     useBibleStore.setState({
       selectedVerse: null,
+      translationSelectionStatus: "ready",
       activeTranslationId: 2,
       translations: [
         {
@@ -54,6 +55,24 @@ describe("presentVerse", () => {
       ],
     })
     useBroadcastStore.setState({ liveVerse: null, liveSourceVerse: null })
+  })
+
+  it("holds live output until an ambiguous translation is confirmed", async () => {
+    useBibleStore.setState({ translationSelectionStatus: "needs_confirmation" })
+    mockInvoke.mockResolvedValue(sampleVerse)
+    await presentVerse(sampleVerse)
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
+    expect(mockInvoke).not.toHaveBeenCalledWith("get_verse", expect.anything())
+  })
+
+  it("rejects a verse lookup that completes after translation confirmation is lost", async () => {
+    let finish!: (value: Verse) => void
+    mockInvoke.mockImplementation((command) => command === "get_verse" ? new Promise<Verse>((resolve) => { finish = resolve }) : Promise.resolve(null))
+    const pending = presentVerse(sampleVerse)
+    useBibleStore.setState({ translationSelectionStatus: "needs_confirmation" })
+    finish(sampleVerse)
+    await pending
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
   })
 
   it("presents the refetched verse text, not the stale queue text", async () => {

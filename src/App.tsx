@@ -3,6 +3,7 @@ import { useBroadcastOutputs } from "@/hooks/use-broadcast-outputs"
 import { useBibleNavigation } from "@/hooks/use-bible-navigation"
 import { useRemoteControl } from "@/hooks/use-remote-control"
 import { TutorialOverlay } from "@/components/tutorial/tutorial-overlay"
+import { TranslationSelectionDialog } from "@/components/translation-selection-dialog"
 import { Toaster } from "sonner"
 
 export function App() {
@@ -12,6 +13,7 @@ export function App() {
   return (
     <>
       <Dashboard />
+      <TranslationSelectionDialog />
       <TutorialOverlay />
       <Toaster position="bottom-right" />
     </>
