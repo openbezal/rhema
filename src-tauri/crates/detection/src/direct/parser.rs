@@ -22,7 +22,8 @@ pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
     let _ = offset; // consumed whitespace
 
     // Tokenize the text after the book name for easier parsing
-    let tokens = tokenize(after_trimmed);
+    let raw_tokens = tokenize(after_trimmed);
+    let tokens = anchored_reference_tokens(&raw_tokens)?;
 
     // Pattern: Book name only (no chapter/verse) → chapter-only, held for refinement
     // e.g., "Genesis" on a partial transcript — wait for chapter:verse to follow
@@ -37,24 +38,24 @@ pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
     }
 
     // Try pattern: chapter:verse or chapter:verse-end
-    if let Some(result) = try_colon_pattern(&tokens, book_match) {
+    if let Some(result) = try_colon_pattern(tokens, book_match) {
         return Some(result);
     }
 
     // Try pattern: corrections like "verse 5 sorry chapter 3" or "chapter 3 verse 5 sorry verse 7"
     // Handles mid-speech corrections with keywords like "sorry", "rather", "I mean"
-    if let Some(result) = try_correction_pattern(&tokens, book_match) {
+    if let Some(result) = try_correction_pattern(tokens, book_match) {
         return Some(result);
     }
 
     // Try pattern: "chapter N verse M" (spoken form)
-    if let Some(result) = try_chapter_verse_spoken(&tokens, book_match) {
+    if let Some(result) = try_chapter_verse_spoken(tokens, book_match) {
         return Some(result);
     }
 
     // Try pattern: "verse N" (implies chapter 1)
     // e.g., "Genesis verse 5" → Genesis 1:5
-    if let Some(result) = try_verse_only_pattern(&tokens, book_match) {
+    if let Some(result) = try_verse_only_pattern(tokens, book_match) {
         return Some(result);
     }
 
@@ -62,22 +63,22 @@ pub fn parse_reference(text: &str, book_match: &BookMatch) -> Option<VerseRef> {
     // e.g. "32 verse 1"
     // Before N-verse-M, so a chapter split into digit groups is rejoined
     // rather than having its tail dropped.
-    if let Some(result) = try_split_chapter_verse_pattern(&tokens, book_match) {
+    if let Some(result) = try_split_chapter_verse_pattern(tokens, book_match) {
         return Some(result);
     }
 
-    if let Some(result) = try_number_verse_pattern(&tokens, book_match) {
+    if let Some(result) = try_number_verse_pattern(tokens, book_match) {
         return Some(result);
     }
 
     // Try pattern: spoken numbers like "thirty two verse one"
-    if let Some(result) = try_spoken_numbers(&tokens, book_match) {
+    if let Some(result) = try_spoken_numbers(tokens, book_match) {
         return Some(result);
     }
 
     // Try pattern: two consecutive numbers "3 16" → chapter 3 verse 16
     // This handles "John 3 16" where Deepgram transcribes without colon or keywords
-    if let Some(result) = try_two_numbers(&tokens, book_match) {
+    if let Some(result) = try_two_numbers(tokens, book_match) {
         return Some(result);
     }
 
@@ -103,6 +104,52 @@ enum Token {
     Number(i32),
     Colon,
     Dash,
+}
+
+/// A citation begins with its address (or a short explicit citation introduction).
+/// Scanning past arbitrary narration binds a person's name to a later "verse N".
+fn anchored_reference_tokens(tokens: &[Token]) -> Option<&[Token]> {
+    const INTRODUCTIONS: &[&[&str]] = &[
+        &["let", "s", "go", "to"],
+        &["let", "us", "go", "to"],
+        &["s", "gospel"],
+        &["gospel"],
+        &["epistle"],
+        &["letter"],
+    ];
+    let skip = INTRODUCTIONS
+        .iter()
+        .find(|words| {
+            words.len() <= tokens.len()
+                && words.iter().zip(tokens).all(
+                    |(expected, token)| matches!(token, Token::Word(actual) if actual == expected),
+                )
+        })
+        .map_or(0, |words| words.len());
+    let address = &tokens[skip..];
+    match address.first() {
+        None if skip == 0 => Some(address),
+        Some(Token::Word(word))
+            if matches!(word.as_str(), "chapter" | "chapters" | "verse" | "verses") =>
+        {
+            Some(address)
+        }
+        Some(token) if token_to_number(token).is_some() => Some(address),
+        _ => None,
+    }
+}
+
+/// Whether the citation prefix actually supplies a chapter number. A trailing
+/// "chapter" keyword is still incomplete and must not default established context to one.
+pub fn has_explicit_chapter(text: &str) -> bool {
+    let raw = tokenize(text);
+    let Some(tokens) = anchored_reference_tokens(&raw) else {
+        return false;
+    };
+    let offset = usize::from(
+        matches!(tokens.first(), Some(Token::Word(word)) if word == "chapter" || word == "chapters"),
+    );
+    consume_number(tokens, offset).is_some()
 }
 
 /// Tokenize text into words, numbers, colons, and dashes.
@@ -934,6 +981,33 @@ pub fn parse_contextual(text: &str) -> Option<ContextualRef> {
     None
 }
 
+/// Bare correction pairs may contain citation/correction words, but not narrative prose.
+pub fn is_numeric_correction(text: &str) -> bool {
+    let tokens = tokenize(text);
+    let mut numbers = 0;
+    for token in tokens {
+        match token {
+            Token::Number(_) => numbers += 1,
+            Token::Word(word)
+                if matches!(
+                    word.as_str(),
+                    "oh" | "sorry"
+                        | "rather"
+                        | "i"
+                        | "mean"
+                        | "no"
+                        | "please"
+                        | "chapter"
+                        | "chapters"
+                        | "verse"
+                        | "verses"
+                ) => {}
+            _ => return false,
+        }
+    }
+    numbers >= 2
+}
+
 /// All adjacent digit-number pairs in the text, in order of appearance.
 ///
 /// Deepgram renders a spoken "twenty-two twenty" as "22 20" — two plain
@@ -1262,7 +1336,7 @@ mod tests {
     fn test_correction_bare_pair_after_keyword() {
         // Live incident: "…chapter 20 22 … oh, sorry. 22 20." — the corrected
         // reference arrives as a bare pair with no chapter/verse keyword.
-        let bm = make_book_match("Revelation", 66, 0);
+        let bm = make_book_match("Revelation", 66, 10);
         let text = "Revelation chapter 20 22 oh, sorry. 22 20.";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 22);
@@ -1273,7 +1347,7 @@ mod tests {
     fn test_correction_without_numbers_is_chapter_only() {
         // "…chapter 20 … oh, sorry." with nothing after must NOT invent
         // verse 1 — it stays chapter-only until the correction arrives.
-        let bm = make_book_match("Revelation", 66, 0);
+        let bm = make_book_match("Revelation", 66, 10);
         let text = "Revelation chapter 20 oh, sorry.";
         let result = parse_reference(text, &bm).unwrap();
         assert_eq!(result.chapter, 20);
