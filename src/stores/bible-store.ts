@@ -23,6 +23,7 @@ interface PendingNavigation {
 
 interface BibleState {
   followDetections: boolean
+  followRevision: number
   setFollowDetections: (enabled: boolean) => void
   translations: Translation[]
   activeTranslationId: number
@@ -61,7 +62,8 @@ interface BibleState {
 
 export const useBibleStore = create<BibleState>((set, get) => ({
   followDetections: false,
-  setFollowDetections: (followDetections) => set(state => ({ followDetections, ...(!followDetections && state.pendingNavigation?.follow ? { pendingNavigation: null } : {}) })),
+  followRevision: 0,
+  setFollowDetections: (followDetections) => set(state => state.followDetections === followDetections ? state : ({ followDetections, followRevision: state.followRevision + 1, ...(!followDetections && state.pendingNavigation?.follow ? { pendingNavigation: null } : {}) })),
   translations: [],
   activeTranslationId: 1, // Resolved against installed metadata during hydration.
   activeTranslationCode: "KJV",

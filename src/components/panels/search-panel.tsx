@@ -175,21 +175,6 @@ export function SearchPanel() {
     [currentChapter, selectedVerse]
   )
 
-  // After a chapter reloads in a different translation the verse rows carry new
-  // ids, so re-point the selection at the row that is actually on screen.
-  useEffect(() => {
-    if (!selectedVerse || currentChapter.length === 0) return
-    const match = currentChapter.find(
-      (v) =>
-        v.book_number === selectedVerse.book_number &&
-        v.chapter === selectedVerse.chapter &&
-        v.verse === selectedVerse.verse
-    )
-    if (match && match.id !== selectedVerse.id) {
-      bibleActions.selectVerse(match)
-    }
-  }, [currentChapter, selectedVerse])
-
   // The one place a verse row is scrolled into view. Driven by an explicit
   // reveal request rather than by `selectedVerse`, because `presentVerse`
   // selects a verse on every auto-live detection and must not drag the
@@ -243,6 +228,9 @@ export function SearchPanel() {
   // bible_next / bible_prev commands do, so the two surfaces cannot diverge.
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.defaultPrevented || e.nativeEvent.isComposing) return
+      const target = e.target
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"]')) return
       if (e.key === "ArrowLeft") {
         e.preventDefault()
         if (chapter > 1) {
@@ -395,6 +383,7 @@ export function SearchPanel() {
     && (autocompleteResult.stage === "chapter" || autocompleteResult.stage === "verse")
 
   const handleQuickKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.defaultPrevented || e.nativeEvent.isComposing) return
     // Tab or → accepts suggestion and advances to NEXT STAGE
     if ((e.key === "Tab" || e.key === "ArrowRight") && quickSuggestion && quickSuggestion !== quickInput) {
       e.preventDefault()

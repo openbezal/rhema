@@ -9,6 +9,8 @@ import type { Verse, VerseRenderData, OutputClearMode } from "@/types"
 interface PresentOptions {
   selectPreview?: boolean
   automatic?: boolean
+  /** Keep the original preview permission across translation refreshes. */
+  followRevision?: number
   /** A caller may reserve intent before its chapter/reference lookup. */
   intentRevision?: number
 }
@@ -16,6 +18,7 @@ interface Intent {
   reference: Verse
   selectPreview: boolean
   automatic: boolean
+  followRevision: number
 }
 let revision = 0
 let pendingIntent: Intent | null = null
@@ -87,6 +90,8 @@ export async function presentVerse(
     reference: { ...verse },
     selectPreview: options.selectPreview !== false,
     automatic: options.automatic === true,
+    followRevision:
+      options.followRevision ?? useBibleStore.getState().followRevision,
   }
   pendingIntent = intent
   const ticket = ++revision
@@ -133,7 +138,9 @@ export async function presentVerse(
     }
     if (
       intent.selectPreview &&
-      (!intent.automatic || useBibleStore.getState().followDetections)
+      (!intent.automatic ||
+        (useBibleStore.getState().followDetections &&
+          useBibleStore.getState().followRevision === intent.followRevision))
     )
       useBibleStore.getState().selectVerse(full)
     if (!current()) return
@@ -177,6 +184,7 @@ export function refreshLiveVerse(): Promise<void> {
     ? presentVerse(source, {
         selectPreview: intent?.selectPreview ?? false,
         automatic: intent?.automatic ?? false,
+        followRevision: intent?.followRevision,
       })
     : Promise.resolve()
 }

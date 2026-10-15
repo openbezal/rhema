@@ -164,6 +164,7 @@ afterEach(async () => {
   await act(async () => root.unmount())
   host.remove()
   Reflect.deleteProperty(Element.prototype, "scrollIntoView")
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 async function mount() {
@@ -253,5 +254,124 @@ describe("app-root session integration", () => {
         .setPendingNavigation({ bookNumber: 43, chapter: 3, verse: 16 })
     )
     expect(document.activeElement).toBe(input)
+  })
+  it.each(["pending", "rejected"])(
+    "does not loop preview refresh against old rows with a %s chapter",
+    async (chapterState) => {
+      vi.spyOn(console, "error").mockImplementation(() => {})
+      await mount()
+      useBibleStore
+        .getState()
+        .setTranslations([
+          ...useBibleStore.getState().translations,
+          {
+            id: 2,
+            abbreviation: "ESV",
+            title: "ESV",
+            language: "en",
+            is_downloaded: true,
+            is_copyrighted: true,
+          },
+        ])
+      let reads = 0
+      mocks.invoke.mockImplementation((command, args) => {
+        if (command === "get_verse") {
+          reads++
+          return reads < 8
+            ? Promise.resolve({ ...genesis, id: 100, translation_id: 2 })
+            : new Promise(() => {})
+        }
+        if (command === "list_books")
+          return Promise.resolve(
+            useBibleStore
+              .getState()
+              .books.map((book) => ({
+                ...book,
+                translation_id: args.translationId,
+              }))
+          )
+        if (command === "get_chapter")
+          return chapterState === "rejected"
+            ? Promise.reject(new Error("Chapter unavailable"))
+            : new Promise(() => {})
+        return Promise.resolve(null)
+      })
+      await act(async () => useBibleStore.getState().setActiveTranslation(2))
+      expect(reads).toBeLessThanOrEqual(1)
+      expect(useBibleStore.getState().selectedVerse?.translation_id).toBe(2)
+    }
+  )
+  it.each(["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"])(
+    "keeps %s in the focused editor instead of invoking Bible navigation",
+    async (key) => {
+      useBroadcastStore.getState().setAutoLive(false)
+      const second = { ...genesis, id: 2, verse: 2, text: "Genesis two" }
+      useBibleStore.getState().selectVerse(key === "ArrowUp" ? second : genesis)
+      await mount()
+      const input = host.querySelector<HTMLInputElement>(
+        '[data-tour="quick-nav"]'
+      )!
+      input.focus()
+      const previous = useBibleStore.getState().selectedVerse
+      mocks.invoke.mockClear()
+      await act(async () =>
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key, bubbles: true })
+        )
+      )
+      expect(useBibleStore.getState().selectedVerse).toEqual(previous)
+      expect(useBroadcastStore.getState().liveVerse).toBeNull()
+      expect(mocks.invoke).not.toHaveBeenCalledWith(
+        "get_chapter",
+        expect.anything()
+      )
+    }
+  )
+
+  it.each(["composition", "already handled"])(
+    "ignores panel navigation when a key event is %s",
+    async (reason) => {
+      useBroadcastStore.getState().setAutoLive(false)
+      await mount()
+      const event = new KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        bubbles: true,
+        cancelable: true,
+        isComposing: reason === "composition",
+      })
+      if (reason === "already handled") event.preventDefault()
+      await act(async () =>
+        host.querySelector('[data-slot="search-panel"]')?.dispatchEvent(event)
+      )
+      expect(useBroadcastStore.getState().liveVerse).toBeNull()
+      expect(useBibleStore.getState().selectedVerse).toEqual(genesis)
+    }
+  )
+  it("does not present or clear a reference while Enter accepts IME composition", async () => {
+    useBroadcastStore.getState().setAutoLive(false)
+    await mount()
+    const input = host.querySelector<HTMLInputElement>(
+      '[data-tour="quick-nav"]'
+    )!
+    input.focus()
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      )!.set!.call(input, "John 3:16")
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    expect(useBibleStore.getState().selectedVerse).toEqual(john)
+    await act(async () =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          isComposing: true,
+        })
+      )
+    )
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
+    expect(input.value).toBe("John 3:16")
   })
 })

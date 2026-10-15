@@ -186,30 +186,34 @@ describe("app-owned detection session", () => {
       expect(useQueueStore.getState().items).toHaveLength(0)
     }
   )
-  it("does not move preview when Follow is disabled during an automatic lookup", async () => {
-    let finish!: (verse: Verse) => void
-    const pending = new Promise<Verse>((resolve) => {
-      finish = resolve
-    })
-    mocks.invoke.mockImplementation(async (command) =>
-      command === "get_verse"
-        ? pending
-        : command === "get_chapter"
-          ? pending.then((value) => [value])
-          : null
-    )
-    await connect()
-    cleanups.push(connectBibleNavigation(), connectPresentationController())
-    operatorActions.setFollowDetections(true)
-    operatorActions.setAutoLive(true)
-    send("verse_detections", [detection])
-    operatorActions.setFollowDetections(false)
-    finish(verse)
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(useBibleStore.getState().selectedVerse).toEqual(browsed)
-    expect(useBibleStore.getState().revealRequest).toBe(0)
-    expect(useBroadcastStore.getState().liveSourceVerse).toEqual(verse)
-  })
+  it.each([false, true])(
+    "does not move preview after Follow cancellation (reenabled=%s)",
+    async (reenabled) => {
+      let finish!: (verse: Verse) => void
+      const pending = new Promise<Verse>((resolve) => {
+        finish = resolve
+      })
+      mocks.invoke.mockImplementation(async (command) =>
+        command === "get_verse"
+          ? pending
+          : command === "get_chapter"
+            ? pending.then((value) => [value])
+            : null
+      )
+      await connect()
+      cleanups.push(connectBibleNavigation(), connectPresentationController())
+      operatorActions.setFollowDetections(true)
+      operatorActions.setAutoLive(true)
+      send("verse_detections", [detection])
+      operatorActions.setFollowDetections(false)
+      if (reenabled) operatorActions.setFollowDetections(true)
+      finish(verse)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(useBibleStore.getState().selectedVerse).toEqual(browsed)
+      expect(useBibleStore.getState().revealRequest).toBe(0)
+      expect(useBroadcastStore.getState().liveSourceVerse).toEqual(verse)
+    }
+  )
   it("does not restore a pending automatic verse after Auto is disabled and reenabled", async () => {
     let finish!: (verse: Verse) => void
     mocks.invoke.mockImplementation((command) =>
