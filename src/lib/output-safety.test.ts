@@ -93,6 +93,22 @@ describe("going on air", () => {
     expect(await pending).toBe(false)
     expect(useBroadcastStore.getState().isLive).toBe(false)
   })
+  it("discards availability read before a completed transport stop", async () => {
+    const stale = deferred<{ active: boolean }>()
+    let firstProbe = true
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command !== "get_ndi_status") return undefined
+      if (firstProbe) { firstProbe = false; return stale.promise }
+      return { active: true }
+    })
+    const pending = requestOnAir(true)
+    await vi.waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("get_ndi_status", { outputId: output.id }))
+    mocks.ask.mockResolvedValue(true)
+    expect(await setOutputEnabled(output.id, false)).toBe(true)
+    stale.resolve({ active: true })
+    expect(await pending).toBe(false)
+    expect(useBroadcastStore.getState().isLive).toBe(false)
+  })
   it("coalesces double activation into one confirmation", async () => {
     mocks.ask.mockResolvedValue(true)
     expect(await Promise.all([requestOnAir(true), requestOnAir(true)])).toEqual([true, true])
@@ -104,6 +120,22 @@ describe("changing outputs", () => {
   beforeEach(() => {
     mocks.invoke.mockImplementation(async (command: string) => command === "get_ndi_status" ? { active: true } : undefined)
     useBroadcastStore.setState({ isLive: true })
+  })
+  it("makes enabling an already-active sender idempotent despite stale card status", async () => {
+    expect(await setOutputEnabled(output.id, true)).toBe(true)
+    expect(mocks.invoke).toHaveBeenCalledWith("get_ndi_status", { outputId: output.id })
+    expect(mocks.invoke.mock.calls.some(([command]) => command === "start_ndi")).toBe(false)
+    expect(mocks.ask).not.toHaveBeenCalled()
+    expect(useBroadcastStore.getState().outputStatus[output.id]?.ndiActive).toBe(true)
+  })
+  it("requires consent before enabling when native status is unavailable", async () => {
+    mocks.invoke.mockImplementation(async (command: string) => {
+      if (command === "get_ndi_status") throw new Error("Status unavailable")
+      if (command === "start_ndi") return { sourceName: "Stage", width: 1920, height: 1080, fps: 24 }
+    })
+    expect(await setOutputEnabled(output.id, true)).toBe(false)
+    expect(mocks.ask).toHaveBeenCalledOnce()
+    expect(mocks.invoke.mock.calls.some(([command]) => command === "start_ndi")).toBe(false)
   })
   it("leaves an active output running when stop is dismissed", async () => {
     expect(await setOutputEnabled(output.id, false)).toBe(false)

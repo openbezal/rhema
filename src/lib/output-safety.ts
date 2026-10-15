@@ -2,7 +2,7 @@ import { ask } from "@tauri-apps/plugin-dialog"
 import { toast } from "sonner"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { MAIN_OUTPUT_ID, type BroadcastOutput } from "@/types"
-import { disableOutput, enableOutput, inspectOutput, transportChanged } from "./broadcast-output-control"
+import { disableOutput, enableOutput, inspectOutput, outputRuntimeVersion, transportChanged } from "./broadcast-output-control"
 
 let liveRevision = 0
 let pendingLive: Promise<boolean> | null = null
@@ -22,8 +22,9 @@ export function requestOnAir(active: boolean): Promise<boolean> {
   const revision = ++liveRevision
   const job = (async () => {
     const outputs = useBroadcastStore.getState().outputs
+    const versions = outputs.map(output => outputRuntimeVersion(output.id))
     const unchanged = () => useBroadcastStore.getState().outputs.length === outputs.length &&
-      outputs.every(output => currentOutput(output.id) === output)
+      outputs.every((output, index) => currentOutput(output.id) === output && outputRuntimeVersion(output.id) === versions[index])
     const states = await Promise.all(outputs.map(inspectOutput))
     if (revision !== liveRevision || !unchanged()) return false
     const audience = states.some(({ status }) => status.previewOpen || status.ndiActive)
@@ -67,7 +68,21 @@ export function setOutputEnabled(id: string, enabled: boolean): Promise<boolean>
   return outputJob(id, async () => {
     const output = currentOutput(id)
     if (!output) return false
-    if (enabled) return enableOutput(output)
+    if (enabled) {
+      const version = outputRuntimeVersion(id)
+      const inspection = await inspectOutput(output)
+      const unchanged = () => currentOutput(id) === output && outputRuntimeVersion(id) === version
+      if (!unchanged()) return false
+      const active = output.type === "ndi" ? inspection.status.ndiActive : inspection.status.previewOpen
+      if (active) {
+        useBroadcastStore.getState().setOutputStatus(id, inspection.status)
+        return true
+      }
+      if (inspection.uncertain && !await ask(`Start “${output.name}”? Its current status is unavailable; restarting may interrupt an active output.`, {
+        title: "Output status unavailable", kind: "warning", okLabel: "Start output", cancelLabel: "Keep output",
+      })) return false
+      return unchanged() ? enableOutput(output) : false
+    }
     const inspection = await confirmStop(output, "Stop output")
     if (!inspection) return false
     if (!inspection.hasWindow && !inspection.status.ndiActive && !inspection.uncertain) return true

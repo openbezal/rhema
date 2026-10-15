@@ -84,6 +84,7 @@ async function isPreviewWindowVisible(outputId: string): Promise<boolean> {
 
 const outputVersions = new Map<string, number>()
 const versionOf = (id: string) => outputVersions.get(id) ?? 0
+export const outputRuntimeVersion = (id: string) => versionOf(id)
 const advanceVersion = (id: string) => {
   const version = versionOf(id) + 1
   outputVersions.set(id, version)
