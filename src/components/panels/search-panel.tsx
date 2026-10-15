@@ -32,6 +32,8 @@ import {
 import { useBible, bibleActions, findLoadedVerse } from "@/hooks/use-bible"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { activateTranslation } from "@/stores/bible-store"
+import { operatorActions } from "@/lib/operator-actions"
+import { Switch } from "@/components/ui/switch"
 import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
@@ -133,6 +135,7 @@ export function SearchPanel() {
     selectedVerse,
   } = useBible()
 
+  const followDetections = useBibleStore(s => s.followDetections)
   const queueItems = useQueueStore((s) => s.items)
   const queuedVerseKeys = useMemo(() => {
     return new Set(
@@ -141,17 +144,6 @@ export function SearchPanel() {
   }, [queueItems])
 
   const selectedBookNumber = selectedBook?.book_number
-
-  // Load initial data and default to Genesis 1:1
-  useEffect(() => {
-    bibleActions.loadTranslations().catch(console.error)
-    bibleActions.loadBooks().then(() => {
-      const state = useBibleStore.getState()
-      if (!state.selectedVerse && !state.pendingNavigation) {
-        state.setPendingNavigation({ bookNumber: 1, chapter: 1, verse: 1 })
-      }
-    }).catch(console.error)
-  }, [])
 
   // Load chapter when book + chapter are set
   useEffect(() => {
@@ -240,7 +232,6 @@ export function SearchPanel() {
     const book = state.books.find((book) => book.book_number === target?.book_number)
     if (!target || !book) return
     applyNavigationSelection(book, target.chapter)
-    panelRef.current?.focus()
   }), [applyNavigationSelection])
 
   const handleVerseClick = useCallback((verse: Verse) => {
@@ -384,13 +375,7 @@ export function SearchPanel() {
         verse: result.verse
       })
 
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (quickInputRef.current && document.activeElement !== quickInputRef.current) {
-            quickInputRef.current.focus()
-          }
-        })
-      })
+
     }
 
     if ((result.stage === "chapter" || result.stage === "verse") && result.matchedBook && result.chapter) {
@@ -498,6 +483,10 @@ export function SearchPanel() {
           </button>
         </div>
 
+        <label className="flex shrink-0 items-center gap-1.5 pr-3 text-xs text-muted-foreground" title="Follow detected verses in Bible browsing. Auto live is controlled separately.">
+          Follow
+          <Switch aria-label="Follow detections" data-tour="follow-detections" checked={followDetections} onCheckedChange={operatorActions.setFollowDetections} />
+        </label>
         {activeTab === "book" ? (
           <div className="flex flex-1 items-center gap-2 pr-3">
             {/* EasyWorship-style autocomplete */}

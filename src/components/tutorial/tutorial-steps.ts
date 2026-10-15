@@ -10,7 +10,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-slot="transcript-panel"]',
     title: "Live Transcript",
     content:
-      "Start transcribing to convert speech to text in real time. Detected Bible verses are highlighted automatically.",
+      "Start transcribing to convert speech to text in real time. Detections continue while panels are hidden.",
     placement: "right",
   },
   {
@@ -26,7 +26,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="book-search"]',
     title: "Book Search",
     content:
-      "Look up any verse by book, chapter, and number. Switch translations from the dropdown.",
+      "Look up any verse by book, chapter, and number. Follow lets detections navigate this panel; keep it off while browsing manually.",
     placement: "bottom",
     spotlightPadding: 2,
   },
@@ -61,7 +61,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-slot="preview-panel"]',
     title: "Programme Preview",
     content:
-      "Preview how verses will look before going live. What you see here is what your audience sees.",
+      "Preview the browsed verse. It can differ from live output; Present sends your choice to the audience.",
     placement: "bottom",
   },
   {
@@ -69,7 +69,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-slot="live-output-panel"]',
     title: "Live Display",
     content:
-      "The live output. Presented verses appear here and on connected displays or NDI outputs.",
+      "Presented verses appear here and on connected outputs. Auto presents detected verses independently of Follow. The eraser clears content without stopping outputs.",
     placement: "bottom",
   },
   {

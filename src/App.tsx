@@ -1,3 +1,4 @@
+import { useDetectionSession } from "@/hooks/use-detection-session"
 import { usePresentationController } from "@/hooks/use-presentation-controller"
 import { Dashboard } from "@/components/layout/dashboard"
 import { useBroadcastOutputs } from "@/hooks/use-broadcast-outputs"
@@ -8,6 +9,7 @@ import { TranslationSelectionDialog } from "@/components/translation-selection-d
 import { Toaster } from "sonner"
 
 export function App() {
+  useDetectionSession()
   usePresentationController()
   useBibleNavigation()
   useRemoteControl()

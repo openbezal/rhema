@@ -702,3 +702,7 @@ For issues or questions:
 **Next Steps:**
 - Learn about [Whisper Transcription](./whisper.md) for local speech-to-text
 - See [README](../README.md) for general usage and setup
+
+## Shared operator policies
+
+HTTP/OSC Auto commands, Live display's Auto switch and Settings → Display mode use the same operator state. Follow in Book search controls whether detections navigate browsing and preview; it is independent of Auto and starts off. With Follow off, Auto can present detected verses while preserving the operator's selected book, chapter, preview and scroll position. Reading advances follow the same policy and do not add queue items. See [session controllers](session-controllers.md).

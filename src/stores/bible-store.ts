@@ -17,9 +17,13 @@ interface PendingNavigation {
   present?: boolean
   /** Reserved before a manual step performs asynchronous chapter probes. */
   presentationRevision?: number
+  /** Detection-owned navigation is cancelled when Follow is disabled. */
+  follow?: boolean
 }
 
 interface BibleState {
+  followDetections: boolean
+  setFollowDetections: (enabled: boolean) => void
   translations: Translation[]
   activeTranslationId: number
   activeTranslationCode: string | null
@@ -56,6 +60,8 @@ interface BibleState {
 }
 
 export const useBibleStore = create<BibleState>((set, get) => ({
+  followDetections: false,
+  setFollowDetections: (followDetections) => set(state => ({ followDetections, ...(!followDetections && state.pendingNavigation?.follow ? { pendingNavigation: null } : {}) })),
   translations: [],
   activeTranslationId: 1, // Resolved against installed metadata during hydration.
   activeTranslationCode: "KJV",

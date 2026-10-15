@@ -2,7 +2,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { REMOTE_EVENTS, type RemoteEventName } from "@/lib/remote-events"
-import { remoteActions } from "@/lib/remote-actions"
+import { operatorActions } from "@/lib/operator-actions"
 
 /** App-owned event subscriptions, independent of panel visibility. */
 export function connectRemoteControl(): () => void {
@@ -29,18 +29,18 @@ export function connectRemoteControl(): () => void {
     })
   }
 
-  register(REMOTE_EVENTS.next, remoteActions.queueNext)
-  register(REMOTE_EVENTS.prev, remoteActions.queuePrev)
-  register(REMOTE_EVENTS.send_to_live, remoteActions.sendToLive)
-  register(REMOTE_EVENTS.add_to_queue, remoteActions.addToQueue)
-  register(REMOTE_EVENTS.bible_next, () => step(remoteActions.bibleNext))
-  register(REMOTE_EVENTS.bible_prev, () => step(remoteActions.biblePrev))
-  register(REMOTE_EVENTS.show, () => remoteActions.toggleOnAir(true))
-  register(REMOTE_EVENTS.hide, () => remoteActions.toggleOnAir(false))
-  register(REMOTE_EVENTS.auto_broadcast, remoteActions.toggleAutoLive)
+  register(REMOTE_EVENTS.next, operatorActions.queueNext)
+  register(REMOTE_EVENTS.prev, operatorActions.queuePrev)
+  register(REMOTE_EVENTS.send_to_live, operatorActions.sendToLive)
+  register(REMOTE_EVENTS.add_to_queue, operatorActions.addToQueue)
+  register(REMOTE_EVENTS.bible_next, () => step(operatorActions.bibleNext))
+  register(REMOTE_EVENTS.bible_prev, () => step(operatorActions.biblePrev))
+  register(REMOTE_EVENTS.show, () => operatorActions.toggleOnAir(true))
+  register(REMOTE_EVENTS.hide, () => operatorActions.toggleOnAir(false))
+  register(REMOTE_EVENTS.auto_broadcast, operatorActions.toggleAutoLive)
   register(REMOTE_EVENTS.set_auto_broadcast, (raw) => {
     const active = parsePayload(raw)?.active
-    if (typeof active === "boolean") remoteActions.setAutoLive(active)
+    if (typeof active === "boolean") operatorActions.setAutoLive(active)
   })
   register(REMOTE_EVENTS.theme, (raw) => {
     const name = parsePayload(raw)?.name
@@ -54,7 +54,7 @@ export function connectRemoteControl(): () => void {
   })
   register(REMOTE_EVENTS.on_air, (raw) => {
     const active = parsePayload(raw)?.active
-    if (typeof active === "boolean") remoteActions.toggleOnAir(active)
+    if (typeof active === "boolean") operatorActions.toggleOnAir(active)
   })
   register(REMOTE_EVENTS.confidence, (raw) => {
     const value = parsePayload(raw)?.value

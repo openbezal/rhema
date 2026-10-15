@@ -5,13 +5,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
-import { clearLive } from "@/lib/presentation-controller"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore } from "@/stores"
-import { remoteActions } from "@/lib/remote-actions"
+import { operatorActions } from "@/lib/operator-actions"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
@@ -50,7 +49,7 @@ export function LiveOutputPanel() {
           </span>
           <Switch
             checked={autoLive}
-            onCheckedChange={remoteActions.setAutoLive}
+            onCheckedChange={operatorActions.setAutoLive}
           />
         </label>
         <DropdownMenu>
@@ -62,13 +61,13 @@ export function LiveOutputPanel() {
             <EraserIcon className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => clearLive("transparent")}>
+            <DropdownMenuItem onSelect={() => operatorActions.clearLive("transparent")}>
               Transparent
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => clearLive("black")}>
+            <DropdownMenuItem onSelect={() => operatorActions.clearLive("black")}>
               Black
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => clearLive("background")}>
+            <DropdownMenuItem onSelect={() => operatorActions.clearLive("background")}>
               Background only
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -84,7 +83,7 @@ export function LiveOutputPanel() {
           </span>
           <Switch
             checked={isLive}
-            onCheckedChange={remoteActions.toggleOnAir}
+            onCheckedChange={operatorActions.toggleOnAir}
             className="data-[state=checked]:bg-emerald-500"
           />
         </label>

@@ -8,12 +8,14 @@ import type { Verse, VerseRenderData, OutputClearMode } from "@/types"
 
 interface PresentOptions {
   selectPreview?: boolean
+  automatic?: boolean
   /** A caller may reserve intent before its chapter/reference lookup. */
   intentRevision?: number
 }
 interface Intent {
   reference: Verse
   selectPreview: boolean
+  automatic: boolean
 }
 let revision = 0
 let pendingIntent: Intent | null = null
@@ -74,9 +76,17 @@ export async function presentVerse(
     return
   const selected = selection()
   if (!selected || !validReference(verse)) return
+  // A manual selection takes ownership from unfinished automatic browsing.
+  if (
+    options.selectPreview !== false &&
+    useBibleStore.getState().pendingNavigation?.follow
+  ) {
+    useBibleStore.getState().setPendingNavigation(null)
+  }
   const intent: Intent = {
     reference: { ...verse },
     selectPreview: options.selectPreview !== false,
+    automatic: options.automatic === true,
   }
   pendingIntent = intent
   const ticket = ++revision
@@ -85,6 +95,7 @@ export async function presentVerse(
     const now = selection()
     return (
       ticket === revision &&
+      (!intent.automatic || useBroadcastStore.getState().autoLive) &&
       now?.id === selected.id &&
       now.code === selected.code &&
       !(startedLive && !useBroadcastStore.getState().isLive)
@@ -120,7 +131,11 @@ export async function presentVerse(
       })
       return
     }
-    if (intent.selectPreview) useBibleStore.getState().selectVerse(full)
+    if (
+      intent.selectPreview &&
+      (!intent.automatic || useBibleStore.getState().followDetections)
+    )
+      useBibleStore.getState().selectVerse(full)
     if (!current()) return
     useBroadcastStore
       .getState()
@@ -159,7 +174,10 @@ export function refreshLiveVerse(): Promise<void> {
   const source =
     intent?.reference ?? useBroadcastStore.getState().liveSourceVerse
   return source
-    ? presentVerse(source, { selectPreview: intent?.selectPreview ?? false })
+    ? presentVerse(source, {
+        selectPreview: intent?.selectPreview ?? false,
+        automatic: intent?.automatic ?? false,
+      })
     : Promise.resolve()
 }
 
@@ -175,7 +193,11 @@ export function connectPresentationController(): () => void {
       if (selection()) void refreshLiveVerse()
     })
     const broadcast = useBroadcastStore.subscribe((state, previous) => {
-      if (previous.isLive && !state.isLive) invalidatePresentation()
+      if (
+        (previous.isLive && !state.isLive) ||
+        (previous.autoLive && !state.autoLive && pendingIntent?.automatic)
+      )
+        invalidatePresentation()
     })
     disconnect = () => {
       bible()
