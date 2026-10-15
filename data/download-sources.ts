@@ -8,8 +8,11 @@
 import { mkdir, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { ensureYorubaSource } from "./lib/yoruba-source"
 
-const DATA_DIR = import.meta.dir
+const directoryIndex = process.argv.indexOf("--data-dir")
+const DATA_DIR = directoryIndex >= 0 ? process.argv[directoryIndex + 1] : import.meta.dir
+if (!DATA_DIR) throw new Error("--data-dir requires a directory")
 const SOURCES_DIR = join(DATA_DIR, "sources")
 const CROSS_REFS_DIR = join(DATA_DIR, "cross-refs")
 
@@ -132,6 +135,8 @@ async function main() {
 
   console.log("\n📖 Downloading Bible translations (pre-built zip)...\n")
   await downloadSourcesZip()
+  console.log("\n📖 Verifying the pinned Yoruba source...\n")
+  await ensureYorubaSource(SOURCES_DIR)
 
   console.log("\n🔗 Downloading cross-references...\n")
   await downloadCrossRefs()
@@ -139,7 +144,7 @@ async function main() {
   console.log("\n✅ All source data downloaded!\n")
 }
 
-main().catch((err) => {
+if (import.meta.main) main().catch((err) => {
   console.error("❌ Download failed:", err)
   process.exit(1)
 })

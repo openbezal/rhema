@@ -17,11 +17,14 @@
  */
 
 import { join } from "node:path"
+import { ensureBibleAssets } from "./lib/bible-assets"
 import { existsSync } from "node:fs"
 import { ensurePythonEnv, getVenvBin, PROJECT_ROOT } from "./lib/python-env"
 
 // ── Paths ────────────────────────────────────────────────────────────
-const DATA_DIR = join(PROJECT_ROOT, "data")
+const directoryIndex = process.argv.indexOf("--data-dir")
+const DATA_DIR = directoryIndex >= 0 ? process.argv[directoryIndex + 1] : join(PROJECT_ROOT, "data")
+if (!DATA_DIR) throw new Error("--data-dir requires a directory")
 const MODELS_DIR = join(PROJECT_ROOT, "models", "qwen3-embedding-0.6b")
 const MODELS_DIR_INT8 = join(
   PROJECT_ROOT,
@@ -29,10 +32,6 @@ const MODELS_DIR_INT8 = join(
   "qwen3-embedding-0.6b-int8"
 )
 
-const KJV_SOURCE = join(DATA_DIR, "sources", "KJV.json")
-const NIV_SOURCE = join(DATA_DIR, "sources", "NIV.json")
-const ESV_SOURCE = join(DATA_DIR, "sources", "ESV.json")
-const CROSS_REFS = join(DATA_DIR, "cross-refs", "cross_references.txt")
 const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
 const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b.bin")
@@ -83,6 +82,10 @@ async function run(
 
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
+  if (process.argv.includes("--bible-only")) {
+    await ensureBibleAssets(DATA_DIR, { force })
+    return
+  }
   console.log("\n╔══════════════════════════════════════════════╗")
   console.log("║   Rhema – Full Setup Pipeline                ║")
   console.log("╚══════════════════════════════════════════════╝")
@@ -114,25 +117,9 @@ async function main() {
     console.log("  ⏭ Skip: only needed for --with-embedding")
   }
 
-  // ── Phase 2: Bible source data (pre-built zip + cross-refs) ────
-  console.log("\n━━━ Phase 2/7: Download Bible source data ━━━")
-  if (
-    !shouldSkip(
-      "Bible source data",
-      KJV_SOURCE,
-      NIV_SOURCE,
-      ESV_SOURCE,
-      CROSS_REFS
-    )
-  ) {
-    await run(["bun", "run", join(DATA_DIR, "download-sources.ts")])
-  }
-
-  // ── Phase 3: Build Bible database ──────────────────────────────
-  console.log("\n━━━ Phase 3/7: Build Bible database ━━━")
-  if (!shouldSkip("Bible database", DB_PATH)) {
-    await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
-  }
+  // Always verify required sources, then compare the DB's content manifest.
+  console.log("\n━━━ Bible sources and database freshness ━━━")
+  await ensureBibleAssets(DATA_DIR, { force })
 
   // ── Phase 4: ONNX model download + quantize ────────────────────
   console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")

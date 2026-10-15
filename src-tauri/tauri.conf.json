@@ -27,7 +27,12 @@
     }
   },
   "bundle": {
-    "resources": { "../data/rhema.db": "rhema.db" },
+    "resources": {
+      "../data/rhema.db": "rhema.db",
+      "../data/licenses/OYCB-NOTICE.txt": "licenses/OYCB-NOTICE.txt",
+      "../data/licenses/OYCB-about.html": "licenses/OYCB-about.html",
+      "../data/yoruba-source.json": "licenses/OYCB-source.json"
+    },
     "active": true,
     "targets": "all",
     "macOS": {

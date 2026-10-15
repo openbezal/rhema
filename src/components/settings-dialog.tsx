@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { invoke } from "@tauri-apps/api/core"
 
 import { Button } from "@/components/ui/button"
+import { BibleDataNotices } from "@/components/bible-data-notices"
 import { DiagnosticsSection } from "@/components/settings/diagnostics-section"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -585,6 +586,7 @@ function BibleSection() {
           {translations.length > 0 && ` ${translations.length} translations available.`}
         </p>
       </div>
+      <div><BibleDataNotices /></div>
     </div>
   )
 }

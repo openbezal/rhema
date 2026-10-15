@@ -66,6 +66,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Install data-tool test dependencies
+        working-directory: .
+        run: bun install --frozen-lockfile
+      - name: Validate Bible data tools on this platform
+        working-directory: .
+        run: bun run test --run data/
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}

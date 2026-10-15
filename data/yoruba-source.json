@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "code": "OYCB",
+  "language": "yo",
+  "title": "Biblica® Open Yoruba Contemporary Bible™",
+  "sourcePage": "https://ebible.org/bible/details.php?id=yor",
+  "sourceUpdated": "2025-06-25",
+  "archiveUrl": "https://ebible.org/Scriptures/yor_vpl.zip",
+  "archiveSha256": "84c3664fb47178f7fa1a906ece313d937acb1be68b6ed050c9af8c022e283383",
+  "vplEntry": "yor_vpl.txt",
+  "vplSha256": "1b1392a2eb8db604dd73f222e3b9e50937c3f9b38fa221a442c08bb6034d5dff",
+  "jsonSha256": "5f9684df719412c04a3678e1f3f9221cdf856aabe58ac3f05fce17c10661416b",
+  "aboutSha256": "734878c78418c57309c9d88f2751bae051a4f8a0a0adc043415697c5ad874c9a",
+  "books": 66,
+  "verses": 31087,
+  "license": "CC-BY-SA-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+}

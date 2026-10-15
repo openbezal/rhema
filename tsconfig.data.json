@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.data.tsbuildinfo",
+    "types": ["bun"],
+    "resolveJsonModule": true
+  },
+  "include": [
+    "data/*.test.ts",
+    "data/convert-yoruba-vpl.ts",
+    "data/build-bible-db.ts",
+    "data/download-sources.ts",
+    "data/ci-build.ts",
+    "data/prepare-embeddings.ts",
+    "data/lib/*.ts"
+  ]
+}

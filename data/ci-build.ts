@@ -17,16 +17,15 @@
  */
 
 import { join } from "node:path"
+import { ensureBibleAssets } from "./lib/bible-assets"
 import { existsSync } from "node:fs"
 import { ensurePythonEnv, PROJECT_ROOT } from "./lib/python-env"
 
 // ── Paths ────────────────────────────────────────────────────────────
-const DATA_DIR = join(PROJECT_ROOT, "data")
+const directoryIndex = process.argv.indexOf("--data-dir")
+const DATA_DIR = directoryIndex >= 0 ? process.argv[directoryIndex + 1] : join(PROJECT_ROOT, "data")
+if (!DATA_DIR) throw new Error("--data-dir requires a directory")
 
-const KJV_SOURCE = join(DATA_DIR, "sources", "KJV.json")
-const NIV_SOURCE = join(DATA_DIR, "sources", "NIV.json")
-const ESV_SOURCE = join(DATA_DIR, "sources", "ESV.json")
-const CROSS_REFS = join(DATA_DIR, "cross-refs", "cross_references.txt")
 const DB_PATH = join(DATA_DIR, "rhema.db")
 const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
 
@@ -61,6 +60,10 @@ async function run(
 
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
+  if (process.argv.includes("--bible-only")) {
+    await ensureBibleAssets(DATA_DIR, { force })
+    return
+  }
   console.log("\n╔══════════════════════════════════════════════╗")
   console.log("║   Rhema – Bundle Setup Pipeline                ║")
   console.log("╚══════════════════════════════════════════════╝")
@@ -78,25 +81,9 @@ async function main() {
     "meaningless",
   ])
 
-  // ── Phase 2: Bible source data (pre-built zip + cross-refs) ────
-  console.log("\n━━━ Phase 2/4: Download Bible source data ━━━")
-  if (
-    !shouldSkip(
-      "Bible source data",
-      KJV_SOURCE,
-      NIV_SOURCE,
-      ESV_SOURCE,
-      CROSS_REFS
-    )
-  ) {
-    await run(["bun", "run", join(DATA_DIR, "download-sources.ts")])
-  }
-
-  // ── Phase 3: Build Bible database ──────────────────────────────
-  console.log("\n━━━ Phase 3/4: Build Bible database ━━━")
-  if (!shouldSkip("Bible database", DB_PATH)) {
-    await run(["bun", "run", join(DATA_DIR, "build-bible-db.ts")])
-  }
+  // Always verify required sources, then compare the DB's content manifest.
+  console.log("\n━━━ Bible sources and database freshness ━━━")
+  await ensureBibleAssets(DATA_DIR, { force })
 
   // Embedding re-ranking assets (ONNX model + verse embeddings) are
   // deliberately NOT built for release bundles: they are optional, cost
