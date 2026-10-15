@@ -45,24 +45,25 @@ pub fn coerce_bool(arg: &OscType) -> Result<bool, CommandError> {
 pub fn coerce_f32_normalized(arg: &OscType) -> Result<f32, CommandError> {
     match arg {
         OscType::Float(f) => Ok(f.clamp(0.0, 1.0)),
-        #[expect(clippy::cast_possible_truncation, reason = "OSC double values are small control values that fit in f32")]
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "OSC double values are small control values that fit in f32"
+        )]
         OscType::Double(d) => Ok((*d as f32).clamp(0.0, 1.0)),
-        #[expect(clippy::cast_precision_loss, reason = "OSC int values are small control values that fit in f32")]
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "OSC int values are small control values that fit in f32"
+        )]
         OscType::Int(i) => {
-            let val = if *i > 1 {
-                *i as f32 / 100.0
-            } else {
-                *i as f32
-            };
+            let val = if *i > 1 { *i as f32 / 100.0 } else { *i as f32 };
             Ok(val.clamp(0.0, 1.0))
         }
-        #[expect(clippy::cast_precision_loss, reason = "OSC long values are small control values that fit in f32")]
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "OSC long values are small control values that fit in f32"
+        )]
         OscType::Long(l) => {
-            let val = if *l > 1 {
-                *l as f32 / 100.0
-            } else {
-                *l as f32
-            };
+            let val = if *l > 1 { *l as f32 / 100.0 } else { *l as f32 };
             Ok(val.clamp(0.0, 1.0))
         }
         other => Err(CommandError::TypeCoercion {
@@ -147,22 +148,22 @@ mod tests {
 
     #[test]
     fn coerce_bool_from_true() {
-        assert_eq!(coerce_bool(&OscType::Bool(true)).unwrap(), true);
+        assert!(coerce_bool(&OscType::Bool(true)).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_false() {
-        assert_eq!(coerce_bool(&OscType::Bool(false)).unwrap(), false);
+        assert!(!coerce_bool(&OscType::Bool(false)).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_int_1() {
-        assert_eq!(coerce_bool(&OscType::Int(1)).unwrap(), true);
+        assert!(coerce_bool(&OscType::Int(1)).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_int_0() {
-        assert_eq!(coerce_bool(&OscType::Int(0)).unwrap(), false);
+        assert!(!coerce_bool(&OscType::Int(0)).unwrap());
     }
 
     #[test]
@@ -172,65 +173,61 @@ mod tests {
 
     #[test]
     fn coerce_bool_from_float_1_0() {
-        assert_eq!(coerce_bool(&OscType::Float(1.0)).unwrap(), true);
+        assert!(coerce_bool(&OscType::Float(1.0)).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_float_0_0() {
-        assert_eq!(coerce_bool(&OscType::Float(0.0)).unwrap(), false);
+        assert!(!coerce_bool(&OscType::Float(0.0)).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_float_0_7() {
-        assert_eq!(coerce_bool(&OscType::Float(0.7)).unwrap(), true);
+        assert!(coerce_bool(&OscType::Float(0.7)).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_string_true() {
-        assert_eq!(
-            coerce_bool(&OscType::String("true".into())).unwrap(),
-            true
-        );
+        assert!(coerce_bool(&OscType::String("true".into())).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_string_false() {
-        assert_eq!(
-            coerce_bool(&OscType::String("false".into())).unwrap(),
-            false
-        );
+        assert!(!coerce_bool(&OscType::String("false".into())).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_string_on() {
-        assert_eq!(coerce_bool(&OscType::String("on".into())).unwrap(), true);
+        assert!(coerce_bool(&OscType::String("on".into())).unwrap());
     }
 
     #[test]
     fn coerce_bool_from_string_off() {
-        assert_eq!(coerce_bool(&OscType::String("off".into())).unwrap(), false);
+        assert!(!coerce_bool(&OscType::String("off".into())).unwrap());
     }
 
     // --- coerce_f32_normalized tests ---
 
     #[test]
     fn coerce_f32_from_float() {
-        assert_eq!(coerce_f32_normalized(&OscType::Float(0.75)).unwrap(), 0.75);
+        assert!(
+            (coerce_f32_normalized(&OscType::Float(0.75)).unwrap() - 0.75).abs() < f32::EPSILON
+        );
     }
 
     #[test]
     fn coerce_f32_from_int_percent() {
-        assert_eq!(coerce_f32_normalized(&OscType::Int(75)).unwrap(), 0.75);
+        assert!((coerce_f32_normalized(&OscType::Int(75)).unwrap() - 0.75).abs() < f32::EPSILON);
     }
 
     #[test]
     fn coerce_f32_from_int_0() {
-        assert_eq!(coerce_f32_normalized(&OscType::Int(0)).unwrap(), 0.0);
+        assert!((coerce_f32_normalized(&OscType::Int(0)).unwrap() - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn coerce_f32_from_int_1_literal() {
-        assert_eq!(coerce_f32_normalized(&OscType::Int(1)).unwrap(), 1.0);
+        assert!((coerce_f32_normalized(&OscType::Int(1)).unwrap() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -241,12 +238,12 @@ mod tests {
 
     #[test]
     fn coerce_f32_clamps_high() {
-        assert_eq!(coerce_f32_normalized(&OscType::Float(1.5)).unwrap(), 1.0);
+        assert!((coerce_f32_normalized(&OscType::Float(1.5)).unwrap() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn coerce_f32_clamps_low() {
-        assert_eq!(coerce_f32_normalized(&OscType::Float(-0.5)).unwrap(), 0.0);
+        assert!((coerce_f32_normalized(&OscType::Float(-0.5)).unwrap() - 0.0).abs() < f32::EPSILON);
     }
 
     // --- coerce_string tests ---
@@ -366,27 +363,24 @@ mod tests {
     fn parse_osc_unknown_address_errors() {
         let result = parse_osc("/rhema/unknown", &[]);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown OSC address"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown OSC address"));
     }
 
     #[test]
     fn parse_osc_opacity_missing_arg_errors() {
         let result = parse_osc("/rhema/opacity", &[]);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing argument"));
+        assert!(result.unwrap_err().to_string().contains("Missing argument"));
     }
 
     #[test]
     fn parse_osc_theme_missing_arg_errors() {
         let result = parse_osc("/rhema/theme", &[]);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing argument"));
+        assert!(result.unwrap_err().to_string().contains("Missing argument"));
     }
 
     #[test]

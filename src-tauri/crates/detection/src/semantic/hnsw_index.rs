@@ -10,9 +10,9 @@
 use std::path::Path;
 
 #[cfg(feature = "vector-search")]
-use crate::error::DetectionError;
-#[cfg(feature = "vector-search")]
 use super::index::{SearchResult, VectorIndex};
+#[cfg(feature = "vector-search")]
+use crate::error::DetectionError;
 
 /// Vector index backed by a flat array of pre-computed embeddings.
 ///
@@ -90,9 +90,7 @@ impl HnswVectorIndex {
             )));
         }
 
-        log::info!(
-            "HnswVectorIndex loaded: {num_vectors} vectors, dim={dim}",
-        );
+        log::info!("HnswVectorIndex loaded: {num_vectors} vectors, dim={dim}",);
 
         Ok(Self {
             embeddings,
@@ -161,11 +159,7 @@ impl VectorIndex for HnswVectorIndex {
             let end = start + self.dimension;
             let stored = &self.embeddings[start..end];
 
-            let dot: f32 = query
-                .iter()
-                .zip(stored.iter())
-                .map(|(a, b)| a * b)
-                .sum();
+            let dot: f32 = query.iter().zip(stored.iter()).map(|(a, b)| a * b).sum();
 
             scores.push((i, f64::from(dot)));
         }
@@ -233,8 +227,7 @@ mod tests {
 
     #[test]
     fn test_dimension_mismatch() {
-        let index =
-            HnswVectorIndex::from_vecs(vec![vec![1.0, 0.0]], vec![1], 2).unwrap();
+        let index = HnswVectorIndex::from_vecs(vec![vec![1.0, 0.0]], vec![1], 2).unwrap();
         let err = index.search(&[1.0, 0.0, 0.0], 1);
         assert!(err.is_err());
     }

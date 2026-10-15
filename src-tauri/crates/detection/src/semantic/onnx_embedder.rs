@@ -15,9 +15,9 @@ use ort::value::Tensor;
 use tokenizers::Tokenizer;
 
 #[cfg(feature = "onnx")]
-use crate::error::DetectionError;
-#[cfg(feature = "onnx")]
 use super::embedder::TextEmbedder;
+#[cfg(feature = "onnx")]
+use crate::error::DetectionError;
 
 /// ONNX-based text embedder.
 ///
@@ -82,11 +82,7 @@ impl OnnxEmbedder {
             .map_err(|e| DetectionError::Internal(format!("tokenizer load: {e}")))?;
 
         // Ensure the tokenizer pads and truncates to our max length.
-        let pad_id = tokenizer
-            .get_vocab(true)
-            .get("[PAD]")
-            .copied()
-            .unwrap_or(0);
+        let pad_id = tokenizer.get_vocab(true).get("[PAD]").copied().unwrap_or(0);
         let pad_token = tokenizer
             .id_to_token(pad_id)
             .unwrap_or_else(|| "[PAD]".to_string());
@@ -153,7 +149,11 @@ impl OnnxEmbedder {
         Ok(Self {
             session: Mutex::new(session),
             tokenizer: Mutex::new(tokenizer),
-            #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "dim validated to be positive and small")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "dim validated to be positive and small"
+            )]
             dim: dim as usize,
             // No prefix — matches the Python precompute script which embeds
             // documents with no prefix. Symmetric mode gives highest similarity.
@@ -179,6 +179,10 @@ impl OnnxEmbedder {
     /// 4. Run ONNX inference.
     /// 5. Mean-pool the last hidden state over the attention mask.
     /// 6. L2-normalise the resulting vector.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "keep tensor setup, inference and pooling together to preserve ONNX lifetimes"
+    )]
     fn embed_impl(&self, text: &str) -> Result<Vec<f32>, DetectionError> {
         let embed_start = std::time::Instant::now();
         let prefixed = format!("{}{}", self.prompt_prefix, text);
@@ -197,7 +201,10 @@ impl OnnxEmbedder {
         let seq_len = ids.len();
 
         // Build owned tensors with shape [1, seq_len].
-        #[expect(clippy::cast_possible_wrap, reason = "seq_len is at most MAX_TOKENS (128), fits i64")]
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "seq_len is at most MAX_TOKENS (128), fits i64"
+        )]
         let shape = vec![1i64, seq_len as i64];
 
         let input_ids_data: Vec<i64> = ids.iter().map(|&v| i64::from(v)).collect();
@@ -209,7 +216,10 @@ impl OnnxEmbedder {
             .map_err(|e| DetectionError::Internal(format!("attention_mask tensor: {e}")))?;
 
         // Qwen3 needs position_ids. For models that don't have this input, it's ignored.
-        #[expect(clippy::cast_possible_wrap, reason = "seq_len is at most MAX_TOKENS (128), fits i64")]
+        #[expect(
+            clippy::cast_possible_wrap,
+            reason = "seq_len is at most MAX_TOKENS (128), fits i64"
+        )]
         let position_ids_data: Vec<i64> = (0..seq_len as i64).collect();
         let position_ids_tensor = Tensor::from_array((shape, position_ids_data))
             .map_err(|e| DetectionError::Internal(format!("position_ids tensor: {e}")))?;
@@ -253,7 +263,11 @@ impl OnnxEmbedder {
 
         let out_dims: &[i64] = out_shape;
 
-        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "ONNX tensor dimensions are small positive values")]
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "ONNX tensor dimensions are small positive values"
+        )]
         let pooled = if out_dims.len() == 2 {
             // sentence_embedding: shape [1, dim] — already pooled by sentence-transformers
             let dim = out_dims[1] as usize;
@@ -298,11 +312,7 @@ impl OnnxEmbedder {
         }
 
         let elapsed = embed_start.elapsed();
-        log::info!(
-            "[ONNX] embed() took {:?} for {} chars",
-            elapsed,
-            text.len()
-        );
+        log::info!("[ONNX] embed() took {:?} for {} chars", elapsed, text.len());
 
         Ok(result)
     }

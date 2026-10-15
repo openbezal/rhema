@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { SparklesIcon, ChevronLeftIcon } from "lucide-react"
-import type { TooltipRenderProps, Controls } from "react-joyride"
+import type { TooltipRenderProps } from "react-joyride"
 
 export function TutorialTooltip({
   index,
@@ -13,46 +13,38 @@ export function TutorialTooltip({
   controls,
   tooltipProps,
 }: TooltipRenderProps) {
-  const controlsRef = useRef<Controls>(controls)
-  const indexRef = useRef(index)
-  const isLastStepRef = useRef(isLastStep)
-
-  controlsRef.current = controls
-  indexRef.current = index
-  isLastStepRef.current = isLastStep
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") {
         e.preventDefault()
-        if (isLastStepRef.current) {
-          controlsRef.current.skip("button_skip")
+        if (isLastStep) {
+          controls.skip("button_skip")
         } else {
-          controlsRef.current.next()
+          controls.next()
         }
-      } else if (e.key === "ArrowLeft" && indexRef.current > 0) {
+      } else if (e.key === "ArrowLeft" && index > 0) {
         e.preventDefault()
-        controlsRef.current.prev()
+        controls.prev()
       } else if (e.key === "Escape") {
         e.preventDefault()
-        controlsRef.current.skip("button_close")
+        controls.skip("button_close")
       }
     }
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  }, [controls, index, isLastStep])
 
   return (
     <div
       {...tooltipProps}
       className="z-[70] w-[340px] overflow-hidden rounded-xl bg-card shadow-2xl shadow-black/25"
     >
-      <div className="flex items-center gap-2.5 border-b border-border/40 px-4 pb-3 pt-4">
+      <div className="flex items-center gap-2.5 border-b border-border/40 px-4 pt-4 pb-3">
         <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15">
           <SparklesIcon className="size-3.5 text-primary" />
         </div>
-        <h3 className="text-sm font-semibold leading-tight tracking-tight text-foreground">
+        <h3 className="text-sm leading-tight font-semibold tracking-tight text-foreground">
           {step.title ?? `Step ${index + 1}`}
         </h3>
       </div>
@@ -77,7 +69,7 @@ export function TutorialTooltip({
               }`}
             />
           ))}
-          <span className="ml-1 text-[0.6875rem] tabular-nums text-muted-foreground/50">
+          <span className="ml-1 text-[0.6875rem] text-muted-foreground/50 tabular-nums">
             {index + 1}/{size}
           </span>
         </div>

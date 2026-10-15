@@ -45,11 +45,11 @@ fn levenshtein(a: &str, b: &str) -> usize {
 /// to prevent false positives like "Mara" → "Mark".
 fn max_distance_for(name: &str) -> usize {
     if name.len() <= 4 {
-        1  // "Mark", "Ruth", "Joel" — only 1 edit allowed
+        1 // "Mark", "Ruth", "Joel" — only 1 edit allowed
     } else if name.len() <= 8 {
         2
     } else {
-        3  // "Philippians", "Deuteronomy" — allow 3 for very long names
+        3 // "Philippians", "Deuteronomy" — allow 3 for very long names
     }
 }
 
@@ -112,9 +112,9 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
                 let dist = levenshtein(candidate, &book_lower);
                 if dist > 0 && dist <= max_dist {
                     // Avoid overlapping with an already-found match at the same position
-                    let dominated = matches.iter().any(|m| {
-                        m.start == span_start && m.end == span_end && m.distance <= dist
-                    });
+                    let dominated = matches
+                        .iter()
+                        .any(|m| m.start == span_start && m.end == span_end && m.distance <= dist);
                     if !dominated {
                         matches.push(FuzzyMatch {
                             book_name: book.name.to_string(),
@@ -130,7 +130,11 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
     }
 
     // De-duplicate: for overlapping spans keep the lowest-distance match.
-    matches.sort_by(|a, b| a.start.cmp(&b.start).then_with(|| a.distance.cmp(&b.distance)));
+    matches.sort_by(|a, b| {
+        a.start
+            .cmp(&b.start)
+            .then_with(|| a.distance.cmp(&b.distance))
+    });
     let mut result: Vec<FuzzyMatch> = Vec::new();
     let mut last_end: usize = 0;
     for m in matches {

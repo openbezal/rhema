@@ -10,13 +10,13 @@
 //! - [`DeviceInfo`], [`AudioConfig`], [`AudioFrame`] — configuration and data
 //! - [`AudioError`] — error type for audio operations
 
-pub mod types;
-pub mod error;
-pub mod device;
-pub mod meter;
 pub mod capture;
+pub mod device;
+pub mod error;
+pub mod meter;
+pub mod types;
 pub mod vad;
 
-pub use types::*;
 pub use error::*;
+pub use types::*;
 pub use vad::{Vad, VadConfig, VadState, VadTransition};

@@ -32,7 +32,7 @@ interface BroadcastPayload {
   verse: VerseRenderData | null
 }
 
-function BroadcastCanvas() {
+export function BroadcastCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestData = useRef<BroadcastPayload | null>(null)
   const ndiConfigRef = useRef<NdiConfigEventPayload>({

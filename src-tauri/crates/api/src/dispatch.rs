@@ -22,10 +22,7 @@ pub trait CommandSink: Send + Sync {
 pub struct CommandDispatcher;
 
 impl CommandDispatcher {
-    pub fn dispatch(
-        cmd: &RemoteCommand,
-        sink: &dyn CommandSink,
-    ) -> Result<(), CommandError> {
+    pub fn dispatch(cmd: &RemoteCommand, sink: &dyn CommandSink) -> Result<(), CommandError> {
         match cmd {
             RemoteCommand::Next => sink.emit_event("remote:next", "{}"),
             RemoteCommand::Prev => sink.emit_event("remote:prev", "{}"),

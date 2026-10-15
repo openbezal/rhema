@@ -6,7 +6,10 @@ const I16_MAX: f32 = i16::MAX as f32;
 /// Both values are normalized to the range 0.0..=1.0.
 pub fn compute_level(samples: &[i16]) -> AudioLevel {
     if samples.is_empty() {
-        return AudioLevel { rms: 0.0, peak: 0.0 };
+        return AudioLevel {
+            rms: 0.0,
+            peak: 0.0,
+        };
     }
 
     let mut sum_sq: f64 = 0.0;
@@ -20,9 +23,15 @@ pub fn compute_level(samples: &[i16]) -> AudioLevel {
         }
     }
 
-    #[expect(clippy::cast_precision_loss, reason = "sample count fits comfortably in f64 mantissa")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "sample count fits comfortably in f64 mantissa"
+    )]
     let count = samples.len() as f64;
-    #[expect(clippy::cast_possible_truncation, reason = "RMS is a small normalized value that fits in f32")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "RMS is a small normalized value that fits in f32"
+    )]
     let rms = ((sum_sq / count).sqrt() as f32) / I16_MAX;
     let peak = f32::from(peak_abs) / I16_MAX;
 

@@ -1,12 +1,15 @@
-#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
 
 use std::sync::Mutex;
 
 use base64::Engine;
+use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
-use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
 
 /// Map `output_id` to its Tauri window label (`broadcast-{id}`).
 ///
@@ -80,18 +83,14 @@ pub async fn ensure_broadcast_window(
     if app.get_webview_window(&label).is_some() {
         return Ok(());
     }
-    WebviewWindowBuilder::new(
-        &app,
-        &label,
-        WebviewUrl::App(window_url(&output_id).into()),
-    )
-    .title(title.unwrap_or_else(|| "Rhema Output".to_string()))
-    .inner_size(1920.0, 1080.0)
-    .visible(false)
-    .skip_taskbar(true)
-    .focused(false)
-    .build()
-    .map_err(|e| e.to_string())?;
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(window_url(&output_id).into()))
+        .title(title.unwrap_or_else(|| "Rhema Output".to_string()))
+        .inner_size(1920.0, 1080.0)
+        .visible(false)
+        .skip_taskbar(true)
+        .focused(false)
+        .build()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -141,25 +140,21 @@ pub async fn open_broadcast_window(
         window
     } else {
         log::info!("open_broadcast_window: creating window '{label}'");
-        WebviewWindowBuilder::new(
-            &app,
-            &label,
-            WebviewUrl::App(window_url(&output_id).into()),
-        )
-        .title(title.unwrap_or_else(|| "Rhema Output".to_string()))
-        .visible(false)
-        .decorations(true)
-        .always_on_top(false)
-        .skip_taskbar(false)
-        .focused(false)
-        .decorations(false)
-        .fullscreen(true)
-        .minimizable(false)
-        .build()
-        .map_err(|e| {
-            log::error!("open_broadcast_window: window build failed: {e}");
-            e.to_string()
-        })?
+        WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(window_url(&output_id).into()))
+            .title(title.unwrap_or_else(|| "Rhema Output".to_string()))
+            .visible(false)
+            .decorations(true)
+            .always_on_top(false)
+            .skip_taskbar(false)
+            .focused(false)
+            .decorations(false)
+            .fullscreen(true)
+            .minimizable(false)
+            .build()
+            .map_err(|e| {
+                log::error!("open_broadcast_window: window build failed: {e}");
+                e.to_string()
+            })?
     };
 
     window
@@ -188,7 +183,13 @@ pub async fn open_broadcast_window(
         e.to_string()
     })?;
     let _ = window.set_focus();
-    log::info!("open_broadcast_window: '{label}' shown at ({},{}) {}x{}", pos.x, pos.y, size.width, size.height);
+    log::info!(
+        "open_broadcast_window: '{label}' shown at ({},{}) {}x{}",
+        pos.x,
+        pos.y,
+        size.width,
+        size.height
+    );
 
     Ok(())
 }
@@ -281,7 +282,12 @@ pub fn push_ndi_frame(
         .map_err(|e| format!("base64 decode error: {e}"))?;
     let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
     runtime
-        .send_frame_rgba(&request.output_id, request.width, request.height, &rgba_data)
+        .send_frame_rgba(
+            &request.output_id,
+            request.width,
+            request.height,
+            &rgba_data,
+        )
         .map_err(|e| e.to_string())
 }
 

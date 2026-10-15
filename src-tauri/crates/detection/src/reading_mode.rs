@@ -164,8 +164,15 @@ impl ReadingMode {
         if !self.verses.is_empty() {
             self.active = true;
             self.last_match_time = Instant::now();
-            let verse = self.verses.get(self.current_index).map_or(0, |v| v.verse_number);
-            log::info!("[READING] Resumed at: {} {}:{verse}", self.book_name, self.chapter);
+            let verse = self
+                .verses
+                .get(self.current_index)
+                .map_or(0, |v| v.verse_number);
+            log::info!(
+                "[READING] Resumed at: {} {}:{verse}",
+                self.book_name,
+                self.chapter
+            );
         }
     }
 
@@ -217,7 +224,11 @@ impl ReadingMode {
     /// in the text. Returns `Some(ChapterChange)` when a different chapter is
     /// requested, `None` otherwise.
     ///
-    /// Also sets bare_number_context when "chapter" keyword is detected without a number.
+    /// Also sets `bare_number_context` when "chapter" keyword is detected without a number.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "chapter commands share one ordered context-update sequence"
+    )]
     pub fn check_chapter_command(&mut self, text: &str) -> Option<ChapterChange> {
         if self.verses.is_empty() {
             return None;
@@ -229,12 +240,15 @@ impl ReadingMode {
         // Check if text contains "chapter" keyword without a number following it
         // This sets context for the next bare number to be interpreted as chapter
         // BUT exclude "next chapter" and "previous chapter" commands
-        if !trimmed.contains("next") && !trimmed.contains("previous") {
-            if (trimmed.contains("chapter") && trimmed.ends_with("chapter")) || trimmed.ends_with("chapter?") || trimmed.ends_with("chapter.") {
-                log::info!("[READING] Detected 'chapter' keyword without number - expecting chapter number next");
-                self.bare_number_context = BareNumberContext::ExpectingChapter;
-                return None; // No navigation yet, just set context
-            }
+        if !trimmed.contains("next")
+            && !trimmed.contains("previous")
+            && ((trimmed.contains("chapter") && trimmed.ends_with("chapter"))
+                || trimmed.ends_with("chapter?")
+                || trimmed.ends_with("chapter."))
+        {
+            log::info!("[READING] Detected 'chapter' keyword without number - expecting chapter number next");
+            self.bare_number_context = BareNumberContext::ExpectingChapter;
+            return None; // No navigation yet, just set context
         }
 
         // Check for bare number(s) when expecting chapter or verse
@@ -245,7 +259,9 @@ impl ReadingMode {
                 match self.bare_number_context {
                     BareNumberContext::ExpectingChapter => {
                         // Check if there's a second number (e.g., "5 2" → chapter 5 verse 2)
-                        if let Some((second_num, rest_after_second)) = parse_number_and_rest(rest_trimmed) {
+                        if let Some((second_num, rest_after_second)) =
+                            parse_number_and_rest(rest_trimmed)
+                        {
                             if rest_after_second.trim().is_empty() {
                                 log::info!("[READING] Two numbers '{first_num} {second_num}' interpreted as chapter:verse (context: ExpectingChapter)");
                                 self.bare_number_context = BareNumberContext::None;
@@ -311,18 +327,20 @@ impl ReadingMode {
         }
 
         // "chapter N" or "chapter N verse M" or "N verse M" anywhere in text
-        log::debug!("[READING] Attempting to extract chapter and verse from: {:?}", trimmed);
+        log::debug!("[READING] Attempting to extract chapter and verse from: {trimmed:?}");
         let (chapter_num, verse_num) = extract_chapter_and_verse(trimmed)?;
-        log::debug!("[READING] Extracted: chapter={}, verse={:?}", chapter_num, verse_num);
+        log::debug!("[READING] Extracted: chapter={chapter_num}, verse={verse_num:?}");
 
         // Ignore if it's the same chapter we're already in AND no specific verse
         if chapter_num == self.chapter && verse_num.is_none() {
-            log::debug!("[READING] Ignoring same chapter {} without specific verse", chapter_num);
+            log::debug!("[READING] Ignoring same chapter {chapter_num} without specific verse");
             return None;
         }
 
         if let Some(verse) = verse_num {
-            log::info!("[READING] Chapter change command detected: chapter {chapter_num} verse {verse}");
+            log::info!(
+                "[READING] Chapter change command detected: chapter {chapter_num} verse {verse}"
+            );
             // Reset context after full chapter:verse navigation
             self.bare_number_context = BareNumberContext::None;
         } else {
@@ -352,9 +370,7 @@ impl ReadingMode {
 
         // Check timeout — but don't clear verses, just pause.
         // This allows "verse N" references to re-activate.
-        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS
-            && self.active
-        {
+        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS && self.active {
             log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
             self.active = false;
         }
@@ -397,7 +413,8 @@ impl ReadingMode {
                 let next_idx = self.current_index + 1;
                 if next_idx < self.verses.len() {
                     let next = &self.verses[next_idx];
-                    let next_overlap = word_overlap(&transcript_words, &next.words, next.word_count);
+                    let next_overlap =
+                        word_overlap(&transcript_words, &next.words, next.word_count);
 
                     // If transcript also matches next verse, advance
                     if next_overlap >= MIN_WORD_OVERLAP {
@@ -438,7 +455,7 @@ impl ReadingMode {
     /// - "verse three", "verse 4" → jump to that verse
     /// - "next" / "next verse" → advance by 1
     /// - "previous verse" / "go back" / go back by 1
-    /// - Bare numbers when context is ExpectingVerse
+    /// - Bare numbers when context is `ExpectingVerse`
     fn check_verse_number_reference(&mut self, text: &str) -> Option<ReadingAdvance> {
         let lower = text.to_lowercase();
         let trimmed = lower.trim();
@@ -455,15 +472,18 @@ impl ReadingMode {
                             return self.advance_to(idx);
                         }
                     }
-                    log::warn!("[READING] Verse {} not found in loaded verses", num);
+                    log::warn!("[READING] Verse {num} not found in loaded verses");
                     return None;
                 }
             }
         }
 
         // Check for "next" / "next verse" command
-        if trimmed == "next" || trimmed == "next." || trimmed == "next verse"
-            || trimmed == "next verse." {
+        if trimmed == "next"
+            || trimmed == "next."
+            || trimmed == "next verse"
+            || trimmed == "next verse."
+        {
             let next_idx = self.current_index + 1;
             if next_idx < self.verses.len() {
                 log::info!("[READING] 'Next' command detected");
@@ -473,8 +493,11 @@ impl ReadingMode {
         }
 
         // Check for "previous" / "go back" command
-        if trimmed == "previous verse" || trimmed == "previous verse."
-            || trimmed == "go back" || trimmed == "go back." {
+        if trimmed == "previous verse"
+            || trimmed == "previous verse."
+            || trimmed == "go back"
+            || trimmed == "go back."
+        {
             if self.current_index > 0 {
                 let prev_idx = self.current_index - 1;
                 log::info!("[READING] 'Previous' command detected");
@@ -539,7 +562,7 @@ impl Default for ReadingMode {
 /// "verse three", or bare SINGLE numbers like "3." or "five".
 ///
 /// Returns None for two-number patterns like "5 2" or "five two" which
-/// should be handled as "chapter 5 verse 2" by check_chapter_command.
+/// should be handled as "chapter 5 verse 2" by `check_chapter_command`.
 fn extract_verse_number(text: &str) -> Option<i32> {
     // Find "verse N" or "verses N" anywhere in the text
     for keyword in &["verse ", "verses "] {
@@ -560,8 +583,11 @@ fn extract_verse_number(text: &str) -> Option<i32> {
         let rest_trimmed = rest_after_first.trim_start();
         // If there's another number after the first, this is likely "chapter verse"
         if let Some((_second_num, _)) = parse_number_and_rest(rest_trimmed) {
-            log::debug!("[READING] Found two numbers '{} {}...' - deferring to chapter command handler",
-                first_num, rest_trimmed.split_whitespace().next().unwrap_or(""));
+            log::debug!(
+                "[READING] Found two numbers '{} {}...' - deferring to chapter command handler",
+                first_num,
+                rest_trimmed.split_whitespace().next().unwrap_or("")
+            );
             return None; // Let check_chapter_command handle it
         }
         // Single number - return it as verse
@@ -575,7 +601,10 @@ fn extract_verse_number(text: &str) -> Option<i32> {
 fn parse_number_token(text: &str) -> Option<i32> {
     let trimmed = text.trim_end_matches(['.', ',', '?', '!']);
     // Try digit
-    let token: String = trimmed.chars().take_while(|c| c.is_alphanumeric()).collect();
+    let token: String = trimmed
+        .chars()
+        .take_while(|c| c.is_alphanumeric())
+        .collect();
     if let Ok(n) = token.parse::<i32>() {
         if n > 0 && n <= 176 {
             return Some(n);
@@ -601,21 +630,24 @@ fn extract_chapter_and_verse(text: &str) -> Option<(i32, Option<i32>)> {
     // First try to find "chapter N"
     if let Some(pos) = text.find("chapter ") {
         let rest = &text[pos + "chapter ".len()..];
-        log::debug!("[EXTRACT] Found 'chapter', rest: {:?}", rest);
+        log::debug!("[EXTRACT] Found 'chapter', rest: {rest:?}");
         if let Some((chapter, rest_after_chapter)) = parse_number_and_rest(rest) {
-            log::debug!("[EXTRACT] Parsed chapter={}, rest_after_chapter: {:?}", chapter, rest_after_chapter);
+            log::debug!(
+                "[EXTRACT] Parsed chapter={chapter}, rest_after_chapter: {rest_after_chapter:?}"
+            );
             // Now check if there's "verse M" after the chapter
             if let Some(verse_pos) = rest_after_chapter.find("verse ") {
                 let verse_rest = &rest_after_chapter[verse_pos + "verse ".len()..];
-                log::debug!("[EXTRACT] Found 'verse' at pos {}, verse_rest: {:?}", verse_pos, verse_rest);
+                log::debug!(
+                    "[EXTRACT] Found 'verse' at pos {verse_pos}, verse_rest: {verse_rest:?}"
+                );
                 if let Some((verse, _)) = parse_number_and_rest(verse_rest) {
-                    log::debug!("[EXTRACT] Parsed verse={}", verse);
+                    log::debug!("[EXTRACT] Parsed verse={verse}");
                     return Some((chapter, Some(verse)));
-                } else {
-                    log::debug!("[EXTRACT] Failed to parse verse number from: {:?}", verse_rest);
                 }
+                log::debug!("[EXTRACT] Failed to parse verse number from: {verse_rest:?}");
             } else {
-                log::debug!("[EXTRACT] No 'verse ' keyword found in: {:?}", rest_after_chapter);
+                log::debug!("[EXTRACT] No 'verse ' keyword found in: {rest_after_chapter:?}");
             }
             return Some((chapter, None));
         }
@@ -623,7 +655,9 @@ fn extract_chapter_and_verse(text: &str) -> Option<(i32, Option<i32>)> {
 
     // Also try pattern without "chapter" keyword: "3 verse 5"
     if let Some((chapter, rest_after_number)) = parse_number_and_rest(text) {
-        log::debug!("[EXTRACT] Number-first pattern: chapter={}, rest: {:?}", chapter, rest_after_number);
+        log::debug!(
+            "[EXTRACT] Number-first pattern: chapter={chapter}, rest: {rest_after_number:?}"
+        );
         if let Some(verse_pos) = rest_after_number.find("verse ") {
             let verse_rest = &rest_after_number[verse_pos + "verse ".len()..];
             if let Some((verse, _)) = parse_number_and_rest(verse_rest) {
@@ -640,8 +674,13 @@ fn parse_number_and_rest(text: &str) -> Option<(i32, &str)> {
     let trimmed = text.trim_start();
 
     // Try digit number first
-    if let Some(captures) = trimmed.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<i32>().ok() {
-        let consumed_len = trimmed.chars().take_while(|c| c.is_ascii_digit()).count();
+    if let Ok(captures) = trimmed
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>()
+        .parse::<i32>()
+    {
+        let consumed_len = trimmed.chars().take_while(char::is_ascii_digit).count();
         return Some((captures, &trimmed[consumed_len..]));
     }
 
@@ -656,7 +695,8 @@ fn parse_number_and_rest(text: &str) -> Option<(i32, &str)> {
         if num >= 20 && num % 10 == 0 {
             let rest_trimmed = rest.trim_start();
             if let Some(second_word) = rest_trimmed.split_whitespace().next() {
-                let clean_second: String = second_word.chars().filter(|c| c.is_alphabetic()).collect();
+                let clean_second: String =
+                    second_word.chars().filter(|c| c.is_alphabetic()).collect();
                 if let Some(ones) = parse_spoken_number(&clean_second) {
                     if (1..=9).contains(&ones) {
                         let combined = num + ones;
@@ -696,8 +736,13 @@ fn word_overlap(
         return 0.0;
     }
     let matches = verse_words.intersection(transcript_words).count();
-    #[expect(clippy::cast_precision_loss, reason = "word counts are small enough for f64 precision")]
-    { matches as f64 / verse_word_count as f64 }
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "word counts are small enough for f64 precision"
+    )]
+    {
+        matches as f64 / verse_word_count as f64
+    }
 }
 
 #[cfg(test)]
@@ -828,9 +873,8 @@ mod tests {
     #[test]
     fn test_start_positions_cursor_at_start_verse() {
         let mut rm = ReadingMode::new();
-        let verses: Vec<(i32, String)> = (1..=31)
-            .map(|i| (i, format!("Verse {i} text.")))
-            .collect();
+        let verses: Vec<(i32, String)> =
+            (1..=31).map(|i| (i, format!("Verse {i} text."))).collect();
 
         rm.start(44, "Acts", 15, 28, verses);
         assert_eq!(rm.current_verse(), Some(28));
@@ -841,7 +885,13 @@ mod tests {
     #[test]
     fn test_chapter_command_detected() {
         let mut rm = ReadingMode::new();
-        rm.start(1, "Genesis", 5, 1, vec![(1, "In the beginning.".to_string())]);
+        rm.start(
+            1,
+            "Genesis",
+            5,
+            1,
+            vec![(1, "In the beginning.".to_string())],
+        );
 
         let result = rm.check_chapter_command("let's go to chapter seven");
         assert_eq!(
@@ -913,7 +963,13 @@ mod tests {
     #[test]
     fn test_chapter_verse_command() {
         let mut rm = ReadingMode::new();
-        rm.start(1, "Genesis", 1, 1, vec![(1, "In the beginning.".to_string())]);
+        rm.start(
+            1,
+            "Genesis",
+            1,
+            1,
+            vec![(1, "In the beginning.".to_string())],
+        );
 
         let result = rm.check_chapter_command("chapter 3 verse 5");
         assert!(result.is_some());
@@ -925,7 +981,13 @@ mod tests {
     #[test]
     fn test_number_verse_command() {
         let mut rm = ReadingMode::new();
-        rm.start(1, "Genesis", 1, 1, vec![(1, "In the beginning.".to_string())]);
+        rm.start(
+            1,
+            "Genesis",
+            1,
+            1,
+            vec![(1, "In the beginning.".to_string())],
+        );
 
         let result = rm.check_chapter_command("3 verse 5");
         assert!(result.is_some());
@@ -937,7 +999,13 @@ mod tests {
     #[test]
     fn test_spoken_chapter_verse_command() {
         let mut rm = ReadingMode::new();
-        rm.start(1, "Genesis", 1, 1, vec![(1, "In the beginning.".to_string())]);
+        rm.start(
+            1,
+            "Genesis",
+            1,
+            1,
+            vec![(1, "In the beginning.".to_string())],
+        );
 
         let result = rm.check_chapter_command("chapter three verse five");
         assert!(result.is_some());
@@ -949,10 +1017,19 @@ mod tests {
     #[test]
     fn test_extract_chapter_and_verse() {
         assert_eq!(extract_chapter_and_verse("chapter 3"), Some((3, None)));
-        assert_eq!(extract_chapter_and_verse("chapter 3 verse 5"), Some((3, Some(5))));
+        assert_eq!(
+            extract_chapter_and_verse("chapter 3 verse 5"),
+            Some((3, Some(5)))
+        );
         assert_eq!(extract_chapter_and_verse("3 verse 5"), Some((3, Some(5))));
-        assert_eq!(extract_chapter_and_verse("chapter three verse five"), Some((3, Some(5))));
-        assert_eq!(extract_chapter_and_verse("chapter three verse five."), Some((3, Some(5))));
+        assert_eq!(
+            extract_chapter_and_verse("chapter three verse five"),
+            Some((3, Some(5)))
+        );
+        assert_eq!(
+            extract_chapter_and_verse("chapter three verse five."),
+            Some((3, Some(5)))
+        );
         assert_eq!(extract_chapter_and_verse("hello world"), None);
     }
 
@@ -977,9 +1054,8 @@ mod tests {
     #[test]
     fn test_bare_number_as_chapter_after_chapter_keyword() {
         let mut rm = ReadingMode::new();
-        let verses: Vec<(i32, String)> = (1..=10)
-            .map(|i| (i, format!("Verse {i} text.")))
-            .collect();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
         rm.start(1, "Genesis", 1, 1, verses);
 
         // Say "chapter" - sets context to ExpectingChapter
@@ -997,9 +1073,8 @@ mod tests {
     #[test]
     fn test_bare_two_numbers_as_chapter_verse() {
         let mut rm = ReadingMode::new();
-        let verses: Vec<(i32, String)> = (1..=10)
-            .map(|i| (i, format!("Verse {i} text.")))
-            .collect();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
         rm.start(1, "Genesis", 1, 1, verses);
 
         // Say "chapter" - sets context
@@ -1016,9 +1091,8 @@ mod tests {
     #[test]
     fn test_spoken_numbers_in_context() {
         let mut rm = ReadingMode::new();
-        let verses: Vec<(i32, String)> = (1..=10)
-            .map(|i| (i, format!("Verse {i} text.")))
-            .collect();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
         rm.start(1, "Genesis", 1, 1, verses);
 
         // Say "chapter" - sets context
@@ -1034,9 +1108,8 @@ mod tests {
     #[test]
     fn test_context_resets_after_full_reference() {
         let mut rm = ReadingMode::new();
-        let verses: Vec<(i32, String)> = (1..=10)
-            .map(|i| (i, format!("Verse {i} text.")))
-            .collect();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
         rm.start(1, "Genesis", 1, 1, verses);
 
         // Say "chapter" - sets context

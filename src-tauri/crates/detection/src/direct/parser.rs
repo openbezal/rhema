@@ -165,14 +165,10 @@ fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRe
     // Look for: Number Colon Number [Dash Number]
     for i in 0..tokens.len() {
         if let Token::Number(chapter) = &tokens[i] {
-            if i + 2 < tokens.len()
-                && matches!(&tokens[i + 1], Token::Colon)
-            {
+            if i + 2 < tokens.len() && matches!(&tokens[i + 1], Token::Colon) {
                 if let Token::Number(verse) = &tokens[i + 2] {
                     let mut verse_end = None;
-                    if i + 4 < tokens.len()
-                        && matches!(&tokens[i + 3], Token::Dash)
-                    {
+                    if i + 4 < tokens.len() && matches!(&tokens[i + 3], Token::Dash) {
                         if let Token::Number(end) = &tokens[i + 4] {
                             verse_end = Some(*end);
                         }
@@ -317,9 +313,7 @@ fn try_chapter_verse_spoken(tokens: &[Token], book_match: &BookMatch) -> Option<
                     for j in next_idx..scan_limit {
                         if let Token::Word(vw) = &tokens[j] {
                             if vw == "verse" || vw == "verses" {
-                                if let Some((verse, verse_next)) =
-                                    consume_number(tokens, j + 1)
-                                {
+                                if let Some((verse, verse_next)) = consume_number(tokens, j + 1) {
                                     let verse_end = scan_verse_end(tokens, verse_next);
                                     return Some(VerseRef {
                                         book_number: book_match.book_number,
@@ -341,17 +335,16 @@ fn try_chapter_verse_spoken(tokens: &[Token], book_match: &BookMatch) -> Option<
                         verse_start: 0,
                         verse_end: None,
                     });
-                } else {
-                    // "chapter" keyword found but no number follows
-                    // e.g., "Genesis chapter" (incomplete) → chapter-only
-                    return Some(VerseRef {
-                        book_number: book_match.book_number,
-                        book_name: book_match.book_name.clone(),
-                        chapter: 1,
-                        verse_start: 0,
-                        verse_end: None,
-                    });
                 }
+                // "chapter" keyword found but no number follows
+                // e.g., "Genesis chapter" (incomplete) → chapter-only
+                return Some(VerseRef {
+                    book_number: book_match.book_number,
+                    book_name: book_match.book_name.clone(),
+                    chapter: 1,
+                    verse_start: 0,
+                    verse_end: None,
+                });
             }
         }
     }
@@ -407,12 +400,10 @@ fn try_verse_only_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
                 let has_chapter_before = if i > 0 {
                     // Check for ANY number token OR spoken number word OR "chapter" keyword
                     // in the tokens before the "verse" keyword
-                    tokens[0..i].iter().any(|t| {
-                        match t {
-                            Token::Number(_) => true,
-                            Token::Word(w) => w == "chapter" || parse_spoken_number(w).is_some(),
-                            _ => false,
-                        }
+                    tokens[0..i].iter().any(|t| match t {
+                        Token::Number(_) => true,
+                        Token::Word(w) => w == "chapter" || parse_spoken_number(w).is_some(),
+                        _ => false,
                     })
                 } else {
                     false
@@ -427,17 +418,16 @@ fn try_verse_only_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
                             verse_start: verse,
                             verse_end: None,
                         });
-                    } else {
-                        // "verse" keyword found but no number follows
-                        // e.g., "Genesis verse" (incomplete) → Genesis 1:1
-                        return Some(VerseRef {
-                            book_number: book_match.book_number,
-                            book_name: book_match.book_name.clone(),
-                            chapter: 1,
-                            verse_start: 1,
-                            verse_end: None,
-                        });
                     }
+                    // "verse" keyword found but no number follows
+                    // e.g., "Genesis verse" (incomplete) → Genesis 1:1
+                    return Some(VerseRef {
+                        book_number: book_match.book_number,
+                        book_name: book_match.book_name.clone(),
+                        chapter: 1,
+                        verse_start: 1,
+                        verse_end: None,
+                    });
                 }
             }
         }
@@ -776,9 +766,7 @@ pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Contin
                             if vw == "verse" || vw == "verses" {
                                 if let Some((verse, _)) = consume_number(&tokens, j + 1) {
                                     if verse > 0 && verse <= 176 {
-                                        return Some(Continuation::ChapterAndVerse(
-                                            chapter, verse,
-                                        ));
+                                        return Some(Continuation::ChapterAndVerse(chapter, verse));
                                     }
                                 }
                             }
@@ -1489,7 +1477,10 @@ mod tests {
             extract_adjacent_number_pairs("Revelation 20 22. 22 20."),
             vec![(20, 22), (22, 22), (22, 20)]
         );
-        assert_eq!(extract_adjacent_number_pairs("there were 12 disciples"), vec![]);
+        assert_eq!(
+            extract_adjacent_number_pairs("there were 12 disciples"),
+            vec![]
+        );
         assert_eq!(extract_adjacent_number_pairs("verse 5"), vec![]);
     }
 }

@@ -149,7 +149,11 @@ pub fn fuse_rrf(
         }
     }
 
-    combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    combined.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     combined.truncate(limit);
     combined
 }
@@ -171,7 +175,11 @@ pub fn fuse_rrf(
 pub fn fuse(vector_hits: &[(VerseKey, f64)], fts_keys: &[VerseKey]) -> Vec<FusedHit> {
     let mut results: Vec<FusedHit> = vector_hits
         .iter()
-        .map(|&(key, score)| FusedHit { key, score, origin: FusedOrigin::Vector })
+        .map(|&(key, score)| FusedHit {
+            key,
+            score,
+            origin: FusedOrigin::Vector,
+        })
         .collect();
 
     let seen: HashSet<VerseKey> = vector_hits.iter().map(|&(key, _)| key).collect();
@@ -182,11 +190,19 @@ pub fn fuse(vector_hits: &[(VerseKey, f64)], fts_keys: &[VerseKey]) -> Vec<Fused
             break;
         }
         if !seen.contains(&key) {
-            results.push(FusedHit { key, score, origin: FusedOrigin::Fts5 });
+            results.push(FusedHit {
+                key,
+                score,
+                origin: FusedOrigin::Fts5,
+            });
         }
     }
 
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results
 }
 
@@ -195,7 +211,11 @@ mod tests {
     use super::*;
 
     fn key(book: i32, chapter: i32, verse: i32) -> VerseKey {
-        VerseKey { book_number: book, chapter, verse }
+        VerseKey {
+            book_number: book,
+            chapter,
+            verse,
+        }
     }
 
     #[test]
@@ -204,9 +224,9 @@ mod tests {
         let fused = fuse(&hits, &[]);
         assert_eq!(fused.len(), 2);
         assert_eq!(fused[0].key, key(45, 5, 8));
-        assert_eq!(fused[0].score, 0.72);
+        assert!((fused[0].score - 0.72).abs() < f64::EPSILON);
         assert_eq!(fused[0].origin, FusedOrigin::Vector);
-        assert_eq!(fused[1].score, 0.61);
+        assert!((fused[1].score - 0.61).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -228,7 +248,7 @@ mod tests {
         // The overlapping verse appears once, with its cosine score.
         let entries: Vec<&FusedHit> = fused.iter().filter(|h| h.key == both).collect();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].score, 0.62);
+        assert!((entries[0].score - 0.62).abs() < f64::EPSILON);
         assert_eq!(entries[0].origin, FusedOrigin::Vector);
         // The seen-skip does not shift later FTS ranks: key(1,1,1) is rank 1 → 0.71.
         let other = fused.iter().find(|h| h.key == key(1, 1, 1)).unwrap();
@@ -239,7 +259,10 @@ mod tests {
     fn synthetic_fts_scores_outrank_typical_cosines() {
         // Documents the current (known-problematic) behavior: FTS rank 0-3
         // beats a strong 0.65 cosine match.
-        let fused = fuse(&[(key(43, 3, 16), 0.65)], &[key(1, 1, 1), key(1, 1, 2), key(1, 1, 3)]);
+        let fused = fuse(
+            &[(key(43, 3, 16), 0.65)],
+            &[key(1, 1, 1), key(1, 1, 2), key(1, 1, 3)],
+        );
         assert_eq!(fused[0].origin, FusedOrigin::Fts5);
         assert_eq!(fused[3].key, key(43, 3, 16));
     }

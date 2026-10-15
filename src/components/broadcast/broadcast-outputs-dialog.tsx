@@ -60,24 +60,22 @@ export function BroadcastOutputsDialog({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [busyIds, setBusyIds] = useState<string[]>([])
 
-  const fetchMonitors = useCallback(async () => {
-    setMonitorsRefreshing(true)
-    try {
-      const result = await availableMonitors()
-      void logInfo(
-        `[broadcast-ui] availableMonitors -> ${result.length}: ${result
-          .map((m) => `${m.name ?? "?"} ${m.size.width}x${m.size.height}`)
-          .join(", ")}`,
-      )
-      setMonitors(result)
-    } catch (error) {
-      void logError(`[broadcast-ui] availableMonitors FAILED: ${String(error)}`)
-      toast.error("Could not list monitors", { description: String(error) })
-      setMonitors([])
-    } finally {
-      setMonitorsRefreshing(false)
-    }
-  }, [])
+  const fetchMonitors = useCallback(() =>
+    availableMonitors()
+      .then((result) => {
+        void logInfo(
+          `[broadcast-ui] availableMonitors -> ${result.length}: ${result
+            .map((m) => `${m.name ?? "?"} ${m.size.width}x${m.size.height}`)
+            .join(", ")}`,
+        )
+        setMonitors(result)
+      })
+      .catch((error: unknown) => {
+        void logError(`[broadcast-ui] availableMonitors FAILED: ${String(error)}`)
+        toast.error("Could not list monitors", { description: String(error) })
+        setMonitors([])
+      })
+      .finally(() => setMonitorsRefreshing(false)), [])
 
   useEffect(() => {
     if (open) void fetchMonitors()
@@ -250,7 +248,10 @@ export function BroadcastOutputsDialog({
         draft={newOutputDraft}
         monitors={monitors}
         monitorsRefreshing={monitorsRefreshing}
-        onRefreshMonitors={() => void fetchMonitors()}
+        onRefreshMonitors={() => {
+          setMonitorsRefreshing(true)
+          void fetchMonitors()
+        }}
         onSubmit={handleEditorSubmit}
       />
     </>

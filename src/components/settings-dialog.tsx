@@ -159,18 +159,11 @@ function AudioSection() {
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadDevices = useCallback(async () => {
-    try {
-      setLoading(true)
-      const result = await invoke<DeviceInfo[]>("get_audio_devices")
-      setDevices(result)
-    } catch {
-      // Tauri command may not be available during dev
-      setDevices([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const loadDevices = useCallback(() =>
+    invoke<DeviceInfo[]>("get_audio_devices")
+      .then(setDevices)
+      .catch(() => setDevices([]))
+      .finally(() => setLoading(false)), [])
 
   useEffect(() => {
     loadDevices()

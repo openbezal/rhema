@@ -79,7 +79,6 @@ impl DetectionPipeline {
     pub fn semantic_search(&mut self, query: &str, k: usize) -> Vec<(i64, f64)> {
         self.semantic.search_query(query, k)
     }
-
 }
 
 impl Default for DetectionPipeline {

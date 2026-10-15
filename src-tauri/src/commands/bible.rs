@@ -1,16 +1,17 @@
-#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
 
-use std::sync::Mutex;
 use serde::Serialize;
+use std::sync::Mutex;
 use tauri::State;
 
 use crate::state::AppState;
 use rhema_bible::{Book, CrossReference, Translation, Verse};
 
 #[tauri::command]
-pub fn list_translations(
-    state: State<'_, Mutex<AppState>>,
-) -> Result<Vec<Translation>, String> {
+pub fn list_translations(state: State<'_, Mutex<AppState>>) -> Result<Vec<Translation>, String> {
     let app_state = state.lock().map_err(|e| e.to_string())?;
     let db = app_state
         .bible_db
@@ -99,9 +100,7 @@ pub fn get_cross_references(
 
 /// Get the active translation ID
 #[tauri::command]
-pub fn get_active_translation(
-    state: State<'_, Mutex<AppState>>,
-) -> Result<i64, String> {
+pub fn get_active_translation(state: State<'_, Mutex<AppState>>) -> Result<i64, String> {
     let app_state = state.lock().map_err(|e| e.to_string())?;
     Ok(app_state.active_translation_id)
 }

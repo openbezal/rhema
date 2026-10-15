@@ -5,7 +5,7 @@
  */
 
 import { Database } from "bun:sqlite"
-import { readFileSync } from "node:fs"
+import { readFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 const DATA_DIR = import.meta.dir
@@ -509,9 +509,7 @@ function main() {
   console.log("\n🔨 Building rhema.db...\n")
 
   // Remove existing DB
-  try {
-    require("node:fs").unlinkSync(DB_PATH)
-  } catch {}
+  rmSync(DB_PATH, { force: true })
 
   const db = new Database(DB_PATH, { create: true })
 

@@ -575,6 +575,10 @@ impl DirectDetector {
         })
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "reference detection advances one ordered continuation state machine"
+    )]
     pub fn detect(&mut self, text: &str) -> Vec<Detection> {
         // Step 0: Clean filler phrases from the transcript
         let cleaned = clean_transcript(text);
@@ -1338,7 +1342,9 @@ mod tests {
         // Simulate timeout by replacing with an expired timestamp (exceeds 15s)
         detector.incomplete = Some(IncompleteRef {
             verse_ref: detector.incomplete.as_ref().unwrap().verse_ref.clone(),
-            timestamp: Instant::now() - std::time::Duration::from_secs(20),
+            timestamp: Instant::now()
+                .checked_sub(std::time::Duration::from_secs(20))
+                .unwrap(),
             chapter_is_default: detector.incomplete.as_ref().unwrap().chapter_is_default,
         });
 
@@ -2063,7 +2069,9 @@ mod tests {
         // "22 verse 20" — chapter spoken without the "chapter" keyword.
         let mut detector = DirectDetector::new();
 
-        assert!(detector.detect("Revelation chapter 20 verse 22.").is_empty());
+        assert!(detector
+            .detect("Revelation chapter 20 verse 22.")
+            .is_empty());
 
         let results = detector.detect("22 verse 20.");
         assert_eq!(results.len(), 1);
@@ -2081,7 +2089,10 @@ mod tests {
     #[test]
     fn test_mentioned_books() {
         let detector = DirectDetector::new();
-        assert_eq!(detector.mentioned_books("Revelation chapter 20 verse 22"), vec![66]);
+        assert_eq!(
+            detector.mentioned_books("Revelation chapter 20 verse 22"),
+            vec![66]
+        );
         assert_eq!(detector.mentioned_books("22 verse 20."), Vec::<i32>::new());
     }
 
@@ -2093,7 +2104,10 @@ mod tests {
         let mut detector = DirectDetector::new();
 
         let results = detector.detect("Revelation chapter 20 22 Revelation 20 22 Oh, sorry.");
-        assert!(results.is_empty(), "must not invent Rev 20:1, got {results:?}");
+        assert!(
+            results.is_empty(),
+            "must not invent Rev 20:1, got {results:?}"
+        );
 
         let results =
             detector.detect("Revelation chapter 20 22 Revelation 20 22 oh, sorry. 22 20.");
@@ -2196,14 +2210,16 @@ mod tests {
     #[test]
     fn split_chapter_survives_a_multi_reference_utterance() {
         let mut detector = DirectDetector::new();
-        let out = detector.detect(
-            "Let's open our Bibles to Psalms chapter 100 and Psalm 1 36 verse 1",
-        );
+        let out =
+            detector.detect("Let's open our Bibles to Psalms chapter 100 and Psalm 1 36 verse 1");
         let refs: Vec<(i32, i32)> = out
             .iter()
             .map(|d| (d.verse_ref.chapter, d.verse_ref.verse_start))
             .collect();
-        assert!(refs.contains(&(136, 1)), "expected Psalms 136:1 in {refs:?}");
+        assert!(
+            refs.contains(&(136, 1)),
+            "expected Psalms 136:1 in {refs:?}"
+        );
         assert!(
             !refs.iter().any(|&(c, _)| c == 1),
             "Psalms 1 must not appear: {refs:?}"
@@ -2239,7 +2255,6 @@ mod tests {
             "invented a chapter: {out:?}"
         );
     }
-
 
     /// A bare book name in a partial parks a reference with chapter 1. When the
     /// speaker then states the whole thing, that parked reference used to

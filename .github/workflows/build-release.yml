@@ -45,12 +45,13 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: "1.94.0"
           targets: ${{ matrix.target }}
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.2.21"
+          bun-version: "1.4.2"
 
       # Bounded on purpose. An apt mirror stalling here has twice eaten the
       # whole 45-minute job budget before Rust ever compiled (v0.2.0 and

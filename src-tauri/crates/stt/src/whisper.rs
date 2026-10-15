@@ -11,7 +11,9 @@ use std::time::Duration;
 
 use crossbeam_channel::Receiver;
 use tokio::sync::mpsc;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState};
+use whisper_rs::{
+    FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
+};
 
 use crate::error::SttError;
 use crate::provider::SttProvider;
@@ -30,7 +32,10 @@ fn i16_to_f32(samples: &[i16]) -> Vec<f32> {
 }
 
 /// Extract transcript text, words, and average confidence from Whisper state.
-#[expect(clippy::cast_precision_loss, reason = "timestamps and word counts are small enough")]
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "timestamps and word counts are small enough"
+)]
 fn extract_segments(state: &WhisperState) -> (String, Vec<Word>, f64) {
     let n_segments = state.full_n_segments();
     let mut full_text = String::new();
@@ -38,7 +43,9 @@ fn extract_segments(state: &WhisperState) -> (String, Vec<Word>, f64) {
     let mut total_confidence: f64 = 0.0;
 
     for i in 0..n_segments {
-        let Some(segment) = state.get_segment(i) else { continue; };
+        let Some(segment) = state.get_segment(i) else {
+            continue;
+        };
         let text = segment.to_str_lossy().unwrap_or_default().to_string();
         let start_ts = segment.start_timestamp();
         let end_ts = segment.end_timestamp();
@@ -112,7 +119,10 @@ impl std::fmt::Debug for WhisperProvider {
 
 #[async_trait::async_trait]
 impl SttProvider for WhisperProvider {
-    #[expect(clippy::too_many_lines, reason = "spawns two blocking tasks with setup; splitting would obscure the pipeline flow")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "spawns two blocking tasks with setup; splitting would obscure the pipeline flow"
+    )]
     async fn start(
         &self,
         audio_rx: Receiver<Vec<i16>>,
@@ -162,20 +172,23 @@ impl SttProvider for WhisperProvider {
 
                 match audio_rx.recv_timeout(Duration::from_millis(50)) {
                     Ok(samples) => {
-                        let frame = AudioFrame { samples, timestamp_ms: 0 };
+                        let frame = AudioFrame {
+                            samples,
+                            timestamp_ms: 0,
+                        };
                         let result = vad.process(&frame);
 
                         if let Some(transition) = result.transition {
                             match transition {
                                 VadTransition::SpeechStarted => {
-                                    let _ = vad_event_tx
-                                        .blocking_send(TranscriptEvent::SpeechStarted);
+                                    let _ =
+                                        vad_event_tx.blocking_send(TranscriptEvent::SpeechStarted);
                                 }
                                 VadTransition::SpeechEnded => {
                                     log::info!(
                                         "[WHISPER] flush on SpeechEnded: audio_buffer={} samples ({:.1}s)",
                                         audio_buffer.len(),
-                                        audio_buffer.len() as f64 / 16_000.0,
+                                        f64::from(u32::try_from(audio_buffer.len()).unwrap_or(u32::MAX)) / 16_000.0,
                                     );
                                     if audio_buffer.len() >= MIN_BUFFER_SAMPLES {
                                         let _ = inference_tx
@@ -196,7 +209,7 @@ impl SttProvider for WhisperProvider {
                             log::debug!(
                                 "[WHISPER] audio_buffer={} samples ({:.1}s) frames_seen={frames_seen}",
                                 audio_buffer.len(),
-                                audio_buffer.len() as f64 / 16_000.0,
+                                f64::from(u32::try_from(audio_buffer.len()).unwrap_or(u32::MAX)) / 16_000.0,
                             );
                         }
 
@@ -204,7 +217,7 @@ impl SttProvider for WhisperProvider {
                             log::warn!(
                                 "[WHISPER] flush on MAX_BUFFER ({} samples / {:.1}s) — VAD never closed",
                                 audio_buffer.len(),
-                                audio_buffer.len() as f64 / 16_000.0,
+                                f64::from(u32::try_from(audio_buffer.len()).unwrap_or(u32::MAX)) / 16_000.0,
                             );
                             let _ = inference_tx.blocking_send(std::mem::take(&mut audio_buffer));
                         }
@@ -231,9 +244,9 @@ impl SttProvider for WhisperProvider {
                 Ok(ctx) => ctx,
                 Err(e) => {
                     log::error!("[Whisper] Failed to load model: {e}");
-                    let _ = inf_event_tx.blocking_send(TranscriptEvent::Error(
-                        format!("Failed to load Whisper model: {e}"),
-                    ));
+                    let _ = inf_event_tx.blocking_send(TranscriptEvent::Error(format!(
+                        "Failed to load Whisper model: {e}"
+                    )));
                     return;
                 }
             };
@@ -242,9 +255,9 @@ impl SttProvider for WhisperProvider {
                 Ok(s) => s,
                 Err(e) => {
                     log::error!("[Whisper] Failed to create state: {e}");
-                    let _ = inf_event_tx.blocking_send(TranscriptEvent::Error(
-                        format!("Failed to create Whisper state: {e}"),
-                    ));
+                    let _ = inf_event_tx.blocking_send(TranscriptEvent::Error(format!(
+                        "Failed to create Whisper state: {e}"
+                    )));
                     return;
                 }
             };
@@ -259,9 +272,7 @@ impl SttProvider for WhisperProvider {
                 let audio_f32 = i16_to_f32(&audio_i16);
 
                 let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-                params.set_language(Some(
-                    language.as_deref().unwrap_or("en"),
-                ));
+                params.set_language(Some(language.as_deref().unwrap_or("en")));
                 params.set_n_threads(n_threads);
                 params.set_print_progress(false);
                 params.set_print_special(false);
@@ -275,9 +286,9 @@ impl SttProvider for WhisperProvider {
                 let start = std::time::Instant::now();
                 if let Err(e) = state.full(params, &audio_f32) {
                     log::error!("[Whisper] Inference error: {e}");
-                    let _ = inf_event_tx.blocking_send(TranscriptEvent::Error(
-                        format!("Whisper inference error: {e}"),
-                    ));
+                    let _ = inf_event_tx.blocking_send(TranscriptEvent::Error(format!(
+                        "Whisper inference error: {e}"
+                    )));
                     continue;
                 }
                 let elapsed = start.elapsed();

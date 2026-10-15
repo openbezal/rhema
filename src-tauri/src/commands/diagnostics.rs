@@ -4,7 +4,10 @@
 //! megabytes never cross the IPC boundary, and so the log directory can be
 //! read without granting the webview any new filesystem scope.
 
-#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
 
 use std::path::{Path, PathBuf};
 
@@ -109,9 +112,10 @@ fn log_files(dir: &Path) -> Vec<PathBuf> {
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 return false;
             };
-            name.starts_with(concat!("rhema", "_")) && std::path::Path::new(name)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
+            name.starts_with(concat!("rhema", "_"))
+                && std::path::Path::new(name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
         })
         .collect();
     archives.sort();
@@ -165,7 +169,10 @@ pub fn export_diagnostics(
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_secs();
-    #[expect(clippy::cast_possible_wrap, reason = "seconds since 1970 fit in i64 for millennia")]
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "seconds since 1970 fit in i64 for millennia"
+    )]
     let cutoff = since_minutes.map(|mins| now as i64 - (mins as i64) * 60);
 
     let files = log_files(&dir);
@@ -321,7 +328,6 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
-
 
     #[test]
     fn header_shows_whole_timestamps() {

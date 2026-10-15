@@ -281,7 +281,9 @@ fn spawn_embedding_self_check(app: tauri::AppHandle) {
             let (verse_id, verse_text) = {
                 let managed_state = app.state::<Mutex<state::AppState>>();
                 let app_state = managed_state.lock().unwrap();
-                let Some(db) = app_state.bible_db.as_ref() else { return };
+                let Some(db) = app_state.bible_db.as_ref() else {
+                    return;
+                };
                 match db.get_verse(1, 43, 3, 16) {
                     Ok(Some(v)) => (v.id, v.text),
                     _ => return,
@@ -289,8 +291,7 @@ fn spawn_embedding_self_check(app: tauri::AppHandle) {
             };
 
             let top_hit = {
-                let managed_pipeline =
-                    app.state::<Mutex<rhema_detection::DetectionPipeline>>();
+                let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
                 let mut pipeline = managed_pipeline.lock().unwrap();
                 if !pipeline.has_semantic() {
                     return;
@@ -300,9 +301,7 @@ fn spawn_embedding_self_check(app: tauri::AppHandle) {
 
             match top_hit {
                 Some((id, similarity)) if id == verse_id && similarity >= 0.98 => {
-                    log::info!(
-                        "Embedding index self-check OK (self-similarity {similarity:.4})"
-                    );
+                    log::info!("Embedding index self-check OK (self-similarity {similarity:.4})");
                 }
                 other => {
                     let observed = other.map_or_else(
@@ -350,10 +349,16 @@ fn check_embedding_provenance(
         return None;
     };
     let Ok(meta) = serde_json::from_str::<serde_json::Value>(&raw) else {
-        log::info!("Unreadable embeddings provenance sidecar at {}", meta_path.display());
+        log::info!(
+            "Unreadable embeddings provenance sidecar at {}",
+            meta_path.display()
+        );
         return None;
     };
-    let index_model = meta.get("model_file").and_then(|v| v.as_str()).unwrap_or("");
+    let index_model = meta
+        .get("model_file")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let loaded_model = model_path
         .file_name()
         .map(|f| f.to_string_lossy().into_owned())

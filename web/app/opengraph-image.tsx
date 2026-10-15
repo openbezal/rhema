@@ -40,7 +40,6 @@ export default async function Image() {
             letterSpacing: "-0.02em",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={iconDataUrl}
             width={56}

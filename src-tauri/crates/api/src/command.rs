@@ -50,73 +50,85 @@ mod tests {
 
     #[test]
     fn serialize_next() {
-        let json = serde_json::to_value(&RemoteCommand::Next).unwrap();
+        let json = serde_json::to_value(RemoteCommand::Next).unwrap();
         assert_eq!(json, serde_json::json!({"command": "next"}));
     }
 
     #[test]
     fn serialize_prev() {
-        let json = serde_json::to_value(&RemoteCommand::Prev).unwrap();
+        let json = serde_json::to_value(RemoteCommand::Prev).unwrap();
         assert_eq!(json, serde_json::json!({"command": "prev"}));
     }
 
     #[test]
     fn serialize_show() {
-        let json = serde_json::to_value(&RemoteCommand::Show).unwrap();
+        let json = serde_json::to_value(RemoteCommand::Show).unwrap();
         assert_eq!(json, serde_json::json!({"command": "show"}));
     }
 
     #[test]
     fn serialize_hide() {
-        let json = serde_json::to_value(&RemoteCommand::Hide).unwrap();
+        let json = serde_json::to_value(RemoteCommand::Hide).unwrap();
         assert_eq!(json, serde_json::json!({"command": "hide"}));
     }
 
     #[test]
     fn serialize_theme() {
-        let json = serde_json::to_value(&RemoteCommand::Theme("Dark".into())).unwrap();
-        assert_eq!(json, serde_json::json!({"command": "theme", "value": "Dark"}));
+        let json = serde_json::to_value(RemoteCommand::Theme("Dark".into())).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"command": "theme", "value": "Dark"})
+        );
     }
 
     #[test]
     fn serialize_opacity() {
-        let json = serde_json::to_value(&RemoteCommand::Opacity(0.75)).unwrap();
-        assert_eq!(json, serde_json::json!({"command": "opacity", "value": 0.75}));
+        let json = serde_json::to_value(RemoteCommand::Opacity(0.75)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"command": "opacity", "value": 0.75})
+        );
     }
 
     #[test]
     fn serialize_confidence() {
-        let json = serde_json::to_value(&RemoteCommand::Confidence(0.75)).unwrap();
-        assert_eq!(json, serde_json::json!({"command": "confidence", "value": 0.75}));
+        let json = serde_json::to_value(RemoteCommand::Confidence(0.75)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"command": "confidence", "value": 0.75})
+        );
     }
 
     #[test]
     fn serialize_on_air() {
-        let json = serde_json::to_value(&RemoteCommand::OnAir(true)).unwrap();
-        assert_eq!(json, serde_json::json!({"command": "on_air", "value": true}));
+        let json = serde_json::to_value(RemoteCommand::OnAir(true)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"command": "on_air", "value": true})
+        );
     }
 
     #[test]
     fn serialize_send_to_live() {
-        let json = serde_json::to_value(&RemoteCommand::SendToLive).unwrap();
+        let json = serde_json::to_value(RemoteCommand::SendToLive).unwrap();
         assert_eq!(json, serde_json::json!({"command": "send_to_live"}));
     }
 
     #[test]
     fn serialize_bible_next() {
-        let json = serde_json::to_value(&RemoteCommand::BibleNext).unwrap();
+        let json = serde_json::to_value(RemoteCommand::BibleNext).unwrap();
         assert_eq!(json, serde_json::json!({"command": "bible_next"}));
     }
 
     #[test]
     fn serialize_bible_prev() {
-        let json = serde_json::to_value(&RemoteCommand::BiblePrev).unwrap();
+        let json = serde_json::to_value(RemoteCommand::BiblePrev).unwrap();
         assert_eq!(json, serde_json::json!({"command": "bible_prev"}));
     }
 
     #[test]
     fn serialize_add_to_queue() {
-        let json = serde_json::to_value(&RemoteCommand::AddToQueue).unwrap();
+        let json = serde_json::to_value(RemoteCommand::AddToQueue).unwrap();
         assert_eq!(json, serde_json::json!({"command": "add_to_queue"}));
     }
 
@@ -206,10 +218,7 @@ mod tests {
 
     #[test]
     fn display_theme() {
-        assert_eq!(
-            RemoteCommand::Theme("X".into()).to_string(),
-            "theme(X)"
-        );
+        assert_eq!(RemoteCommand::Theme("X".into()).to_string(), "theme(X)");
     }
 
     #[test]
@@ -274,18 +283,18 @@ mod tests {
 
         for cmd in &cmds {
             match cmd {
-                RemoteCommand::Next => {}
-                RemoteCommand::Prev => {}
-                RemoteCommand::Show => {}
-                RemoteCommand::Hide => {}
-                RemoteCommand::Theme(_) => {}
-                RemoteCommand::Opacity(_) => {}
-                RemoteCommand::Confidence(_) => {}
-                RemoteCommand::OnAir(_) => {}
-                RemoteCommand::SendToLive => {}
-                RemoteCommand::BibleNext => {}
-                RemoteCommand::BiblePrev => {}
-                RemoteCommand::AddToQueue => {}
+                RemoteCommand::Next
+                | RemoteCommand::Prev
+                | RemoteCommand::Show
+                | RemoteCommand::Hide
+                | RemoteCommand::Theme(_)
+                | RemoteCommand::Opacity(_)
+                | RemoteCommand::Confidence(_)
+                | RemoteCommand::OnAir(_)
+                | RemoteCommand::SendToLive
+                | RemoteCommand::BibleNext
+                | RemoteCommand::BiblePrev
+                | RemoteCommand::AddToQueue => {}
             }
         }
 

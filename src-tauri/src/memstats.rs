@@ -14,6 +14,10 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 /// `level_for` filter in `lib.rs`) instead of drowning it.
 const INTERVAL: Duration = Duration::from_secs(60);
 
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "memory counters are diagnostic MB values; byte-level precision above 2^53 is unnecessary"
+)]
 pub fn spawn() {
     tauri::async_runtime::spawn(async move {
         let pid = Pid::from_u32(std::process::id());
@@ -21,20 +25,12 @@ pub fn spawn() {
         let refresh = ProcessRefreshKind::nothing().with_memory();
 
         loop {
-            sys.refresh_processes_specifics(
-                ProcessesToUpdate::Some(&[pid]),
-                true,
-                refresh,
-            );
+            sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[pid]), true, refresh);
 
             if let Some(proc_) = sys.process(pid) {
                 let rss_mb = proc_.memory() as f64 / 1024.0 / 1024.0;
                 let virt_mb = proc_.virtual_memory() as f64 / 1024.0 / 1024.0;
-                log::debug!(
-                    "[MEM] rss={:.1}MB virt={:.0}MB",
-                    rss_mb,
-                    virt_mb,
-                );
+                log::debug!("[MEM] rss={rss_mb:.1}MB virt={virt_mb:.0}MB",);
             }
 
             tokio::time::sleep(INTERVAL).await;

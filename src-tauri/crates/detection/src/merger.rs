@@ -92,15 +92,17 @@ impl DetectionMerger {
         // 5 & 6. Build merged list with auto-queue decisions
         let now = Instant::now();
         let cooldown_ok = match self.last_auto_display {
-            #[expect(clippy::cast_possible_truncation, reason = "cooldown millis won't exceed u64")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "cooldown millis won't exceed u64"
+            )]
             Some(last) => now.duration_since(last).as_millis() as u64 >= self.cooldown_ms,
             None => true,
         };
 
         let mut results = Vec::with_capacity(all.len());
         for detection in all {
-            let auto_queued =
-                detection.confidence >= self.auto_queue_threshold && cooldown_ok;
+            let auto_queued = detection.confidence >= self.auto_queue_threshold && cooldown_ok;
             if auto_queued {
                 self.last_auto_display = Some(now);
             }

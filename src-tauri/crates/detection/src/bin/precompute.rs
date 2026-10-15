@@ -20,8 +20,8 @@ fn main() {
         .unwrap_or_else(|| "models/qwen3-embedding-0.6b/model.onnx".to_string());
     let tokenizer_path = get_arg(&args, "--tokenizer")
         .unwrap_or_else(|| "models/qwen3-embedding-0.6b/tokenizer.json".to_string());
-    let verses_path = get_arg(&args, "--verses")
-        .unwrap_or_else(|| "data/verses-for-embedding.json".to_string());
+    let verses_path =
+        get_arg(&args, "--verses").unwrap_or_else(|| "data/verses-for-embedding.json".to_string());
     let output_embeddings = get_arg(&args, "--output-embeddings")
         .unwrap_or_else(|| "embeddings/kjv-qwen3-0.6b.bin".to_string());
     let output_ids = get_arg(&args, "--output-ids")
@@ -113,7 +113,10 @@ fn write_meta_sidecar(output_embeddings: &str, model_path: &str, count: &usize) 
         "generated_at_unix": generated_at,
         "generated_by": "cargo precompute bin",
     });
-    match std::fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap_or_default()) {
+    match std::fs::write(
+        &meta_path,
+        serde_json::to_string_pretty(&meta).unwrap_or_default(),
+    ) {
         Ok(()) => log::info!("Wrote provenance sidecar {}", meta_path.display()),
         Err(e) => log::warn!("Failed to write provenance sidecar: {e}"),
     }

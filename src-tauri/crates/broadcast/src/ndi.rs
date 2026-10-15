@@ -122,7 +122,9 @@ pub enum NdiError {
     SenderCreateFailed,
     #[error("NDI session is not active")]
     SessionNotActive,
-    #[error("frame dimensions do not match active NDI settings ({expected_width}x{expected_height})")]
+    #[error(
+        "frame dimensions do not match active NDI settings ({expected_width}x{expected_height})"
+    )]
     FrameDimensionsMismatch {
         expected_width: u32,
         expected_height: u32,
@@ -148,17 +150,33 @@ struct NdiLibrary {
 impl NdiLibrary {
     fn load(search_dirs: &[PathBuf]) -> Result<Self, NdiError> {
         let library_path = resolve_library_path(search_dirs)?;
-        log::info!("NDI: loading runtime library from {}", library_path.display());
+        log::info!(
+            "NDI: loading runtime library from {}",
+            library_path.display()
+        );
         // SAFETY: library_path was validated to exist by resolve_library_path()
         let library = unsafe { Library::new(&library_path) }
             .map_err(|e| NdiError::LibraryLoad(e.to_string()))?;
 
-        let initialize_fn = *load_symbol::<NdiInitializeFn>(&library, b"NDIlib_initialize\0", "NDIlib_initialize")?;
-        let ndi_destroy_fn = *load_symbol::<NdiDestroyFn>(&library, b"NDIlib_destroy\0", "NDIlib_destroy")?;
-        let send_create_fn = *load_symbol::<NdiSendCreateFn>(&library, b"NDIlib_send_create\0", "NDIlib_send_create")?;
-        let send_destroy_fn = *load_symbol::<NdiSendDestroyFn>(&library, b"NDIlib_send_destroy\0", "NDIlib_send_destroy")?;
-        let send_video_fn =
-            *load_symbol::<NdiSendVideoV2Fn>(&library, b"NDIlib_send_send_video_v2\0", "NDIlib_send_send_video_v2")?;
+        let initialize_fn =
+            *load_symbol::<NdiInitializeFn>(&library, b"NDIlib_initialize\0", "NDIlib_initialize")?;
+        let ndi_destroy_fn =
+            *load_symbol::<NdiDestroyFn>(&library, b"NDIlib_destroy\0", "NDIlib_destroy")?;
+        let send_create_fn = *load_symbol::<NdiSendCreateFn>(
+            &library,
+            b"NDIlib_send_create\0",
+            "NDIlib_send_create",
+        )?;
+        let send_destroy_fn = *load_symbol::<NdiSendDestroyFn>(
+            &library,
+            b"NDIlib_send_destroy\0",
+            "NDIlib_send_destroy",
+        )?;
+        let send_video_fn = *load_symbol::<NdiSendVideoV2Fn>(
+            &library,
+            b"NDIlib_send_send_video_v2\0",
+            "NDIlib_send_send_video_v2",
+        )?;
 
         // SAFETY: initialize_fn is a valid function pointer loaded from the NDI library
         if !unsafe { initialize_fn() } {
@@ -240,7 +258,10 @@ impl NdiRuntime {
         session_id: String,
         request: NdiStartRequest,
     ) -> Result<NdiSessionInfo, NdiError> {
-        log::info!("NDI[{session_id}]: starting session '{}'", request.source_name);
+        log::info!(
+            "NDI[{session_id}]: starting session '{}'",
+            request.source_name
+        );
         // Hold the library before dropping the old session, so restarting the
         // only active session doesn't unload and immediately reload the runtime.
         let library = self.shared_library()?;
@@ -255,7 +276,9 @@ impl NdiRuntime {
         let info = session.info.clone();
         log::info!(
             "NDI[{session_id}]: session active — {}x{} @ {}fps",
-            info.width, info.height, info.fps
+            info.width,
+            info.height,
+            info.fps
         );
         self.sessions.insert(session_id, session);
         Ok(info)
@@ -312,7 +335,10 @@ unsafe impl Send for NdiRuntime {}
 unsafe impl Sync for NdiRuntime {}
 
 impl ActiveNdiSession {
-    #[expect(clippy::needless_pass_by_value, reason = "request fields are destructured and moved into the session")]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "request fields are destructured and moved into the session"
+    )]
     fn create(request: NdiStartRequest, library: Arc<NdiLibrary>) -> Result<Self, NdiError> {
         let source_name = request.source_name.trim().to_string();
         if source_name.is_empty() {
@@ -412,7 +438,7 @@ impl ActiveNdiSession {
             frame_rate_d: 1001,
             picture_aspect_ratio: (width as f32) / (height as f32),
             frame_format_type: 1, // NDIlib_frame_format_type_progressive
-            timecode: i64::MAX, // NDIlib_send_timecode_synthesize
+            timecode: i64::MAX,   // NDIlib_send_timecode_synthesize
             p_data: self.frame_buffer.as_mut_ptr(),
             line_stride_in_bytes: (width * 4) as i32,
             p_metadata: std::ptr::null(),
@@ -428,7 +454,10 @@ impl ActiveNdiSession {
         }
         self.frame_count += 1;
         if self.frame_count == 1 {
-            log::info!("NDI: first frame sent ({width}x{height}, {} bytes)", self.frame_buffer.len());
+            log::info!(
+                "NDI: first frame sent ({width}x{height}, {} bytes)",
+                self.frame_buffer.len()
+            );
         } else if self.frame_count.is_multiple_of(300) {
             log::info!("NDI: {} frames sent", self.frame_count);
         }
@@ -507,8 +536,8 @@ mod tests {
 
     impl TempDir {
         fn new(tag: &str) -> Self {
-            let dir = std::env::temp_dir()
-                .join(format!("rhema-ndi-test-{tag}-{}", std::process::id()));
+            let dir =
+                std::env::temp_dir().join(format!("rhema-ndi-test-{tag}-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)
         }
@@ -551,7 +580,10 @@ mod tests {
         let err = resolve_library_path(std::slice::from_ref(&dir.0)).unwrap_err();
         match err {
             NdiError::LibraryNotFound(paths) => {
-                assert!(paths.contains(dir.0.to_str().unwrap()), "attempted paths: {paths}");
+                assert!(
+                    paths.contains(dir.0.to_str().unwrap()),
+                    "attempted paths: {paths}"
+                );
             }
             other => panic!("unexpected error: {other:?}"),
         }

@@ -1,4 +1,7 @@
-#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
 
 use std::sync::Mutex;
 
@@ -42,7 +45,7 @@ fn source_to_string(source: &rhema_detection::DetectionSource) -> String {
 /// Resolution order:
 /// 1. By `verse_id` (semantic detections with DB primary key)
 /// 2. By `book_number/chapter/verse_start` with active translation (direct + FTS5 detections)
-/// 3. Fallback to unresolved VerseRef fields (no DB available)
+/// 3. Fallback to unresolved `VerseRef` fields (no DB available)
 pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult {
     let vr = &merged.detection.verse_ref;
     let vid = merged.detection.verse_id;
@@ -56,22 +59,32 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
         }
         // Fall back to book/chapter/verse lookup (direct + FTS5 detections)
         if vr.book_number > 0 && vr.chapter > 0 && vr.verse_start > 0 {
-            if let Ok(Some(v)) = db.get_verse(state.active_translation_id, vr.book_number, vr.chapter, vr.verse_start) {
+            if let Ok(Some(v)) = db.get_verse(
+                state.active_translation_id,
+                vr.book_number,
+                vr.chapter,
+                vr.verse_start,
+            ) {
                 return Some(v);
             }
         }
         None
     });
 
-    let (reference, verse_text, book_name, book_number, chapter, verse) = match resolved {
-        Some(v) => {
-            let r = format!("{} {}:{}", v.book_name, v.chapter, v.verse);
-            (r, v.text, v.book_name, v.book_number, v.chapter, v.verse)
-        }
-        None => {
-            let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
-            (r, String::new(), vr.book_name.clone(), vr.book_number, vr.chapter, vr.verse_start)
-        }
+    let (reference, verse_text, book_name, book_number, chapter, verse) = if let Some(v) = resolved
+    {
+        let r = format!("{} {}:{}", v.book_name, v.chapter, v.verse);
+        (r, v.text, v.book_name, v.book_number, v.chapter, v.verse)
+    } else {
+        let r = format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start);
+        (
+            r,
+            String::new(),
+            vr.book_name.clone(),
+            vr.book_number,
+            vr.chapter,
+            vr.verse_start,
+        )
     };
 
     DetectionResult {
@@ -196,7 +209,11 @@ pub fn semantic_search(
             let db = app_state.bible_db.as_ref()?;
             let v = db.get_verse_by_id(verse_id).ok().flatten()?;
             Some((
-                VerseKey { book_number: v.book_number, chapter: v.chapter, verse: v.verse },
+                VerseKey {
+                    book_number: v.book_number,
+                    chapter: v.chapter,
+                    verse: v.verse,
+                },
                 similarity,
             ))
         })
@@ -211,7 +228,11 @@ pub fn semantic_search(
         .iter()
         .map(|f| {
             (
-                VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse },
+                VerseKey {
+                    book_number: f.book_number,
+                    chapter: f.chapter,
+                    verse: f.verse,
+                },
                 f.phrase_match,
             )
         })
@@ -287,9 +308,7 @@ pub struct ReadingModeStatus {
 
 /// Stop reading mode
 #[tauri::command]
-pub fn stop_reading_mode(
-    state: State<'_, Mutex<ReadingMode>>,
-) -> Result<(), String> {
+pub fn stop_reading_mode(state: State<'_, Mutex<ReadingMode>>) -> Result<(), String> {
     let mut rm = state.lock().map_err(|e| e.to_string())?;
     rm.deactivate();
     Ok(())

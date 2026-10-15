@@ -99,8 +99,7 @@ impl BookMatcher {
         // including longer patterns that share a start position with shorter ones.
         let mut state = aho_corasick::automaton::OverlappingState::start();
         loop {
-            self.automaton
-                .find_overlapping(&text_lower, &mut state);
+            self.automaton.find_overlapping(&text_lower, &mut state);
             let Some(mat) = state.get_match() else {
                 break;
             };
@@ -163,26 +162,26 @@ mod tests {
     #[test]
     fn test_find_john() {
         let matcher = BookMatcher::new();
-        let matches = matcher.find_books("Jesus said in John 3:16");
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].book_name, "John");
-        assert_eq!(matches[0].book_number, 43);
+        let found_books = matcher.find_books("Jesus said in John 3:16");
+        assert_eq!(found_books.len(), 1);
+        assert_eq!(found_books[0].book_name, "John");
+        assert_eq!(found_books[0].book_number, 43);
     }
 
     #[test]
     fn test_find_psalm() {
         let matcher = BookMatcher::new();
-        let matches = matcher.find_books("David in Psalm thirty two");
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].book_name, "Psalms");
+        let found_books = matcher.find_books("David in Psalm thirty two");
+        assert_eq!(found_books.len(), 1);
+        assert_eq!(found_books[0].book_name, "Psalms");
     }
 
     #[test]
     fn test_find_numbered_book() {
         let matcher = BookMatcher::new();
-        let matches = matcher.find_books("Paul wrote in 1 Corinthians 13");
-        assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].book_name, "1 Corinthians");
+        let found_books = matcher.find_books("Paul wrote in 1 Corinthians 13");
+        assert_eq!(found_books.len(), 1);
+        assert_eq!(found_books[0].book_name, "1 Corinthians");
     }
 
     #[test]

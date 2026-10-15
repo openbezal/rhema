@@ -28,10 +28,10 @@ impl Default for VadConfig {
             silence_threshold: 0.005,
             frame_threshold: 0.0025,
             overall_threshold: 0.05,
-            silence_frame_count: 12,       // ~750ms of silence to end
-            min_voice_frames: 4,           // ~250ms of voice to start
-            max_utterance_frames: 240,     // ~15s max utterance
-            pre_buffer_frames: 4,          // ~250ms pre-buffer
+            silence_frame_count: 12,   // ~750ms of silence to end
+            min_voice_frames: 4,       // ~250ms of voice to start
+            max_utterance_frames: 240, // ~15s max utterance
+            pre_buffer_frames: 4,      // ~250ms pre-buffer
         }
     }
 }
@@ -91,8 +91,8 @@ impl Vad {
     /// Also returns a state transition event if the state changed.
     pub fn process(&mut self, frame: &AudioFrame) -> VadResult {
         let level = meter::compute_level(&frame.samples);
-        let is_voiced = level.rms >= self.config.silence_threshold
-            && level.rms >= self.config.frame_threshold;
+        let is_voiced =
+            level.rms >= self.config.silence_threshold && level.rms >= self.config.frame_threshold;
 
         match self.state {
             VadState::Silence => {
@@ -223,9 +223,13 @@ pub enum VadTransition {
 mod tests {
     use super::*;
 
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "test RMS amplitudes deliberately quantize to i16 samples"
+    )]
     fn make_frame(rms_level: f32) -> AudioFrame {
         // Create a frame with samples that produce roughly the desired RMS level
-        let amplitude = (rms_level * i16::MAX as f32) as i16;
+        let amplitude = (rms_level * f32::from(i16::MAX)) as i16;
         let samples = vec![amplitude; 1024];
         AudioFrame {
             samples,
@@ -257,8 +261,10 @@ mod tests {
 
     #[test]
     fn test_speech_detection() {
-        let mut config = VadConfig::default();
-        config.min_voice_frames = 2; // Lower for testing
+        let config = VadConfig {
+            min_voice_frames: 2, // Lower for testing
+            ..VadConfig::default()
+        };
         let mut vad = Vad::new(config);
 
         // First voiced frame: not enough yet
@@ -275,8 +281,10 @@ mod tests {
 
     #[test]
     fn test_speech_forwards_audio() {
-        let mut config = VadConfig::default();
-        config.min_voice_frames = 1;
+        let config = VadConfig {
+            min_voice_frames: 1,
+            ..VadConfig::default()
+        };
         let mut vad = Vad::new(config);
 
         // Trigger speech
@@ -289,9 +297,11 @@ mod tests {
 
     #[test]
     fn test_silence_after_speech() {
-        let mut config = VadConfig::default();
-        config.min_voice_frames = 1;
-        config.silence_frame_count = 2; // Quick silence detection for testing
+        let config = VadConfig {
+            min_voice_frames: 1,
+            silence_frame_count: 2, // Quick silence detection for testing
+            ..VadConfig::default()
+        };
         let mut vad = Vad::new(config);
 
         // Start speech
@@ -310,9 +320,11 @@ mod tests {
 
     #[test]
     fn test_pre_buffer_flushed_on_speech() {
-        let mut config = VadConfig::default();
-        config.min_voice_frames = 1;
-        config.pre_buffer_frames = 2;
+        let config = VadConfig {
+            min_voice_frames: 1,
+            pre_buffer_frames: 2,
+            ..VadConfig::default()
+        };
         let mut vad = Vad::new(config);
 
         // Feed 2 silent frames (goes into pre-buffer)
@@ -327,8 +339,10 @@ mod tests {
 
     #[test]
     fn test_reset() {
-        let mut config = VadConfig::default();
-        config.min_voice_frames = 1;
+        let config = VadConfig {
+            min_voice_frames: 1,
+            ..VadConfig::default()
+        };
         let mut vad = Vad::new(config);
 
         let _ = vad.process(&voiced_frame());

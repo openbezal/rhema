@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, State};
 
 use rhema_api::{
-    CommandError, CommandSink, HttpConfig, HttpHandle, OscConfig, OscHandle, SharedStatus,
-    new_shared_status, start_http_server, start_osc_listener,
+    new_shared_status, start_http_server, start_osc_listener, CommandError, CommandSink,
+    HttpConfig, HttpHandle, OscConfig, OscHandle, SharedStatus,
 };
 
 /// Tauri-aware implementation of `CommandSink`.
@@ -36,11 +36,10 @@ impl CommandSink for TauriSink {
                     .emit("remote:hide", "{}")
                     .map_err(|e| CommandError::DispatchFailed(e.to_string()))
             }
-            "set_confidence" => {
-                self.app
-                    .emit("remote:confidence", args.to_string())
-                    .map_err(|e| CommandError::DispatchFailed(e.to_string()))
-            }
+            "set_confidence" => self
+                .app
+                .emit("remote:confidence", args.to_string())
+                .map_err(|e| CommandError::DispatchFailed(e.to_string())),
             _ => Err(CommandError::DispatchFailed(format!(
                 "Unknown backend action: {action}"
             ))),
@@ -118,13 +117,14 @@ pub async fn stop_osc(state: State<'_, Mutex<OscRuntime>>) -> Result<(), String>
 
 /// Get the current OSC listener status.
 #[tauri::command]
-pub async fn get_osc_status(
-    state: State<'_, Mutex<OscRuntime>>,
-) -> Result<OscStatus, String> {
+pub async fn get_osc_status(state: State<'_, Mutex<OscRuntime>>) -> Result<OscStatus, String> {
     let runtime = state.lock().map_err(|e| e.to_string())?;
 
     Ok(OscStatus {
-        running: runtime.handle.as_ref().is_some_and(rhema_api::OscHandle::is_active),
+        running: runtime
+            .handle
+            .as_ref()
+            .is_some_and(rhema_api::OscHandle::is_active),
         port: runtime.bound_port,
     })
 }
@@ -220,13 +220,14 @@ pub async fn stop_http(state: State<'_, Mutex<HttpRuntime>>) -> Result<(), Strin
 
 /// Get the current HTTP API server status.
 #[tauri::command]
-pub async fn get_http_status(
-    state: State<'_, Mutex<HttpRuntime>>,
-) -> Result<HttpStatus, String> {
+pub async fn get_http_status(state: State<'_, Mutex<HttpRuntime>>) -> Result<HttpStatus, String> {
     let runtime = state.lock().map_err(|e| e.to_string())?;
 
     Ok(HttpStatus {
-        running: runtime.handle.as_ref().is_some_and(rhema_api::HttpHandle::is_active),
+        running: runtime
+            .handle
+            .as_ref()
+            .is_some_and(rhema_api::HttpHandle::is_active),
         port: runtime.bound_port,
     })
 }

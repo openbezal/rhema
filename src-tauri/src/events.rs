@@ -13,7 +13,7 @@ pub struct AudioLevelPayload {
 
 #[derive(Clone, serde::Serialize)]
 pub struct AudioTestStoppedPayload {
-    /// Why the test ended: "stopped" | "timeout" | "device_lost"
+    /// Why the test ended: "stopped" | "timeout" | "`device_lost`"
     pub reason: String,
 }
 

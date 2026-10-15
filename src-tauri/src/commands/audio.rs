@@ -1,4 +1,7 @@
-#![expect(clippy::needless_pass_by_value, reason = "Tauri command extractors require pass-by-value")]
+#![expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -18,9 +21,7 @@ const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// List all available audio input devices.
 #[tauri::command]
-pub fn get_audio_devices(
-    _state: State<'_, Mutex<AppState>>,
-) -> Result<Vec<DeviceInfo>, String> {
+pub fn get_audio_devices(_state: State<'_, Mutex<AppState>>) -> Result<Vec<DeviceInfo>, String> {
     rhema_audio::device::enumerate_devices().map_err(|e| e.to_string())
 }
 
@@ -78,18 +79,17 @@ pub fn start_audio_test(
             let device_lost = Arc::new(AtomicBool::new(false));
             let (audio_tx, audio_rx) = crossbeam_channel::bounded::<AudioFrame>(64);
 
-            let capture =
-                match rhema_audio::capture::start(config, audio_tx, device_lost.clone()) {
-                    Ok(c) => {
-                        let _ = ready_tx.send(Ok(()));
-                        c
-                    }
-                    Err(e) => {
-                        thread_active.store(false, Ordering::SeqCst);
-                        let _ = ready_tx.send(Err(e.to_string()));
-                        return;
-                    }
-                };
+            let capture = match rhema_audio::capture::start(config, audio_tx, device_lost.clone()) {
+                Ok(c) => {
+                    let _ = ready_tx.send(Ok(()));
+                    c
+                }
+                Err(e) => {
+                    thread_active.store(false, Ordering::SeqCst);
+                    let _ = ready_tx.send(Err(e.to_string()));
+                    return;
+                }
+            };
 
             log::info!("[AUDIO TEST] Capture started");
 
@@ -135,7 +135,10 @@ pub fn start_audio_test(
             thread_active.store(false, Ordering::SeqCst);
             let _ = app.emit(
                 EVENT_AUDIO_LEVEL,
-                AudioLevelPayload { rms: 0.0, peak: 0.0 },
+                AudioLevelPayload {
+                    rms: 0.0,
+                    peak: 0.0,
+                },
             );
             let _ = app.emit(
                 EVENT_AUDIO_TEST_STOPPED,

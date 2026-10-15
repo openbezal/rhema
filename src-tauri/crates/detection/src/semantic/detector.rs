@@ -53,8 +53,12 @@ impl SemanticDetector {
             return vec![];
         }
 
-        let Ok(embedding) = self.embedder.embed(text) else { return vec![] };
-        let Ok(results) = self.index.search(&embedding, 5) else { return vec![] };
+        let Ok(embedding) = self.embedder.embed(text) else {
+            return vec![];
+        };
+        let Ok(results) = self.index.search(&embedding, 5) else {
+            return vec![];
+        };
 
         let now = Self::timestamp_ms();
         let mut seen_verse_ids = HashSet::new();
@@ -95,7 +99,9 @@ impl SemanticDetector {
         if !self.is_ready() {
             return vec![];
         }
-        let Ok(embedding) = self.embedder.embed(query) else { return vec![] };
+        let Ok(embedding) = self.embedder.embed(query) else {
+            return vec![];
+        };
         match self.index.search(&embedding, k) {
             Ok(results) => results.iter().map(|r| (r.verse_id, r.similarity)).collect(),
             Err(_) => vec![],
@@ -104,7 +110,10 @@ impl SemanticDetector {
 
     // ---- private helpers ----
 
-    #[expect(clippy::cast_possible_truncation, reason = "timestamp millis won't exceed u64 for centuries")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "timestamp millis won't exceed u64 for centuries"
+    )]
     fn timestamp_ms() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -112,7 +121,12 @@ impl SemanticDetector {
             .as_millis() as u64
     }
 
-    fn make_detection(verse_id: i64, similarity: f64, snippet: &str, detected_at: u64) -> Detection {
+    fn make_detection(
+        verse_id: i64,
+        similarity: f64,
+        snippet: &str,
+        detected_at: u64,
+    ) -> Detection {
         Detection {
             verse_ref: VerseRef {
                 book_number: 0,
@@ -123,9 +137,7 @@ impl SemanticDetector {
             },
             verse_id: Some(verse_id),
             confidence: similarity,
-            source: DetectionSource::Semantic {
-                similarity,
-            },
+            source: DetectionSource::Semantic { similarity },
             transcript_snippet: snippet.to_string(),
             detected_at,
             is_chapter_only: false,
@@ -196,10 +208,7 @@ mod tests {
         assert!(!detections.is_empty());
         for d in &detections {
             assert!(d.confidence >= 0.35);
-            assert!(matches!(
-                d.source,
-                DetectionSource::Semantic { .. }
-            ));
+            assert!(matches!(d.source, DetectionSource::Semantic { .. }));
         }
     }
 
@@ -223,7 +232,8 @@ mod tests {
 
         // Raise threshold above the result's similarity
         detector.set_confidence_threshold(0.70);
-        let detections = detector.detect("whoever believes in him shall not perish but have everlasting life");
+        let detections =
+            detector.detect("whoever believes in him shall not perish but have everlasting life");
         assert!(detections.is_empty());
     }
 }

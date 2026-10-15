@@ -10,11 +10,11 @@ use std::io::Write;
 use std::path::Path;
 
 #[cfg(feature = "onnx")]
-use crate::error::DetectionError;
-#[cfg(feature = "onnx")]
 use super::embedder::TextEmbedder;
 #[cfg(feature = "onnx")]
 use super::onnx_embedder::OnnxEmbedder;
+#[cfg(feature = "onnx")]
+use crate::error::DetectionError;
 
 /// Pre-compute embeddings for a set of verses and write the results to
 /// binary files.
@@ -44,10 +44,7 @@ pub fn precompute_embeddings(
     log::info!("Pre-computing embeddings for {total} verses ...");
 
     let mut emb_file = std::fs::File::create(output_embeddings_path).map_err(|e| {
-        DetectionError::Internal(format!(
-            "create {}: {e}",
-            output_embeddings_path.display()
-        ))
+        DetectionError::Internal(format!("create {}: {e}", output_embeddings_path.display()))
     })?;
 
     let mut ids_file = std::fs::File::create(output_ids_path).map_err(|e| {
@@ -65,15 +62,15 @@ pub fn precompute_embeddings(
                 embedding.len() * std::mem::size_of::<f32>(),
             )
         };
-        emb_file.write_all(emb_bytes).map_err(|e| {
-            DetectionError::Internal(format!("write embedding: {e}"))
-        })?;
+        emb_file
+            .write_all(emb_bytes)
+            .map_err(|e| DetectionError::Internal(format!("write embedding: {e}")))?;
 
         // Write verse_id as raw i64 bytes (native byte order).
         let id_bytes = verse_id.to_ne_bytes();
-        ids_file.write_all(&id_bytes).map_err(|e| {
-            DetectionError::Internal(format!("write id: {e}"))
-        })?;
+        ids_file
+            .write_all(&id_bytes)
+            .map_err(|e| DetectionError::Internal(format!("write id: {e}")))?;
 
         if (i + 1) % 1000 == 0 || i + 1 == total {
             log::info!("  embedded {}/{} verses", i + 1, total);

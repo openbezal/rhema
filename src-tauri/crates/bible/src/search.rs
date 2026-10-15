@@ -35,18 +35,15 @@ pub struct Bm25Result {
 /// "WHO is my neighbour") and dropping them made AND/OR queries match the
 /// wrong verses.
 const STOP_WORDS: &[&str] = &[
-    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "is", "it", "be", "are", "was",
-    "were", "been", "has", "have", "had", "do", "does", "did", "that",
-    "this", "these", "those", "he", "she", "we", "they", "you", "i",
-    "me", "him", "her", "us", "them", "my", "his", "its", "our", "your",
-    "their", "so", "if", "as", "am", "about", "into", "than",
-    "just", "also", "very", "like", "even",
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
+    "from", "is", "it", "be", "are", "was", "were", "been", "has", "have", "had", "do", "does",
+    "did", "that", "this", "these", "those", "he", "she", "we", "they", "you", "i", "me", "him",
+    "her", "us", "them", "my", "his", "its", "our", "your", "their", "so", "if", "as", "am",
+    "about", "into", "than", "just", "also", "very", "like", "even",
 ];
 
-static STOP_WORD_SET: LazyLock<HashSet<&str>> = LazyLock::new(|| {
-    STOP_WORDS.iter().copied().collect()
-});
+static STOP_WORD_SET: LazyLock<HashSet<&str>> =
+    LazyLock::new(|| STOP_WORDS.iter().copied().collect());
 
 fn is_stop_word(word: &str) -> bool {
     STOP_WORD_SET.contains(word.to_lowercase().as_str())
@@ -162,11 +159,7 @@ fn run_fts_query(
          LIMIT ?2",
     )?;
     let rows = stmt.query_map(
-        rusqlite::params![
-            fts_query,
-            limit as i64,
-            (limit * TRANSLATION_FANOUT) as i64
-        ],
+        rusqlite::params![fts_query, limit as i64, (limit * TRANSLATION_FANOUT) as i64],
         |row: &rusqlite::Row| {
             Ok(Bm25Result {
                 rank: row.get(0)?,
@@ -178,7 +171,8 @@ fn run_fts_query(
             })
         },
     )?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(BibleError::from)
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(BibleError::from)
 }
 
 /// Deduplicate results by (`book_number`, chapter, verse), keeping first occurrence.
@@ -212,7 +206,10 @@ impl BibleDb {
         translation_id: i64,
         limit: usize,
     ) -> Result<Vec<Verse>, BibleError> {
-        let conn = self.conn.lock().map_err(|e| BibleError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| BibleError::Internal(e.to_string()))?;
         let mut stmt = conn.prepare(
             "SELECT v.id, v.translation_id, v.book_number, v.book_name, v.book_abbreviation, v.chapter, v.verse, v.text \
              FROM verses_fts fts \
@@ -256,7 +253,10 @@ impl BibleDb {
         query: &str,
         limit: usize,
     ) -> Result<Vec<Bm25Result>, BibleError> {
-        let conn = self.conn.lock().map_err(|e| BibleError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| BibleError::Internal(e.to_string()))?;
         let fetch_limit = limit * 4;
 
         // Tier 1: Exact phrase match
@@ -293,7 +293,10 @@ impl BibleDb {
     }
 
     pub fn search_books(&self, query: &str) -> Result<Vec<Book>, BibleError> {
-        let conn = self.conn.lock().map_err(|e| BibleError::Internal(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| BibleError::Internal(e.to_string()))?;
         let pattern = format!("{query}%");
         let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, name, abbreviation, testament \
@@ -342,10 +345,7 @@ mod tests {
 
     #[test]
     fn and_query_filters_stop_words() {
-        assert_eq!(
-            build_and_query("be doers of the word"),
-            "doers word"
-        );
+        assert_eq!(build_and_query("be doers of the word"), "doers word");
     }
 
     #[test]
@@ -379,7 +379,8 @@ mod tests {
 
     #[test]
     fn or_query_caps_at_10_terms() {
-        let long_input = "God love peace faith hope joy spirit truth grace mercy light salvation prayer";
+        let long_input =
+            "God love peace faith hope joy spirit truth grace mercy light salvation prayer";
         let result = build_or_query(long_input);
         let term_count = result.matches(" OR ").count() + 1;
         assert!(term_count <= 10);
@@ -394,10 +395,7 @@ mod tests {
     fn and_query_keeps_negations() {
         // "not" must survive filtering: "thou shalt not kill" loses all
         // meaning without it.
-        assert_eq!(
-            build_and_query("do not be afraid"),
-            "not afraid"
-        );
+        assert_eq!(build_and_query("do not be afraid"), "not afraid");
     }
 
     #[test]
@@ -406,18 +404,12 @@ mod tests {
             build_and_query("thou shalt not kill"),
             "thou shalt not kill"
         );
-        assert_eq!(
-            build_and_query("for all have sinned"),
-            "all sinned"
-        );
+        assert_eq!(build_and_query("for all have sinned"), "all sinned");
     }
 
     #[test]
     fn and_query_keeps_question_words() {
-        assert_eq!(
-            build_and_query("who is my neighbour"),
-            "who neighbour"
-        );
+        assert_eq!(build_and_query("who is my neighbour"), "who neighbour");
     }
 
     /// Build an in-memory-style test database with the production schema
@@ -467,7 +459,10 @@ mod tests {
         let results = db.search_verses_bm25("God so loved the world", 10).unwrap();
         // Two translations of John 3:16 collapse into one result; 3:17 may
         // follow from the AND/OR tiers. No verse reference appears twice.
-        assert!(!results.is_empty(), "FTS query returned no rows — SQL error?");
+        assert!(
+            !results.is_empty(),
+            "FTS query returned no rows — SQL error?"
+        );
         let mut seen = HashSet::new();
         for r in &results {
             assert!(
@@ -478,7 +473,10 @@ mod tests {
                 r.verse
             );
         }
-        assert_eq!((results[0].book_number, results[0].chapter, results[0].verse), (43, 3, 16));
+        assert_eq!(
+            (results[0].book_number, results[0].chapter, results[0].verse),
+            (43, 3, 16)
+        );
     }
 
     #[test]

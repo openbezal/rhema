@@ -10,14 +10,14 @@
 //! - [`Verse`], [`Book`], [`Translation`] — data models
 //! - [`BibleError`] — error type for all database operations
 
-pub mod models;
-pub mod error;
-pub mod db;
-pub mod lookup;
-pub mod search;
 pub mod crossref;
+pub mod db;
+pub mod error;
+pub mod lookup;
+pub mod models;
+pub mod search;
 
-pub use models::*;
-pub use error::*;
 pub use db::*;
+pub use error::*;
+pub use models::*;
 pub use search::Bm25Result;

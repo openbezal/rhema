@@ -15,24 +15,24 @@
 //! - `onnx` — enables ONNX Runtime for local embedding inference
 //! - `vector-search` — enables HNSW vector index for similarity search
 
-pub mod types;
-pub mod error;
 pub mod direct;
+pub mod error;
 pub mod fusion;
-pub mod semantic;
 pub mod merger;
 pub mod pipeline;
-pub mod sentence_buffer;
 pub mod reading_mode;
+pub mod semantic;
+pub mod sentence_buffer;
+pub mod types;
 
-pub use types::*;
-pub use error::*;
 pub use direct::detector::DirectDetector;
-pub use semantic::detector::SemanticDetector;
+pub use error::*;
 pub use merger::{DetectionMerger, MergedDetection};
 pub use pipeline::DetectionPipeline;
+pub use reading_mode::{ChapterChange, ReadingAdvance, ReadingMode};
+pub use semantic::detector::SemanticDetector;
 pub use sentence_buffer::SentenceBuffer;
-pub use reading_mode::{ReadingMode, ReadingAdvance, ChapterChange};
+pub use types::*;
 
 #[cfg(feature = "onnx")]
 pub use semantic::onnx_embedder::OnnxEmbedder;

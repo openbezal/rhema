@@ -1,6 +1,6 @@
+pub mod detector;
 pub mod embedder;
 pub mod index;
-pub mod detector;
 
 #[cfg(feature = "onnx")]
 pub mod onnx_embedder;

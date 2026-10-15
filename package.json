@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
@@ -29,7 +29,8 @@
     "web:dev": "cd web && bun run dev",
     "web:build": "cd web && bun run build",
     "web:start": "cd web && bun run start",
-    "web:lint": "cd web && bun run lint"
+    "web:lint": "cd web && bun run lint",
+    "verify:typecheck": "bun run scripts/verify-typecheck.ts"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",

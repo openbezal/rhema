@@ -75,9 +75,7 @@ impl DeepgramRestClient {
 
         if let Some(channels) = channels {
             for channel in channels {
-                let alternatives = channel
-                    .get("alternatives")
-                    .and_then(|a| a.as_array());
+                let alternatives = channel.get("alternatives").and_then(|a| a.as_array());
 
                 if let Some(alts) = alternatives {
                     if let Some(first) = alts.first() {

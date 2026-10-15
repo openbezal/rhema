@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export type Platform = "mac" | "windows" | "linux" | "other";
 
+// Platform detection has no change event during a page's lifetime.
+const subscribe = () => () => {};
+const serverSnapshot = (): null => null;
+
 export function usePlatform(): Platform | null {
-  const [platform, setPlatform] = useState<Platform | null>(null);
-
-  useEffect(() => {
-    setPlatform(detectPlatform());
-  }, []);
-
-  return platform;
+  return useSyncExternalStore(subscribe, detectPlatform, serverSnapshot);
 }
 
 function detectPlatform(): Platform {

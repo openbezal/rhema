@@ -80,7 +80,11 @@ struct AcceptKey {
 
 impl AcceptKey {
     fn key(self) -> VerseKey {
-        VerseKey { book_number: self.book_number, chapter: self.chapter, verse: self.verse }
+        VerseKey {
+            book_number: self.book_number,
+            chapter: self.chapter,
+            verse: self.verse,
+        }
     }
 }
 
@@ -168,10 +172,9 @@ fn main() {
         );
     }
 
-    let mut golden: GoldenFile = serde_json::from_str(
-        &std::fs::read_to_string(&golden_path).expect("read golden set"),
-    )
-    .expect("parse golden set");
+    let mut golden: GoldenFile =
+        serde_json::from_str(&std::fs::read_to_string(&golden_path).expect("read golden set"))
+            .expect("parse golden set");
     log::info!("Loaded {} golden queries", golden.queries.len());
 
     let db = BibleDb::open(Path::new(&db_path)).expect("open bible db");
@@ -253,8 +256,14 @@ fn run_benchmark(
             ("fused", &fused_keys, fused_ms),
         ] {
             let best = best_rank(keys, &accepts);
-            tallies.entry((q.category.clone(), mode)).or_default().record(best, latency_ms);
-            tallies.entry(("ALL".to_string(), mode)).or_default().record(best, latency_ms);
+            tallies
+                .entry((q.category.clone(), mode))
+                .or_default()
+                .record(best, latency_ms);
+            tallies
+                .entry(("ALL".to_string(), mode))
+                .or_default()
+                .record(best, latency_ms);
         }
         log::debug!("query {} done", q.id);
     }
@@ -281,8 +290,14 @@ fn run_benchmark_vector_only(
         let latency_ms = t0.elapsed().as_secs_f64() * 1000.0;
         let keys: Vec<VerseKey> = hits.iter().map(|&(k, _)| k).collect();
         let best = best_rank(&keys, &accepts);
-        tallies.entry((q.category.clone(), "vector")).or_default().record(best, latency_ms);
-        tallies.entry(("ALL".to_string(), "vector")).or_default().record(best, latency_ms);
+        tallies
+            .entry((q.category.clone(), "vector"))
+            .or_default()
+            .record(best, latency_ms);
+        tallies
+            .entry(("ALL".to_string(), "vector"))
+            .or_default()
+            .record(best, latency_ms);
     }
     println!("(query prefix mode: {mode_name})");
     print_table(&tallies);
@@ -294,7 +309,11 @@ fn fts_search(db: &BibleDb, query: &str) -> Vec<FtsCandidate> {
         .iter()
         .map(|f| {
             (
-                VerseKey { book_number: f.book_number, chapter: f.chapter, verse: f.verse },
+                VerseKey {
+                    book_number: f.book_number,
+                    chapter: f.chapter,
+                    verse: f.verse,
+                },
                 f.phrase_match,
             )
         })
@@ -321,7 +340,11 @@ fn vector_search(
         .filter_map(|r| {
             let v = db.get_verse_by_id(r.verse_id).ok().flatten()?;
             Some((
-                VerseKey { book_number: v.book_number, chapter: v.chapter, verse: v.verse },
+                VerseKey {
+                    book_number: v.book_number,
+                    chapter: v.chapter,
+                    verse: v.verse,
+                },
                 r.similarity,
             ))
         })
@@ -366,11 +389,20 @@ fn print_table(tallies: &HashMap<(String, &'static str), Tally>) {
 fn run_provenance_probe(embedder: &mut OnnxEmbedder, index: &HnswVectorIndex, db: &BibleDb) {
     // (book_number, chapter, verse) for well-known verses; resolved to KJV
     // text and verse ids through the database (KJV translation_id = 1).
-    let refs = [(43, 3, 16), (1, 1, 1), (19, 23, 1), (45, 8, 28), (40, 11, 28)];
+    let refs = [
+        (43, 3, 16),
+        (1, 1, 1),
+        (19, 23, 1),
+        (45, 8, 28),
+        (40, 11, 28),
+    ];
 
     println!("\n=== Embedding provenance probe ===");
     println!("cosine of freshly embedded KJV verse text vs stored index vector\n");
-    println!("{:<18} {:>10} {:>12}", "verse", "no prefix", "\"passage: \"");
+    println!(
+        "{:<18} {:>10} {:>12}",
+        "verse", "no prefix", "\"passage: \""
+    );
 
     let mut sum_none = 0.0f64;
     let mut sum_passage = 0.0f64;
@@ -387,9 +419,13 @@ fn run_provenance_probe(embedder: &mut OnnxEmbedder, index: &HnswVectorIndex, db
         };
 
         embedder.set_prompt_prefix(String::new());
-        let Ok(plain) = embedder.embed(&v.text) else { continue };
+        let Ok(plain) = embedder.embed(&v.text) else {
+            continue;
+        };
         embedder.set_prompt_prefix("passage: ".to_string());
-        let Ok(passage) = embedder.embed(&v.text) else { continue };
+        let Ok(passage) = embedder.embed(&v.text) else {
+            continue;
+        };
 
         let cos_none = dot(&plain, stored);
         let cos_passage = dot(&passage, stored);
@@ -423,7 +459,10 @@ fn run_provenance_probe(embedder: &mut OnnxEmbedder, index: &HnswVectorIndex, db
 }
 
 fn dot(a: &[f32], b: &[f32]) -> f64 {
-    a.iter().zip(b.iter()).map(|(&x, &y)| f64::from(x) * f64::from(y)).sum()
+    a.iter()
+        .zip(b.iter())
+        .map(|(&x, &y)| f64::from(x) * f64::from(y))
+        .sum()
 }
 
 /// Sample `count` random KJV verses (deterministic seed) and build three
@@ -442,7 +481,11 @@ fn generate_fragment_queries(db: &BibleDb, count: usize) -> Vec<GoldenQuery> {
         .iter()
         .map(|v| {
             (
-                VerseKey { book_number: v.book_number, chapter: v.chapter, verse: v.verse },
+                VerseKey {
+                    book_number: v.book_number,
+                    chapter: v.chapter,
+                    verse: v.verse,
+                },
                 v.text.split_whitespace().collect::<Vec<_>>().join(" "),
             )
         })

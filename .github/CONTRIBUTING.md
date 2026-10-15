@@ -88,8 +88,10 @@ Frontend and top-level commands:
 | `bun run tauri build` | Produce a platform installer |
 | `bun run dev` | Run the frontend only on the Vite dev server |
 | `bun run build` | `tsc -b && vite build` |
-| `bun run typecheck` | `tsc --noEmit` |
-| `bun run lint` | ESLint |
+| `bun run typecheck` | Checks referenced app and Vite projects with `tsc -b --noEmit` |
+| `bun run verify:typecheck` | Seeds a temporary type error to verify the check actually rejects it |
+| `bun run lint` | Desktop and data/script ESLint |
+| `bun run web:lint` | Web project ESLint with its Next.js configuration |
 | `bun run format` | Prettier (with the Tailwind plugin) |
 | `bun run test` | Vitest (frontend unit tests) |
 
@@ -98,9 +100,9 @@ Rust commands — run from `src-tauri/`:
 | Command | What it does |
 |---|---|
 | `cargo check` | Fast compile check across the workspace |
-| `cargo clippy --all-targets` | Lint the whole workspace |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | Strict workspace lint |
 | `cargo fmt` | rustfmt |
-| `cargo test` | Unit tests across all crates |
+| `cargo test --workspace --locked` | Unit tests across all crates |
 | `cargo test -p rhema-detection` | Tests for one crate |
 
 ### Debugging
@@ -234,3 +236,7 @@ AI coding assistants are fine — many contributors (and maintainers) use them. 
 By participating in this project, you agree to abide by the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
 Thanks for contributing!
+
+### Pull request validation
+
+The validation workflow runs frontend checks, separate Next.js lint, and native Rust tests/lint on macOS, Windows and Linux with Bun 1.4.2 and Rust 1.94.0. Native compile tests use an empty SQLite resource solely to satisfy the Tauri build-time resource path; release builds prepare the real Bible database separately. These checks do not replace packaged-app microphone, projector or NDI receiver acceptance tests.

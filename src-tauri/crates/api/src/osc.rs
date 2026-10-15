@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use rosc::{OscPacket, OscMessage};
+use rosc::{OscMessage, OscPacket};
 
 use crate::coerce::parse_osc;
 use crate::dispatch::{CommandDispatcher, CommandSink};
@@ -69,8 +69,14 @@ pub struct OscStartResult {
 /// # Errors
 ///
 /// Returns `CommandError::DispatchFailed` if the UDP socket cannot bind.
-#[expect(clippy::needless_pass_by_value, reason = "OscConfig is consumed to move fields into the spawned thread")]
-pub fn start_osc_listener<S>(config: OscConfig, sink: Arc<S>) -> Result<OscStartResult, CommandError>
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "OscConfig is consumed to move fields into the spawned thread"
+)]
+pub fn start_osc_listener<S>(
+    config: OscConfig,
+    sink: Arc<S>,
+) -> Result<OscStartResult, CommandError>
 where
     S: CommandSink + 'static,
 {
@@ -100,8 +106,9 @@ where
             while thread_active.load(Ordering::SeqCst) {
                 let (size, _src) = match socket.recv_from(&mut buf) {
                     Ok(result) => result,
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
-                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                    Err(ref e)
+                        if e.kind() == std::io::ErrorKind::WouldBlock
+                            || e.kind() == std::io::ErrorKind::TimedOut =>
                     {
                         // Timeout — loop back to check active flag
                         continue;
@@ -238,7 +245,10 @@ mod tests {
         // Give the listener thread time to process
         std::thread::sleep(Duration::from_millis(200));
 
-        assert!(sink.command_count() > 0, "Should have received at least one command");
+        assert!(
+            sink.command_count() > 0,
+            "Should have received at least one command"
+        );
 
         // Clean up
         let mut handle = result.handle;
@@ -287,7 +297,10 @@ mod tests {
     fn handle_packet_processes_bundle() {
         let sink = MockSink::new();
         let bundle = OscPacket::Bundle(rosc::OscBundle {
-            timetag: rosc::OscTime { seconds: 0, fractional: 0 },
+            timetag: rosc::OscTime {
+                seconds: 0,
+                fractional: 0,
+            },
             content: vec![
                 OscPacket::Message(OscMessage {
                     addr: "/rhema/next".into(),
