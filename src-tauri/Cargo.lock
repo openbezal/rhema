@@ -3805,6 +3805,7 @@ dependencies = [
  "rhema-broadcast",
  "rhema-detection",
  "rhema-stt",
+ "rusqlite",
  "serde",
  "serde_json",
  "sysinfo",

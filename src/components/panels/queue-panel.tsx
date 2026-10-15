@@ -2,11 +2,7 @@ import { PanelHeader } from "@/components/ui/panel-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import {
-  PlayIcon,
-  XIcon,
-  GripVerticalIcon,
-} from "lucide-react"
+import { PlayIcon, XIcon, GripVerticalIcon } from "lucide-react"
 import { useQueueStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { bibleActions } from "@/hooks/use-bible"
@@ -66,14 +62,17 @@ function QueueItemRow({
             : "hover:bg-muted/50"
       )}
     >
-      <GripVerticalIcon
-        className="size-3 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100"
-      />
+      <GripVerticalIcon className="size-3 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100" />
 
       <span className="flex-1 truncate text-sm font-medium text-foreground">
         {item.reference}
       </span>
 
+      {item.translation_code && (
+        <span className="text-xs text-muted-foreground">
+          {item.translation_code}
+        </span>
+      )}
       {sourceBadge}
 
       <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">

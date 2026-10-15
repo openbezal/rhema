@@ -1,0 +1,567 @@
+[
+  {
+    "time": "2026-10-15T20:06:08.009Z",
+    "event": "pointerdown",
+    "target": "Start arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.044Z",
+    "event": "focusin",
+    "target": "Start arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.079Z",
+    "event": "pointerup",
+    "target": "Start arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.110Z",
+    "event": "click",
+    "target": "Start arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.249Z",
+    "event": "pointerdown",
+    "target": "H3",
+    "card": "semantic|KJV|43:3:16",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.258Z",
+    "event": "focusout",
+    "target": "Stop arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.266Z",
+    "event": "focusin",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.276Z",
+    "event": "pointerup",
+    "target": "H3",
+    "card": "semantic|KJV|43:3:16",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:08.284Z",
+    "event": "click",
+    "target": "H3",
+    "card": "semantic|KJV|43:3:16",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:09.185Z",
+    "event": "keydown",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 0
+  },
+  {
+    "time": "2026-10-15T20:06:09.230Z",
+    "event": "scroll",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 336.5
+  },
+  {
+    "time": "2026-10-15T20:06:09.259Z",
+    "event": "scroll",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 343.5
+  },
+  {
+    "time": "2026-10-15T20:06:09.287Z",
+    "event": "scroll",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 370.5
+  },
+  {
+    "time": "2026-10-15T20:06:09.315Z",
+    "event": "scroll",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 471.5
+  },
+  {
+    "time": "2026-10-15T20:06:09.323Z",
+    "event": "scroll",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 546
+  },
+  {
+    "time": "2026-10-15T20:06:09.340Z",
+    "event": "pointerdown",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 546
+  },
+  {
+    "time": "2026-10-15T20:06:09.349Z",
+    "event": "focusout",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 546
+  },
+  {
+    "time": "2026-10-15T20:06:09.358Z",
+    "event": "pointerup",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 546
+  },
+  {
+    "time": "2026-10-15T20:06:09.366Z",
+    "event": "click",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 546
+  },
+  {
+    "time": "2026-10-15T20:07:25.161Z",
+    "event": "scroll",
+    "target": "DIV",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:07:25.215Z",
+    "event": "pointerdown",
+    "target": "Queue",
+    "card": "semantic|KJV|43:3:18",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:07:25.248Z",
+    "event": "focusin",
+    "target": "Queue",
+    "card": "semantic|KJV|43:3:18",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:07:25.279Z",
+    "event": "pointerup",
+    "target": "Queue",
+    "card": "semantic|KJV|43:3:18",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:07:25.317Z",
+    "event": "click",
+    "target": "Queue",
+    "card": "semantic|KJV|43:3:18",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.472Z",
+    "event": "pointerdown",
+    "target": "Stop arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.516Z",
+    "event": "focusout",
+    "target": "Queue",
+    "card": "semantic|KJV|43:3:18",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.552Z",
+    "event": "focusin",
+    "target": "Stop arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.587Z",
+    "event": "pointerup",
+    "target": "Stop arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.622Z",
+    "event": "click",
+    "target": "Stop arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.734Z",
+    "event": "pointerdown",
+    "target": "Apply updates (15)",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.745Z",
+    "event": "focusout",
+    "target": "Start arrivals",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.755Z",
+    "event": "focusin",
+    "target": "Apply updates (15)",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.767Z",
+    "event": "pointerup",
+    "target": "Apply updates (15)",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.775Z",
+    "event": "click",
+    "target": "Apply updates (15)",
+    "visible": [
+      "semantic|KJV|43:3:16",
+      "semantic|KJV|43:3:17",
+      "semantic|KJV|43:3:18",
+      "semantic|KJV|43:3:19",
+      "semantic|KJV|43:3:20"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:22.792Z",
+    "event": "focusout",
+    "target": "Apply updates (0)",
+    "visible": [
+      "semantic|KJV|43:3:35",
+      "semantic|KJV|43:3:21",
+      "semantic|KJV|43:3:22",
+      "semantic|KJV|43:3:23",
+      "semantic|KJV|43:3:24",
+      "semantic|KJV|43:3:34",
+      "semantic|KJV|43:3:33",
+      "semantic|KJV|43:3:32",
+      "semantic|KJV|43:3:31",
+      "semantic|KJV|43:3:30",
+      "semantic|KJV|43:3:29",
+      "semantic|KJV|43:3:28",
+      "semantic|KJV|43:3:27",
+      "semantic|KJV|43:3:26",
+      "semantic|KJV|43:3:25"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:23.258Z",
+    "event": "pointerdown",
+    "target": "SUMMARY",
+    "visible": [
+      "semantic|KJV|43:3:35",
+      "semantic|KJV|43:3:21",
+      "semantic|KJV|43:3:22",
+      "semantic|KJV|43:3:23",
+      "semantic|KJV|43:3:24",
+      "semantic|KJV|43:3:34",
+      "semantic|KJV|43:3:33",
+      "semantic|KJV|43:3:32",
+      "semantic|KJV|43:3:31",
+      "semantic|KJV|43:3:30",
+      "semantic|KJV|43:3:29",
+      "semantic|KJV|43:3:28",
+      "semantic|KJV|43:3:27",
+      "semantic|KJV|43:3:26",
+      "semantic|KJV|43:3:25"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:23.288Z",
+    "event": "focusin",
+    "target": "SUMMARY",
+    "visible": [
+      "semantic|KJV|43:3:35",
+      "semantic|KJV|43:3:21",
+      "semantic|KJV|43:3:22",
+      "semantic|KJV|43:3:23",
+      "semantic|KJV|43:3:24",
+      "semantic|KJV|43:3:34",
+      "semantic|KJV|43:3:33",
+      "semantic|KJV|43:3:32",
+      "semantic|KJV|43:3:31",
+      "semantic|KJV|43:3:30",
+      "semantic|KJV|43:3:29",
+      "semantic|KJV|43:3:28",
+      "semantic|KJV|43:3:27",
+      "semantic|KJV|43:3:26",
+      "semantic|KJV|43:3:25"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:23.321Z",
+    "event": "pointerup",
+    "target": "SUMMARY",
+    "visible": [
+      "semantic|KJV|43:3:35",
+      "semantic|KJV|43:3:21",
+      "semantic|KJV|43:3:22",
+      "semantic|KJV|43:3:23",
+      "semantic|KJV|43:3:24",
+      "semantic|KJV|43:3:34",
+      "semantic|KJV|43:3:33",
+      "semantic|KJV|43:3:32",
+      "semantic|KJV|43:3:31",
+      "semantic|KJV|43:3:30",
+      "semantic|KJV|43:3:29",
+      "semantic|KJV|43:3:28",
+      "semantic|KJV|43:3:27",
+      "semantic|KJV|43:3:26",
+      "semantic|KJV|43:3:25"
+    ],
+    "scrollTop": 333
+  },
+  {
+    "time": "2026-10-15T20:08:23.351Z",
+    "event": "click",
+    "target": "SUMMARY",
+    "visible": [
+      "semantic|KJV|43:3:35",
+      "semantic|KJV|43:3:21",
+      "semantic|KJV|43:3:22",
+      "semantic|KJV|43:3:23",
+      "semantic|KJV|43:3:24",
+      "semantic|KJV|43:3:34",
+      "semantic|KJV|43:3:33",
+      "semantic|KJV|43:3:32",
+      "semantic|KJV|43:3:31",
+      "semantic|KJV|43:3:30",
+      "semantic|KJV|43:3:29",
+      "semantic|KJV|43:3:28",
+      "semantic|KJV|43:3:27",
+      "semantic|KJV|43:3:26",
+      "semantic|KJV|43:3:25"
+    ],
+    "scrollTop": 333
+  }
+]

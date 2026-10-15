@@ -27,6 +27,9 @@ pub struct DetectionResult {
     pub verse: i32,
     pub confidence: f64,
     pub source: String,
+    pub translation_id: Option<i64>,
+    pub translation_code: Option<String>,
+    pub score_kind: &'static str,
     pub auto_queued: bool,
     pub transcript_snippet: String,
     /// True when detected from a chapter-only reference (verse defaults to 1, may be refined).
@@ -71,6 +74,8 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
         None
     });
 
+    let translation_id = resolved.as_ref().map(|verse| verse.translation_id);
+    let translation_code = translation_code(state, translation_id);
     let (reference, verse_text, book_name, book_number, chapter, verse) = if let Some(v) = resolved
     {
         let r = format!("{} {}:{}", v.book_name, v.chapter, v.verse);
@@ -96,10 +101,28 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
         verse,
         confidence: merged.detection.confidence,
         source: source_to_string(&merged.detection.source),
+        translation_id,
+        translation_code,
+        score_kind: match merged.detection.source {
+            rhema_detection::DetectionSource::DirectReference => "reference",
+            rhema_detection::DetectionSource::Semantic { .. } => "cosine",
+        },
         auto_queued: merged.auto_queued,
         transcript_snippet: merged.detection.transcript_snippet.clone(),
         is_chapter_only: merged.detection.is_chapter_only,
     }
+}
+
+pub(super) fn translation_code(state: &AppState, translation_id: Option<i64>) -> Option<String> {
+    let id = translation_id?;
+    state
+        .bible_db
+        .as_ref()?
+        .list_translations()
+        .ok()?
+        .into_iter()
+        .find(|translation| translation.id == id)
+        .map(|translation| translation.abbreviation.trim().to_uppercase())
 }
 
 /// Run the detection pipeline on a piece of transcript text
@@ -313,3 +336,6 @@ pub fn stop_reading_mode(state: State<'_, Mutex<ReadingMode>>) -> Result<(), Str
     rm.deactivate();
     Ok(())
 }
+
+#[cfg(test)]
+mod provenance_tests;

@@ -7,6 +7,10 @@ export interface DetectionResult {
   verse: number
   confidence: number
   source: "direct" | "semantic"
+  /** Attribution supplied by the backend that resolved this text. */
+  translation_id?: number | null
+  translation_code?: string | null
+  score_kind?: "reference" | "fts_rank" | "cosine" | "hybrid" | "unknown"
   auto_queued: boolean
   transcript_snippet: string
   /** True when detected from a chapter-only reference (verse defaults to 1, may be refined). */

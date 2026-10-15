@@ -16,9 +16,17 @@ export const TUTORIAL_STEPS: Step[] = [
   {
     ...STEP_DEFAULTS,
     target: '[data-slot="detections-panel"]',
-    title: "AI Detections",
+    title: "Direct detections",
     content:
-      "Detected verses appear here. Press Present to display a verse on screen, or Queue to save it for later.",
+      "Spoken references appear here. Present sends a verified verse to the audience; Queue saves it for later.",
+    placement: "left",
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-slot="suggestions-panel"]',
+    title: "Suggestions",
+    content:
+      "Quotation matches retain a stable list while you inspect them. Apply updates when ready to see new matches. Keyword search scores are not similarity percentages.",
     placement: "left",
   },
   {

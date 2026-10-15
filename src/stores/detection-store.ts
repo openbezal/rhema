@@ -1,5 +1,14 @@
 import { create } from "zustand"
 import type { DetectionResult } from "@/types"
+import { useSettingsStore } from "./settings-store"
+import {
+  mergeSuggestionHistory,
+  suggestionKey,
+  dismissSuggestion,
+  detectionCandidate,
+  type SuggestionCandidate,
+  type SuggestionInput,
+} from "@/lib/suggestion-history"
 
 /**
  * How long a dismissed reference stays suppressed (issue #149).
@@ -34,6 +43,12 @@ function pruneDismissed(
 
 interface DetectionState {
   detections: DetectionResult[]
+  suggestions: SuggestionCandidate[]
+  dismissedSuggestions: Record<string, number>
+  pruneSuggestions: () => void
+  dismissSuggestion: (key: string) => void
+  clearSuggestions: () => void
+  clearDirectDetections: () => void
   // Dismissed `source|verse_ref` keys → the time their suppression expires.
   dismissed: Record<string, number>
   autoMode: boolean
@@ -50,32 +65,83 @@ interface DetectionState {
   setConfidenceThreshold: (threshold: number) => void
 }
 
+function suggestionPatch(
+  state: Pick<DetectionState, "suggestions" | "dismissedSuggestions">,
+  incoming: DetectionResult[]
+) {
+  const now = Date.now()
+  const dismissedSuggestions = pruneDismissed(state.dismissedSuggestions, now)
+  const accepted: SuggestionInput[] = incoming
+    .filter(
+      (item) => item.source === "semantic" && item.verse_text.trim().length > 0
+    )
+    .map(detectionCandidate)
+    .filter((item) => !dismissedSuggestions[suggestionKey(item)])
+  const settings = useSettingsStore.getState()
+  return {
+    suggestions: mergeSuggestionHistory(state.suggestions, accepted, now, {
+      capacity: settings.suggestionCapacity,
+      retentionMs: settings.suggestionRetentionMs,
+    }),
+    dismissedSuggestions,
+  }
+}
+
 export const useDetectionStore = create<DetectionState>((set, get) => ({
   detections: [],
+  suggestions: [],
+  dismissedSuggestions: {},
+  pruneSuggestions: () => set((state) => suggestionPatch(state, [])),
+  dismissSuggestion: (key) =>
+    set((state) => ({
+      suggestions: dismissSuggestion(state.suggestions, key),
+      dismissedSuggestions: Object.fromEntries(
+        Object.entries({
+          ...pruneDismissed(state.dismissedSuggestions, Date.now()),
+          [key]: Date.now() + DISMISS_SUPPRESSION_MS,
+        }).slice(-100)
+      ),
+    })),
+  clearSuggestions: () => set({ suggestions: [], dismissedSuggestions: {} }),
+  clearDirectDetections: () =>
+    set((state) => ({
+      detections: state.detections.filter((item) => item.source !== "direct"),
+    })),
   dismissed: {},
   autoMode: false,
   confidenceThreshold: 0.8,
 
   addDetection: (detection) =>
     set((state) => {
+      const suggestions = suggestionPatch(state, [detection])
       const dismissed = pruneDismissed(state.dismissed, Date.now())
       // Dismissed by the operator — stay out of the list until the window ends
       if (dismissed[dismissKey(detection.verse_ref, detection.source)]) {
-        return { dismissed }
+        return { dismissed, ...suggestions }
       }
       // Deduplicate: if same verse_ref exists, keep higher confidence at top
       const filtered = state.detections.filter(
-        (d) => d.verse_ref !== detection.verse_ref || d.confidence > detection.confidence,
+        (d) =>
+          d.verse_ref !== detection.verse_ref ||
+          d.confidence > detection.confidence
       )
       // If we filtered one out, the new one has higher (or equal) confidence
       if (filtered.length < state.detections.length) {
-        return { detections: [detection, ...filtered].slice(0, 50), dismissed }
+        return {
+          detections: [detection, ...filtered].slice(0, 50),
+          dismissed,
+          ...suggestions,
+        }
       }
       // Check if it was already there with higher confidence
       if (state.detections.some((d) => d.verse_ref === detection.verse_ref)) {
-        return { dismissed } // existing has higher confidence, keep it
+        return { dismissed, ...suggestions } // existing has higher confidence, keep it
       }
-      return { detections: [detection, ...state.detections].slice(0, 50), dismissed }
+      return {
+        detections: [detection, ...state.detections].slice(0, 50),
+        dismissed,
+        ...suggestions,
+      }
     }),
   addDetections: (incoming) =>
     set((state) => {
@@ -109,7 +175,11 @@ export const useDetectionStore = create<DetectionState>((set, get) => ({
         }
       }
 
-      return { detections: [...direct.slice(0, 25), ...semantic], dismissed }
+      return {
+        detections: [...direct.slice(0, 25), ...semantic],
+        dismissed,
+        ...suggestionPatch(state, incoming),
+      }
     }),
   setDetections: (detections) => set({ detections }),
   removeDetection: (verseRef) =>
@@ -133,8 +203,13 @@ export const useDetectionStore = create<DetectionState>((set, get) => ({
     const expiresAt = get().dismissed[dismissKey(verseRef, source)]
     return expiresAt !== undefined && expiresAt > Date.now()
   },
-  clearDetections: () => set({ detections: [], dismissed: {} }),
+  clearDetections: () =>
+    set({
+      detections: [],
+      dismissed: {},
+      suggestions: [],
+      dismissedSuggestions: {},
+    }),
   setAutoMode: (autoMode) => set({ autoMode }),
-  setConfidenceThreshold: (confidenceThreshold) =>
-    set({ confidenceThreshold }),
+  setConfidenceThreshold: (confidenceThreshold) => set({ confidenceThreshold }),
 }))

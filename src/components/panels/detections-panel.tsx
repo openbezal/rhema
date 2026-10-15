@@ -2,19 +2,16 @@ import { useEffect, useMemo } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { queueSuggestion } from "@/lib/suggestion-actions"
+import { detectionCandidate } from "@/lib/suggestion-history"
 import { PlayIcon, PlusIcon, XIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { bibleActions } from "@/hooks/use-bible"
-import { useQueueStore, useBibleStore } from "@/stores"
+import { useBibleStore, useDetectionStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { mark } from "@/lib/latency-marks"
 import type { DetectionResult } from "@/types"
-
-const SOURCE_COLORS: Record<string, { text: string; label: string }> = {
-  direct: { text: "text-green-600", label: "Direct" },
-  semantic: { text: "text-indigo-300", label: "Semantic" },
-}
 
 function DetectionCard({ detection }: { detection: DetectionResult }) {
   const handlePresent = () => {
@@ -79,66 +76,23 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           size="sm"
           className="gap-1"
           onClick={() => {
-            useQueueStore.getState().addItem({
-              id: crypto.randomUUID(),
-              verse: {
-                id: 0,
-                translation_id: useBibleStore.getState().activeTranslationId,
-                book_number: detection.book_number,
-                book_name: detection.book_name,
-                book_abbreviation: "",
-                chapter: detection.chapter,
-                verse: detection.verse,
-                text: detection.verse_text,
-              },
-              reference: detection.verse_ref,
-              confidence: detection.confidence,
-              source: detection.source === "direct" ? "ai-direct" : "ai-semantic",
-              added_at: Date.now(),
-            })
+            void queueSuggestion({
+              ...detectionCandidate(detection),
+              firstSeenAt: Date.now(),
+              lastSeenAt: Date.now(),
+            }).catch((error: unknown) =>
+              toast.error("Could not queue detection", {
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : "Check the source translation.",
+              })
+            )
           }}
         >
           <PlusIcon className="size-3" />
           Queue
         </Button>
-      </div>
-    </div>
-  )
-}
-
-function DetectionColumn({
-  source,
-  detections,
-}: {
-  source: "direct" | "semantic"
-  detections: DetectionResult[]
-}) {
-  const style = SOURCE_COLORS[source]
-  return (
-    <div className="flex min-h-0 flex-col">
-      <div className="sticky top-0 z-10 flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5">
-        <span
-          className={cn(
-            "text-[0.5625rem] font-medium uppercase tracking-wider",
-            style.text
-          )}
-        >
-          {style.label}
-        </span>
-        <span className="text-[0.5625rem] text-muted-foreground">
-          {detections.length}
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {detections.length === 0 ? (
-          <p className="p-4 text-center text-xs text-muted-foreground">
-            No {style.label.toLowerCase()} detections yet
-          </p>
-        ) : (
-          detections.map((detection, i) => (
-            <DetectionCard key={`${detection.verse_ref}-${i}`} detection={detection} />
-          ))
-        )}
       </div>
     </div>
   )
@@ -158,15 +112,9 @@ export function DetectionsPanel() {
     return () => cancelAnimationFrame(raf)
   }, [detections])
 
-  // Issue #104: direct (spoken references) and semantic (quoted text)
-  // detections in separate columns, so a burst of direct hits doesn't push
-  // the semantic ones out of view.
+  // Spoken citations retain their own recent timeline; quotation matches have a separate snapshot.
   const directDetections = useMemo(
     () => detections.filter((d) => d.source === "direct"),
-    [detections]
-  )
-  const semanticDetections = useMemo(
-    () => detections.filter((d) => d.source !== "direct"),
     [detections]
   )
 
@@ -175,23 +123,27 @@ export function DetectionsPanel() {
       data-slot="detections-panel"
       className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
-      <PanelHeader title="Recent detections">
+      <PanelHeader title="Direct detections">
         <button
-          onClick={() => detectionActions.clearDetections()}
+          onClick={() => useDetectionStore.getState().clearDirectDetections()}
           className="text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
         >
           Clear all
         </button>
       </PanelHeader>
 
-      {detections.length === 0 ? (
+      {directDetections.length === 0 ? (
         <p className="p-4 text-center text-xs text-muted-foreground">
-          Verse detections will appear here during transcription
+          Spoken references will appear here during transcription
         </p>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-border">
-          <DetectionColumn source="direct" detections={directDetections} />
-          <DetectionColumn source="semantic" detections={semanticDetections} />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {directDetections.map((detection) => (
+            <DetectionCard
+              key={`${detection.translation_code ?? "legacy"}|${detection.book_number}:${detection.chapter}:${detection.verse}`}
+              detection={detection}
+            />
+          ))}
         </div>
       )}
     </div>

@@ -19,7 +19,14 @@ interface QueueState {
   /** Fill in verse text on an item that was queued without it. Never overwrites non-empty text. */
   backfillText: (id: string, text: string) => void
   /** Update a chapter-only queue item in place when the verse is refined. */
-  updateEarlyRef: (bookNumber: number, chapter: number, verse: number, reference: string, verseText: string) => boolean
+  updateEarlyRef: (
+    bookNumber: number,
+    chapter: number,
+    verse: number,
+    reference: string,
+    verseText: string,
+    attribution?: { translationId: number; translationCode: string }
+  ) => boolean
 }
 
 let flashTimer: ReturnType<typeof setTimeout> | null = null
@@ -35,13 +42,17 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         (i) =>
           i.verse.book_number === item.verse.book_number &&
           i.verse.chapter === item.verse.chapter &&
-          i.verse.verse === item.verse.verse,
+          i.verse.verse === item.verse.verse
       )
       if (idx !== -1) {
         // Duplicate: don't re-add, but backfill text if the existing item
         // was queued without it (detections can arrive with empty text).
         const existing = state.items[idx]
-        if (!existing.verse.text && item.verse.text) {
+        if (
+          existing.verse.translation_id === item.verse.translation_id &&
+          !existing.verse.text &&
+          item.verse.text
+        ) {
           const items = [...state.items]
           items[idx] = {
             ...existing,
@@ -76,7 +87,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       (i) =>
         i.verse.book_number === bookNumber &&
         i.verse.chapter === chapter &&
-        i.verse.verse === verse,
+        i.verse.verse === verse
     ),
   backfillText: (id, text) =>
     set((state) => {
@@ -89,29 +100,41 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       }
       return { items }
     }),
-  updateEarlyRef: (bookNumber, chapter, verse, reference, verseText) => {
+  updateEarlyRef: (
+    bookNumber,
+    chapter,
+    verse,
+    reference,
+    verseText,
+    attribution
+  ) => {
     let found = false
     set((state) => {
       // First try exact match: same book + same chapter
       let idx = state.items.findIndex(
         (i) =>
           i.is_chapter_only &&
+          (!attribution ||
+            i.verse.translation_id === attribution.translationId) &&
           i.verse.book_number === bookNumber &&
-          i.verse.chapter === chapter,
+          i.verse.chapter === chapter
       )
       // Fallback: same book, any chapter (book-only detection guessed chapter 1)
       if (idx === -1) {
         idx = state.items.findIndex(
           (i) =>
             i.is_chapter_only &&
-            i.verse.book_number === bookNumber,
+            (!attribution ||
+              i.verse.translation_id === attribution.translationId) &&
+            i.verse.book_number === bookNumber
         )
       }
       if (idx === -1) return state
       found = true
       const items = [...state.items]
       const item = { ...items[idx] }
-      item.verse = { ...item.verse, verse, text: verseText }
+      item.verse = { ...item.verse, chapter, verse, text: verseText }
+      if (attribution) item.translation_code = attribution.translationCode
       item.reference = reference
       item.is_chapter_only = false
       items[idx] = item

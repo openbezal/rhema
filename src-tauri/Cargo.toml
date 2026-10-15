@@ -70,6 +70,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 fontdb = "0.24.0"
 
+[dev-dependencies]
+rusqlite = { version = "0.34", features = ["bundled"] }
+
 [features]
 default = ["whisper"]
 whisper = ["rhema-stt/whisper"]

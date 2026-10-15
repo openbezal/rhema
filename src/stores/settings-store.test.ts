@@ -40,7 +40,8 @@ describe("settings store", () => {
       return null
     })
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     await hydrateSettings()
 
     const state = useSettingsStore.getState()
@@ -55,7 +56,8 @@ describe("settings store", () => {
   it("hydrate with no persisted values falls back to defaults", async () => {
     mockGet.mockResolvedValue(null)
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     const before = useSettingsStore.getState()
     await hydrateSettings()
     const after = useSettingsStore.getState()
@@ -68,7 +70,8 @@ describe("settings store", () => {
   it("a setter call after hydration writes the full snapshot to disk", async () => {
     mockGet.mockResolvedValue(null)
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     await hydrateSettings()
 
     useSettingsStore.getState().setGain(1.75)
@@ -86,7 +89,8 @@ describe("settings store", () => {
   it("rapid setter calls coalesce into a single save", async () => {
     mockGet.mockResolvedValue(null)
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     await hydrateSettings()
 
     const { setGain } = useSettingsStore.getState()
@@ -103,7 +107,8 @@ describe("settings store", () => {
   it("concurrent hydrate calls attach only one subscription", async () => {
     mockGet.mockResolvedValue(null)
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     // Kick off two concurrent hydrations — a second caller must not
     // attach a duplicate subscription that would double every write.
     await Promise.all([hydrateSettings(), hydrateSettings()])
@@ -118,7 +123,8 @@ describe("settings store", () => {
     mockLoad.mockRejectedValue(new Error("store not available"))
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     await expect(hydrateSettings()).resolves.toBeUndefined()
 
     // Defaults preserved
@@ -134,13 +140,43 @@ describe("settings store", () => {
     mockSave.mockRejectedValue(new Error("disk error"))
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
-    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
     await hydrateSettings()
 
     useSettingsStore.getState().setAutoMode(true)
     await flushSave()
 
-    expect(warnSpy).toHaveBeenCalledWith("[settings] Failed to persist settings")
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[settings] Failed to persist settings"
+    )
     warnSpy.mockRestore()
+  })
+  it("migrates missing suggestion controls to safe defaults and validates old values", async () => {
+    mockGet.mockImplementation(async (key: string) =>
+      key === "suggestionCapacity"
+        ? "bad"
+        : key === "suggestionRetentionMs"
+          ? Infinity
+          : null
+    )
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
+    await hydrateSettings()
+    expect(useSettingsStore.getState()).toMatchObject({
+      suggestionCapacity: 25,
+      suggestionRetentionMs: 60_000,
+    })
+  })
+  it("bounds suggestion settings before persisting them", async () => {
+    const { useSettingsStore } = await import("./settings-store")
+    useSettingsStore.getState().setSuggestionCapacity(Infinity)
+    expect(useSettingsStore.getState().suggestionCapacity).toBe(25)
+    useSettingsStore.getState().setSuggestionCapacity(10_000)
+    useSettingsStore.getState().setSuggestionRetentionMs(0)
+    expect(useSettingsStore.getState()).toMatchObject({
+      suggestionCapacity: 100,
+      suggestionRetentionMs: 1_000,
+    })
   })
 })

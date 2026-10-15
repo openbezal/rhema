@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { mark } from "./latency-marks"
 import { pickAutoPresentTarget } from "./auto-present-target"
 import { presentVerse } from "./presentation-controller"
+import { useSettingsStore } from "@/stores/settings-store"
 import { translationCode } from "./translation-selection"
 import {
   useAudioStore,
@@ -21,12 +22,18 @@ interface TranscriptPayload {
 function candidateVerse(
   data: Pick<
     DetectionResult,
-    "book_number" | "book_name" | "chapter" | "verse" | "verse_text"
+    | "book_number"
+    | "book_name"
+    | "chapter"
+    | "verse"
+    | "verse_text"
+    | "translation_id"
   >
 ): Verse {
   return {
     id: 0,
-    translation_id: useBibleStore.getState().activeTranslationId,
+    translation_id:
+      data.translation_id ?? useBibleStore.getState().activeTranslationId,
     book_number: data.book_number,
     book_name: data.book_name,
     book_abbreviation: "",
@@ -40,14 +47,12 @@ function followCandidate(verse: Verse): void {
   if (useBroadcastStore.getState().autoLive)
     void presentVerse(verse, { selectPreview: follow, automatic: true })
   if (follow)
-    useBibleStore
-      .getState()
-      .setPendingNavigation({
-        bookNumber: verse.book_number,
-        chapter: verse.chapter,
-        verse: verse.verse,
-        follow: true,
-      })
+    useBibleStore.getState().setPendingNavigation({
+      bookNumber: verse.book_number,
+      chapter: verse.chapter,
+      verse: verse.verse,
+      follow: true,
+    })
 }
 function handleDetections(detections: DetectionResult[]): void {
   mark(
@@ -67,6 +72,16 @@ function handleDetections(detections: DetectionResult[]): void {
 
   // Auto-queue high-confidence detections
   for (const d of detections) {
+    if (
+      !d.translation_code?.trim() ||
+      !Number.isSafeInteger(d.translation_id) ||
+      (d.translation_id ?? 0) <= 0
+    )
+      continue
+    const attribution = {
+      translationId: d.translation_id as number,
+      translationCode: d.translation_code.trim().toUpperCase(),
+    }
     // Check if this detection refines an existing chapter-only queue item
     if (
       !d.is_chapter_only &&
@@ -78,7 +93,8 @@ function handleDetections(detections: DetectionResult[]): void {
           d.chapter,
           d.verse,
           d.verse_ref,
-          d.verse_text
+          d.verse_text,
+          attribution
         )
     ) {
       continue
@@ -100,7 +116,11 @@ function handleDetections(detections: DetectionResult[]): void {
         const existing = queue.items[dupIdx]
         // Backfill text if the existing item was queued without it
         // (e.g. an earlier detection emitted with empty verse text).
-        if (!existing.verse.text && d.verse_text) {
+        if (
+          existing.verse.translation_id === attribution.translationId &&
+          !existing.verse.text &&
+          d.verse_text
+        ) {
           queue.backfillText(existing.id, d.verse_text)
         }
         queue.flashItem(existing.id)
@@ -111,7 +131,7 @@ function handleDetections(detections: DetectionResult[]): void {
         id: crypto.randomUUID(),
         verse: {
           id: 0,
-          translation_id: useBibleStore.getState().activeTranslationId,
+          translation_id: attribution.translationId,
           book_number: d.book_number,
           book_name: d.book_name,
           book_abbreviation: "",
@@ -120,6 +140,7 @@ function handleDetections(detections: DetectionResult[]): void {
           text: d.verse_text,
         },
         reference: d.verse_ref,
+        translation_code: attribution.translationCode,
         confidence: d.confidence,
         source: d.source === "direct" ? "ai-direct" : "ai-semantic",
         added_at: Date.now(),
@@ -134,7 +155,15 @@ let release: (() => void) | null = null
 export function connectDetectionSession(): () => void {
   if (leases++ === 0) {
     let cancelled = false
-    const unlisteners: UnlistenFn[] = []
+    const unlisteners: UnlistenFn[] = [
+      useSettingsStore.subscribe((settings, previous) => {
+        if (
+          settings.suggestionCapacity !== previous.suggestionCapacity ||
+          settings.suggestionRetentionMs !== previous.suggestionRetentionMs
+        )
+          useDetectionStore.getState().pruneSuggestions()
+      }),
+    ]
     const on = <T>(event: string, handler: (payload: T) => void) => {
       void listen<T>(event, ({ payload }) => {
         if (!cancelled) handler(payload)
@@ -178,16 +207,14 @@ export function connectDetectionSession(): () => void {
     })
     on<TranscriptPayload>("transcript_final", (payload) => {
       mark(`transcript_final received "${payload.text.slice(0, 30)}"`)
-      useTranscriptStore
-        .getState()
-        .addSegment({
-          id: crypto.randomUUID(),
-          text: payload.text,
-          is_final: true,
-          confidence: payload.confidence,
-          words: [],
-          timestamp: Date.now(),
-        })
+      useTranscriptStore.getState().addSegment({
+        id: crypto.randomUUID(),
+        text: payload.text,
+        is_final: true,
+        confidence: payload.confidence,
+        words: [],
+        timestamp: Date.now(),
+      })
     })
     on<{ abbreviation: string; translation_id: number }>(
       "translation_command",

@@ -17,7 +17,10 @@ function makeVerse(overrides: Partial<Verse> = {}): Verse {
   }
 }
 
-function makeItem(overrides: Partial<QueueItem> = {}, verse: Partial<Verse> = {}): QueueItem {
+function makeItem(
+  overrides: Partial<QueueItem> = {},
+  verse: Partial<Verse> = {}
+): QueueItem {
   return {
     id: "item-1",
     verse: makeVerse(verse),
@@ -55,7 +58,12 @@ describe("addItem", () => {
     useQueueStore.getState().addItem(makeItem({ id: "a" }, { text: "" }))
     useQueueStore
       .getState()
-      .addItem(makeItem({ id: "b", added_at: 99 }, { text: "For God so loved the world" }))
+      .addItem(
+        makeItem(
+          { id: "b", added_at: 99 },
+          { text: "For God so loved the world" }
+        )
+      )
 
     const items = useQueueStore.getState().items
     expect(items).toHaveLength(1)
@@ -65,8 +73,12 @@ describe("addItem", () => {
   })
 
   it("does not overwrite existing text on a duplicate", () => {
-    useQueueStore.getState().addItem(makeItem({ id: "a" }, { text: "original text" }))
-    useQueueStore.getState().addItem(makeItem({ id: "b" }, { text: "different text" }))
+    useQueueStore
+      .getState()
+      .addItem(makeItem({ id: "a" }, { text: "original text" }))
+    useQueueStore
+      .getState()
+      .addItem(makeItem({ id: "b" }, { text: "different text" }))
 
     expect(useQueueStore.getState().items[0].verse.text).toBe("original text")
   })
@@ -78,12 +90,14 @@ describe("backfillText", () => {
     useQueueStore.getState().backfillText("a", "For God so loved the world")
 
     expect(useQueueStore.getState().items[0].verse.text).toBe(
-      "For God so loved the world",
+      "For God so loved the world"
     )
   })
 
   it("never overwrites non-empty text", () => {
-    useQueueStore.getState().addItem(makeItem({ id: "a" }, { text: "original text" }))
+    useQueueStore
+      .getState()
+      .addItem(makeItem({ id: "a" }, { text: "original text" }))
     useQueueStore.getState().backfillText("a", "different text")
 
     expect(useQueueStore.getState().items[0].verse.text).toBe("original text")
@@ -95,5 +109,69 @@ describe("backfillText", () => {
     useQueueStore.getState().backfillText("a", "")
 
     expect(useQueueStore.getState().items[0].verse.text).toBe("")
+  })
+})
+
+describe("attributed early-reference refinement", () => {
+  it("cannot overwrite another translation's early text", () => {
+    useQueueStore
+      .getState()
+      .addItem(
+        makeItem(
+          { is_chapter_only: true },
+          { translation_id: 2, verse: 1, text: "ESV early text" }
+        )
+      )
+    expect(
+      useQueueStore
+        .getState()
+        .updateEarlyRef(43, 3, 16, "John 3:16", "KJV text", {
+          translationId: 1,
+          translationCode: "KJV",
+        })
+    ).toBe(false)
+    expect(useQueueStore.getState().items[0].verse.text).toBe("ESV early text")
+  })
+  it("updates the canonical chapter when repairing a book-only early item", () => {
+    useQueueStore
+      .getState()
+      .addItem(makeItem({ is_chapter_only: true }, { chapter: 1, verse: 1 }))
+    expect(
+      useQueueStore
+        .getState()
+        .updateEarlyRef(43, 3, 16, "John 3:16", "KJV verified text", {
+          translationId: 1,
+          translationCode: "KJV",
+        })
+    ).toBe(true)
+    expect(useQueueStore.getState().items[0]).toMatchObject({
+      translation_code: "KJV",
+      verse: { chapter: 3, verse: 16, text: "KJV verified text" },
+    })
+  })
+})
+
+describe("duplicate text attribution", () => {
+  it("does not backfill another translation's empty item", () => {
+    useQueueStore
+      .getState()
+      .addItem(
+        makeItem(
+          { id: "esv", translation_code: "ESV" },
+          { translation_id: 2, text: "" }
+        )
+      )
+    useQueueStore
+      .getState()
+      .addItem(
+        makeItem(
+          { id: "kjv", translation_code: "KJV" },
+          { translation_id: 1, text: "KJV text" }
+        )
+      )
+    expect(useQueueStore.getState().items[0]).toMatchObject({
+      translation_code: "ESV",
+      verse: { translation_id: 2, text: "" },
+    })
   })
 })

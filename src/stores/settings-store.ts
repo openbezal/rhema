@@ -1,4 +1,8 @@
 import { create } from "zustand"
+import {
+  DEFAULT_SUGGESTION_OPTIONS,
+  suggestionOptions,
+} from "@/lib/suggestion-history"
 import { load, type Store } from "@tauri-apps/plugin-store"
 
 type SttProvider = "deepgram" | "whisper"
@@ -12,6 +16,8 @@ interface SettingsState {
   autoMode: boolean
   confidenceThreshold: number
   cooldownMs: number
+  suggestionCapacity: number
+  suggestionRetentionMs: number
   onboardingComplete: boolean
   sttProvider: SttProvider
 
@@ -23,6 +29,8 @@ interface SettingsState {
   setAutoMode: (auto: boolean) => void
   setConfidenceThreshold: (threshold: number) => void
   setCooldownMs: (ms: number) => void
+  setSuggestionCapacity: (capacity: number) => void
+  setSuggestionRetentionMs: (ms: number) => void
   setOnboardingComplete: (complete: boolean) => void
   setSttProvider: (provider: SttProvider) => void
 }
@@ -36,6 +44,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   autoMode: false,
   confidenceThreshold: 0.8,
   cooldownMs: 2500,
+  suggestionCapacity: 25,
+  suggestionRetentionMs: 60_000,
   onboardingComplete: false,
   sttProvider: "deepgram",
 
@@ -47,6 +57,20 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setAutoMode: (autoMode) => set({ autoMode }),
   setConfidenceThreshold: (confidenceThreshold) => set({ confidenceThreshold }),
   setCooldownMs: (cooldownMs) => set({ cooldownMs }),
+  setSuggestionCapacity: (capacity) =>
+    set((state) => ({
+      suggestionCapacity: suggestionOptions({
+        capacity,
+        retentionMs: state.suggestionRetentionMs,
+      }).capacity,
+    })),
+  setSuggestionRetentionMs: (retentionMs) =>
+    set((state) => ({
+      suggestionRetentionMs: suggestionOptions({
+        capacity: state.suggestionCapacity,
+        retentionMs,
+      }).retentionMs,
+    })),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   setSttProvider: (sttProvider) => set({ sttProvider }),
 }))
@@ -60,6 +84,8 @@ const PERSISTED_KEYS = [
   "autoMode",
   "confidenceThreshold",
   "cooldownMs",
+  "suggestionCapacity",
+  "suggestionRetentionMs",
   "onboardingComplete",
   "sttProvider",
 ] as const satisfies readonly (keyof SettingsState)[]
@@ -89,6 +115,18 @@ export function hydrateSettings(): Promise<void> {
           ;(patch as Record<string, unknown>)[key] = value
         }
       }
+      const validated = suggestionOptions({
+        capacity:
+          typeof patch.suggestionCapacity === "number"
+            ? patch.suggestionCapacity
+            : DEFAULT_SUGGESTION_OPTIONS.capacity,
+        retentionMs:
+          typeof patch.suggestionRetentionMs === "number"
+            ? patch.suggestionRetentionMs
+            : DEFAULT_SUGGESTION_OPTIONS.retentionMs,
+      })
+      patch.suggestionCapacity = validated.capacity
+      patch.suggestionRetentionMs = validated.retentionMs
       if (Object.keys(patch).length > 0) {
         useSettingsStore.setState(patch)
       }

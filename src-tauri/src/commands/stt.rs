@@ -686,6 +686,9 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
                 .map(|v| v.text)
                 .unwrap_or_default();
 
+            if verse_text.trim().is_empty() {
+                return None;
+            }
             Some(super::detection::DetectionResult {
                 verse_ref: format!("{} {}:{}", hit.book_name, hit.chapter, hit.verse),
                 verse_text,
@@ -695,6 +698,12 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
                 verse: hit.verse,
                 confidence,
                 source: "semantic".to_string(),
+                translation_id: Some(app_state.active_translation_id),
+                translation_code: super::detection::translation_code(
+                    &app_state,
+                    Some(app_state.active_translation_id),
+                ),
+                score_kind: "fts_rank",
                 auto_queued: false,
                 transcript_snippet: truncate_safe(transcript, 100).to_string(),
                 is_chapter_only: false,

@@ -25,6 +25,7 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useAudioStore } from "@/stores/audio-store"
+import { useSettingsStore } from "@/stores/settings-store"
 import { useQueueStore } from "@/stores/queue-store"
 const verse: Verse = {
   id: 1,
@@ -52,6 +53,9 @@ const detection: DetectionResult = {
   verse_text: "Candidate text",
   confidence: 0.95,
   source: "direct",
+  translation_id: 1,
+  translation_code: "KJV",
+  score_kind: "reference",
   auto_queued: false,
   transcript_snippet: "John three sixteen",
   is_chapter_only: false,
@@ -114,6 +118,7 @@ beforeEach(() => {
   })
   useTranscriptStore.setState(useTranscriptStore.getInitialState())
   useDetectionStore.setState(useDetectionStore.getInitialState())
+  useSettingsStore.setState(useSettingsStore.getInitialState())
   useQueueStore.getState().clearQueue()
 })
 afterEach(() => {
@@ -312,5 +317,45 @@ describe("app-owned detection session", () => {
     } finally {
       warn.mockRestore()
     }
+  })
+  it("preserves backend text attribution when a delayed packet arrives after a translation switch", async () => {
+    await connect()
+    useBibleStore.setState({
+      activeTranslationId: 2,
+      activeTranslationCode: "ESV",
+    })
+    send("verse_detections", [{ ...detection, auto_queued: true }])
+    expect(useQueueStore.getState().items[0]).toMatchObject({
+      translation_code: "KJV",
+      verse: { translation_id: 1, text: "Candidate text" },
+    })
+  })
+  it("does not auto-queue packets with unresolved translation attribution", async () => {
+    await connect()
+    send("verse_detections", [
+      {
+        ...detection,
+        translation_id: null,
+        translation_code: null,
+        auto_queued: true,
+      },
+    ])
+    expect(useQueueStore.getState().items).toEqual([])
+  })
+  it("bounds hidden-panel history immediately when configuration changes", async () => {
+    await connect()
+    send(
+      "verse_detections",
+      Array.from({ length: 10 }, (_, index) => ({
+        ...detection,
+        source: "semantic",
+        score_kind: "fts_rank",
+        verse: index + 1,
+        verse_ref: `John 3:${index + 1}`,
+      }))
+    )
+    expect(useDetectionStore.getState().suggestions).toHaveLength(10)
+    useSettingsStore.getState().setSuggestionCapacity(3)
+    expect(useDetectionStore.getState().suggestions).toHaveLength(3)
   })
 })
