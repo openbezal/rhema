@@ -97,6 +97,7 @@ pub fn run() {
         .manage(Mutex::new(commands::remote::OscRuntime::new()))
         .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
+            commands::preferences::read_bible_preferences,
             commands::bible::list_translations,
             commands::bible::list_books,
             commands::bible::get_chapter,

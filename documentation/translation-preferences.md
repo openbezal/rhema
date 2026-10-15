@@ -10,6 +10,10 @@ the current `catalog` mapping of codes to IDs for provenance. The catalog is nev
 used to infer a language from an old numeric ID. The legacy `activeTranslationId`
 key is removed after a confirmed choice is saved.
 
+Hydration reads the fixed preference file through a native checked command, because
+the store plugin suppresses errors during its initial load. A genuinely absent file
+is distinguished from an existing corrupt, unreadable, or invalid JSON file.
+
 If an older preference contains only a numeric ID, or its saved translation is no
 longer installed, choose an installed Bible in the selection dialog. Presentation
 waits for a confirmed selection. An unreadable preference file also requires a

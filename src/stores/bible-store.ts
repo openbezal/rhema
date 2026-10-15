@@ -110,8 +110,11 @@ export async function hydrateBibleStore(): Promise<void> {
   let saved: unknown = null
   let legacyId: unknown = null
   try {
-    const store = await load("bible.json", { autoSave: false, defaults: {} })
-    ;[saved, legacyId] = await Promise.all([store.get("translationSelection"), store.get("activeTranslationId")])
+    // plugin-store suppresses initial disk/JSON errors, so hydration uses a
+    // checked native read. Its absent-file result is distinct from failure.
+    const preferences = await invoke<{ translationSelection?: unknown; activeTranslationId?: unknown } | null>("read_bible_preferences")
+    saved = preferences?.translationSelection
+    legacyId = preferences?.activeTranslationId
   } catch (error) {
     // Missing provenance is not a fresh installation. Ask the operator.
     legacyId = "unreadable"
@@ -121,11 +124,12 @@ export async function hydrateBibleStore(): Promise<void> {
   useBibleStore.setState({
     ...(selection.translation ? { activeTranslationId: selection.translation.id } : {}),
     activeTranslationCode: selection.status === "ready" && selection.translation ? translationCode(selection.translation) : null,
-    translationSelectionStatus: selection.status,
+    translationSelectionStatus: selection.status === "ready" ? "loading" : selection.status,
   })
   if (selection.status !== "ready" || !selection.translation) return
   try {
     await invoke("set_active_translation", { translationId: selection.translation.id })
+    useBibleStore.setState({ translationSelectionStatus: "ready" })
   } catch (error) {
     useBibleStore.setState({ translationSelectionStatus: "needs_confirmation" })
     console.warn("[bible] Failed to activate saved translation:", error)

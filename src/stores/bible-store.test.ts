@@ -20,7 +20,11 @@ beforeEach(() => {
   mockSave.mockReset().mockResolvedValue(undefined)
   mockDelete.mockReset().mockResolvedValue(true)
   mockLoad.mockReset().mockResolvedValue({ get: mockGet, set: mockSet, save: mockSave, delete: mockDelete })
-  mockInvoke.mockReset().mockImplementation((command) => command === "list_translations" ? Promise.resolve(catalog) : Promise.resolve(undefined))
+  mockInvoke.mockReset().mockImplementation(async (command) => {
+    if (command === "list_translations") return catalog
+    if (command === "read_bible_preferences") return { translationSelection: await mockGet("translationSelection"), activeTranslationId: await mockGet("activeTranslationId") }
+    return undefined
+  })
 })
 afterEach(() => { cleanups.splice(0).forEach((stop) => stop()); vi.useRealTimers(); vi.restoreAllMocks() })
 
@@ -69,12 +73,44 @@ describe("stable Bible translation persistence", () => {
   })
 
   it("requires a deliberate selection if saved preferences cannot be read", async () => {
-    mockLoad.mockRejectedValue(new Error("unreadable preferences"))
+    mockInvoke.mockImplementation((command) => command === "list_translations" ? Promise.resolve(catalog) : Promise.reject(new Error("unreadable preferences")))
     vi.spyOn(console, "warn").mockImplementation(() => {})
     const { hydrateBibleStore, useBibleStore } = await import("./bible-store")
     await hydrateBibleStore()
     expect(useBibleStore.getState().translations).toEqual(catalog)
     expect(useBibleStore.getState().translationSelectionStatus).toBe("needs_confirmation")
+  })
+
+  it("requires confirmation when the actual plugin suppresses a corrupt-file load error", async () => {
+    // plugin-store 2.4.4 resolves load() with an empty map after JSON/IO failure.
+    // The checked native read must independently report that existing-file error.
+    mockInvoke.mockImplementation((command) => {
+      if (command === "list_translations") return Promise.resolve(catalog)
+      if (command === "read_bible_preferences") return Promise.reject(new Error("Invalid Bible preferences"))
+      return Promise.resolve(undefined)
+    })
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { hydrateBibleStore, useBibleStore } = await import("./bible-store")
+    await hydrateBibleStore()
+    expect(useBibleStore.getState().translationSelectionStatus).toBe("needs_confirmation")
+    expect(mockSet).not.toHaveBeenCalled()
+  })
+
+  it("waits for backend activation before allowing presentation", async () => {
+    let finish!: () => void
+    mockInvoke.mockImplementation((command) => {
+      if (command === "list_translations") return Promise.resolve(catalog)
+      if (command === "read_bible_preferences") return Promise.resolve(null)
+      if (command === "set_active_translation") return new Promise<void>((resolve) => { finish = resolve })
+      return Promise.resolve(undefined)
+    })
+    const { hydrateBibleStore, useBibleStore } = await import("./bible-store")
+    const hydration = hydrateBibleStore()
+    await vi.waitFor(() => expect(finish).toBeDefined())
+    expect(useBibleStore.getState().translationSelectionStatus).toBe("loading")
+    finish()
+    await hydration
+    expect(useBibleStore.getState().translationSelectionStatus).toBe("ready")
   })
 
   it("confirms a known selection and ignores unknown IDs", async () => {
