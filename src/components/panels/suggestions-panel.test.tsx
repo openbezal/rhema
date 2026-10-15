@@ -169,6 +169,44 @@ describe("stable Suggestions interaction", () => {
     expect(card().textContent).toContain("KJV")
     expect(card().textContent).not.toMatch(/75%|cosine|semantic/i)
   })
+  it("releases expiry protection when the focused Dismiss control is removed", async () => {
+    useSettingsStore.setState({ suggestionRetentionMs: 1_000 })
+    useDetectionStore.getState().addDetections([hit(16), hit(17)])
+    await mount()
+    const dismiss = card().querySelector<HTMLButtonElement>(
+      '[aria-label^="Dismiss"]'
+    )!
+    await act(async () => dismiss.focus())
+    await act(async () => dismiss.click())
+    expect(document.activeElement).toBe(document.body)
+    await act(async () => vi.advanceTimersByTime(2_000))
+    expect(container.querySelectorAll("[data-suggestion-key]")).toHaveLength(0)
+  })
+  it("refreshes liveness without replacing an inspected snapshot or losing its latest expiry after eviction", async () => {
+    useSettingsStore.setState({
+      suggestionRetentionMs: 3_000,
+      suggestionCapacity: 1,
+    })
+    await mount()
+    const original = card()
+    await act(async () => vi.advanceTimersByTime(2_000))
+    await act(async () =>
+      useDetectionStore
+        .getState()
+        .addDetections([
+          { ...hit(16), verse_text: "Updated text awaiting Apply" },
+        ])
+    )
+    await act(async () => vi.advanceTimersByTime(1_000))
+    expect(card()).toBe(original)
+    expect(card().textContent).toContain("Fixture text 16")
+    expect(applyButton().textContent).toContain("1")
+    await act(async () => useDetectionStore.getState().addDetections([hit(17)]))
+    await act(async () => vi.advanceTimersByTime(1_000))
+    expect(card()).toBe(original)
+    await act(async () => vi.advanceTimersByTime(1_000))
+    expect(container.querySelectorAll("[data-suggestion-key]")).toHaveLength(0)
+  })
   it("cleans its expiry and scrolling timers when hidden", async () => {
     await mount()
     await act(async () =>

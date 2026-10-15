@@ -131,6 +131,34 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       }
       if (idx === -1) return state
       found = true
+      const destination = state.items.find(
+        (item, index) =>
+          index !== idx &&
+          item.verse.book_number === bookNumber &&
+          item.verse.chapter === chapter &&
+          item.verse.verse === verse
+      )
+      if (destination) {
+        // The saved canonical entry keeps its source/text. Remove the redundant
+        // placeholder while retaining selection and highlight by item identity.
+        const redundant = state.items[idx]
+        const items = state.items.filter((item) => item.id !== redundant.id)
+        const selectedId =
+          state.activeIndex === null ? null : state.items[state.activeIndex]?.id
+        const selected =
+          selectedId === redundant.id ? destination.id : selectedId
+        const activeIndex = selected
+          ? items.findIndex((item) => item.id === selected)
+          : -1
+        return {
+          items,
+          activeIndex: activeIndex < 0 ? null : activeIndex,
+          highlightedId:
+            state.highlightedId === redundant.id
+              ? destination.id
+              : state.highlightedId,
+        }
+      }
       const items = [...state.items]
       const item = { ...items[idx] }
       item.verse = { ...item.verse, chapter, verse, text: verseText }

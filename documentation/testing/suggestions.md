@@ -10,7 +10,7 @@ FTS matches say **Keyword search**, without fabricated percentages. Native packe
 
 ## Automated checks
 
-401 frontend tests across 34 files, typecheck, lint and production build pass. New tests cover history/expiry/dedupe/capacity, dismissal, settings migration, actual ingestion, hover/focus/held pointer/scroll, pending updates, verified actions, hidden settings changes and delayed-packet attribution. Regression tests were observed failing before implementation.
+404 frontend tests across 34 files, typecheck, lint and production build pass. New tests cover history/expiry/dedupe/capacity, dismissal, settings migration, actual ingestion, hover/focus/held pointer/scroll, pending updates, verified actions, hidden settings changes and delayed-packet attribution. Regression tests were observed failing before implementation.
 
 382 Rust workspace tests pass with default features and with `--no-default-features`; strict Clippy and formatting pass. Two real SQLite tests verify that a resolved KJV row remains attributed to KJV while ESV is selected and unresolved references receive no invented metadata. First-party native artifacts were cleared before checks to avoid cross-worktree cache reuse.
 
@@ -31,3 +31,5 @@ At 1280×800, Search, Direct detections and Suggestions sit alongside each other
 ## Remaining acceptance
 
 Packaged native operator typing/IME, real audio/provider ingestion, physical NDI/OMT receivers, Windows/vMix cadence, recorded-sermon accuracy and cross-branch integration remain. The direct-reference timeline is a current feed, not a frozen snapshot. These results do not automatically close those acceptance gates or issue #145.
+
+One fresh whole-branch review identified three Important issues and no Critical/Minor findings. All three regressions failed before the single fix pass and pass afterward: removing a focused Dismiss control releases expiry protection; refreshed canonical liveness is tracked independently of visible text/order, including after capacity eviction; and early-reference collision retains the already queued source/text while removing the redundant placeholder and preserving selection/highlight. Full frontend gates were repeated on the fixed head. No second review was run.

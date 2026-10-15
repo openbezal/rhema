@@ -108,11 +108,13 @@ export function SuggestionsPanel() {
   const capacity = useSettingsStore((state) => state.suggestionCapacity)
   const [visible, setVisible] = useState(() => available)
   const [hovered, setHovered] = useState(false)
-  const [focused, setFocused] = useState(false)
+  const panelRef = useRef<HTMLElement>(null)
+  // Freshness can advance without replacing displayed text or ordering.
+  const freshness = useRef(new Map<string, number>())
   const [held, setHeld] = useState(false)
   const [scrolling, setScrolling] = useState(false)
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const frozen = hovered || focused || held || scrolling
+  const frozen = hovered || held || scrolling
   const snapshot = new Map(visible.map((item) => [suggestionKey(item), item]))
   const pending = available.filter(
     (item) => snapshot.get(suggestionKey(item)) !== item
@@ -122,7 +124,6 @@ export function SuggestionsPanel() {
     const blur = () => {
       setHeld(false)
       setHovered(false)
-      setFocused(false)
     }
     window.addEventListener("pointerup", release)
     window.addEventListener("pointercancel", release)
@@ -135,15 +136,39 @@ export function SuggestionsPanel() {
     }
   }, [])
   useEffect(() => {
+    const recent = new Map(
+      available.map((item) => [suggestionKey(item), item.lastSeenAt])
+    )
+    const previous = freshness.current
+    freshness.current = new Map(
+      visible.map((item) => {
+        const key = suggestionKey(item)
+        return [
+          key,
+          Math.max(
+            item.lastSeenAt,
+            previous.get(key) ?? 0,
+            recent.get(key) ?? 0
+          ),
+        ]
+      })
+    )
+  }, [available, visible])
+  useEffect(() => {
     prune()
   }, [prune, capacity, retentionMs])
   useEffect(() => {
     const timer = setInterval(() => {
       prune()
-      if (!frozen)
+      // Removing a focused card need not emit blur; consult the actual DOM.
+      if (!frozen && !panelRef.current?.contains(document.activeElement))
         setVisible((previous) => {
           const retained = previous.filter(
-            (item) => Date.now() - item.lastSeenAt < retentionMs
+            (item) =>
+              Date.now() -
+                (freshness.current.get(suggestionKey(item)) ??
+                  item.lastSeenAt) <
+              retentionMs
           )
           return retained.length === previous.length ? previous : retained
         })
@@ -152,16 +177,12 @@ export function SuggestionsPanel() {
   }, [frozen, prune, retentionMs])
   return (
     <section
+      ref={panelRef}
       data-slot="suggestions-panel"
       aria-label="Suggestions"
       className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
-      onFocusCapture={() => setFocused(true)}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget))
-          setFocused(false)
-      }}
       onPointerDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("[data-suggestion-key]"))
           setHeld(true)

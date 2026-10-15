@@ -175,3 +175,43 @@ describe("duplicate text attribution", () => {
     })
   })
 })
+
+describe("early-reference canonical deduplication", () => {
+  it("keeps the existing canonical item's source and selection when refinement collides", () => {
+    useQueueStore
+      .getState()
+      .addItem(
+        makeItem(
+          { id: "early", is_chapter_only: true, translation_code: "KJV" },
+          { chapter: 1, verse: 1, text: "Early KJV" }
+        )
+      )
+    useQueueStore
+      .getState()
+      .addItem(
+        makeItem(
+          { id: "saved", source: "ai-semantic", translation_code: "ESV" },
+          { translation_id: 2, text: "Saved ESV" }
+        )
+      )
+    useQueueStore.getState().setActive(1)
+    useQueueStore.setState({ highlightedId: "early" })
+    expect(
+      useQueueStore
+        .getState()
+        .updateEarlyRef(43, 3, 16, "John 3:16", "Resolved KJV", {
+          translationId: 1,
+          translationCode: "KJV",
+        })
+    ).toBe(true)
+    expect(useQueueStore.getState().items).toHaveLength(1)
+    expect(useQueueStore.getState().items[0]).toMatchObject({
+      id: "saved",
+      source: "ai-semantic",
+      translation_code: "ESV",
+      verse: { translation_id: 2, text: "Saved ESV" },
+    })
+    expect(useQueueStore.getState().activeIndex).toBe(0)
+    expect(useQueueStore.getState().highlightedId).toBe("saved")
+  })
+})
