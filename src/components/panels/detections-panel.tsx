@@ -37,7 +37,12 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   }
 
   return (
-    <div className="group border-b border-border p-3 last:border-0">
+    <div
+      data-operator-item={`${detection.translation_code}|${detection.verse_ref}`}
+      tabIndex={0}
+      aria-label={detection.verse_ref}
+      className="group border-b border-border p-3 last:border-0 focus-visible:outline-2 focus-visible:outline-ring"
+    >
       <div className="flex items-center gap-2">
         <ConfidenceDot confidence={detection.confidence} />
         <span className="flex-1 truncate text-sm font-semibold text-foreground">
@@ -67,7 +72,12 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       )}
 
       <div className="mt-2 flex gap-2">
-        <Button size="sm" className="gap-1" onClick={handlePresent}>
+        <Button
+          size="sm"
+          className="gap-1"
+          data-operator-present
+          onClick={handlePresent}
+        >
           <PlayIcon className="size-3" />
           Present
         </Button>
@@ -121,6 +131,9 @@ export function DetectionsPanel() {
   return (
     <div
       data-slot="detections-panel"
+      data-operator-list="detections"
+      tabIndex={-1}
+      aria-label="Detections panel"
       className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader title="Direct detections">

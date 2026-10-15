@@ -1,3 +1,4 @@
+import { setRemoteServerRunning } from "@/lib/operator-palette"
 import { operatorActions } from "@/lib/operator-actions"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -710,33 +711,30 @@ function RemoteControlSection() {
 
   const handleOscToggle = async () => {
     try {
-      if (oscStatus.running) {
-        await invoke("stop_osc")
-        setOscError(null)
-      } else {
-        const port = parseInt(oscPort) || 8000
-        const boundPort = await invoke<number>("start_osc", { port })
-        setOscPort(String(boundPort))
-        setOscError(null)
-      }
-    } catch (e) {
-      setOscError(String(e))
+      const status = await setRemoteServerRunning(
+        "osc",
+        !oscStatus.running,
+        Number(oscPort)
+      )
+      setOscStatus(status)
+      if (status.port !== null) setOscPort(String(status.port))
+      setOscError(null)
+    } catch (error) {
+      setOscError(String(error))
     }
   }
-
   const handleHttpToggle = async () => {
     try {
-      if (httpStatus.running) {
-        await invoke("stop_http")
-        setHttpError(null)
-      } else {
-        const port = parseInt(httpPort) || 8080
-        const boundPort = await invoke<number>("start_http", { port })
-        setHttpPort(String(boundPort))
-        setHttpError(null)
-      }
-    } catch (e) {
-      setHttpError(String(e))
+      const status = await setRemoteServerRunning(
+        "http",
+        !httpStatus.running,
+        Number(httpPort)
+      )
+      setHttpStatus(status)
+      if (status.port !== null) setHttpPort(String(status.port))
+      setHttpError(null)
+    } catch (error) {
+      setHttpError(String(error))
     }
   }
 

@@ -2,10 +2,9 @@ import { PanelHeader } from "@/components/ui/panel-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { PlayIcon, XIcon, GripVerticalIcon } from "lucide-react"
+import { PlayIcon, XIcon } from "lucide-react"
 import { useQueueStore } from "@/stores"
-import { presentVerse } from "@/hooks/use-broadcast"
-import { bibleActions } from "@/hooks/use-bible"
+import { operatorActions } from "@/lib/operator-actions"
 import type { QueueItem } from "@/types"
 
 function QueueItemRow({
@@ -20,14 +19,7 @@ function QueueItemRow({
   isHighlighted: boolean
 }) {
   const handlePresent = () => {
-    useQueueStore.getState().setActive(index)
-    // Navigate the Bible panel to the presented verse, as detections do
-    bibleActions.navigateToVerse(
-      item.verse.book_number,
-      item.verse.chapter,
-      item.verse.verse
-    )
-    void presentVerse(item.verse)
+    void operatorActions.presentQueueItem(index)
   }
 
   const handleRemove = (e: React.MouseEvent) => {
@@ -52,9 +44,12 @@ function QueueItemRow({
   return (
     <div
       data-queue-idx={index}
+      data-operator-item={item.id}
+      tabIndex={0}
+      aria-label={item.reference}
       onClick={handlePresent}
       className={cn(
-        "group flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 transition-colors",
+        "group flex cursor-pointer flex-col gap-1 rounded-md px-2.5 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-ring",
         isHighlighted
           ? "animate-pulse border border-amber-500/40 bg-amber-500/15"
           : isActive
@@ -62,33 +57,44 @@ function QueueItemRow({
             : "hover:bg-muted/50"
       )}
     >
-      <GripVerticalIcon className="size-3 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100" />
-
-      <span className="flex-1 truncate text-sm font-medium text-foreground">
+      <span
+        title={item.reference}
+        className="w-full truncate text-sm font-medium text-foreground"
+      >
         {item.reference}
       </span>
 
-      {item.translation_code && (
-        <span className="text-xs text-muted-foreground">
-          {item.translation_code}
-        </span>
-      )}
-      {sourceBadge}
+      <div className="flex w-full items-center gap-2">
+        {item.translation_code && (
+          <span className="text-xs text-muted-foreground">
+            {item.translation_code}
+          </span>
+        )}
+        {sourceBadge}
 
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={(e) => {
-            e.stopPropagation()
-            handlePresent()
-          }}
-        >
-          <PlayIcon className="size-2.5" />
-        </Button>
-        <Button variant="ghost" size="icon-xs" onClick={handleRemove}>
-          <XIcon className="size-2.5" />
-        </Button>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Present ${item.reference}`}
+            data-operator-present
+            onClick={(e) => {
+              e.stopPropagation()
+              handlePresent()
+            }}
+          >
+            <PlayIcon className="size-2.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            data-operator-remove
+            aria-label={`Remove ${item.reference} from Queue`}
+            onClick={handleRemove}
+          >
+            <XIcon className="size-2.5" />
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -102,6 +108,9 @@ export function QueuePanel() {
   return (
     <div
       data-slot="queue-panel"
+      data-operator-list="queue"
+      tabIndex={-1}
+      aria-label="Queue panel"
       className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader title="Queue">

@@ -67,6 +67,22 @@ export function toVerseRenderData(
   }
 }
 
+export function matchesResolvedVerse(
+  row: Verse | null,
+  reference: Pick<Verse, "book_number" | "chapter" | "verse">,
+  translationId: number
+): row is Verse {
+  return Boolean(
+    row &&
+    row.translation_id === translationId &&
+    row.book_number === reference.book_number &&
+    row.chapter === reference.chapter &&
+    row.verse === reference.verse &&
+    typeof row.text === "string" &&
+    row.text.trim()
+  )
+}
+
 /** Only text verified against the current translation/reference can commit. */
 export async function presentVerse(
   verse: Verse,
@@ -121,15 +137,7 @@ export async function presentVerse(
       `presentVerse get_verse done ${reference.book_name} ${reference.chapter}:${reference.verse}`
     )
     if (!current()) return
-    if (
-      !full ||
-      full.translation_id !== selected.id ||
-      full.book_number !== reference.book_number ||
-      full.chapter !== reference.chapter ||
-      full.verse !== reference.verse ||
-      typeof full.text !== "string" ||
-      !full.text.trim()
-    ) {
+    if (!matchesResolvedVerse(full, reference, selected.id)) {
       toast.error("Verse unavailable in the selected translation", {
         id: "presentation-lookup",
         description: "The previous live content has been retained.",

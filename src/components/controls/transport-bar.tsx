@@ -1,8 +1,17 @@
+import { useOperatorUiStore } from "@/lib/operator-ui"
+import { shortcutHint } from "@/lib/shortcut-registry"
 import { useState } from "react"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { LiveIndicator } from "@/components/ui/live-indicator"
 import { Badge } from "@/components/ui/badge"
-import { MicIcon, PaletteIcon, CastIcon, SunIcon, MoonIcon } from "lucide-react"
+import {
+  KeyboardIcon,
+  MicIcon,
+  PaletteIcon,
+  CastIcon,
+  SunIcon,
+  MoonIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { ThemeDesigner } from "@/components/broadcast/theme-designer"
@@ -19,7 +28,7 @@ export function TransportBar() {
   return (
     <div
       data-slot="transport-bar"
-      className="col-span-4 flex h-14 items-center justify-between border-b border-border  bg-card px-3"
+      className="col-span-4 flex h-14 items-center justify-between border-b border-border bg-card px-3"
     >
       {/* Left: Logo + Plan Badge */}
       <div className="flex items-center gap-2.5">
@@ -59,7 +68,10 @@ export function TransportBar() {
         >
           <CastIcon className="size-3.5" />
         </Button>
-        <BroadcastOutputsDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
+        <BroadcastOutputsDialog
+          open={broadcastOpen}
+          onOpenChange={setBroadcastOpen}
+        />
         <Button
           variant="ghost"
           size="icon-sm"
@@ -70,6 +82,15 @@ export function TransportBar() {
           <PaletteIcon className="size-3.5" />
         </Button>
         <ThemeDesigner />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Keyboard shortcuts"
+          title={`Keyboard shortcuts (${shortcutHint("show-shortcuts")})`}
+          onClick={() => useOperatorUiStore.setState({ shortcutsOpen: true })}
+        >
+          <KeyboardIcon className="size-3.5" />
+        </Button>
         <SettingsDialog />
       </div>
     </div>

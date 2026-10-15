@@ -1,3 +1,5 @@
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
+import { OperatorShortcutOverlays } from "@/components/controls/operator-shortcut-overlays"
 import { useDetectionSession } from "@/hooks/use-detection-session"
 import { usePresentationController } from "@/hooks/use-presentation-controller"
 import { Dashboard } from "@/components/layout/dashboard"
@@ -9,6 +11,7 @@ import { TranslationSelectionDialog } from "@/components/translation-selection-d
 import { Toaster } from "sonner"
 
 export function App() {
+  useKeyboardShortcuts()
   useDetectionSession()
   usePresentationController()
   useBibleNavigation()
@@ -17,6 +20,7 @@ export function App() {
   return (
     <>
       <Dashboard />
+      <OperatorShortcutOverlays />
       <TranslationSelectionDialog />
       <TutorialOverlay />
       <Toaster position="bottom-right" />

@@ -53,7 +53,10 @@ function SuggestionCard({
   return (
     <article
       data-suggestion-key={suggestionKey(candidate)}
-      className="border-b border-border p-3 last:border-0"
+      data-operator-item={suggestionKey(candidate)}
+      tabIndex={0}
+      aria-label={`${candidate.translation_code} ${candidate.verse_ref}`}
+      className="border-b border-border p-3 last:border-0 focus-visible:outline-2 focus-visible:outline-ring"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-semibold">{candidate.verse_ref}</h3>
@@ -71,6 +74,7 @@ function SuggestionCard({
         <Button
           size="sm"
           disabled={!known || busy}
+          data-operator-present
           onClick={() => void actOnCandidate("present")}
         >
           Present
@@ -217,6 +221,7 @@ export function SuggestionsPanel() {
         </button>
       </div>
       <div
+        data-operator-list="suggestions"
         aria-label="Suggestion results"
         tabIndex={0}
         className="min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:outline-ring"

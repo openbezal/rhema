@@ -10,13 +10,19 @@ export function PreviewPanel() {
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
-  const translation = translations.find((t) => t.id === selectedVerse?.translation_id)?.abbreviation ?? "Unknown translation"
+  const translation =
+    translations.find((t) => t.id === selectedVerse?.translation_id)
+      ?.abbreviation ?? "Unknown translation"
 
-  const verseData = selectedVerse ? toVerseRenderData(selectedVerse, translation) : null
+  const verseData = selectedVerse
+    ? toVerseRenderData(selectedVerse, translation)
+    : null
 
   return (
     <div
       data-slot="preview-panel"
+      tabIndex={-1}
+      aria-label="Preview panel"
       className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader title="Program preview" />

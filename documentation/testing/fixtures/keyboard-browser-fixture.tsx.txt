@@ -1,0 +1,51 @@
+import {mockIPC,mockWindows} from '@tauri-apps/api/mocks'
+import {createRoot} from 'react-dom/client'
+import {useSyncExternalStore} from 'react'
+import './src/index.css'
+const catalogue=[{id:1,abbreviation:'KJV',title:'King James Version',language:'en',is_downloaded:true,is_copyrighted:false},{id:2,abbreviation:'ESV',title:'English Standard Version',language:'en',is_downloaded:true,is_copyrighted:true}]
+const book=(id:number)=>({id:43+id,translation_id:id,book_number:43,name:'John',abbreviation:'Jn',testament:'NT'})
+const row=(id:number,chapter:number,verse:number)=>({id:id*1000+chapter*100+verse,translation_id:id,book_number:43,book_name:'John',book_abbreviation:'Jn',chapter,verse,text:`Fixture ${id===1?'KJV':'ESV'} text for John ${chapter}:${verse}. Keyboard workflow only.`})
+const records=new Map<number,string>();const stores=new Map<string,Record<string,unknown>>([['settings.json',{onboardingComplete:true,sttProvider:'whisper'}]])
+let rid=0;const calls:string[]=[];const native={transcribing:false,readingStops:0,osc:{running:false,port:null as number|null},http:{running:false,port:null as number|null}}
+const subscribers=new Set<()=>void>();let nativeSnapshot=JSON.stringify(native)
+function changed(){nativeSnapshot=JSON.stringify({...native,calls:calls.slice(-8)});subscribers.forEach(fn=>fn())}
+mockWindows('main')
+mockIPC(async(command,args:any)=>{
+ if(!command.includes('log')&&command!=='update_remote_status'&&command!=='ui_mark'){calls.push(command);if(calls.length>50)calls.shift()}
+ if(command==='list_translations')return catalogue
+ if(command==='list_books')return [book(args.translationId)]
+ if(command==='get_chapter')return args.bookNumber===43&&[3,4].includes(args.chapter)?[1,2,16,17,18].map(v=>row(args.translationId,args.chapter,v)):[]
+ if(command==='get_verse')return args.bookNumber===43&&[3,4].includes(args.chapter)&&[1,2,16,17,18].includes(args.verse)?row(args.translationId,args.chapter,args.verse):null
+ if(command==='set_active_translation')return
+ if(command==='get_osc_status')return native.osc
+ if(command==='get_http_status')return native.http
+ if(command==='start_osc'||command==='start_http'){const kind=command==='start_osc'?'osc':'http';native[kind]={running:true,port:args.port};changed();return args.port}
+ if(command==='stop_osc'||command==='stop_http'){const kind=command==='stop_osc'?'osc':'http';native[kind]={running:false,port:null};changed();return}
+ if(command==='start_transcription'){native.transcribing=true;changed();return}
+ if(command==='stop_transcription'){native.transcribing=false;changed();return}
+ if(command==='stop_reading_mode'){native.readingStops++;changed();return}
+ if(command==='get_audio_devices')return [{id:'fixture',name:'Mock microphone — no capture',is_default:true}]
+ if(command==='get_ndi_status')return null
+ if(command==='plugin:window|get_all_windows')return ['main','broadcast-main']
+ if(command==='plugin:window|is_visible')return args.label==='broadcast-main'
+ if(command==='plugin:store|load'){const id=++rid;records.set(id,args.path);if(!stores.has(args.path))stores.set(args.path,{});return id}
+ if(command==='plugin:store|get'){const data=stores.get(records.get(args.rid)!)!;return [data[args.key],args.key in data]}
+ if(command==='plugin:store|set'){stores.get(records.get(args.rid)!)![args.key]=args.value;return}
+ if(command==='plugin:store|save')return
+ if(command==='get_embedding_status')return {available:false,model_loaded:false,embeddings_loaded:false}
+ if(command==='list_system_fonts')return ['Georgia','Arial']
+ if(command==='get_recent_detections'||command==='search_context'||command==='search_verses'||command==='semantic_search'||command==='get_cross_references')return []
+ return undefined
+},{shouldMockEvents:true})
+async function boot(){
+ const [{App},{ThemeProvider},{TooltipProvider},{useBibleStore},{useQueueStore},{useSettingsStore},{useBroadcastStore},{useTranscriptStore},{useDetectionStore}]=await Promise.all([import('./src/App'),import('./src/components/theme-provider'),import('./src/components/ui/tooltip'),import('./src/stores/bible-store'),import('./src/stores/queue-store'),import('./src/stores/settings-store'),import('./src/stores/broadcast-store'),import('./src/stores/transcript-store'),import('./src/stores/detection-store')])
+ useSettingsStore.setState({onboardingComplete:true,sttProvider:'whisper'})
+ useBibleStore.setState({translations:catalogue,activeTranslationId:1,activeTranslationCode:'KJV',translationSelectionStatus:'ready',books:[book(1)],currentChapter:[16,17,18].map(v=>row(1,3,v)),selectedVerse:row(1,3,16),followDetections:false})
+ useQueueStore.setState({items:[16,17,18].map(v=>({id:`qa-q-${v}`,verse:row(1,3,v),reference:`John 3:${v}`,translation_code:'KJV',confidence:1,source:'manual' as const,added_at:Date.now()})),activeIndex:null})
+ useBroadcastStore.setState({autoLive:false,isLive:false})
+ useDetectionStore.setState({detections:[16,17].map(v=>({book_number:43,book_name:'John',chapter:3,verse:v,verse_ref:`John 3:${v}`,verse_text:row(1,3,v).text,translation_id:1,translation_code:'KJV',confidence:.95,source:'direct' as const,timestamp:Date.now()}))})
+ function Debug(){const bible=useBibleStore(),queue=useQueueStore(),live=useBroadcastStore(),transcript=useTranscriptStore();const runtime=useSyncExternalStore(fn=>{subscribers.add(fn);return()=>subscribers.delete(fn)},()=>nativeSnapshot)
+ return <><div style={{position:'fixed',top:10,left:125,zIndex:100,pointerEvents:'none',fontSize:10,color:'#fbbf24'}}>QA: mocked IPC / DB / windows / audio / servers · actual production Dashboard</div><pre data-testid="keyboard-fixture-state" style={{position:'fixed',bottom:0,left:0,zIndex:100,fontSize:9,maxWidth:'100%',maxHeight:36,overflow:'auto',background:'#101010',color:'#fff',padding:3}}>{JSON.stringify({onAir:live.isLive,live:live.liveVerse?.reference,preview:bible.selectedVerse?.verse,primary:bible.activeTranslationCode,queue:queue.items.map(i=>i.id),active:queue.activeIndex,transcribing:transcript.isTranscribing,runtime:JSON.parse(runtime)})}</pre></>}
+ createRoot(document.getElementById('root')!).render(<ThemeProvider defaultTheme="dark"><TooltipProvider><App/><Debug/></TooltipProvider></ThemeProvider>)
+}
+void boot().catch(error=>{document.body.innerHTML=`<pre>Fixture error: ${String(error)}</pre>`})

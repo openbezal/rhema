@@ -1,3 +1,4 @@
+import { shortcutHint } from "@/lib/shortcut-registry"
 import { EraserIcon } from "lucide-react"
 import {
   DropdownMenu,
@@ -29,6 +30,8 @@ export function LiveOutputPanel() {
   return (
     <div
       data-slot="live-output-panel"
+      tabIndex={-1}
+      aria-label="Live Output panel"
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card",
         isLive && "shadow-[inset_0_2px_0_0_rgba(16,185,129,0.3)]"
@@ -61,18 +64,27 @@ export function LiveOutputPanel() {
             <EraserIcon className="size-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => operatorActions.clearLive("transparent")}>
+            <DropdownMenuItem
+              onSelect={() => operatorActions.clearLive("transparent")}
+            >
               Transparent
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => operatorActions.clearLive("black")}>
+            <DropdownMenuItem
+              onSelect={() => operatorActions.clearLive("black")}
+            >
               Black
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => operatorActions.clearLive("background")}>
+            <DropdownMenuItem
+              onSelect={() => operatorActions.clearLive("background")}
+            >
               Background only
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <label className="ml-2 flex items-center gap-2">
+        <label
+          className="ml-2 flex items-center gap-2"
+          title={`Toggle live output (${shortcutHint("toggle-live")})`}
+        >
           <span
             className={cn(
               "text-[0.625rem] font-medium tracking-wider uppercase transition-colors",

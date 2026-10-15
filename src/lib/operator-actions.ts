@@ -10,18 +10,23 @@ import { useQueueStore } from "@/stores/queue-store"
  * Returns null when the live verse came from somewhere other than the queue.
  */
 function findLiveQueueIndex(): number | null {
-  const { liveVerse } = useBroadcastStore.getState()
-  if (!liveVerse) return null
-
+  const { liveSourceVerse } = useBroadcastStore.getState()
+  if (!liveSourceVerse) return null
   const index = useQueueStore
     .getState()
-    .items.findIndex((item) => item.reference === liveVerse.reference)
+    .items.findIndex(
+      (item) =>
+        item.verse.book_number === liveSourceVerse.book_number &&
+        item.verse.chapter === liveSourceVerse.chapter &&
+        item.verse.verse === liveSourceVerse.verse
+    )
   return index >= 0 ? index : null
 }
 
 async function presentQueueItem(index: number): Promise<void> {
   const item = useQueueStore.getState().items[index]
   if (!item) return
+  useQueueStore.getState().setActive(index)
   // Navigate the Bible panel to the presented verse, as detections do
   useBibleStore.getState().setPendingNavigation({
     bookNumber: item.verse.book_number,
@@ -57,6 +62,7 @@ function stepQueue(offset: number): void {
  * callbacks, outside React's render cycle.
  */
 export const operatorActions = {
+  presentQueueItem,
   /** Present the verse showing in Program preview on the live output. */
   sendToLive: () => {
     const { selectedVerse } = useBibleStore.getState()

@@ -1,3 +1,4 @@
+import { shortcutHint } from "@/lib/shortcut-registry"
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { LevelMeter } from "@/components/ui/level-meter"
@@ -20,7 +21,11 @@ function AudioLevelMeter() {
 /**
  * Leaf component that subscribes to `currentPartial`. Partials update per audio tick.
  */
-function LivePartialLine({ scrollRef }: { scrollRef: RefObject<HTMLDivElement | null> }) {
+function LivePartialLine({
+  scrollRef,
+}: {
+  scrollRef: RefObject<HTMLDivElement | null>
+}) {
   const currentPartial = useTranscriptStore((s) => s.currentPartial)
 
   useEffect(() => {
@@ -63,6 +68,8 @@ export function TranscriptPanel() {
   return (
     <div
       data-slot="transcript-panel"
+      tabIndex={-1}
+      aria-label="Transcript panel"
       className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader
@@ -132,14 +139,21 @@ export function TranscriptPanel() {
             variant="ghost"
             size="sm"
             className="text-destructive hover:text-destructive"
+            title={`Stop transcription (${shortcutHint("toggle-transcription")})`}
             onClick={stopTranscription}
           >
             <MicOffIcon className="size-3" />
             Stop transcribing
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" onClick={startTranscription}>
-              <MicIcon className="size-3" />
+          <Button
+            variant="ghost"
+            size="sm"
+            title={`Start transcription (${shortcutHint("toggle-transcription")})`}
+            disabled={connectionStatus === "connecting"}
+            onClick={startTranscription}
+          >
+            <MicIcon className="size-3" />
             Start transcribing
           </Button>
         )}

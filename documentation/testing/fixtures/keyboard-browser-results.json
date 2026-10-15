@@ -1,0 +1,102 @@
+{
+  "scope": "Production Dashboard/UI/fonts/Canvas/Fabric with mocked Tauri IPC, database, audio, remote servers and output windows. Browser workflow evidence only.",
+  "viewports": [
+    [
+      1280,
+      720
+    ],
+    [
+      1024,
+      600
+    ]
+  ],
+  "checks": [
+    [
+      "G Q, J, Enter",
+      "Focused Queue item presented, output remained off-air."
+    ],
+    [
+      "J, Mod+Enter",
+      "John3:17 presented, active selection cleared, all three Queue rows retained."
+    ],
+    [
+      "Delete",
+      "Removed focused row and focused its neighbor; last live verse retained."
+    ],
+    [
+      "Space",
+      "Shared output-safety action enabled on-air state using a mocked visible output."
+    ],
+    [
+      "S then S while provider connecting",
+      "Reproduced stop guard bug, added failing regression, fixed, rebuilt and verified start/stop. No microphone used."
+    ],
+    [
+      "Space on focused native button",
+      "Activated button rather than global on-air action."
+    ],
+    [
+      "Mod+K, type S",
+      "Palette typed normally; did not start transcription."
+    ],
+    [
+      "Palette translation command",
+      "ESV selected via verified stable metadata; no implicit live state."
+    ],
+    [
+      "Palette John4:2",
+      "Verified row lookup then browsed without presenting."
+    ],
+    [
+      "[ { } ]",
+      "Actual verse/chapter commands landed at4:1,3:1,4:1,4:2; missing chapter5 retained4:1."
+    ],
+    [
+      "G S",
+      "Focused the actual Bible list."
+    ],
+    [
+      "Context search then slash",
+      "Returned to Book search and focused quick input."
+    ],
+    [
+      "Type s? in quick input",
+      "No global transcription/help command."
+    ],
+    [
+      "Escape sequence",
+      "Reproduced always-consumed empty-input Escape; regression/fix verified clear, then blur, then one reading-stop command."
+    ],
+    [
+      "Help at1024x600",
+      "Scroll reached every shortcut and list explanation; Escape closed help without another reading stop."
+    ],
+    [
+      "Palette HTTP/OSC start-stop",
+      "Mock status became running then stopped; Settings polled and displayed matching HTTP port8080. No socket servers started."
+    ],
+    [
+      "Palette theme command",
+      "Modern Light rendered in actual preview while off-air."
+    ],
+    [
+      "G D,J,Enter at1024x600",
+      "Reproduced outer workspace scrolling away from focused card. Scoped Bible reveal fix verified focused card fully visible at top357/bottom473 in600px viewport."
+    ],
+    [
+      "Final Queue minimum view",
+      "References and translation/source metadata readable on separate lines; focused actions visible."
+    ],
+    [
+      "Cleanup",
+      "Fixture off-air, mocked audio/servers stopped; tab closed, viewport reset, preview server stopped; normal Vite input restored and root fixture removed."
+    ]
+  ],
+  "limits": [
+    "Physical microphone/provider and OS-global registration not exercised.",
+    "Windows/Linux native typing, IME and focus acceptance remain open.",
+    "No physical receiver or integrated native output claim.",
+    "Context-results list navigation additionally covered by mounted component tests.",
+    "Actual Tauri/native lifecycle integration remains Task11."
+  ]
+}

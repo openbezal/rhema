@@ -62,18 +62,45 @@ export const useQueueStore = create<QueueState>((set, get) => ({
         }
         return state
       }
-      return { items: [item, ...state.items] }
+      return {
+        items: [item, ...state.items],
+        activeIndex: state.activeIndex === null ? null : state.activeIndex + 1,
+      }
     }),
   removeItem: (id) =>
-    set((state) => ({
-      items: state.items.filter((i) => i.id !== id),
-    })),
+    set((state) => {
+      const selectedId =
+        state.activeIndex === null ? null : state.items[state.activeIndex]?.id
+      const items = state.items.filter((item) => item.id !== id)
+      const index = selectedId
+        ? items.findIndex((item) => item.id === selectedId)
+        : -1
+      return {
+        items,
+        activeIndex: index < 0 ? null : index,
+        highlightedId: state.highlightedId === id ? null : state.highlightedId,
+      }
+    }),
   reorderItems: (fromIndex, toIndex) =>
     set((state) => {
+      if (
+        !Number.isInteger(fromIndex) ||
+        !Number.isInteger(toIndex) ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= state.items.length ||
+        toIndex >= state.items.length
+      )
+        return state
+      const selectedId =
+        state.activeIndex === null ? null : state.items[state.activeIndex]?.id
       const items = [...state.items]
       const [moved] = items.splice(fromIndex, 1)
       items.splice(toIndex, 0, moved)
-      return { items }
+      const index = selectedId
+        ? items.findIndex((item) => item.id === selectedId)
+        : -1
+      return { items, activeIndex: index < 0 ? null : index }
     }),
   setActive: (activeIndex) => set({ activeIndex }),
   clearQueue: () => set({ items: [], activeIndex: null }),
