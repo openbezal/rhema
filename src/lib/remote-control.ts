@@ -8,6 +8,16 @@ import { remoteActions } from "@/lib/remote-actions"
 export function connectRemoteControl(): () => void {
   let cancelled = false
   const unlisteners: UnlistenFn[] = []
+  // A controller sends discrete steps. Finish boundary discovery before the
+  // next step reads its cursor, otherwise overlapping probes collapse inputs.
+  let navigation = Promise.resolve()
+  const step = (action: () => Promise<void>) => {
+    navigation = navigation.then(async () => {
+      if (!cancelled) await action()
+    }).catch((error: unknown) => {
+      if (!cancelled) console.warn("[remote-control] navigation failed:", error)
+    })
+  }
   const register = (event: RemoteEventName, handler: (payload: unknown) => void) => {
     void listen<unknown>(event, ({ payload }) => {
       if (!cancelled) handler(payload)
@@ -23,8 +33,8 @@ export function connectRemoteControl(): () => void {
   register(REMOTE_EVENTS.prev, remoteActions.queuePrev)
   register(REMOTE_EVENTS.send_to_live, remoteActions.sendToLive)
   register(REMOTE_EVENTS.add_to_queue, remoteActions.addToQueue)
-  register(REMOTE_EVENTS.bible_next, remoteActions.bibleNext)
-  register(REMOTE_EVENTS.bible_prev, remoteActions.biblePrev)
+  register(REMOTE_EVENTS.bible_next, () => step(remoteActions.bibleNext))
+  register(REMOTE_EVENTS.bible_prev, () => step(remoteActions.biblePrev))
   register(REMOTE_EVENTS.show, () => remoteActions.toggleOnAir(true))
   register(REMOTE_EVENTS.hide, () => remoteActions.toggleOnAir(false))
   register(REMOTE_EVENTS.auto_broadcast, remoteActions.toggleAutoLive)

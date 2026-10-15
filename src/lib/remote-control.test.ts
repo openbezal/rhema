@@ -9,6 +9,7 @@ const { mockListen, mockInvoke, handlers } = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/event", () => ({ listen: mockListen, emitTo: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mockInvoke }))
 
+import { connectBibleNavigation } from "./bible-navigation"
 import { connectRemoteControl } from "./remote-control"
 import { syncStatusSnapshot } from "@/hooks/use-remote-control"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -76,6 +77,32 @@ describe("app-owned remote control", () => {
     await vi.waitFor(() => expect(useBroadcastStore.getState().liveSourceVerse).toEqual(second))
     send("remote:bible_prev")
     await vi.waitFor(() => expect(useBroadcastStore.getState().liveSourceVerse).toEqual(first))
+  })
+
+  it.each([
+    ["remote:bible_next", "remote:bible_next", 4, 2],
+    ["remote:bible_next", "remote:bible_prev", 3, 1],
+    ["remote:bible_prev", "remote:bible_prev", 2, 1],
+  ])("preserves overlapping %s then %s triggers", async (firstEvent, secondEvent, expectedChapter, expectedVerse) => {
+    const makeVerse = (chapter: number, verse: number): Verse => ({ id: chapter * 10 + verse, translation_id: 1, book_number: 43, book_name: "John", book_abbreviation: "Jn", chapter, verse, text: `John ${chapter}:${verse}` })
+    const chapters = new Map([[2, [makeVerse(2, 1), makeVerse(2, 2)]], [3, [makeVerse(3, 1)]], [4, [makeVerse(4, 1), makeVerse(4, 2)]]])
+    useBibleStore.setState({ books: [{ id: 43, translation_id: 1, book_number: 43, name: "John", abbreviation: "Jn", testament: "NT" }], currentChapter: chapters.get(3), selectedVerse: makeVerse(3, 1), pendingNavigation: null })
+    let finish!: () => void
+    let firstProbe = true
+    mockInvoke.mockImplementation((command, args) => {
+      if (command !== "get_chapter") return Promise.resolve(null)
+      const rows = chapters.get(args.chapter) ?? []
+      if (!firstProbe) return Promise.resolve(rows)
+      firstProbe = false
+      return new Promise<Verse[]>((resolve) => { finish = () => resolve(rows) })
+    })
+    cleanups.push(connectBibleNavigation())
+    await connect()
+    send(firstEvent)
+    send(secondEvent)
+    await vi.waitFor(() => expect(finish).toBeDefined())
+    finish()
+    await vi.waitFor(() => expect(useBroadcastStore.getState().liveSourceVerse).toEqual(makeVerse(expectedChapter, expectedVerse)))
   })
 
   it("disposes a listener whose registration resolves after unmount", async () => {
