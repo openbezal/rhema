@@ -9,6 +9,17 @@ import { readFileSync, renameSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { createBibleBuildManifest } from "./lib/bible-build-manifest"
+import { BIBLE_CANON } from "./lib/bible-canon"
+
+const CANONICAL_BOOK_NUMBERS = new Map<string, number>(
+  BIBLE_CANON.map(([, name], index) => [name.toLowerCase(), index + 1]),
+)
+
+function canonicalBookNumber(name: string): number | undefined {
+  const normalized = name.trim().toLowerCase().replace(/\s+/g, " ")
+    .replace(/^(iii|ii|i) /, (_, roman: string) => `${({ i: 1, ii: 2, iii: 3 } as Record<string, number>)[roman]} `)
+  return CANONICAL_BOOK_NUMBERS.get(normalized === "revelation of john" ? "revelation" : normalized)
+}
 
 const directoryIndex = process.argv.indexOf("--data-dir")
 const DATA_DIR = directoryIndex >= 0 ? process.argv[directoryIndex + 1] : import.meta.dir
@@ -577,10 +588,9 @@ function populateDatabase(db: Database) {
 
     // Insert books and verses
     const bookNumbers = new Set<number>()
-    for (let bookIdx = 0; bookIdx < data.books.length; bookIdx++) {
-      const book = data.books[bookIdx]
-      const bookNumber = book.book_number ?? bookIdx + 1
-      if (!Number.isInteger(bookNumber) || bookNumber < 1 || bookNumber > 66 || bookNumbers.has(bookNumber)) {
+    for (const book of data.books) {
+      const bookNumber = book.book_number ?? canonicalBookNumber(book.name)
+      if (bookNumber === undefined || !Number.isInteger(bookNumber) || bookNumber < 1 || bookNumber > 66 || bookNumbers.has(bookNumber)) {
         throw new Error(`Invalid or duplicate canonical book number in ${meta.file}`)
       }
       bookNumbers.add(bookNumber)

@@ -28,6 +28,27 @@ describe("Bible database upgrades", () => {
     expect(query(directory, "SELECT book_number, chapter, verse, text FROM verses")).toEqual([{ book_number: 43, chapter: 3, verse: 16, text: "Synthetic fixture text" }])
   })
 
+  it.each([
+    ["John", 43], ["I John", 62], ["II Peter", 61], ["III John", 64], ["Revelation of John", 66],
+  ])("resolves legacy partial source %s by canonical name", async (name, bookNumber) => {
+    const directory = await fixture()
+    const legacy = { books: [{ name, chapters: source.books[0].chapters }] }
+    await writeFile(join(directory, "sources", "KJV.json"), JSON.stringify(legacy))
+    build(directory)
+    expect(query(directory, "SELECT book_number FROM verses")).toEqual([{ book_number: bookNumber }])
+  })
+
+  it("rejects an unknown book without coordinates and preserves the working database", async () => {
+    const directory = await fixture()
+    const path = join(directory, "sources", "KJV.json")
+    await writeFile(path, JSON.stringify(source))
+    build(directory)
+    const before = await readFile(join(directory, "rhema.db"))
+    await writeFile(path, JSON.stringify({ books: [{ name: "Unknown", chapters: source.books[0].chapters }] }))
+    expect(() => build(directory)).toThrow()
+    expect(await readFile(join(directory, "rhema.db"))).toEqual(before)
+  })
+
   it("preserves explicit empty omission rows in existing translation sources", async () => {
     const directory = await fixture()
     const omitted = structuredClone(source)

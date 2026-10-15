@@ -26,7 +26,9 @@ Build data while Rhema is closed, then restart it to use the new database.
 
 A rebuild writes a temporary database, validates it, closes it and replaces the
 old file only after success. Failed downloads or invalid source JSON leave the
-working database intact. Explicit canonical book numbers protect partial sources.
+working database intact. Explicit canonical book numbers protect partial sources. Legacy sources resolve
+canonical names, including Roman numeral prefixes, instead of array positions;
+unknown names without explicit coordinates are rejected.
 Existing English sources' empty omission placeholders are retained so their
 lookup semantics stay unchanged. Yoruba source rows must contain text.
 
@@ -45,9 +47,16 @@ an unchanged rerun preserved the exact DB SHA-256. The primary checkout's DB
 was not changed.
 
 Browser QA verified the actual offline notice, scrolling to the source/license
-footer while retaining the close button, and Escape dismissal. Packaged native
-resource inspection and installed-app translation-upgrade acceptance on all
-three supported operating systems are still required before release.
+footer while retaining the close button, and Escape dismissal. A macOS debug
+`.app` built with a separate QA identifier included the database and all three
+notice/source resources with matching hashes. In that isolated profile, corrupt
+preferences remained untouched until explicit confirmation, Yoruba Genesis 1:1
+rendered in preview, the offline notice opened, and OYCB survived a native restart.
+The normal application profile was not changed. Windows/Linux installed-bundle
+checks and signed release acceptance are still required before release.
 
 ![Offline data notices](reviews/artifacts/bible-data-notices.png)
 ![Source and license footer](reviews/artifacts/bible-data-notices-footer.png)
+
+![Packaged macOS Yoruba preview](reviews/artifacts/native-yoruba-preview.png)
+![Packaged macOS offline notice](reviews/artifacts/native-bible-data-notices.png)
