@@ -295,3 +295,5 @@ For each slice:
 ## Handoff
 
 This plan delivers the requested review and proposed fix/testing sequence. The recommended first implementation slice is Task 0, followed by the small #181/#180 corrections and stable translation identity. Review the proposed architecture before restructuring panels; carry approved changes forward in small branches without starting a dashboard rewrite.
+
+Our [atomic document foundation #201](https://github.com/openbezal/rhema/pull/201), head `6d69d8c`, now preserves prior exports on write/replacement failure, retains shared-file permission bits and uses bounded strict UTF-8 JSON reads through native dialogs. One review found two user-visible defects; both were reproduced and fixed in one pass. Local gates pass with 729 frontend/data tests and 445 Rust tests in each configuration; all five cross-platform CI jobs passed (run 38833196700). Actual native dialog/package acceptance is still pending. This supports #140; versioned archives/reference viewing, staged preference application and session reset continue separately.
