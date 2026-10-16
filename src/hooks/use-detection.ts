@@ -1,10 +1,23 @@
 import { invoke } from "@tauri-apps/api/core"
 import { useDetectionStore } from "@/stores"
 import type { DetectionResult } from "@/types"
+import { ensureSessionRevision } from "@/lib/session-revision"
+import {
+  isOperatorWorkCurrent,
+  operatorRevision,
+} from "@/lib/operator-maintenance"
 
 // Stable action functions (same pattern as use-bible.ts)
 async function detectVerses(text: string) {
-  const results = await invoke<DetectionResult[]>("detect_verses", { text })
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
+  const expectedSessionRevision = await ensureSessionRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
+  const results = await invoke<DetectionResult[]>("detect_verses", {
+    text,
+    expectedSessionRevision,
+  })
+  if (!isOperatorWorkCurrent(epoch)) return []
   if (results.length > 0) {
     useDetectionStore.getState().addDetections(results)
   }

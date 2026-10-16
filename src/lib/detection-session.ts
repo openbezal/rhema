@@ -6,6 +6,7 @@ import { presentVerse } from "./presentation-controller"
 import { useSettingsStore } from "@/stores/settings-store"
 import { translationCode } from "./translation-selection"
 import { connectOutsideMaintenance } from "./operator-maintenance"
+import { ensureSessionRevision, readSessionPayload } from "./session-revision"
 import {
   useAudioStore,
   useTranscriptStore,
@@ -160,6 +161,12 @@ function connectActiveDetectionSession(): () => void {
   if (leases++ === 0) {
     useDetectionStore.getState().pruneSuggestions()
     let cancelled = false
+    void ensureSessionRevision().catch((error: unknown) => {
+      if (!cancelled)
+        toast.error("Session unavailable", {
+          description: `Restart Rhema before transcribing. ${String(error)}`,
+        })
+    })
     const unlisteners: UnlistenFn[] = [
       useSettingsStore.subscribe((settings, previous) => {
         if (
@@ -170,8 +177,9 @@ function connectActiveDetectionSession(): () => void {
       }),
     ]
     const on = <T>(event: string, handler: (payload: T) => void) => {
-      void listen<T>(event, ({ payload }) => {
-        if (!cancelled) handler(payload)
+      void listen<unknown>(`session:${event}`, ({ payload }) => {
+        const packet = readSessionPayload<T>(payload)
+        if (!cancelled && packet) handler(packet.payload)
       })
         .then((stop) => {
           if (cancelled) stop()

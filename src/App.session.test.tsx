@@ -98,20 +98,26 @@ const detected: DetectionResult = {
 let root: Root
 let host: HTMLDivElement
 const send = (event: string, payload: unknown) => {
-  for (const handler of mocks.listeners.get(event) ?? []) handler({ payload })
+  const session = !event.includes(":")
+  for (const handler of mocks.listeners.get(
+    session ? `session:${event}` : event
+  ) ?? [])
+    handler({ payload: session ? { revision: 0, payload } : payload })
 }
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
   Element.prototype.scrollIntoView = vi.fn()
   mocks.listeners.clear()
   mocks.invoke.mockImplementation(async (command, args) =>
-    command === "get_verse"
-      ? args.bookNumber === 43
-        ? john
-        : { ...genesis, verse: args.verse }
-      : command === "get_chapter"
-        ? [john]
-        : null
+    command === "read_operator_session_revision"
+      ? 0
+      : command === "get_verse"
+        ? args.bookNumber === 43
+          ? john
+          : { ...genesis, verse: args.verse }
+        : command === "get_chapter"
+          ? [john]
+          : null
   )
   useBibleStore.setState({
     ...useBibleStore.getInitialState(),
@@ -187,7 +193,7 @@ describe("app-root session integration", () => {
   it("ingests exactly once after actual Transcript and Search panels unmount under StrictMode", async () => {
     await mount()
     expect(host.querySelector('[data-slot="transcript-panel"]')).not.toBeNull()
-    expect(mocks.listeners.get("transcript_final")?.size).toBe(1)
+    expect(mocks.listeners.get("session:transcript_final")?.size).toBe(1)
     await hide()
     await act(async () => {
       send("transcript_final", { text: "Panels are hidden", confidence: 1 })
@@ -200,7 +206,7 @@ describe("app-root session integration", () => {
     expect(useBibleStore.getState().selectedVerse).toEqual(genesis)
     expect(useBibleStore.getState().revealRequest).toBe(0)
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
-    expect(mocks.listeners.get("verse_detections")?.size).toBe(1)
+    expect(mocks.listeners.get("session:verse_detections")?.size).toBe(1)
   })
   it("completes remote Bible actions and output-ready sync with both panels hidden", async () => {
     await mount()
@@ -260,19 +266,17 @@ describe("app-root session integration", () => {
     async (chapterState) => {
       vi.spyOn(console, "error").mockImplementation(() => {})
       await mount()
-      useBibleStore
-        .getState()
-        .setTranslations([
-          ...useBibleStore.getState().translations,
-          {
-            id: 2,
-            abbreviation: "ESV",
-            title: "ESV",
-            language: "en",
-            is_downloaded: true,
-            is_copyrighted: true,
-          },
-        ])
+      useBibleStore.getState().setTranslations([
+        ...useBibleStore.getState().translations,
+        {
+          id: 2,
+          abbreviation: "ESV",
+          title: "ESV",
+          language: "en",
+          is_downloaded: true,
+          is_copyrighted: true,
+        },
+      ])
       let reads = 0
       mocks.invoke.mockImplementation((command, args) => {
         if (command === "get_verse") {
@@ -283,12 +287,10 @@ describe("app-root session integration", () => {
         }
         if (command === "list_books")
           return Promise.resolve(
-            useBibleStore
-              .getState()
-              .books.map((book) => ({
-                ...book,
-                translation_id: args.translationId,
-              }))
+            useBibleStore.getState().books.map((book) => ({
+              ...book,
+              translation_id: args.translationId,
+            }))
           )
         if (command === "get_chapter")
           return chapterState === "rejected"

@@ -1,6 +1,7 @@
 import { useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
+import { ensureSessionRevision } from "@/lib/session-revision"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import {
@@ -37,6 +38,8 @@ export const transcriptionActions = {
     transcript.setConnectionStatus("connecting")
     const job = (async () => {
       try {
+        await ensureSessionRevision()
+        if (!current()) return
         const startRevision = await invoke<number>(
           "read_transcription_start_revision"
         )

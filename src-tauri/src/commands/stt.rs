@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 
 use rhema_detection::fusion::{FTS5_CONFIDENCE_DECAY, FTS5_MIN_CONFIDENCE, FTS5_RANK0_CONFIDENCE};
 
-use tauri::{AppHandle, Emitter, Manager, State};
+use crate::session_events::SessionEmitter;
+use tauri::{AppHandle, Manager, State};
 
 use crate::events::{
     AudioLevelPayload, TranscriptPayload, EVENT_AUDIO_LEVEL, EVENT_AUDIO_SOURCE_LOST,
@@ -507,7 +508,7 @@ fn process_transcript_event(
                     epoch_ms(),
                     truncate_safe(&transcript, 60)
                 );
-                let _ = app.emit(
+                let _ = app.emit_session(
                     EVENT_TRANSCRIPT_PARTIAL,
                     TranscriptPayload {
                         text: transcript.clone(),
@@ -543,7 +544,7 @@ fn process_transcript_event(
                 );
                 // Emit as permanent transcript segment IMMEDIATELY
                 // (never blocked by detection work)
-                let _ = app.emit(
+                let _ = app.emit_session(
                     EVENT_TRANSCRIPT_FINAL,
                     TranscriptPayload {
                         text: transcript.clone(),
@@ -584,19 +585,19 @@ fn process_transcript_event(
         }
         TranscriptEvent::UtteranceEnd => {}
         TranscriptEvent::SpeechStarted => {
-            let _ = app.emit("stt_speech_started", ());
+            let _ = app.emit_session("stt_speech_started", ());
         }
         TranscriptEvent::Error(msg) => {
             log::error!("[STT] Error: {msg}");
-            let _ = app.emit("stt_error", msg);
+            let _ = app.emit_session("stt_error", msg);
         }
         TranscriptEvent::Connected => {
             log::info!("[STT] Connected");
-            let _ = app.emit("stt_connected", ());
+            let _ = app.emit_session("stt_connected", ());
         }
         TranscriptEvent::Disconnected => {
             log::warn!("[STT] Disconnected");
-            let _ = app.emit("stt_disconnected", ());
+            let _ = app.emit_session("stt_disconnected", ());
         }
     }
 }
@@ -630,7 +631,7 @@ fn emit_current<S: serde::Serialize + Clone>(
     event: &str,
     payload: S,
 ) {
-    let _ = sessions.with_current(token, || app.emit(event, payload));
+    let _ = sessions.with_current(token, || app.emit_session(event, payload));
 }
 
 /// Run direct (regex/pattern) detection only. Instant, no ONNX.
@@ -727,7 +728,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> Option<rhema_detec
         results.len(),
         results.first().map_or("", |r| r.verse_ref.as_str())
     );
-    if let Err(error) = app.emit("verse_detections", &results) {
+    if let Err(error) = app.emit_session("verse_detections", &results) {
         log::warn!("[DET-DIRECT] Failed to emit accepted results: {error}");
         return None;
     }
@@ -852,7 +853,7 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
         results.len(),
         results.first().map_or("", |r| r.verse_ref.as_str())
     );
-    let _ = app.emit("verse_detections", &results);
+    let _ = app.emit_session("verse_detections", &results);
     log::info!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
 }
 
@@ -921,7 +922,7 @@ fn check_reading_mode(
     );
     drop(reading);
     if let Some(advance) = advance {
-        let _ = app.emit("reading_mode_verse", &advance);
+        let _ = app.emit_session("reading_mode_verse", &advance);
         return true;
     }
     accepted.is_some()
@@ -956,7 +957,7 @@ fn check_translation_command(app: &AppHandle, transcript: &str) {
                     log::info!("[STT] Voice command: switched to {abbrev} (id={})", t.id);
                     drop(app_state);
 
-                    let _ = app.emit(
+                    let _ = app.emit_session(
                         "translation_command",
                         TranslationSwitch {
                             abbreviation: abbrev,

@@ -28,6 +28,7 @@ import { useAudioStore } from "@/stores/audio-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { beginOperatorMaintenance } from "./operator-maintenance"
+import { acceptSessionReset } from "./session-revision"
 const verse: Verse = {
   id: 1,
   translation_id: 1,
@@ -63,8 +64,9 @@ const detection: DetectionResult = {
 }
 const cleanups: (() => void)[] = []
 const disposers: ReturnType<typeof vi.fn>[] = []
-function send(event: string, payload: unknown) {
-  for (const callback of mocks.callbacks.get(event) ?? []) callback({ payload })
+function send(event: string, payload: unknown, revision = 0) {
+  for (const callback of mocks.callbacks.get(`session:${event}`) ?? [])
+    callback({ payload: { revision, payload } })
 }
 async function connect() {
   const stop = connectDetectionSession()
@@ -86,7 +88,13 @@ beforeEach(() => {
     return Promise.resolve(dispose)
   })
   mocks.invoke.mockImplementation(async (command) =>
-    command === "get_verse" ? verse : command === "get_chapter" ? [verse] : null
+    command === "read_operator_session_revision"
+      ? 0
+      : command === "get_verse"
+        ? verse
+        : command === "get_chapter"
+          ? [verse]
+          : null
   )
   useBibleStore.setState({
     ...useBibleStore.getInitialState(),
@@ -297,7 +305,7 @@ describe("app-owned detection session", () => {
       })
     })
     const stop = await connect()
-    const old = mocks.callbacks.get("audio_level")?.[0]
+    const old = mocks.callbacks.get("session:audio_level")?.[0]
     stop()
     await connect()
     const late = vi.fn()
@@ -364,19 +372,55 @@ describe("app-owned detection session", () => {
 it("pauses shared ingestion and keeps queued old callbacks canceled after maintenance", async () => {
   await connect()
   await connect()
-  const old = mocks.callbacks.get("transcript_final")![0]
-  const oldDetections = mocks.callbacks.get("verse_detections")![0]
+  const old = mocks.callbacks.get("session:transcript_final")![0]
+  const oldDetections = mocks.callbacks.get("session:verse_detections")![0]
   const lease = beginOperatorMaintenance()
   try {
-    old({payload:{text:"obsolete",confidence:1}})
-    oldDetections({payload:[{...detection,auto_queued:true}]})
+    old({ payload: { text: "obsolete", confidence: 1 } })
+    oldDetections({ payload: [{ ...detection, auto_queued: true }] })
     expect(useTranscriptStore.getState().segments).toHaveLength(0)
     expect(useQueueStore.getState().items).toHaveLength(0)
     lease.release()
     await Promise.resolve()
-    old({payload:{text:"still obsolete",confidence:1}})
-    send("transcript_final",{text:"new generation",confidence:1})
-    expect(useTranscriptStore.getState().segments.map(segment=>segment.text)).toEqual(["new generation"])
-    expect(mocks.callbacks.get("transcript_final")).toHaveLength(2)
-  } finally {lease.release()}
+    old({ payload: { text: "still obsolete", confidence: 1 } })
+    send("transcript_final", { text: "new generation", confidence: 1 })
+    expect(
+      useTranscriptStore.getState().segments.map((segment) => segment.text)
+    ).toEqual(["new generation"])
+    expect(mocks.callbacks.get("session:transcript_final")).toHaveLength(2)
+  } finally {
+    lease.release()
+  }
+})
+
+it("rejects an old native packet delivered to the new listener after an acknowledged reset", async () => {
+  await connect()
+  const lease = beginOperatorMaintenance()
+  acceptSessionReset(0, 1)
+  lease.release()
+  await Promise.resolve()
+  send("transcript_final", { text: "old queued transcript", confidence: 1 }, 0)
+  send("transcript_partial", { text: "old partial", confidence: 1 }, 0)
+  send("verse_detections", [{ ...detection, auto_queued: true }], 0)
+  send(
+    "reading_mode_verse",
+    { ...detection, reference: detection.verse_ref },
+    0
+  )
+  send("translation_command", { translation_id: 2, abbreviation: "ESV" }, 0)
+  send("stt_error", "old failure", 0)
+  expect(useTranscriptStore.getState().segments).toEqual([])
+  expect(useTranscriptStore.getState().currentPartial).toBe("")
+  expect(useDetectionStore.getState().detections).toEqual([])
+  expect(useQueueStore.getState().items).toEqual([])
+  expect(useBibleStore.getState().selectedVerse).toBe(browsed)
+  expect(mocks.error).not.toHaveBeenCalled()
+  send(
+    "transcript_final",
+    { text: "new acknowledged session", confidence: 1 },
+    1
+  )
+  expect(
+    useTranscriptStore.getState().segments.map((item) => item.text)
+  ).toEqual(["new acknowledged session"])
 })

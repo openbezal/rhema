@@ -1,0 +1,739 @@
+{
+  "steps": [
+    {
+      "step": "boot-native7",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "retained-queue",
+            "text": "Retained Queue verse — Chineke Ọlọ́run",
+            "code": "BIUO"
+          }
+        ],
+        "active": 0,
+        "transcriptCount": 5,
+        "detectionCount": 1,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 7,
+        "bootstrapReads": 1,
+        "currentSends": 0,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "current7-accepted",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "daaacd80-30c7-4879-a0bd-ecebd47541f4",
+            "text": "Synthetic BIUO fixture for John 3:17. Session boundary QA only.",
+            "code": "BIUO"
+          },
+          {
+            "id": "retained-queue",
+            "text": "Retained Queue verse — Chineke Ọlọ́run",
+            "code": "BIUO"
+          }
+        ],
+        "active": 1,
+        "transcriptCount": 6,
+        "detectionCount": 2,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 7,
+        "bootstrapReads": 1,
+        "currentSends": 1,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "old6-and-raw-rejected",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "daaacd80-30c7-4879-a0bd-ecebd47541f4",
+            "text": "Synthetic BIUO fixture for John 3:17. Session boundary QA only.",
+            "code": "BIUO"
+          },
+          {
+            "id": "retained-queue",
+            "text": "Retained Queue verse — Chineke Ọlọ́run",
+            "code": "BIUO"
+          }
+        ],
+        "active": 1,
+        "transcriptCount": 6,
+        "detectionCount": 2,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 7,
+        "bootstrapReads": 1,
+        "currentSends": 1,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "old7-to-new-listener-rejected",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "daaacd80-30c7-4879-a0bd-ecebd47541f4",
+            "text": "Synthetic BIUO fixture for John 3:17. Session boundary QA only.",
+            "code": "BIUO"
+          },
+          {
+            "id": "retained-queue",
+            "text": "Retained Queue verse — Chineke Ọlọ́run",
+            "code": "BIUO"
+          }
+        ],
+        "active": 1,
+        "transcriptCount": 6,
+        "detectionCount": 2,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 8,
+        "bootstrapReads": 1,
+        "currentSends": 1,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "current8-accepted",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "c0d5f5cc-78b9-40ca-87a6-a514409490f6",
+            "text": "Synthetic BIUO fixture for John 3:18. Session boundary QA only.",
+            "code": "BIUO"
+          },
+          {
+            "id": "daaacd80-30c7-4879-a0bd-ecebd47541f4",
+            "text": "Synthetic BIUO fixture for John 3:17. Session boundary QA only.",
+            "code": "BIUO"
+          },
+          {
+            "id": "retained-queue",
+            "text": "Retained Queue verse — Chineke Ọlọ́run",
+            "code": "BIUO"
+          }
+        ],
+        "active": 2,
+        "transcriptCount": 7,
+        "detectionCount": 3,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 8,
+        "bootstrapReads": 1,
+        "currentSends": 2,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "reload-bootstrap8",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 8,
+        "bootstrapReads": 1,
+        "currentSends": 0,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 0,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "reloaded-old7-rejected",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 8,
+        "bootstrapReads": 1,
+        "currentSends": 0,
+        "mode": "apply",
+        "revision": 1,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 0,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "reloaded-current8-accepted",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "2658bece-d461-4b64-b88a-03fc89534e60",
+            "text": "Synthetic BIUO fixture for John 3:17. Session boundary QA only.",
+            "code": "BIUO"
+          }
+        ],
+        "active": null,
+        "transcriptCount": 1,
+        "detectionCount": 1,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 8,
+        "bootstrapReads": 1,
+        "currentSends": 1,
+        "mode": "apply",
+        "revision": 2,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "bootstrap-fails-no-ingestion-no-provider-start",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 1,
+          "chapter": 1,
+          "verse": 1,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 1,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [],
+        "uiGain": 1.6,
+        "frame": "Held John 3:16 (BIUO)",
+        "onAir": false,
+        "queue": [],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "sessionRevision": 8,
+        "bootstrapReads": 2,
+        "currentSends": 1,
+        "mode": "apply",
+        "revision": 3,
+        "savedBookNames": [],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    }
+  ],
+  "logs": [
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 3495073253. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:05:13.123Z",
+      "url": "http://127.0.0.1:56419/assets/main-CCioOMmS.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 4176293834. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:05:13.123Z",
+      "url": "http://127.0.0.1:56419/assets/main-CCioOMmS.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 3495073253. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:05:13.456Z",
+      "url": "http://127.0.0.1:56419/assets/main-CCioOMmS.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 4176293834. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:05:13.457Z",
+      "url": "http://127.0.0.1:56419/assets/main-CCioOMmS.js"
+    }
+  ]
+}

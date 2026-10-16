@@ -4,6 +4,7 @@ mod events;
 mod memstats;
 mod operator_profile;
 mod profile_restore;
+mod session_events;
 mod state;
 mod transcription_session;
 
@@ -99,6 +100,7 @@ pub fn run() {
         .manage(Mutex::new(rhema_detection::DirectDetector::new()))
         .manage(Mutex::new(rhema_detection::DetectionMerger::new()))
         .manage(Mutex::new(rhema_detection::ReadingMode::new()))
+        .manage(session_events::SessionRevision::default())
         .manage(Mutex::new(commands::remote::OscRuntime::new()))
         .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
@@ -106,6 +108,8 @@ pub fn run() {
             commands::profile::read_local_profile,
             commands::profile::write_local_profile,
             commands::profile::apply_portable_preferences,
+            commands::session::read_operator_session_revision,
+            commands::session::reset_operator_session,
             commands::documents::save_export_document,
             commands::documents::read_import_document,
             commands::bible::list_translations,

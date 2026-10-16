@@ -292,7 +292,7 @@ it("does not issue duplicate starts while a start command is still pending", asy
   })
   let finish!: (value: undefined) => void
   mocks.invoke.mockImplementation(
-    (command) => command === "read_transcription_start_revision" ? Promise.resolve(0) :
+    (command) => command === "read_transcription_start_revision" || command === "read_operator_session_revision" ? Promise.resolve(0) :
       new Promise<undefined>((resolve) => {
         finish = resolve
       })

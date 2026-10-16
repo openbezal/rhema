@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Emitter, State};
+use crate::session_events::SessionEmitter;
+use tauri::{AppHandle, State};
 
 use crate::events::{
     AudioLevelPayload, AudioTestStoppedPayload, EVENT_AUDIO_LEVEL, EVENT_AUDIO_TEST_STOPPED,
@@ -56,10 +57,9 @@ pub fn start_audio_test(
             app_state.stt_active.load(Ordering::SeqCst),
             app_state.audio_test_active.load(Ordering::SeqCst),
         )?;
+        app_state.audio_test_active.store(true, Ordering::SeqCst);
         app_state.audio_test_active.clone()
     };
-
-    test_active.store(true, Ordering::SeqCst);
 
     // One-shot handshake: the thread reports whether `capture::start`
     // succeeded so device errors (e.g. DeviceNotFound) surface synchronously —
@@ -117,7 +117,7 @@ pub fn start_audio_test(
                         // ~15 Hz at 16 kHz with ~1024-sample frames (as in stt.rs).
                         if frame_count % 4 == 0 {
                             let level = rhema_audio::meter::compute_level(&frame.samples);
-                            let _ = app.emit(
+                            let _ = app.emit_session(
                                 EVENT_AUDIO_LEVEL,
                                 AudioLevelPayload {
                                     rms: level.rms,
@@ -133,14 +133,14 @@ pub fn start_audio_test(
 
             capture.stop();
             thread_active.store(false, Ordering::SeqCst);
-            let _ = app.emit(
+            let _ = app.emit_session(
                 EVENT_AUDIO_LEVEL,
                 AudioLevelPayload {
                     rms: 0.0,
                     peak: 0.0,
                 },
             );
-            let _ = app.emit(
+            let _ = app.emit_session(
                 EVENT_AUDIO_TEST_STOPPED,
                 AudioTestStoppedPayload {
                     reason: reason.to_string(),

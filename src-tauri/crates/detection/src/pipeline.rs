@@ -30,6 +30,12 @@ impl DetectionPipeline {
         self.semantic = detector;
     }
 
+    /// Discard only per-session context/cooldown; keep the model and policy.
+    pub fn reset_session(&mut self) {
+        self.direct = DirectDetector::new();
+        self.merger.reset_session();
+    }
+
     /// Access the direct detector for configuration.
     pub fn direct_mut(&mut self) -> &mut DirectDetector {
         &mut self.direct
@@ -90,6 +96,73 @@ impl Default for DetectionPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resetting_a_session_keeps_the_loaded_semantic_resources_and_search() {
+        use crate::error::DetectionError;
+        use crate::semantic::{
+            embedder::TextEmbedder,
+            index::{SearchResult, VectorIndex},
+        };
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        struct LoadedEmbedder(Arc<AtomicUsize>);
+        impl Drop for LoadedEmbedder {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        impl TextEmbedder for LoadedEmbedder {
+            fn embed(&self, _: &str) -> Result<Vec<f32>, DetectionError> {
+                Ok(vec![1.0])
+            }
+            fn dimension(&self) -> usize {
+                1
+            }
+        }
+        struct LoadedIndex;
+        impl VectorIndex for LoadedIndex {
+            fn len(&self) -> usize {
+                1
+            }
+            fn search(&self, _: &[f32], _: usize) -> Result<Vec<SearchResult>, DetectionError> {
+                Ok(vec![SearchResult {
+                    verse_id: 42,
+                    similarity: 0.9,
+                }])
+            }
+        }
+        let dropped = Arc::new(AtomicUsize::new(0));
+        let mut pipeline = DetectionPipeline::new();
+        pipeline.set_semantic(SemanticDetector::new(
+            Box::new(LoadedEmbedder(dropped.clone())),
+            Box::new(LoadedIndex),
+        ));
+        pipeline.reset_session();
+        assert!(pipeline.has_semantic());
+        assert_eq!(
+            pipeline.semantic_search("retained model", 1),
+            vec![(42, 0.9)]
+        );
+        assert_eq!(dropped.load(Ordering::SeqCst), 0);
+        drop(pipeline);
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn explicit_session_reset_clears_context_and_cooldown_but_keeps_policy() {
+        let mut pipeline = DetectionPipeline::new();
+        pipeline.merger_mut().set_cooldown_ms(60_000);
+        pipeline.merger_mut().set_confidence_threshold(0.94);
+        assert!(pipeline.process_direct("John 3:16")[0].auto_queued);
+        pipeline.reset_session();
+        assert!(pipeline.process_direct("verse 17").is_empty());
+        assert!(pipeline.process_direct("John 3:16")[0].auto_queued);
+        assert!(pipeline.process_direct("3:17").is_empty());
+        assert!(!pipeline.has_semantic());
+    }
 
     #[test]
     fn test_pipeline_direct_only() {

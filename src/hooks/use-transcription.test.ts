@@ -6,7 +6,11 @@ const mockToastError = vi.fn()
 vi.mock("@tauri-apps/api/core", () => ({
   // These existing cases focus on start/stop payloads. The dedicated
   // maintenance suite exercises revision reads, stale responses and dedupe.
-  invoke: (...args: unknown[]) => args[0] === "read_transcription_start_revision" ? Promise.resolve(0) : mockInvoke(...args),
+  invoke: (...args: unknown[]) =>
+    args[0] === "read_transcription_start_revision" ||
+    args[0] === "read_operator_session_revision"
+      ? Promise.resolve(0)
+      : mockInvoke(...args),
 }))
 
 vi.mock("sonner", () => ({

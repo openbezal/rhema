@@ -130,15 +130,24 @@ pub(super) fn translation_code(state: &AppState, translation_id: Option<i64>) ->
 pub fn detect_verses(
     state: State<'_, Mutex<AppState>>,
     pipeline_state: State<'_, Mutex<DetectionPipeline>>,
+    revision: State<'_, crate::session_events::SessionRevision>,
+    expected_session_revision: Option<u64>,
     text: String,
 ) -> Result<Vec<DetectionResult>, String> {
-    let merged = {
-        let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
-        pipeline.process(&text)
-    };
-    let app_state = state.lock().map_err(|e| e.to_string())?;
-    let results: Vec<DetectionResult> = merged.iter().map(|m| to_result(&app_state, m)).collect();
-    Ok(results)
+    let sessions = state
+        .lock()
+        .map_err(|e| e.to_string())?
+        .transcription_sessions
+        .clone();
+    let expected = expected_session_revision.unwrap_or_else(|| revision.current());
+    revision.with_current(&sessions, expected, || {
+        let merged = {
+            let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
+            pipeline.process(&text)
+        };
+        let app_state = state.lock().map_err(|e| e.to_string())?;
+        Ok(merged.iter().map(|m| to_result(&app_state, m)).collect())
+    })
 }
 
 /// Frontend latency mark — logs a webview-side timestamp into the unified

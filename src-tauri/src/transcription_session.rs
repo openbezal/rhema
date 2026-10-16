@@ -95,7 +95,7 @@ impl SessionController {
     ) -> Result<T, String> {
         let current = self.current.lock().map_err(|error| error.to_string())?;
         if current.as_ref().is_some_and(SessionToken::is_active) {
-            return Err("Stop transcription before applying preferences".into());
+            return Err("Stop transcription before changing the session".into());
         }
         self.start_revision.fetch_add(1, Ordering::SeqCst);
         let result = action();
@@ -117,6 +117,16 @@ impl SessionController {
         } else {
             None
         }
+    }
+    /// Serialize manual detection RPC work with start/stop/reset as well.
+    pub(crate) fn with_boundary<R>(
+        &self,
+        action: impl FnOnce() -> Result<R, String>,
+    ) -> Result<R, String> {
+        let current = self.current.lock().map_err(|error| error.to_string())?;
+        let result = action();
+        drop(current);
+        result
     }
     pub(crate) fn stop(&self) -> Result<(), String> {
         let mut current = self.current.lock().map_err(|e| e.to_string())?;

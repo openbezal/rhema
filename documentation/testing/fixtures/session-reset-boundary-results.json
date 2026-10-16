@@ -1,0 +1,78 @@
+{
+  "base": "650a340",
+  "scope": "Task9A5A native session-reset/event ownership foundation; new-session UI remains Task9A5B",
+  "frontend": {
+    "tests": 1003,
+    "files": 84,
+    "typecheck": "pass",
+    "typecheckGuard": "pass",
+    "lint": "pass; zero warnings",
+    "productionBuild": "pass; existing bundle-size advisory"
+  },
+  "native": {
+    "platform": "macOS",
+    "tests": {
+      "default": 486,
+      "no-default": 486
+    },
+    "strictClippy": "pass",
+    "fmt": "pass",
+    "realModelProviderOrMicrophoneUsed": false
+  },
+  "browser": {
+    "viewport": "1024x600",
+    "colorMode": "dark",
+    "production": "main/App/controller event ingestion",
+    "mocked": [
+      "profile",
+      "Bible",
+      "native command receipts",
+      "audio",
+      "windows/output",
+      "dialogs/files"
+    ],
+    "steps": "session-boundary-browser-observations.json",
+    "warnings": {
+      "count": 4,
+      "source": "installed Tauri JS mock unlisten mismatch: event.js sends eventId, mocks.js removes args.id; no workaround applied"
+    },
+    "unexpectedConsoleErrors": 0,
+    "expectedUIErrors": [
+      "injected bootstrap failure",
+      "provider start refused after retry"
+    ],
+    "postBrowserAutomatedOnly": [
+      "obsolete manual-detection return value",
+      "actual manual-work/reset serialization"
+    ]
+  },
+  "review": {
+    "status": "awaiting one fresh Astra/high whole-branch review",
+    "fixPasses": 0
+  },
+  "rulings": [
+    {
+      "decision": "separate native/event foundation from new-session UI",
+      "cost": "additional dependent draft; user-facing reset not complete"
+    },
+    {
+      "decision": "preserve raw channels, main uses tagged only",
+      "cost": "duplicate bounded event serialization/emission"
+    },
+    {
+      "decision": "revision separate from run identity/archive",
+      "cost": "ordinary stop/restart retains logical session until explicit reset"
+    }
+  ],
+  "cleanup": {
+    "qaFilesRemoved": true,
+    "viteEntryRemoved": true,
+    "serverStopped": true,
+    "tabClosed": true,
+    "viewportReset": true
+  },
+  "limitations": [
+    "new-session review/export/acknowledged frontend clear/recovery UI remains next slice",
+    "installed native event delivery/provider/physical receivers unverified"
+  ]
+}

@@ -26,16 +26,27 @@ it("does not start or show connecting status during maintenance", async () => {
 it("deduplicates start and sends the native start revision with the current settings", async () => {
   let release!: (value: number) => void
   native.invoke.mockImplementation((command) =>
-    command === "read_transcription_start_revision"
-      ? new Promise<number>((resolve) => {
-          release = resolve
-        })
-      : Promise.resolve()
+    command === "read_operator_session_revision"
+      ? Promise.resolve(0)
+      : command === "read_transcription_start_revision"
+        ? new Promise<number>((resolve) => {
+            release = resolve
+          })
+        : Promise.resolve()
   )
   const m = await modules()
   const first = m.transcriptionActions.start()
   const duplicate = m.transcriptionActions.start()
-  expect(native.invoke).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() =>
+    expect(native.invoke).toHaveBeenCalledWith(
+      "read_transcription_start_revision"
+    )
+  )
+  expect(
+    native.invoke.mock.calls.filter(
+      ([command]) => command === "read_operator_session_revision"
+    )
+  ).toHaveLength(1)
   const { useSettingsStore } = await import("@/stores/settings-store")
   useSettingsStore.getState().setGain(1.75)
   release(8)
@@ -54,14 +65,17 @@ it("deduplicates start and sends the native start revision with the current sett
 it("does not invoke a delayed start after Stop has completed", async () => {
   let release!: (value: number) => void
   native.invoke.mockImplementation((command) =>
-    command === "read_transcription_start_revision"
-      ? new Promise<number>((resolve) => {
-          release = resolve
-        })
-      : Promise.resolve()
+    command === "read_operator_session_revision"
+      ? Promise.resolve(0)
+      : command === "read_transcription_start_revision"
+        ? new Promise<number>((resolve) => {
+            release = resolve
+          })
+        : Promise.resolve()
   )
   const m = await modules()
   const start = m.transcriptionActions.start()
+  await vi.waitFor(() => expect(release).toBeTypeOf("function"))
   await m.transcriptionActions.stop()
   release(1)
   await start
@@ -80,6 +94,7 @@ it("ignores an obsolete start completion and error after Stop and a new successf
   let reject!: (error: unknown) => void
   let starts = 0
   native.invoke.mockImplementation((command) => {
+    if (command === "read_operator_session_revision") return Promise.resolve(0)
     if (command === "read_transcription_start_revision")
       return Promise.resolve(starts)
     if (command === "start_transcription" && starts++ === 0)
@@ -103,14 +118,17 @@ it("ignores an obsolete start completion and error after Stop and a new successf
 it("does not release an old start across maintenance even if its native revision read completes later", async () => {
   let release!: (value: number) => void
   native.invoke.mockImplementation((command) =>
-    command === "read_transcription_start_revision"
-      ? new Promise<number>((resolve) => {
-          release = resolve
-        })
-      : Promise.resolve()
+    command === "read_operator_session_revision"
+      ? Promise.resolve(0)
+      : command === "read_transcription_start_revision"
+        ? new Promise<number>((resolve) => {
+            release = resolve
+          })
+        : Promise.resolve()
   )
   const m = await modules()
   const old = m.transcriptionActions.start()
+  await vi.waitFor(() => expect(release).toBeTypeOf("function"))
   const lease = m.beginOperatorMaintenance()
   lease.release()
   release(0)

@@ -8,4 +8,5 @@ pub mod fonts;
 pub mod preferences;
 pub mod profile;
 pub mod remote;
+pub mod session;
 pub mod stt;
