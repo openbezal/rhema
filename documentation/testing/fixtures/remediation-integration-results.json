@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "02ac92686fadf19679eac47c6b83f89d80a61130",
+  "base": "94f9339",
+  "integratedReviewedHeads": {
+    "codex/operator-keyboard": "94f9339e6177962331533e0b564b38c91a057c63",
+    "codex/dual-language-presentation": "91c505dfde61694e8732e756e1f51491da16f958",
+    "codex/transcription-session-lifecycle": "4ee35eb596aaab8aafe5b21055ca3a1f5e4fee83",
+    "codex/numbered-book-search": "82e2311d9b4cb18cae579b0c1e320ac9870fb597",
+    "codex/remote-live-controls": "8d8966dab7a2b3bfb67ec9fd74187812d0c806e9",
+    "codex/hausa-igbo-bibles": "3d32b9cc770f60e3070230d2c86cbd5660a0ec81"
+  },
+  "frontend": {
+    "tests": 719,
+    "files": 62,
+    "typecheck": "passed",
+    "lint": "passed",
+    "build": "passed"
+  },
+  "native": {
+    "default": {
+      "tests": 431,
+      "failures": 0
+    },
+    "nodefault": {
+      "tests": 431,
+      "failures": 0
+    },
+    "strictClippy": "passed",
+    "format": "passed"
+  },
+  "scope": "Local combined-source checks and mock-backed browser interactions; not native UI/receiver/platform-package acceptance."
+}

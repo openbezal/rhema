@@ -1,0 +1,26 @@
+{
+  "scope": "Actual integrated App/controllers/components/fonts/Canvas; native/database/audio/windows/HTTP/OSC mocked, no provider/receiver/native app used.",
+  "viewport": {
+    "width": 1024,
+    "height": 600
+  },
+  "observations": [
+    "Fresh fixture starts OFF AIR, KJV primary/BSRK secondary, no transcription/servers.",
+    "On-air KJV+BSRK presentation succeeds via actual shared output-safety/action boundary with mocked visible output window.",
+    "With an 8-second secondary lookup, actual Queue Meta+Enter commits John3:17 KJV and clears selection before secondary resolves; three Queue rows retained.",
+    "Palette Clear-to-black while secondary pending retains cleared live state after the full delayed response.",
+    "Palette stable-code BIUO switch calls native active ID10; Present on an originally KJV Queue row verifies BIUO primary and BSRK optional text.",
+    "Numbered palette input1John1:1 resolves Roman catalogIJohn, browses verse1, retains liveJohn3:16(BIUO/BSRK).",
+    "Quick Search fullnumeric1John1:1 resolves RomanIJohn catalog.",
+    "Settings fresh native active-language lookup displaysBIUO; nested fullIgbo notice works atminimum, closes andreturnsfocus.",
+    "Transcript-panel S starts accepted-connecting mock transcription; secondS stops it.",
+    "CleanupOFF AIR/no transcription/servers;tab8closed/viewportreset/server3179stopped/rootfixturefilesremoved/normalViteinputrestored.",
+    "Final header caption explicitly reads TRANSCRIPTION OFF while broadcast is on, and TRANSCRIPTION ON while broadcast is off; mounted regression tests cover all three relevant combinations.",
+    "Final caption/browser pass used separate loopback origin3180;tab9closed/viewportreset/server3180stopped/rootfixturesremoved/normalViteinputrestored."
+  ],
+  "knownFollowups": [
+    "Search re-evaluates an outstanding typed reference on primary language changes and can reclaim preview after a Queue selection; address under Task9B ownership work. Cleared live was retained.",
+    "This is not native/provider/receiver acceptance. Full Windows/macOS/Linux packages and physical Windows/vMix target remain outstanding."
+  ],
+  "evidenceTiming": "Primary-commit/Clear/notices screenshots precede the header-caption correction. The combined bilingual and transcription-only screenshots verify the corrected final caption. Presentation behavior was unchanged by the caption fix."
+}
