@@ -46,7 +46,11 @@ export function TransportBar() {
           <MicIcon className="size-3.5 text-muted-foreground" />
           <LevelMeter level={audioLevel.rms} bars={4} />
         </div>
-        <LiveIndicator active={isTranscribing} />
+        <LiveIndicator
+          active={isTranscribing}
+          aria-label="Transcription status"
+          label={isTranscribing ? "TRANSCRIPTION ON" : "TRANSCRIPTION OFF"}
+        />
         <Button
           variant="ghost"
           size="icon-sm"

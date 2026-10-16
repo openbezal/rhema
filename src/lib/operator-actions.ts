@@ -33,13 +33,17 @@ async function presentQueueItem(index: number): Promise<boolean> {
     chapter: item.verse.chapter,
     verse: item.verse.verse,
   })
-  let committed = false
-  await presentVerse(item.verse, {
-    onCommitted: () => {
-      committed = true
-    },
-  }).catch((e) => console.warn("[remote-actions] presentQueueItem failed:", e))
-  return committed
+  // The primary commit completes this operator action. Optional language text
+  // can arrive later without holding Queue selection or other keyboard work.
+  return new Promise<boolean>((resolve) => {
+    void presentVerse(item.verse, { onCommitted: () => resolve(true) }).then(
+      () => resolve(false),
+      (error: unknown) => {
+        console.warn("[remote-actions] presentQueueItem failed:", error)
+        resolve(false)
+      }
+    )
+  })
 }
 
 function stepQueue(offset: number): void {

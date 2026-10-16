@@ -29,6 +29,7 @@ beforeEach(() => {
   useBibleStore.setState({
     activeTranslationId: 1,
     activeTranslationCode: "KJV",
+    secondaryTranslationCode: null,
     translationSelectionStatus: "ready",
     translations: [
       {
@@ -265,4 +266,50 @@ it("a failed ModEnter lookup leaves selection even when the old live coordinates
   mock.invoke.mockResolvedValue(null)
   await runShortcutCommand("list-present-clear", event)
   expect(useQueueStore.getState().activeIndex).toBe(0)
+})
+
+it("ModEnter clears its selection at the verified primary commit while secondary text is still pending", async () => {
+  const { useQueueStore } = await import("@/stores/queue-store")
+  const item = {
+    id: "bilingual",
+    verse: v(),
+    reference: "John 3:1",
+    confidence: 1,
+    source: "manual" as const,
+    added_at: 0,
+  }
+  useQueueStore.setState({ items: [item], activeIndex: 0 })
+  const primary = useBibleStore.getState().translations[0]
+  useBibleStore.setState({
+    translations: [primary, { ...primary, id: 2, abbreviation: "OYCB" }],
+    secondaryTranslationCode: "OYCB",
+  })
+  document.body.innerHTML =
+    '<section data-operator-list="queue"><article data-operator-item="bilingual" tabindex="0"></article></section>'
+  const event = new KeyboardEvent("keydown", { bubbles: true })
+  document.querySelector("article")!.dispatchEvent(event)
+  let finishSecondary!: (value: unknown) => void
+  mock.invoke.mockImplementation(async (command, args) => {
+    if (command !== "get_verse") return null
+    if (args.translationId === 2)
+      return new Promise((resolve) => {
+        finishSecondary = resolve
+      })
+    return v()
+  })
+  const action = runShortcutCommand("list-present-clear", event)
+  try {
+    await vi.waitFor(() =>
+      expect(useBroadcastStore.getState().liveSourceVerse?.translation_id).toBe(
+        1
+      )
+    )
+    expect(finishSecondary).toBeTypeOf("function")
+    await vi.waitFor(() =>
+      expect(useQueueStore.getState().activeIndex).toBeNull()
+    )
+  } finally {
+    finishSecondary({ ...v(), translation_id: 2 })
+    await action
+  }
 })
