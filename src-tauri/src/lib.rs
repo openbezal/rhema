@@ -1,4 +1,5 @@
 mod commands;
+mod document_files;
 mod events;
 mod memstats;
 mod state;
@@ -99,6 +100,8 @@ pub fn run() {
         .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
             commands::preferences::read_bible_preferences,
+            commands::documents::save_export_document,
+            commands::documents::read_import_document,
             commands::bible::list_translations,
             commands::bible::list_books,
             commands::bible::get_chapter,

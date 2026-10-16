@@ -3,6 +3,7 @@ pub mod bible;
 pub mod broadcast;
 pub mod detection;
 pub mod diagnostics;
+pub mod documents;
 pub mod fonts;
 pub mod preferences;
 pub mod remote;

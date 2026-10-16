@@ -1,7 +1,8 @@
-import { open, save } from "@tauri-apps/plugin-dialog"
-import { readFile, writeTextFile } from "@tauri-apps/plugin-fs"
+import { open } from "@tauri-apps/plugin-dialog"
+import { readFile } from "@tauri-apps/plugin-fs"
 import type { BroadcastTheme } from "@/types"
 import { normalizeTheme } from "@/lib/theme-migrations"
+import { readImportDocument, saveExportDocument } from "@/lib/document-files"
 
 /**
  * Opens a native file dialog to pick an image, reads it,
@@ -44,32 +45,19 @@ export async function pickThemeBackgroundImage(): Promise<string | null> {
 /**
  * Exports a theme as JSON via native save dialog.
  */
-export async function exportTheme(theme: BroadcastTheme): Promise<void> {
-  const path = await save({
-    defaultPath: `${theme.name.replace(/[^a-zA-Z0-9-_ ]/g, "")}.json`,
-    filters: [{ name: "JSON", extensions: ["json"] }],
-  })
-  if (!path) return
-
-  const json = JSON.stringify(theme, null, 2)
-  await writeTextFile(path, json)
+export async function exportTheme(theme: BroadcastTheme): Promise<boolean> {
+  return saveExportDocument(JSON.stringify(theme, null, 2), "json", theme.name)
 }
 
 /**
  * Imports a theme from a JSON file via native open dialog.
- * Returns the parsed theme or null if cancelled/invalid.
+ * Returns the parsed theme or null if cancelled. Invalid documents reject.
  */
 export async function importTheme(): Promise<BroadcastTheme | null> {
-  const selected = await open({
-    multiple: false,
-    filters: [{ name: "Theme JSON", extensions: ["json"] }],
-  })
+  const selected = await readImportDocument()
   if (!selected) return null
 
-  const path = typeof selected === "string" ? selected : selected
-  const bytes = await readFile(path)
-  const text = new TextDecoder().decode(bytes)
-  const parsed = JSON.parse(text) as BroadcastTheme
+  const parsed = JSON.parse(selected.text) as BroadcastTheme
 
   if (!parsed.id || !parsed.name || !parsed.background || !parsed.layout) {
     throw new Error("Invalid theme file: missing required fields")
