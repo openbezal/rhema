@@ -12,7 +12,9 @@ const image = z.object({
     .string()
     .max(28_000_000)
     .refine(
-      (url) => /^(data:image\/[a-zA-Z0-9.+-]+[;,]|https?:\/\/)/.test(url),
+      (url) =>
+        url === "" ||
+        /^(data:image\/[a-zA-Z0-9.+-]+[;,]|https?:\/\/)/.test(url),
       "Use an embedded image or HTTP image URL"
     ),
   fit: z.enum(["cover", "contain", "stretch"]),

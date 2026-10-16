@@ -12,6 +12,7 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useBibleStore } from "@/stores/bible-store"
 import { BUILTIN_THEMES } from "./builtin-themes"
+import type { BroadcastTheme } from "@/types"
 
 beforeEach(() => {
   native.invoke.mockReset()
@@ -96,3 +97,102 @@ it("rejects an invalid read without changing active stores", async () => {
   expect(useTranscriptStore.getState().segments).toBe(transcript)
   expect(useBroadcastStore.getState().themes).toBe(themes)
 })
+
+it.each(["archive", "preferences"] as const)(
+  "exports %s with saved empty image placeholders from the editor",
+  async (format) => {
+    const emptyImage = {
+      url: "",
+      fit: "cover" as const,
+      blur: 0,
+      brightness: 100,
+      tint: null,
+    }
+    const base: BroadcastTheme = {
+      ...BUILTIN_THEMES[0],
+      id: "custom",
+      builtin: false,
+    }
+    const plate = { ...base.textBox, image: emptyImage }
+    const themes: BroadcastTheme[] = [
+      {
+        ...base,
+        id: "background-inactive",
+        background: { ...base.background, type: "solid", image: emptyImage },
+      },
+      {
+        ...base,
+        id: "background-active",
+        background: { ...base.background, type: "image", image: emptyImage },
+      },
+      {
+        ...base,
+        id: "surface-inactive",
+        textBox: { ...plate, enabled: false },
+      },
+      { ...base, id: "surface-active", textBox: { ...plate, enabled: true } },
+      {
+        ...base,
+        id: "verse-surface",
+        verseText: { ...base.verseText, surface: { ...plate, enabled: true } },
+      },
+      {
+        ...base,
+        id: "reference-surface",
+        reference: { ...base.reference, surface: { ...plate, enabled: true } },
+      },
+      {
+        ...base,
+        id: "secondary-surface",
+        secondaryVerseText: { surface: { ...plate, enabled: true } },
+      },
+    ]
+    useBroadcastStore.setState({ themes })
+    native.invoke.mockResolvedValue(true)
+    await expect(exportCurrentSession(format, "Sunday")).resolves.toBe(true)
+    const exported = JSON.parse(native.invoke.mock.calls[0][1].content)
+      .preferences.customThemes
+    expect(exported).toHaveLength(7)
+    expect(exported[0].background).toMatchObject({
+      type: "solid",
+      image: emptyImage,
+    })
+    expect(exported[1].background).toMatchObject({
+      type: "image",
+      image: emptyImage,
+    })
+    expect(exported[2].textBox).toMatchObject({
+      enabled: false,
+      image: emptyImage,
+    })
+    expect(exported[3].textBox).toMatchObject({
+      enabled: true,
+      image: emptyImage,
+    })
+    expect(exported[4].verseText.surface.image).toEqual(emptyImage)
+    expect(exported[5].reference.surface.image).toEqual(emptyImage)
+    expect(exported[6].secondaryVerseText.surface.image).toEqual(emptyImage)
+  }
+)
+
+it.each(["javascript:alert(1)", "data:text/html;base64,PGh0bWw+"])(
+  "still rejects non-image URL %s",
+  async (url) => {
+    useBroadcastStore.setState({
+      themes: [
+        {
+          ...BUILTIN_THEMES[0],
+          builtin: false,
+          background: {
+            ...BUILTIN_THEMES[0].background,
+            type: "image",
+            image: { url, fit: "cover", blur: 0, brightness: 100, tint: null },
+          },
+        },
+      ],
+    })
+    await expect(
+      exportCurrentSession("preferences", "Sunday")
+    ).rejects.toThrow()
+  }
+)

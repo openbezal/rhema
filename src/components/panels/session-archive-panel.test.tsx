@@ -204,6 +204,22 @@ it("shows saved portable settings for review without applying them", async () =>
     "Auto live": "Disabled",
   })
 })
+
+it("directs an exporting operator to repair a malformed saved theme", async () => {
+  useBroadcastStore.setState({
+    themes: [
+      {
+        ...BUILTIN_THEMES[0],
+        builtin: false,
+        resolution: { width: -1, height: 1080 },
+      },
+    ],
+  })
+  await click("Export preferences JSON")
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+    "Theme Designer"
+  )
+})
 it("closes its modal and restores keyboard focus to the Session trigger", async () => {
   expect(document.querySelector('[role="dialog"]')).not.toBeNull()
   await click("Close")

@@ -41,7 +41,7 @@ const scoreNames: Record<string, string> = {
   hybrid: "Combined search score",
   unknown: "Score unavailable",
 }
-function describeError(error: unknown): string {
+function describeError(error: unknown, operation: "open" | "export"): string {
   if (error instanceof ZodError) {
     const issue = error.issues[0]
     if (issue.path[0] === "version")
@@ -49,8 +49,12 @@ function describeError(error: unknown): string {
     if (issue.path[0] === "kind")
       return "Choose a Rhema session or preferences JSON export."
     if (issue.path.includes("customThemes"))
-      return "A saved custom theme contains invalid values. Choose another export."
-    return "The file contains invalid session data. Choose another Rhema export."
+      return operation === "export"
+        ? "A saved custom theme contains invalid values. Fix it in Theme Designer before exporting."
+        : "A saved custom theme contains invalid values. Choose another export."
+    return operation === "export"
+      ? "The current session contains invalid values. Check settings before exporting."
+      : "The file contains invalid session data. Choose another Rhema export."
   }
   if (error instanceof SyntaxError)
     return "The file is not valid JSON. Choose a Rhema JSON export."
@@ -271,7 +275,7 @@ export function SessionArchivePanel() {
         error: false,
       })
     } catch (error) {
-      setNotice({ text: describeError(error), error: true })
+      setNotice({ text: describeError(error, "export"), error: true })
     } finally {
       setBusy(false)
     }
@@ -289,7 +293,7 @@ export function SessionArchivePanel() {
         error: false,
       })
     } catch (error) {
-      setNotice({ text: describeError(error), error: true })
+      setNotice({ text: describeError(error, "open"), error: true })
     } finally {
       setBusy(false)
     }
