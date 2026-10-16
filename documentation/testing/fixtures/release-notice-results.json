@@ -1,6 +1,6 @@
 {
   "base": "8cc6f40878a73a24b7c11796bd1e62f3278ac594",
-  "stage": "before-independent-review",
+  "stage": "after-single-review-fix-pass",
   "frontend": {
     "tests": 1053,
     "files": 92,
@@ -11,9 +11,9 @@
     "production_build": "pass"
   },
   "native": {
-    "default": 496,
-    "no_default": 496,
-    "new_tests": 7,
+    "default": 498,
+    "no_default": 498,
+    "new_tests": 9,
     "strict_workspace_all_targets_clippy": "pass",
     "fmt": "pass",
     "platform": "macOS"
@@ -53,11 +53,28 @@
     "first_immediate_toast": "expired during initial cold tab observation; delayed response fixture captured without changing production duration"
   },
   "dependencies": {
-    "opener": "2.5.3",
+    "opener": "Rust and JavaScript exactly 2.5.4",
     "added_lock_packages": 45,
-    "removed_or_upgraded_baseline_packages": 0
+    "removed_or_upgraded_baseline_packages": 0,
+    "javascript_resolved_version_changed": false
   },
   "installed_native_acceptance": "pending",
-  "review": "pending",
+  "review": {
+    "reviewed": "5aaa4cd0b7789c1df31b7d750392eb62fb31212e",
+    "reviewer": "fresh Astra/high",
+    "critical": 0,
+    "important": 1,
+    "minor": 1,
+    "fixed": [
+      "startup eligibility frozen from initial check across retry/reload",
+      "opener manifest/lock/version evidence aligned to existing JavaScript 2.5.4"
+    ],
+    "regressions": "initial unavailable/current \u2192 retry available \u2192 reload both RED, then GREEN; initial available positive control",
+    "focused_release_module_tests": 8,
+    "fix_passes": 1,
+    "rereview": false,
+    "exact_usage_cost": "unavailable",
+    "browser_probe": "precedes review fix; final eligibility/dependency automated only"
+  },
   "original_issues_prs": "unchanged"
 }

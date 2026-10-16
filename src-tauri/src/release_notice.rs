@@ -123,6 +123,7 @@ pub(crate) async fn fetch_latest(current: &str) -> ReleaseNotice {
 #[derive(Default)]
 pub(crate) struct ReleaseNoticeRuntime {
     snapshot: Mutex<Option<ReleaseNotice>>,
+    startup_eligible: AtomicBool,
     announced: AtomicBool,
 }
 impl ReleaseNoticeRuntime {
@@ -138,12 +139,21 @@ impl ReleaseNoticeRuntime {
             }
         }
         let status = fetch().await;
+        // The latest Diagnostics result can change, but a retry must not
+        // create startup eligibility in a reloaded main webview.
+        if snapshot.is_none() && !retry {
+            self.startup_eligible.store(
+                matches!(status, ReleaseNotice::Available { .. }),
+                Ordering::SeqCst,
+            );
+        }
         *snapshot = Some(status.clone());
         status
     }
     pub(crate) async fn claim(&self) -> bool {
         let snapshot = self.snapshot.lock().await;
-        matches!(*snapshot, Some(ReleaseNotice::Available { .. }))
+        self.startup_eligible.load(Ordering::SeqCst)
+            && matches!(*snapshot, Some(ReleaseNotice::Available { .. }))
             && !self.announced.swap(true, Ordering::SeqCst)
     }
 }
@@ -332,7 +342,7 @@ mod tests {
         assert!(parse_notice("0.3.2", &vec![b' '; MAX_RELEASE_BYTES + 1]).is_err());
     }
     #[tokio::test]
-    async fn shares_the_initial_check_allows_explicit_retry_and_claims_only_once_per_process() {
+    async fn shares_the_initial_check_and_does_not_promote_retry_to_startup() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         let runtime = ReleaseNoticeRuntime::default();
         let calls = AtomicUsize::new(0);
@@ -357,7 +367,10 @@ mod tests {
             available
         );
         assert_eq!(calls.load(Ordering::SeqCst), 2);
-        assert!(runtime.claim().await);
+        assert!(
+            !runtime.claim().await,
+            "an explicit retry cannot create startup eligibility after reload"
+        );
         assert!(!runtime.claim().await);
         assert_eq!(
             runtime
@@ -367,5 +380,51 @@ mod tests {
                 .await,
             available
         );
+    }
+    #[tokio::test]
+    async fn a_current_launch_cannot_gain_startup_eligibility_by_retry_then_reload() {
+        let runtime = ReleaseNoticeRuntime::default();
+        runtime
+            .check(false, || async {
+                ReleaseNotice::Current {
+                    current_version: "0.3.2".into(),
+                }
+            })
+            .await;
+        let available = parse_notice("0.3.2", &payload("v0.3.3")).unwrap();
+        runtime.check(true, || async { available.clone() }).await;
+        assert_eq!(
+            runtime
+                .check(false, || async { panic!("reload refetched") })
+                .await,
+            available
+        );
+        assert!(!runtime.claim().await);
+    }
+    #[tokio::test]
+    async fn startup_eligibility_comes_only_from_the_initial_check_not_a_retry_result() {
+        let available = parse_notice("0.3.2", &payload("v0.3.3")).unwrap();
+        for initial in [
+            ReleaseNotice::Unavailable,
+            ReleaseNotice::Current {
+                current_version: "0.3.2".into(),
+            },
+            available.clone(),
+        ] {
+            let expected = matches!(initial, ReleaseNotice::Available { .. });
+            let runtime = ReleaseNoticeRuntime::default();
+            runtime.check(false, || async { initial }).await;
+            runtime.check(true, || async { available.clone() }).await;
+            // A reloaded webview receives the latest Diagnostics result. That
+            // must not turn an initially offline/current launch into a toast.
+            assert_eq!(
+                runtime
+                    .check(false, || async { panic!("reload refetched") })
+                    .await,
+                available
+            );
+            assert_eq!(runtime.claim().await, expected);
+            assert!(!runtime.claim().await);
+        }
     }
 }
