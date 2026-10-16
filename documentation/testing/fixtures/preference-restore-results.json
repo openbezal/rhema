@@ -1,10 +1,65 @@
 {
   "base": "a6620e739c0cf3af5b1a5f15604a76c78ccc4619",
-  "review": { "status": "pending", "passes": 0, "fixPasses": 0 },
+  "review": {
+    "status": "complete",
+    "passes": 1,
+    "fixPasses": 1,
+    "critical": 0,
+    "important": 1,
+    "minor": 0,
+    "allFindingsFixed": true,
+    "rulings": [
+      {
+        "behavior": "New-session reset and complete service journal",
+        "decision": "Remain separate approved plan work; ordinary restore must preserve current session.",
+        "costIfWrong": "Service reset is not delivered by this PR."
+      },
+      {
+        "behavior": "Typed Search reclaiming preview on ordinary language change",
+        "decision": "Retain separate 9B task; maintenance-crossing chapter/context/quick callbacks are fixed here.",
+        "costIfWrong": "Ordinary language changes can still reclaim preview until 9B lands."
+      },
+      {
+        "behavior": "Ordering overlapping manual translation changes",
+        "decision": "Pre-existing behavior outside restore; pending translation guard blocks restore until it completes.",
+        "costIfWrong": "Overlapping manual changes still need a dedicated ordering fix."
+      },
+      {
+        "behavior": "Broader detection engine consumption of existing settings",
+        "decision": "Keep pre-existing semantics; this PR persists/restores the current portable fields.",
+        "costIfWrong": "Restored dormant fields do not gain new engine behavior."
+      },
+      {
+        "behavior": "Full Rust validation of theme rendering fields",
+        "decision": "Frontend Zod owns full theme schema; main-window native command checks restore scalars/theme metadata/identity.",
+        "costIfWrong": "Malformed trusted-window direct IPC can store theme rendering data outside the portable UI schema."
+      },
+      {
+        "behavior": "External images opened later in Theme Designer",
+        "decision": "Existing designer behavior; restore itself requires designer closed and does not fetch images.",
+        "costIfWrong": "Later designer rendering may depend on image availability/network."
+      },
+      {
+        "behavior": "Installed three-platform dialogs/filesystem failures/restart",
+        "decision": "Explicit release acceptance remains pending; do not infer it from mocks or CI builds.",
+        "costIfWrong": "Installed platform behavior could still expose defects."
+      },
+      {
+        "behavior": "Real microphone/provider and native receiver reconciliation",
+        "decision": "Pending physical/native acceptance; browser boundaries are synthetic.",
+        "costIfWrong": "Real providers/receivers may behave differently."
+      },
+      {
+        "behavior": "Power-loss durability beyond SQLite transaction tests",
+        "decision": "Claim rollback/reopen only, not power-loss proof.",
+        "costIfWrong": "OS/filesystem durability can differ from tested process behavior."
+      }
+    ]
+  },
   "local": {
     "platform": "macOS",
-    "frontendTests": 841,
-    "frontendFiles": 77,
+    "frontendTests": 863,
+    "frontendFiles": 78,
     "nativeDefaultTests": 476,
     "nativeNoDefaultTests": 476,
     "typecheck": true,
@@ -16,8 +71,14 @@
     "existingViteChunkAdvisory": true
   },
   "browser": {
-    "minimumViewport": { "width": 1024, "height": 600 },
-    "initialSuccessViewport": { "width": 1280, "height": 720 },
+    "minimumViewport": {
+      "width": 1024,
+      "height": 600
+    },
+    "initialSuccessViewport": {
+      "width": 1280,
+      "height": 720
+    },
     "actualAppAndMainStartup": true,
     "nativeStorageFilesDatabaseAudioOutputsMocked": true,
     "reloadBacking": "synthetic sessionStorage",
@@ -41,5 +102,15 @@
     "native document dialogs and filesystem permission/power-loss failures",
     "real provider and microphone traffic",
     "native output reconciliation after an uncertain commit and reload"
+  ],
+  "reviewedSource": "ab26522db4cfbc15298cb2faeda459afca7636e0",
+  "fixedSource": "b0cc5585ff8c5783ee7f39f05e93944c411df9af",
+  "browserSource": "ab26522db4cfbc15298cb2faeda459afca7636e0",
+  "postReviewRegressionEvidence": [
+    "Six state-writing Bible actions retain current state when older work resolves during or after maintenance",
+    "Non-presenting chapter step cannot navigate across maintenance",
+    "Mounted context reference, hybrid and fallback completions are dropped during and after maintenance",
+    "Pending context timer is canceled synchronously",
+    "Quick dropdown completion and typed navigation intent cannot replay after restored catalog publication"
   ]
 }
