@@ -250,3 +250,24 @@ it.each([{}, { bible: { other: true } }])(
     expect(native.invoke.mock.calls[2][1].expectedRevision).toBe(0)
   }
 )
+
+it("discards a canceled save's captured edits rather than retrying them with a later edit", async () => {
+  native.invoke
+    .mockResolvedValueOnce(structuredClone(initial))
+    .mockResolvedValueOnce({
+      version: 1,
+      revision: 1,
+      sections: { bible: { ...initial.sections.bible, extra: true } },
+    })
+  const { openProfileSection } = await import("./profile-persistence")
+  const bible = await openProfileSection("bible")
+  await bible.set("translationSelection", { version: 1, code: "BIUO" })
+  await bible.save(() => false)
+  expect(native.invoke).toHaveBeenCalledTimes(1)
+  await bible.set("extra", true)
+  await bible.save()
+  expect(native.invoke.mock.calls[1][1]).toEqual({
+    expectedRevision: 0,
+    updates: { bible: { ...initial.sections.bible, extra: true } },
+  })
+})

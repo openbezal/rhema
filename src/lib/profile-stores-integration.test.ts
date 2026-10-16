@@ -216,3 +216,95 @@ it("does not replace an unreadable profile with defaults from any store", async 
       .readFailed
   ).toBe(true)
 })
+
+it("keeps a session-only Bible choice temporary after a transient startup read failure", async () => {
+  const healthyNative = native.invoke.getMockImplementation()!
+  let failedProfile = false
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "read_local_profile" && !failedProfile) {
+      failedProfile = true
+      throw new Error("Transient profile read failure")
+    }
+    if (command === "read_bible_preferences")
+      throw new Error("Transient checked read failure")
+    return healthyNative(command, args)
+  })
+  vi.spyOn(console, "warn").mockImplementation(() => {})
+  const settings = await import("@/stores/settings-store")
+  const bible = await import("@/stores/bible-store")
+  await Promise.all([settings.hydrateSettings(), bible.hydrateBibleStore()])
+  stopBible = await bible.initBiblePersistence()
+  bible.useBibleStore.getState().setActiveTranslation(7)
+  await vi.advanceTimersByTimeAsync(1200)
+  expect(
+    native.invoke.mock.calls.filter(
+      ([command]) => command === "write_local_profile"
+    )
+  ).toHaveLength(0)
+  expect(persisted.sections.bible.translationSelection).toMatchObject({
+    code: "BIUO",
+  })
+  expect(persisted.revision).toBe(0)
+})
+
+it("warns and keeps the saved choice when only the separate checked Bible read fails", async () => {
+  const healthyNative = native.invoke.getMockImplementation()!
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "read_bible_preferences")
+      throw new Error("Checked read failure")
+    return healthyNative(command, args)
+  })
+  vi.spyOn(console, "warn").mockImplementation(() => {})
+  const settings = await import("@/stores/settings-store")
+  const bible = await import("@/stores/bible-store")
+  await settings.hydrateSettings()
+  await bible.hydrateBibleStore()
+  expect(
+    (await import("./profile-status")).useProfileStatusStore.getState()
+      .readFailed
+  ).toBe(true)
+  stopBible = await bible.initBiblePersistence()
+  bible.useBibleStore.getState().setActiveTranslation(7)
+  await vi.advanceTimersByTimeAsync(1200)
+  expect(persisted.revision).toBe(0)
+})
+
+it("rechecks a Bible choice after waiting behind another section in the shared queue", async () => {
+  const healthyNative = native.invoke.getMockImplementation()!
+  let release!: () => void
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "write_local_profile" && args.updates?.settings)
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+    return healthyNative(command, args)
+  })
+  const bible = await import("@/stores/bible-store")
+  await bible.hydrateBibleStore()
+  stopBible = await bible.initBiblePersistence()
+  const { openProfileSection } = await import("./profile-persistence")
+  const settings = await openProfileSection("settings")
+  await settings.set("gain", 1.7)
+  const held = settings.save()
+  await vi.advanceTimersByTimeAsync(0)
+  bible.useBibleStore.getState().setActiveTranslation(7)
+  await vi.advanceTimersByTimeAsync(500)
+  bible.useBibleStore
+    .getState()
+    .setTranslations(
+      bible.useBibleStore
+        .getState()
+        .translations.filter((item) => item.id !== 7)
+    )
+  expect(bible.useBibleStore.getState().translationSelectionStatus).toBe(
+    "needs_confirmation"
+  )
+  release()
+  await held
+  await vi.advanceTimersByTimeAsync(0)
+  expect(persisted.sections.settings.gain).toBe(1.7)
+  expect(persisted.sections.bible.translationSelection).toMatchObject({
+    code: "BIUO",
+  })
+  expect(persisted.revision).toBe(1)
+})

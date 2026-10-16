@@ -20,7 +20,7 @@ export interface ProfileSectionStore {
   get<T = unknown>(key: string): Promise<T | undefined>
   set(key: string, value: unknown): Promise<void>
   delete(key: string): Promise<void>
-  save(): Promise<void>
+  save(isCurrent?: () => boolean): Promise<void>
 }
 
 let snapshot: ProfileSnapshot | null = null
@@ -68,11 +68,21 @@ export async function openProfileSection(
     async delete(key) {
       staged.set(key, { removed: true })
     },
-    save() {
+    save(isCurrent) {
       if (staged.size === 0) return Promise.resolve()
       const changes = new Map(staged)
+      const discardCaptured = () => {
+        for (const [key, change] of changes)
+          if (staged.get(key) === change) staged.delete(key)
+      }
       const saved = writes.then(async () => {
         const previous = await loadProfile()
+        // Earlier sections may have held this save. Recheck the owner at the
+        // shared dispatch boundary and discard canceled captured edits.
+        if (isCurrent && !isCurrent()) {
+          discardCaptured()
+          return
+        }
         const values = structuredClone(previous.sections[section])
         for (const [key, change] of changes) {
           if (change.removed) delete values[key]
@@ -102,8 +112,7 @@ export async function openProfileSection(
         }
         // New changes staged during this write must remain pending. Failed
         // writes retain their changes for retry instead of acknowledging them.
-        for (const [key, change] of changes)
-          if (staged.get(key) === change) staged.delete(key)
+        discardCaptured()
       })
       writes = saved.catch(() => {})
       return saved

@@ -1,12 +1,6 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::ErrorKind,
-    path::Path,
-    sync::Mutex,
-    time::Duration,
-};
+use std::{fs, io::ErrorKind, path::Path, sync::Mutex, time::Duration};
 
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Connection, OpenFlags, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -56,19 +50,27 @@ impl ProfileDb {
     pub fn open(directory: &Path) -> Result<Self, String> {
         fs::create_dir_all(directory).map_err(|error| error.to_string())?;
         let path = directory.join("operator-profile.sqlite3");
-        let mut create = OpenOptions::new();
-        create.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            create.mode(0o600);
-        }
-        match create.open(&path) {
-            Ok(_) => {}
-            Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
-            Err(error) => return Err(format!("Cannot create operator profile: {error}")),
-        }
-        let mut connection = Connection::open(&path).map_err(|error| error.to_string())?;
+        // An empty canonical file must never be confused with unfinished
+        // migration. Only a fully committed migration may claim this path.
+        let temporary = match fs::symlink_metadata(&path) {
+            Ok(metadata) if !metadata.file_type().is_file() || metadata.len() == 0 => {
+                return Err("Operator profile is not a valid database file".into());
+            }
+            Ok(_) => None,
+            Err(error) if error.kind() == ErrorKind::NotFound => Some(
+                tempfile::Builder::new()
+                    .prefix(".operator-profile-")
+                    .tempfile_in(directory)
+                    .map_err(|error| error.to_string())?,
+            ),
+            Err(error) => return Err(format!("Cannot inspect operator profile: {error}")),
+        };
+        let database_path = temporary
+            .as_ref()
+            .map_or(path.as_path(), tempfile::NamedTempFile::path);
+        let mut connection =
+            Connection::open_with_flags(database_path, OpenFlags::SQLITE_OPEN_READ_WRITE)
+                .map_err(|error| error.to_string())?;
         connection
             .busy_timeout(Duration::from_secs(2))
             .map_err(|error| error.to_string())?;
@@ -79,6 +81,9 @@ impl ProfileDb {
             return Err(format!(
                 "Unsupported operator profile version {existing_version}"
             ));
+        }
+        if existing_version == 0 && temporary.is_none() {
+            return Err("Existing operator profile has no supported schema".into());
         }
         // Inspect before configuring the connection: an older app must leave a
         // future profile's storage policy alone. New SQLite files use DELETE.
@@ -130,6 +135,21 @@ impl ProfileDb {
         }
         read_snapshot(&transaction)?;
         transaction.commit().map_err(|error| error.to_string())?;
+        if let Some(temporary) = temporary {
+            // Close SQLite before renaming on Windows; flush the completed
+            // file and never replace a canonical file installed by a peer.
+            connection.close().map_err(|(_, error)| error.to_string())?;
+            temporary
+                .as_file()
+                .sync_all()
+                .map_err(|error| error.to_string())?;
+            match temporary.persist_noclobber(&path) {
+                Ok(_) => {}
+                Err(error) if error.error.kind() == ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(format!("Cannot install operator profile: {error}")),
+            }
+            return Self::open(directory);
+        }
         Ok(Self { connection })
     }
 
@@ -362,6 +382,7 @@ mod tests {
         fs::write(directory.path().join("settings.json"), "{\"gain\":1.5}").unwrap();
         fs::write(directory.path().join("bible.json"), "{\"incomplete\":").unwrap();
         assert!(ProfileDb::open(directory.path()).is_err());
+        assert!(!directory.path().join("operator-profile.sqlite3").exists());
         assert_eq!(
             fs::read_to_string(directory.path().join("bible.json")).unwrap(),
             "{\"incomplete\":"
@@ -614,5 +635,90 @@ mod tests {
                 & 0o777,
             0o600
         );
+    }
+
+    #[test]
+    fn truncated_canonical_profile_never_restores_stale_legacy_values() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("settings.json"), r#"{"gain":1}"#).unwrap();
+        let mut profile = ProfileDb::open(directory.path()).unwrap();
+        profile
+            .write(
+                0,
+                ProfileUpdates {
+                    settings: Some(object(json!({"gain":2}))),
+                    ..ProfileUpdates::default()
+                },
+            )
+            .unwrap();
+        drop(profile);
+        let path = directory.path().join("operator-profile.sqlite3");
+        fs::write(&path, b"").unwrap();
+        assert!(ProfileDb::open(directory.path()).is_err());
+        assert_eq!(fs::metadata(path).unwrap().len(), 0);
+        assert_eq!(
+            fs::read_to_string(directory.path().join("settings.json")).unwrap(),
+            r#"{"gain":1}"#
+        );
+    }
+
+    #[test]
+    fn preexisting_version_zero_database_is_rejected_without_remigration() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("settings.json"), r#"{"gain":1}"#).unwrap();
+        let path = directory.path().join("operator-profile.sqlite3");
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute_batch("PRAGMA application_id = 123;")
+            .unwrap();
+        drop(connection);
+        let original = fs::read(&path).unwrap();
+        assert!(!original.is_empty());
+        assert!(ProfileDb::open(directory.path()).is_err());
+        assert_eq!(fs::read(path).unwrap(), original);
+    }
+
+    #[test]
+    fn concurrent_initializers_cannot_replace_a_committed_profile() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::write(directory.path().join("settings.json"), r#"{"gain":1}"#).unwrap();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+        let successes = std::thread::scope(|scope| {
+            let workers: Vec<_> = [2, 3]
+                .into_iter()
+                .map(|gain| {
+                    let path = directory.path();
+                    let barrier = barrier.clone();
+                    scope.spawn(move || {
+                        barrier.wait();
+                        let mut profile = ProfileDb::open(path).unwrap();
+                        profile
+                            .write(
+                                0,
+                                ProfileUpdates {
+                                    settings: Some(object(json!({"gain":gain}))),
+                                    ..ProfileUpdates::default()
+                                },
+                            )
+                            .is_ok()
+                    })
+                })
+                .collect();
+            barrier.wait();
+            workers
+                .into_iter()
+                .map(|worker| usize::from(worker.join().unwrap()))
+                .sum::<usize>()
+        });
+        assert_eq!(successes, 1);
+        let snapshot = serde_json::to_value(
+            ProfileDb::open(directory.path())
+                .unwrap()
+                .snapshot()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(snapshot["revision"], 1);
+        assert!([json!(2), json!(3)].contains(&snapshot["sections"]["settings"]["gain"]));
     }
 }

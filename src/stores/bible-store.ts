@@ -1,6 +1,7 @@
 import { resolveSecondaryTranslation, resolveTranslationSelection, saveTranslationSelection, translationCode, type TranslationSelectionStatus } from "@/lib/translation-selection"
 import { create } from "zustand"
 import { openProfileSection } from "@/lib/profile-persistence"
+import { useProfileStatusStore } from "@/lib/profile-status"
 import { invoke } from "@tauri-apps/api/core"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
@@ -134,6 +135,7 @@ export async function hydrateBibleStore(): Promise<void> {
   } catch (error) {
     // Missing provenance is not a fresh installation. Ask the operator.
     legacyId = "unreadable"
+    useProfileStatusStore.setState({ readFailed: true })
     console.warn("[bible] Failed to read translation preference:", error)
   }
   const selection = resolveTranslationSelection(translations, saved, legacyId)
@@ -166,8 +168,10 @@ export async function activateTranslation(id: number): Promise<void> {
 
 /** Persist stable identity and its current catalog, with ordered disk writes. */
 export async function initBiblePersistence(): Promise<() => void> {
+  if (useProfileStatusStore.getState().readFailed) return () => {}
   try {
     const store = await openProfileSection("bible")
+    if (useProfileStatusStore.getState().readFailed) return () => {}
     let timer: ReturnType<typeof setTimeout> | null = null
     let writes = Promise.resolve()
     let previousCode: string | null = null
@@ -189,11 +193,14 @@ export async function initBiblePersistence(): Promise<() => void> {
         timer = null
         writes = writes.then(async () => {
           if (stopped) return
-          const current = useBibleStore.getState()
-          if (current.translationSelectionStatus !== "ready" || `${current.activeTranslationCode}|${current.secondaryTranslationCode ?? ""}` !== key) return
+          const isCurrent = () => {
+            const current = useBibleStore.getState()
+            return !stopped && !useProfileStatusStore.getState().readFailed && current.translationSelectionStatus === "ready" && `${current.activeTranslationCode}|${current.secondaryTranslationCode ?? ""}` === key
+          }
+          if (!isCurrent()) return
           await store.set("translationSelection", selection)
           await store.delete("activeTranslationId")
-          await store.save()
+          await store.save(isCurrent)
         }).catch((error: unknown) => console.warn("[bible] Failed to save translation preference:", error))
       }, 500)
     }
