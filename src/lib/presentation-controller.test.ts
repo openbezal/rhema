@@ -14,6 +14,7 @@ import {
   invalidatePresentation,
   refreshLiveVerse,
   connectPresentationController,
+  toVerseRenderData,
 } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -59,6 +60,43 @@ beforeEach(() => {
   })
 })
 describe("verified primary text", () => {
+  it("attaches the verified primary address to the committed render payload", async () => {
+    mocks.invoke.mockImplementation(async (command) =>
+      command === "get_verse" ? resolved : null
+    )
+    await presentVerse(source)
+    expect(useBroadcastStore.getState().liveVerse).toMatchObject({
+      address: {
+        bookNumber: 43,
+        bookName: "John",
+        chapter: 3,
+        verse: 16,
+        translationCode: "ESV",
+      },
+      segments: [{ verseNumber: 16, text: "Verified primary text" }],
+    })
+  })
+  it("includes optional edition attribution in the shared preview/program address", () => {
+    expect(
+      toVerseRenderData(source, "ESV", {
+        verse: { ...source, text: "Second" },
+        code: "KJV",
+      })
+    ).toMatchObject({
+      address: {
+        bookNumber: 43,
+        bookName: "John",
+        chapter: 3,
+        verse: 16,
+        translationCode: "ESV",
+        secondaryTranslationCode: "KJV",
+      },
+      secondary: {
+        translationCode: "KJV",
+        segments: [{ verseNumber: 16, text: "Second" }],
+      },
+    })
+  })
   it.each([null, new Error("Lookup failed")])(
     "holds the prior verse when primary text cannot be resolved: %s",
     async (response) => {
@@ -299,22 +337,29 @@ it("traces reserved operator intent before upstream chapter lookup delay", async
 })
 
 it("does not present or clear the committed frame during maintenance", async () => {
-  const lease=beginOperatorMaintenance()
+  const lease = beginOperatorMaintenance()
   try {
     await presentVerse(source)
     clearLive("transparent")
     expect(mocks.invoke).not.toHaveBeenCalled()
     expect(useBroadcastStore.getState().liveVerse).toEqual(held)
-  } finally {lease.release()}
+  } finally {
+    lease.release()
+  }
 })
 
 it("does not commit a lookup from before maintenance after its lease is released", async () => {
-  let resolve!: (row:Verse)=>void
-  mocks.invoke.mockImplementation(()=>new Promise<Verse>(done=>{resolve=done}))
-  const old=presentVerse(source)
-  const lease=beginOperatorMaintenance()
+  let resolve!: (row: Verse) => void
+  mocks.invoke.mockImplementation(
+    () =>
+      new Promise<Verse>((done) => {
+        resolve = done
+      })
+  )
+  const old = presentVerse(source)
+  const lease = beginOperatorMaintenance()
   lease.release()
-  resolve({...source,translation_id:2,text:"obsolete lookup"})
+  resolve({ ...source, translation_id: 2, text: "obsolete lookup" })
   await old
   expect(useBroadcastStore.getState().liveVerse).toEqual(held)
 })

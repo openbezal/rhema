@@ -64,3 +64,20 @@ it("rejects malformed imports before returning a theme", async () => {
   native.invoke.mockResolvedValue({ name: "invalid.json", text: '{"broken":' })
   await expect(importTheme()).rejects.toThrow()
 })
+
+it.each([true, false])(
+  "round-trips reference verse numbers=%s through exported theme JSON",
+  async (includeVerseNumbers) => {
+    const theme = {
+      ...BUILTIN_THEMES[0],
+      reference: { ...BUILTIN_THEMES[0].reference, includeVerseNumbers },
+    }
+    native.invoke.mockResolvedValueOnce(true)
+    await exportTheme(theme)
+    const exported = native.invoke.mock.calls[0][1].content
+    native.invoke.mockResolvedValueOnce({ name: "theme.json", text: exported })
+    const imported = await importTheme()
+    expect(imported?.reference.includeVerseNumbers).toBe(includeVerseNumbers)
+    expect(imported?.verseNumbers).toEqual(theme.verseNumbers)
+  }
+)

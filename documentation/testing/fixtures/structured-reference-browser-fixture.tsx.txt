@@ -1,0 +1,68 @@
+import { mockIPC, mockWindows } from "@tauri-apps/api/mocks"
+import { createRoot } from "react-dom/client"
+import { useSyncExternalStore } from "react"
+import { BUILTIN_THEMES } from "./src/lib/builtin-themes"
+import "./src/index.css"
+
+const key = "rhema-structured-reference-qa-v1"
+let profile = JSON.parse(sessionStorage.getItem(key) ?? "null") ?? {
+  version: 1, revision: 0, sections: { settings: {}, bible: {}, broadcast: {
+    customThemes: [{ ...BUILTIN_THEMES[0], id: "qa-reference", name: "Independent reference", builtin: false,
+      verseText: { ...BUILTIN_THEMES[0].verseText, fontSize: 100 },
+      reference: { ...BUILTIN_THEMES[0].reference, fontSize: 72, uppercase: false },
+      verseNumbers: { ...BUILTIN_THEMES[0].verseNumbers, visible: true, fontSize: 48 },
+    }],
+    outputs: [{ id: "main", type: "display", name: "Mock display", themeId: "qa-reference", monitorIndex: 0 }], autoLive: false,
+  } },
+}
+let exported: any = null
+const subscribers = new Set<() => void>()
+let receipt = ""
+function changed() {
+  receipt = JSON.stringify({ revision: profile.revision, savedReferenceNumbers: profile.sections.broadcast.customThemes[0]?.reference.includeVerseNumbers ?? true, savedBodyNumbers: profile.sections.broadcast.customThemes[0]?.verseNumbers.visible, exportedReferenceNumbers: exported?.reference.includeVerseNumbers ?? null, exportedBodyNumbers: exported?.verseNumbers.visible ?? null })
+  subscribers.forEach(fn => fn())
+}
+changed()
+mockWindows("main")
+mockIPC(async (command, args: any) => {
+  if (command === "read_local_profile") return structuredClone(profile)
+  if (command === "write_local_profile") {
+    if (args.expectedRevision !== profile.revision) throw new Error("Synthetic stale profile")
+    profile = { ...profile, revision: profile.revision + 1, sections: { ...profile.sections, ...structuredClone(args.updates) } }
+    sessionStorage.setItem(key, JSON.stringify(profile)); changed()
+    return { version: 1, revision: profile.revision, sections: structuredClone(args.updates) }
+  }
+  if (command === "save_export_document") { exported = JSON.parse(args.content); changed(); return true }
+  if (command === "list_system_fonts") return ["Georgia", "Arial"]
+  return undefined
+}, { shouldMockEvents: true })
+
+async function boot() {
+  const [{ ThemeDesigner }, { CanvasVerse }, { ThemeProvider, useTheme }, { TooltipProvider }, { useBroadcastStore, hydrateBroadcastThemes, flushBroadcastPersistence }, { toVerseRenderData }, { formatVerseReference }, { exportTheme }] = await Promise.all([
+    import("./src/components/broadcast/theme-designer"), import("./src/components/ui/canvas-verse"), import("./src/components/theme-provider"), import("./src/components/ui/tooltip"), import("./src/stores/broadcast-store"), import("./src/lib/presentation-controller"), import("./src/lib/verse-reference"), import("./src/lib/theme-designer-files"),
+  ])
+  await hydrateBroadcastThemes()
+  useBroadcastStore.setState({ presentationRecovery: "ready", isLive: false, liveVerse: null })
+  const primary = { id: 1, translation_id: 1, book_number: 43, book_name: "John", book_abbreviation: "Jn", chapter: 3, verse: 16, text: "Primary synthetic verse text, with its own body number." }
+  const verse = toVerseRenderData(primary, "KJV", { verse: { ...primary, translation_id: 8, text: "Secondary synthetic verse text with its own body number." }, code: "OYCB" })
+  function Harness() {
+    const saved = useBroadcastStore(s => s.themes.find(t => t.id === "qa-reference")!)
+    const draft = useBroadcastStore(s => s.draftTheme)
+    const debug = useSyncExternalStore(fn => { subscribers.add(fn); return () => subscribers.delete(fn) }, () => receipt)
+    const { theme, setTheme } = useTheme()
+    const button = "rounded border px-3 py-2 text-sm"
+    return <main className="min-h-screen bg-background p-4 text-foreground">
+      <p className="mb-3 text-sm">Reference QA · production Canvas/Fabric/theme UI · mocked native profile and export · no output device</p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button className={button} onClick={() => { const store = useBroadcastStore.getState(); store.startEditing(saved.id); store.setDesignerOpen(true) }}>Open Theme Designer</button>
+        <button className={button} onClick={() => void flushBroadcastPersistence()}>Flush saved preferences</button>
+        <button className={button} onClick={() => void exportTheme(saved)}>Export saved theme</button>
+        <button className={button} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>Toggle color mode</button>
+      </div>
+      <pre className="mb-3 whitespace-pre-wrap text-xs" data-testid="reference-state">{JSON.stringify({ savedLabel: formatVerseReference(verse, saved.reference.includeVerseNumbers), bodyNumbers: saved.verseNumbers.visible, draftReferenceNumbers: draft?.reference.includeVerseNumbers ?? true, ...JSON.parse(debug) })}</pre>
+      <div className="mx-auto max-w-4xl"><CanvasVerse theme={saved} verse={verse}/></div>
+    </main>
+  }
+  createRoot(document.getElementById("root")!).render(<ThemeProvider defaultTheme="light" storageKey="rhema-reference-qa-color"><TooltipProvider><Harness/><ThemeDesigner/></TooltipProvider></ThemeProvider>)
+}
+void boot().catch(error => { document.body.textContent = `Fixture boot failed: ${String(error)}` })

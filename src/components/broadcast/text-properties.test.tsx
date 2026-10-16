@@ -70,6 +70,32 @@ async function input(selector: string, value: string) {
     target!.dispatchEvent(new Event("change", { bubbles: true }))
   })
 }
+it("edits reference verse numbers without changing body numbers or going live", async () => {
+  await act(async () =>
+    useBroadcastStore.setState({ selectedElement: "reference" })
+  )
+  const bodyBefore = useBroadcastStore.getState().draftTheme!.verseNumbers
+  const checkbox = container.querySelector<HTMLInputElement>(
+    'input[aria-label="Verse numbers in reference"]'
+  )
+  expect(checkbox).not.toBeNull()
+  expect(checkbox!.checked).toBe(true)
+  await act(async () => checkbox!.click())
+  expect(
+    useBroadcastStore.getState().draftTheme!.reference.includeVerseNumbers
+  ).toBe(false)
+  expect(useBroadcastStore.getState().draftTheme!.verseNumbers).toEqual(
+    bodyBefore
+  )
+  expect(useBroadcastStore.getState()).toMatchObject({
+    isLive: false,
+    liveVerse: null,
+  })
+  await act(async () => checkbox!.click())
+  expect(
+    useBroadcastStore.getState().draftTheme!.reference.includeVerseNumbers
+  ).toBe(true)
+})
 it("edits the visible secondary font size without changing primary or going live", async () => {
   const before = useBroadcastStore.getState().draftTheme!.verseText.fontSize
   await input('input[aria-label="Secondary font size"]', "80")

@@ -477,6 +477,24 @@ function ReferenceProperties() {
       />
       <FontControls prefix="reference" />
 
+      <div className="flex flex-col gap-1.5">
+        <label className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+          Verse numbers in reference
+          <input
+            type="checkbox"
+            aria-label="Verse numbers in reference"
+            checked={draftTheme.reference.includeVerseNumbers !== false}
+            onChange={(e) =>
+              update("reference.includeVerseNumbers", e.target.checked)
+            }
+            className="h-4 w-4 rounded border-input accent-primary"
+          />
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Verse Text controls body verse numbers separately.
+        </p>
+      </div>
+
       {/* Uppercase */}
       <div className="flex items-center justify-between">
         <label className="text-xs font-medium text-muted-foreground">

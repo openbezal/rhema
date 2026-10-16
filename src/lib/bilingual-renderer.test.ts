@@ -156,6 +156,76 @@ const plate = {
   padding: 24,
   image: null,
 }
+describe("independent reference and body verse numbers", () => {
+  for (const bilingual of [false, true]) {
+    for (const position of ["above", "below", "inline", "free"] as const) {
+      it(`measures and draws the chapter reference in ${position}, bilingual=${bilingual}`, () => {
+        const data: VerseRenderData = {
+          ...dual,
+          address: {
+            bookNumber: 43,
+            bookName: "John",
+            chapter: 3,
+            verse: 16,
+            translationCode: "ESV",
+            ...(bilingual ? { secondaryTranslationCode: "KJV" } : {}),
+          },
+          segments: [{ verseNumber: 16, text: "PRIMARY short text" }],
+          secondary: bilingual
+            ? {
+                translationCode: "KJV",
+                segments: [{ verseNumber: 16, text: "SECONDARY short text" }],
+              }
+            : undefined,
+        }
+        const t = theme()
+        t.reference = {
+          ...t.reference,
+          uppercase: false,
+          textTransform: "none",
+          includeVerseNumbers: false,
+          position: position === "free" ? "above" : position,
+        }
+        t.verseNumbers = { ...t.verseNumbers, visible: true }
+        if (position === "free")
+          t.layout = {
+            ...t.layout,
+            mode: "free",
+            referenceBox: { x: 5, y: 5, width: 90, height: 12 },
+            verseBox: { x: 5, y: 25, width: 90, height: 25 },
+            secondaryBox: { x: 5, y: 60, width: 90, height: 25 },
+          }
+        const short = recorder()
+        const shortMetrics = renderVerse(short.ctx, t, data)!
+        expect(shortMetrics).not.toBeNull()
+        expect(short.text.map((row) => row.text)).toContain(
+          `John 3 (ESV${bilingual ? " · KJV" : ""})`
+        )
+        expect(
+          short.text.filter((row) => row.text.trim() === "16")
+        ).toHaveLength(bilingual ? 2 : 1)
+        t.reference.includeVerseNumbers = true
+        const full = recorder()
+        const fullMetrics = renderVerse(full.ctx, t, data)!
+        expect(full.text.map((row) => row.text)).toContain(
+          `John 3:16 (ESV${bilingual ? " · KJV" : ""})`
+        )
+        expect(shortMetrics.referenceRect!.width).toBeLessThan(
+          fullMetrics.referenceRect!.width
+        )
+        t.verseNumbers.visible = false
+        const noBodyNumbers = recorder()
+        renderVerse(noBodyNumbers.ctx, t, data)
+        expect(
+          noBodyNumbers.text.filter((row) => row.text.trim() === "16")
+        ).toHaveLength(0)
+        expect(noBodyNumbers.text.map((row) => row.text)).toContain(
+          `John 3:16 (ESV${bilingual ? " · KJV" : ""})`
+        )
+      })
+    }
+  }
+})
 describe("bilingual output pixels and geometry", () => {
   it("draws actual primary and secondary fragments with independent styles", () => {
     const r = recorder()
@@ -422,16 +492,27 @@ it("forwards negative letter spacing into measured rich-inline text", () => {
 it("requests a secondary-only font and redraws after its delayed load completes", async () => {
   const { onThemeFontsLoaded } = await import("./verse-renderer")
   let finish!: (faces: unknown[]) => void
-  const promise = new Promise<unknown[]>((resolve) => { finish = resolve })
-  const load = vi.fn(() => promise), changed = vi.fn()
+  const promise = new Promise<unknown[]>((resolve) => {
+    finish = resolve
+  })
+  const load = vi.fn(() => promise),
+    changed = vi.fn()
   vi.stubGlobal("document", { fonts: { load } })
   const stop = onThemeFontsLoaded(changed)
   try {
-    const t = theme(); t.secondaryVerseText = { fontFamily: "Secondary font delay fixture" }
+    const t = theme()
+    t.secondaryVerseText = { fontFamily: "Secondary font delay fixture" }
     computeVerseLayoutMetrics(recorder().ctx, t, dual)
-    expect(load).toHaveBeenCalledWith(expect.stringContaining("Secondary font delay fixture"))
+    expect(load).toHaveBeenCalledWith(
+      expect.stringContaining("Secondary font delay fixture")
+    )
     expect(changed).not.toHaveBeenCalled()
-    finish([{}]); await promise; await Promise.resolve()
+    finish([{}])
+    await promise
+    await Promise.resolve()
     expect(changed).toHaveBeenCalled()
-  } finally { stop(); vi.unstubAllGlobals() }
+  } finally {
+    stop()
+    vi.unstubAllGlobals()
+  }
 })

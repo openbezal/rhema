@@ -9,6 +9,7 @@ export const DESIGN_WORKSPACE = { width: 1920, height: 1080 }
 export const BILINGUAL_DESIGN_SAMPLE: VerseRenderData = {
   ...SAMPLE_VERSE,
   reference: "Genesis 1:1 (KJV · OYCB)",
+  address: { ...SAMPLE_VERSE.address!, secondaryTranslationCode: "OYCB" },
   secondary: {
     translationCode: "OYCB",
     segments: [

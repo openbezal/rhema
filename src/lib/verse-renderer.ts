@@ -1,4 +1,5 @@
 import { bilingualRegions } from "./bilingual-layout"
+import { formatVerseReference } from "./verse-reference"
 import { secondaryVerseStyle, secondaryRenderData } from "./bilingual-theme"
 import { clearCache } from "@chenglou/pretext"
 import {
@@ -1136,8 +1137,14 @@ function computeBilingualMetrics(
   } catch {
     /* older webviews */
   }
+  const formattedReference = formatVerseReference(
+    verse,
+    theme.reference.includeVerseNumbers
+  )
   const referenceText = applyTextTransform(
-    theme.reference.uppercase ? verse.reference.toUpperCase() : verse.reference,
+    theme.reference.uppercase
+      ? formattedReference.toUpperCase()
+      : formattedReference,
     resolveTextTransform(theme.reference.textTransform)
   )
   const measuredReferenceWidth = ctx.measureText(referenceText).width
@@ -1309,10 +1316,14 @@ function computeSingleVerseLayoutMetrics(
     false
   )
 
+  const formattedReference = formatVerseReference(
+    verse,
+    scaledTheme.reference.includeVerseNumbers
+  )
   const refText = applyTextTransform(
     scaledTheme.reference.uppercase
-      ? verse.reference.toUpperCase()
-      : verse.reference,
+      ? formattedReference.toUpperCase()
+      : formattedReference,
     resolveTextTransform(scaledTheme.reference.textTransform)
   )
   const measureReferenceWidth = (maxWidth: number) => {
@@ -1695,7 +1706,7 @@ function renderVerseImpl(
     drawReference(
       ctx,
       scaledTheme,
-      verse.reference,
+      formatVerseReference(verse, scaledTheme.reference.includeVerseNumbers),
       referenceArea.x,
       referenceArea.width,
       referenceRect.y

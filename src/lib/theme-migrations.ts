@@ -12,6 +12,13 @@ import {
 /** Sample verse used wherever a layout must be computed without live data. */
 export const SAMPLE_VERSE: VerseRenderData = {
   reference: "Genesis 1:1 (KJV)",
+  address: {
+    bookNumber: 1,
+    bookName: "Genesis",
+    chapter: 1,
+    verse: 1,
+    translationCode: "KJV",
+  },
   segments: [
     {
       verseNumber: 1,
@@ -87,6 +94,7 @@ export function normalizeTheme(theme: BroadcastTheme): BroadcastTheme {
     },
     reference: {
       ...theme.reference,
+      includeVerseNumbers: theme.reference?.includeVerseNumbers !== false,
       surface: normalizeSurface(theme.reference?.surface),
     },
     layout,

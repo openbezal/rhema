@@ -91,6 +91,14 @@ export function toVerseRenderData(
 ): VerseRenderData {
   return {
     reference: `${verse.book_name} ${verse.chapter}:${verse.verse} (${translation}${secondary ? ` · ${secondary.code}` : ""})`,
+    address: {
+      bookNumber: verse.book_number,
+      bookName: verse.book_name,
+      chapter: verse.chapter,
+      verse: verse.verse,
+      translationCode: translation,
+      ...(secondary ? { secondaryTranslationCode: secondary.code } : {}),
+    },
     segments: [{ verseNumber: verse.verse, text: verse.text }],
     ...(secondary
       ? {

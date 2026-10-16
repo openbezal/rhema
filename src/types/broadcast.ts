@@ -7,6 +7,15 @@ export interface VerseSegment {
 
 export interface VerseRenderData {
   reference: string
+  /** Verified canonical address; old string-only frames remain supported. */
+  address?: {
+    bookNumber: number
+    bookName: string
+    chapter: number
+    verse: number
+    translationCode: string
+    secondaryTranslationCode?: string
+  }
   segments: VerseSegment[]
   /** Same canonical address, independently verified optional translation. */
   secondary?: { translationCode: string; segments: VerseSegment[] }
@@ -113,6 +122,8 @@ export interface BroadcastTheme {
     textTransform?: TextTransform
     textDecoration?: TextDecoration
     uppercase: boolean
+    /** Defaults to true; independent of verseNumbers.visible in the body. */
+    includeVerseNumbers?: boolean
     letterSpacing: number
     position: "above" | "below" | "inline"
     /** Optional chip behind the reference alone. Absent means none. */

@@ -35,6 +35,13 @@ type FilterTab = "all" | "pinned" | "custom"
 
 const THUMBNAIL_VERSE: VerseRenderData = {
   reference: "John 3:16 (KJV)",
+  address: {
+    bookNumber: 43,
+    bookName: "John",
+    chapter: 3,
+    verse: 16,
+    translationCode: "KJV",
+  },
   segments: [{ text: "Sample Verse" }],
 }
 

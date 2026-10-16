@@ -1,0 +1,29 @@
+{
+  "viewport": {
+    "width": 1024,
+    "height": 600
+  },
+  "lastVisibleState": {
+    "savedLabel": "John 3:16 (KJV · OYCB)",
+    "bodyNumbers": false,
+    "draftReferenceNumbers": true,
+    "revision": 3,
+    "savedReferenceNumbers": true,
+    "savedBodyNumbers": false,
+    "exportedReferenceNumbers": true,
+    "exportedBodyNumbers": false
+  },
+  "logs": [],
+  "observed": [
+    "Initial full reference John 3:16 (KJV · OYCB), body 16 in both languages",
+    "Reference option off in production Reference Text properties: designer Genesis 1 (KJV · OYCB), both body numbers retained",
+    "Save Theme and flush: John 3 (KJV · OYCB), body numbers retained; mock export false/true",
+    "Reload and reopen in dark mode: unchecked reference option preserved",
+    "Reference option on and independent Primary Verse Numbers off: John 3:16 (KJV · OYCB), neither body number; actual Theme Library Export receipt true/false"
+  ],
+  "limitations": [
+    "Native profile and export dialogs mocked",
+    "Canvas/Fabric/theme UI real browser production build",
+    "No physical output device or installed-platform test"
+  ]
+}

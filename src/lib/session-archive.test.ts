@@ -103,6 +103,29 @@ it("round-trips Unicode and exports only final transcript segments", () => {
   )
 })
 
+it.each([true, false])(
+  "keeps the independent reference verse number choice=%s in both portable JSON documents",
+  (includeVerseNumbers) => {
+    const theme = {
+      ...BUILTIN_THEMES[0],
+      id: "custom-reference",
+      builtin: false,
+      reference: { ...BUILTIN_THEMES[0].reference, includeVerseNumbers },
+    }
+    useBroadcastStore.setState({ themes: [...BUILTIN_THEMES, theme] })
+    const archive = captureSessionArchive("Reference", 3000)
+    for (const document of [archive, preferencesDocument(archive)]) {
+      const parsed = parseSessionDocument(JSON.stringify(document))
+      expect(
+        parsed.preferences.customThemes[0].reference.includeVerseNumbers
+      ).toBe(includeVerseNumbers)
+      expect(parsed.preferences.customThemes[0].verseNumbers).toEqual(
+        theme.verseNumbers
+      )
+    }
+  }
+)
+
 it("exports portable preferences without keys, device identities or runtime state", () => {
   const json = JSON.stringify(
     preferencesDocument(captureSessionArchive("Settings", 3000))
@@ -170,17 +193,15 @@ it("retains unknown attribution without guessing the active translation", () => 
 it.each(["unknown", " UNKNOWN ", " "])(
   "treats %s source tags as unavailable",
   (translation_code) => {
-    useQueueStore
-      .getState()
-      .addItem({
-        id: "unknown",
-        verse: { ...source, translation_id: 999 },
-        translation_code,
-        reference: "John 3:16",
-        confidence: 0.7,
-        source: "ai-semantic",
-        added_at: 1000,
-      })
+    useQueueStore.getState().addItem({
+      id: "unknown",
+      verse: { ...source, translation_id: 999 },
+      translation_code,
+      reference: "John 3:16",
+      confidence: 0.7,
+      source: "ai-semantic",
+      added_at: 1000,
+    })
     expect(
       captureSessionArchive("Unknown", 3000).queue[0].verse.translationCode
     ).toBeNull()

@@ -56,6 +56,12 @@ describe("normalizeTheme — surfaces", () => {
 })
 
 describe("normalizeTheme", () => {
+  it("defaults legacy references to include verse numbers and preserves an explicit opt-out", () => {
+    expect(normalizeTheme(stackedBase).reference.includeVerseNumbers).toBe(true)
+    const hidden = { ...stackedBase, reference: { ...stackedBase.reference, includeVerseNumbers: false } }
+    expect(normalizeTheme(hidden).reference.includeVerseNumbers).toBe(false)
+    expect(normalizeTheme(hidden).verseNumbers).toEqual(stackedBase.verseNumbers)
+  })
   it("defaults layout.mode to stacked for legacy themes", () => {
     const legacy = {
       ...stackedBase,

@@ -1,0 +1,10 @@
+{
+  "base": "f380f9393cbaf2fbacf1b78e1a59360f79e8fd1c",
+  "scope": "Task 9B2A: structured verse references and independent reference verse-number control",
+  "frontend": { "files": 79, "tests": 928, "focusedTests": 110, "typecheck": "pass", "typecheckGuard": "pass", "lint": "pass; zero warnings", "productionBuild": "pass; existing bundle-size advisory" },
+  "native": { "sourceChanged": false, "dependenciesChanged": false, "localRerun": false, "inheritedBase204": "476 default and 476 no-default macOS tests; not a new run" },
+  "browser": { "viewport": "1024x600", "themes": ["light", "dark"], "production": ["Canvas", "Fabric", "theme designer", "theme library export", "profile facade"], "mocked": ["native profile", "native file dialogs and write", "window events"], "unexpectedWarningsOrErrors": 0, "artifacts": "structured-reference-browser-observations.json" },
+  "review": { "status": "pending one fresh whole-branch review", "fixPasses": 0, "rulings": [] },
+  "limitations": ["String-only held frames remain verbatim until a verified presentation supplies an address", "Book display overrides are the next slice", "Installed-platform and physical receiver acceptance remain outstanding"],
+  "cleanup": { "qaFilesRemoved": true, "viteEntryRemoved": true, "serverStopped": true, "temporaryTabClosed": true, "viewportReset": true }
+}

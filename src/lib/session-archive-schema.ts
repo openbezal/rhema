@@ -105,6 +105,7 @@ const theme: z.ZodType<BroadcastTheme> = z
     reference: z.object({
       ...font,
       uppercase: z.boolean(),
+      includeVerseNumbers: z.boolean().optional(),
       letterSpacing: number.min(-1000).max(1000),
       position: z.enum(["above", "below", "inline"]),
       surface: surface.optional(),
