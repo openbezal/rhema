@@ -6,6 +6,7 @@ import { PlayIcon, XIcon } from "lucide-react"
 import { useQueueStore } from "@/stores"
 import { operatorActions } from "@/lib/operator-actions"
 import type { QueueItem } from "@/types"
+import { useDisplayVerseReference } from "@/hooks/use-book-display-names"
 
 function QueueItemRow({
   item,
@@ -18,6 +19,13 @@ function QueueItemRow({
   isActive: boolean
   isHighlighted: boolean
 }) {
+  const displayReference = useDisplayVerseReference()
+  const reference = displayReference(
+    item.verse,
+    item.translation_code,
+    item.is_chapter_only,
+    item.reference
+  )
   const handlePresent = () => {
     void operatorActions.presentQueueItem(index)
   }
@@ -46,7 +54,7 @@ function QueueItemRow({
       data-queue-idx={index}
       data-operator-item={item.id}
       tabIndex={0}
-      aria-label={item.reference}
+      aria-label={reference}
       onClick={handlePresent}
       className={cn(
         "group flex cursor-pointer flex-col gap-1 rounded-md px-2.5 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-ring",
@@ -58,10 +66,10 @@ function QueueItemRow({
       )}
     >
       <span
-        title={item.reference}
+        title={reference}
         className="w-full truncate text-sm font-medium text-foreground"
       >
-        {item.reference}
+        {reference}
       </span>
 
       <div className="flex w-full items-center gap-2">
@@ -76,7 +84,7 @@ function QueueItemRow({
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={`Present ${item.reference}`}
+            aria-label={`Present ${reference}`}
             data-operator-present
             onClick={(e) => {
               e.stopPropagation()
@@ -89,7 +97,7 @@ function QueueItemRow({
             variant="ghost"
             size="icon-xs"
             data-operator-remove
-            aria-label={`Remove ${item.reference} from Queue`}
+            aria-label={`Remove ${reference} from Queue`}
             onClick={handleRemove}
           >
             <XIcon className="size-2.5" />

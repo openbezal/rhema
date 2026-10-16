@@ -34,6 +34,15 @@ describe("structured displayed verse references", () => {
       "Ọ̀rọ̀ 1 3 (BIUO)"
     )
   })
+  it("uses the explicit display label without changing numbered canonical coordinates or body content", () => {
+    const renamed = {
+      ...verse,
+      address: { ...verse.address!, displayBookName: "1 Ọ̀rọ̀" },
+    }
+    expect(formatVerseReference(renamed)).toBe("1 Ọ̀rọ̀ 3:16 (ESV · KJV)")
+    expect(formatVerseReference(renamed, false)).toBe("1 Ọ̀rọ̀ 3 (ESV · KJV)")
+    expect(renamed.address.bookName).toBe("1 John")
+  })
   it("leaves old string-only frames intact without guessing where their numbers are", () => {
     for (const reference of [
       "1 John 3:16 (KJV)",

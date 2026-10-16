@@ -11,6 +11,8 @@ import {
   matchesResolvedVerse,
 } from "./presentation-controller"
 import { operatorActions } from "./operator-actions"
+import { displayBooks } from "./book-display-names"
+import { useSettingsStore } from "@/stores/settings-store"
 import type { Verse } from "@/types"
 export interface PaletteCommand {
   id: string
@@ -70,13 +72,25 @@ export async function browsePaletteReference(query: string): Promise<void> {
   const parts = query
     .trim()
     .match(/^(.+?\D)\s*(\d{1,3})\s*[:.\s]\s*(\d{1,3})$/u)
-  const exact = parts
-    ? state.books.filter((book) =>
+  const books = displayBooks(
+    state.books,
+    state.activeTranslationCode,
+    useSettingsStore.getState().bookDisplayOverrides
+  )
+  const canonical = parts
+    ? books.filter((book) =>
         [book.name, book.abbreviation].some(
           (name) => normalizeBook(name) === normalizeBook(parts[1])
         )
       )
     : []
+  const exact = canonical.length
+    ? canonical
+    : parts
+      ? books.filter(
+          (book) => normalizeBook(book.displayName) === normalizeBook(parts[1])
+        )
+      : []
   const chapter = Number(parts?.[2])
   const verse = Number(parts?.[3])
   if (exact.length !== 1 || chapter < 1 || verse < 1)

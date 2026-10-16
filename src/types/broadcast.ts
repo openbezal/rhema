@@ -11,6 +11,8 @@ export interface VerseRenderData {
   address?: {
     bookNumber: number
     bookName: string
+    /** Optional operator display preference; canonical bookName is retained. */
+    displayBookName?: string
     chapter: number
     verse: number
     translationCode: string

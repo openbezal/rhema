@@ -15,6 +15,7 @@ vi.mock("@/components/ui/canvas-verse", () => ({
 import { PreviewPanel } from "./preview-panel"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useSettingsStore } from "@/stores/settings-store"
 const primary = {
   id: 1,
   translation_id: 2,
@@ -35,6 +36,7 @@ function data() {
   return JSON.parse(container.querySelector("pre")!.textContent!)
 }
 beforeEach(async () => {
+  useSettingsStore.setState({ bookDisplayOverrides: [] })
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
   pending.clear()
   mocks.invoke.mockReset().mockImplementation(
@@ -121,6 +123,26 @@ it("removes optional preview immediately when None is selected", async () => {
     await settle()
   })
   expect(data().secondary).toBeUndefined()
+})
+it("relabels preview without restarting its pending optional lookup or changing canonical selection", async () => {
+  const calls = mocks.invoke.mock.calls.length
+  await act(async () =>
+    useSettingsStore
+      .getState()
+      .setBookDisplayOverrides([
+        { translationCode: "ESV", bookNumber: 43, label: "Yohanan" },
+      ])
+  )
+  expect(data().reference).toBe("Yohanan 3:16 (ESV)")
+  expect(mocks.invoke.mock.calls).toHaveLength(calls)
+  await act(async () => {
+    pending.get(16)?.(optional)
+    await settle()
+  })
+  expect(data().reference).toBe("Yohanan 3:16 (ESV · KJV)")
+  expect(data().segments[0].text).toBe(primary.text)
+  expect(data().secondary.segments[0].text).toBe(optional.text)
+  expect(useBibleStore.getState().selectedVerse?.book_name).toBe("John")
 })
 it("retains the source label while primary translation refresh is pending", async () => {
   await act(async () => {

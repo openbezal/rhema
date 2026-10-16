@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils"
 import { importTheme, exportTheme } from "@/lib/theme-designer-files"
 import { NewThemeDialog } from "./new-theme-dialog"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
+import { useSettingsStore } from "@/stores/settings-store"
+import { applyBookDisplayNames } from "@/lib/book-display-names"
 
 type FilterTab = "all" | "pinned" | "custom"
 
@@ -58,6 +60,7 @@ function ThemeCard({
   isSelected: boolean
   onSelect: () => void
 }) {
+  const bookNames = useSettingsStore((s) => s.bookDisplayOverrides)
   return (
     <div
       role="button"
@@ -74,7 +77,11 @@ function ThemeCard({
     >
       {/* Thumbnail */}
       <div className="relative aspect-video w-full overflow-hidden rounded-lg">
-        <CanvasVerse theme={theme} verse={THUMBNAIL_VERSE} className="w-full" />
+        <CanvasVerse
+          theme={theme}
+          verse={applyBookDisplayNames(THUMBNAIL_VERSE, bookNames)}
+          className="w-full"
+        />
 
         {/* Active badge */}
         {isActive && (

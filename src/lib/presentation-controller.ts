@@ -7,9 +7,19 @@ import {
   type BroadcastTrace,
 } from "@/lib/broadcast-trace"
 import { translationCode } from "@/lib/translation-selection"
-import { connectOutsideMaintenance, isOperatorMaintenanceActive, isOperatorWorkCurrent, operatorRevision } from "./operator-maintenance"
+import {
+  connectOutsideMaintenance,
+  isOperatorMaintenanceActive,
+  isOperatorWorkCurrent,
+  operatorRevision,
+} from "./operator-maintenance"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useSettingsStore } from "@/stores/settings-store"
+import {
+  applyBookDisplayNames,
+  type BookDisplayOverride,
+} from "./book-display-names"
 import type { Verse, VerseRenderData, OutputClearMode } from "@/types"
 
 interface PresentOptions {
@@ -87,9 +97,10 @@ function validReference(verse: Verse) {
 export function toVerseRenderData(
   verse: Verse,
   translation: string,
-  secondary?: { verse: Verse; code: string } | null
+  secondary?: { verse: Verse; code: string } | null,
+  bookNames: readonly BookDisplayOverride[] = []
 ): VerseRenderData {
-  return {
+  const data: VerseRenderData = {
     reference: `${verse.book_name} ${verse.chapter}:${verse.verse} (${translation}${secondary ? ` · ${secondary.code}` : ""})`,
     address: {
       bookNumber: verse.book_number,
@@ -114,6 +125,7 @@ export function toVerseRenderData(
         }
       : {}),
   }
+  return applyBookDisplayNames(data, bookNames)
 }
 
 export function matchesResolvedVerse(
@@ -225,7 +237,12 @@ export async function presentVerse(
     useBroadcastStore
       .getState()
       .setLiveVerse(
-        toVerseRenderData(full, selected.code),
+        toVerseRenderData(
+          full,
+          selected.code,
+          null,
+          useSettingsStore.getState().bookDisplayOverrides
+        ),
         full,
         "background",
         trace
@@ -235,10 +252,15 @@ export async function presentVerse(
     if (current() && selected.secondary) {
       if (matchesResolvedVerse(second, reference, selected.secondary.id)) {
         useBroadcastStore.getState().setLiveVerse(
-          toVerseRenderData(full, selected.code, {
-            verse: second,
-            code: selected.secondary.code,
-          }),
+          toVerseRenderData(
+            full,
+            selected.code,
+            {
+              verse: second,
+              code: selected.secondary.code,
+            },
+            useSettingsStore.getState().bookDisplayOverrides
+          ),
           full,
           "background",
           trace
@@ -358,9 +380,26 @@ function connectActivePresentationController(): () => void {
       )
         invalidatePresentation()
     })
+    const relabel = () => {
+      if (isOperatorMaintenanceActive()) return
+      const live = useBroadcastStore.getState()
+      if (!live.liveVerse) return
+      const renamed = applyBookDisplayNames(
+        live.liveVerse,
+        useSettingsStore.getState().bookDisplayOverrides
+      )
+      if (renamed !== live.liveVerse)
+        live.setLiveVerse(renamed, live.liveSourceVerse, live.clearMode)
+    }
+    const settings = useSettingsStore.subscribe((state, previous) => {
+      if (state.bookDisplayOverrides !== previous.bookDisplayOverrides)
+        relabel()
+    })
+    relabel()
     disconnect = () => {
       bible()
       broadcast()
+      settings()
       invalidatePresentation()
     }
   }

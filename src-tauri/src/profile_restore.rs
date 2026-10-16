@@ -10,6 +10,14 @@ use crate::{
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BookDisplayName {
+    pub translation_code: String,
+    pub book_number: u8,
+    pub label: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PortableSettings {
     pub gain: f64,
     pub auto_mode: bool,
@@ -18,6 +26,8 @@ pub struct PortableSettings {
     pub suggestion_capacity: u32,
     pub suggestion_retention_ms: u32,
     pub stt_provider: String,
+    #[serde(default)]
+    pub book_display_overrides: Vec<BookDisplayName>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -40,6 +50,32 @@ pub struct ProfileApplyReceipt {
 }
 
 fn validate_settings(settings: &PortableSettings) -> Result<(), String> {
+    if settings.book_display_overrides.len() > 6600 {
+        return Err("Keep at most 6600 book display names".into());
+    }
+    let mut names = HashSet::new();
+    for name in &settings.book_display_overrides {
+        let code = name.translation_code.as_bytes();
+        let code_character = |value: &u8| value.is_ascii_uppercase() || value.is_ascii_digit();
+        if code.is_empty()
+            || code.len() > 32
+            || !code_character(&code[0])
+            || !code
+                .iter()
+                .all(|value| code_character(value) || b"._-".contains(value))
+            || !(1..=66).contains(&name.book_number)
+            || name.label.trim().is_empty()
+            || name.label.trim() != name.label
+            || name.label.encode_utf16().count() > 120
+            || name
+                .label
+                .chars()
+                .any(|value| matches!(value, '\u{0000}'..='\u{001f}' | '\u{007f}'..='\u{009f}'))
+            || !names.insert((&name.translation_code, name.book_number))
+        {
+            return Err("Book display names need unique edition/book identities and single-line names up to 120 characters".into());
+        }
+    }
     if !settings.gain.is_finite()
         || !(0.0..=2.0).contains(&settings.gain)
         || !settings.confidence_threshold.is_finite()
@@ -230,6 +266,87 @@ mod tests {
 
     fn snapshot(profile: &mut ProfileDb) -> Value {
         serde_json::to_value(profile.snapshot().unwrap()).unwrap()
+    }
+
+    fn with_book_names(mut input: PortableRestore, names: Value) -> PortableRestore {
+        let mut settings = serde_json::to_value(&input.settings).unwrap();
+        settings["bookDisplayOverrides"] = names;
+        input.settings = serde_json::from_value(settings).unwrap();
+        input
+    }
+
+    #[test]
+    fn book_display_names_restore_by_code_and_reopen_without_changing_local_bindings() {
+        let (directory, mut profile, mut state) = fixture();
+        let names = json!([
+            {"translationCode":"KJV","bookNumber":66,"label":"Revelation"},
+            {"translationCode":"FUTURE","bookNumber":62,"label":"1 Ọ̀rọ̀"}
+        ]);
+        let input = with_book_names(restore(), names.clone());
+        apply_preferences(&mut profile, &mut state, 0, input).unwrap();
+        let after = snapshot(&mut profile);
+        assert_eq!(after["sections"]["settings"]["bookDisplayOverrides"], names);
+        assert_eq!(
+            after["sections"]["settings"]["deepgramApiKey"],
+            "FAKE-LOCAL"
+        );
+        drop(profile);
+        assert_eq!(
+            snapshot(&mut ProfileDb::open(directory.path()).unwrap()),
+            after
+        );
+    }
+
+    #[test]
+    fn book_display_names_are_bounded_and_reject_duplicates_before_any_write() {
+        let valid = json!({"translationCode":"KJV","bookNumber":66,"label":"Revelation"});
+        let mut cases = Vec::new();
+        for (key, value) in [
+            ("translationCode", json!("__proto__")),
+            ("translationCode", json!("kjv")),
+            ("bookNumber", json!(0)),
+            ("bookNumber", json!(67)),
+            ("label", json!(" ")),
+            ("label", json!("Line\nBreak")),
+            ("label", json!("A\u{0085}B")),
+            ("label", json!("x".repeat(121))),
+        ] {
+            let mut item = valid.clone();
+            item[key] = value;
+            cases.push(json!([item]));
+        }
+        cases.push(json!([valid.clone(), valid.clone()]));
+        cases.push(Value::Array(vec![valid; 6601]));
+        for names in cases {
+            let (_directory, mut profile, mut state) = fixture();
+            let before = snapshot(&mut profile);
+            let input = with_book_names(restore(), names);
+            assert!(apply_preferences(&mut profile, &mut state, 0, input).is_err());
+            assert_eq!(snapshot(&mut profile), before);
+            assert_eq!(state.active_translation_id, 7);
+        }
+    }
+
+    #[test]
+    fn book_display_names_roll_back_with_a_real_mid_transaction_failure() {
+        let (directory, mut profile, mut state) = fixture();
+        let before = snapshot(&mut profile);
+        let connection =
+            rusqlite::Connection::open(directory.path().join("operator-profile.sqlite3")).unwrap();
+        connection.execute_batch("CREATE TRIGGER refuse_bible BEFORE UPDATE ON profile_sections WHEN OLD.section = 'bible' BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
+        drop(connection);
+        let input = with_book_names(
+            restore(),
+            json!([{"translationCode":"KJV","bookNumber":66,"label":"Revelation"}]),
+        );
+        assert!(apply_preferences(&mut profile, &mut state, 0, input).is_err());
+        assert_eq!(snapshot(&mut profile), before);
+        drop(profile);
+        assert_eq!(
+            snapshot(&mut ProfileDb::open(directory.path()).unwrap()),
+            before
+        );
+        assert_eq!(state.active_translation_id, 7);
     }
 
     #[test]

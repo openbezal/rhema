@@ -14,6 +14,7 @@ import { beginOperatorMaintenance } from "@/lib/operator-maintenance"
 import { connectBibleNavigation } from "@/lib/bible-navigation"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import type { Verse } from "@/types"
+import { useSettingsStore } from "@/stores/settings-store"
 
 const oldVerse: Verse = {
   id: 1,
@@ -53,6 +54,7 @@ async function type(selector: string, value: string, inputType = "insertText") {
   })
 }
 beforeEach(async () => {
+  useSettingsStore.setState({ bookDisplayOverrides: [] })
   vi.useFakeTimers()
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
   vi.stubGlobal(
@@ -111,6 +113,33 @@ afterEach(async () => {
   host.remove()
   vi.useRealTimers()
   vi.unstubAllGlobals()
+})
+it("uses a display alias for typed navigation without replaying it after a later label change", async () => {
+  await act(async () =>
+    useSettingsStore
+      .getState()
+      .setBookDisplayOverrides([
+        { translationCode: "KJV", bookNumber: 43, label: "Yohanan" },
+      ])
+  )
+  await type('input[aria-label="Bible reference search"]', "Yohanan 3:17")
+  expect(useBibleStore.getState().pendingNavigation).toMatchObject({
+    bookNumber: 43,
+    chapter: 3,
+    verse: 17,
+  })
+  const newer = { ...oldVerse, verse: 18 }
+  await act(async () => {
+    useBibleStore.setState({ pendingNavigation: null, selectedVerse: newer })
+    useSettingsStore
+      .getState()
+      .setBookDisplayOverrides([
+        { translationCode: "KJV", bookNumber: 43, label: "Yohane" },
+      ])
+  })
+  expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  expect(useBibleStore.getState().selectedVerse).toBe(newer)
+  expect(useBibleStore.getState().books[0].name).toBe("John")
 })
 for (const phase of ["during", "after"] as const) {
   for (const stage of ["reference", "hybrid", "fallback"] as const) {

@@ -7,6 +7,10 @@ import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { normalizeTheme } from "./theme-migrations"
 import {
+  displayVerseReference,
+  type BookDisplayOverride,
+} from "./book-display-names"
+import {
   SessionArchiveSchema,
   SessionDocumentSchema,
   PortablePreferencesSchema,
@@ -58,6 +62,7 @@ export function capturePreferencesDocument(createdAt = Date.now()) {
         suggestionCapacity: settings.suggestionCapacity,
         suggestionRetentionMs: settings.suggestionRetentionMs,
         sttProvider: settings.sttProvider,
+        bookDisplayOverrides: settings.bookDisplayOverrides,
       },
       primaryTranslationCode: bible.activeTranslationCode,
       secondaryTranslationCode: bible.secondaryTranslationCode,
@@ -96,10 +101,20 @@ function archivedVerse(
 }
 function archivedDetection(
   detection: DetectionResult,
-  translations: Translation[]
+  translations: Translation[],
+  bookNames: readonly BookDisplayOverride[]
 ) {
   return {
-    reference: detection.verse_ref,
+    reference: displayVerseReference(
+      detection,
+      sourceCode(
+        detection.translation_code,
+        detection.translation_id,
+        translations
+      ),
+      bookNames,
+      detection.is_chapter_only
+    ),
     verse: {
       bookNumber: detection.book_number,
       bookName: detection.book_name,
@@ -128,12 +143,23 @@ export function captureSessionArchive(
 ): SessionArchive {
   const bible = useBibleStore.getState()
   const detection = useDetectionStore.getState()
+  const bookNames = useSettingsStore.getState().bookDisplayOverrides
   return SessionArchiveSchema.parse({
     kind: "rhema-session-archive",
     version: 1,
     ...captureTranscriptSnapshot(title, createdAt),
     queue: useQueueStore.getState().items.map((item) => ({
-      reference: item.reference,
+      reference: displayVerseReference(
+        item.verse,
+        sourceCode(
+          item.translation_code,
+          item.verse.translation_id,
+          bible.translations
+        ),
+        bookNames,
+        item.is_chapter_only,
+        item.reference
+      ),
       verse: archivedVerse(
         item.verse,
         item.translation_code,
@@ -146,10 +172,10 @@ export function captureSessionArchive(
     })),
     detectionScope: "current-snapshot",
     detections: detection.detections.map((item) =>
-      archivedDetection(item, bible.translations)
+      archivedDetection(item, bible.translations, bookNames)
     ),
     suggestions: detection.suggestions.map((item) => ({
-      ...archivedDetection(item, bible.translations),
+      ...archivedDetection(item, bible.translations, bookNames),
       firstSeenAt: item.firstSeenAt,
       lastSeenAt: item.lastSeenAt,
     })),

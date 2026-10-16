@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { BroadcastTheme } from "@/types"
+import { BookDisplayOverridesSchema } from "./book-display-names"
 
 const number = z.number().finite()
 const timestamp = number.min(0).max(8_640_000_000_000_000)
@@ -169,6 +170,7 @@ export const PortablePreferencesSchema = z.object({
     suggestionCapacity: number.int().min(1).max(100),
     suggestionRetentionMs: number.int().min(1000).max(300_000),
     sttProvider: z.enum(["deepgram", "whisper"]),
+    bookDisplayOverrides: BookDisplayOverridesSchema.optional(),
   }),
   primaryTranslationCode: code.nullable(),
   secondaryTranslationCode: code.nullable(),

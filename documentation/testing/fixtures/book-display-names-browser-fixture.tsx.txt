@@ -1,0 +1,72 @@
+import {mockIPC,mockWindows} from '@tauri-apps/api/mocks'
+import {createRoot} from 'react-dom/client'
+import {useEffect,useSyncExternalStore} from 'react'
+import {BUILTIN_THEMES} from './src/lib/builtin-themes'
+import {defaultNdiSettings} from './src/types'
+import './src/index.css'
+import { BIBLE_CANON } from './data/lib/bible-canon'
+const catalogue=[{id:8,abbreviation:'OYCB',title:'Open Yoruba Contemporary Bible',language:'yo',is_downloaded:true,is_copyrighted:true},{id:9,abbreviation:'BSRK',title:'Open Hausa Contemporary Bible',language:'ha',is_downloaded:true,is_copyrighted:true},{id:10,abbreviation:'BIUO',title:'Open Igbo Contemporary Bible',language:'ig',is_downloaded:true,is_copyrighted:true},{id:1,abbreviation:'KJV',title:'King James Version',language:'en',is_downloaded:true,is_copyrighted:false},{id:2,abbreviation:'ESV',title:'English Standard Version',language:'en',is_downloaded:true,is_copyrighted:true}]
+const book=(id:number,b=43)=>({id:id*100+b,translation_id:id,book_number:b,name:b===66?'Revelation of John':BIBLE_CANON[b-1]?.[1]??'Unknown',abbreviation:BIBLE_CANON[b-1]?.[0]??'?',testament:b<40?'OT':'NT'})
+const row=(id:number,chapter:number,verse:number,b=43)=>({id:id*1000+chapter*100+verse,translation_id:id,book_number:b,book_name:book(id,b).name,book_abbreviation:book(id,b).abbreviation,chapter,verse,text:`Synthetic ${catalogue.find(t=>t.id===id)?.abbreviation} fixture for ${book(id,b).name} ${chapter}:${verse}. Book display QA only.`})
+
+
+const storageKey='rhema-qa-book-names-v1', savedKey='rhema-qa-book-names-export', seedKey='rhema-qa-book-names-seeded'
+let mode='apply',writes=0,reads=0,legacyCalls=0,startRevision=0,nativeTranscribing=false,lastApplyBeforeRevision:number|null=null,lastApplyHasLocalKey:boolean|null=null
+let lastExport:any=JSON.parse(sessionStorage.getItem(savedKey+'-receipt')??'null')
+let profile=JSON.parse(sessionStorage.getItem(storageKey)??'null')??{version:1,revision:0,sections:{settings:{gain:1.6,deepgramApiKey:'FAKE-LOCAL-KEY',sttProvider:'whisper',onboardingComplete:true,qaUnknown:'keep-local'},bible:{translationSelection:{version:1,code:'BIUO',catalog:{KJV:1,BIUO:10}},followDetections:false},broadcast:{customThemes:[{...BUILTIN_THEMES[0],id:'qa-custom',name:'Chineke Ọlọ́run',builtin:false}],outputs:[{id:'main',name:'Main',type:'display',themeId:'qa-custom',monitorIndex:2,ndi:defaultNdiSettings('Rhema Output')}],autoLive:false}}}
+let nativeActive=catalogue.find(t=>t.abbreviation===profile.sections.bible.translationSelection?.code)?.id??10
+const imported={kind:'rhema-preferences',version:1,createdAt:Date.UTC(2026,9,16,12),preferences:{settings:{gain:1.2,autoMode:false,confidenceThreshold:.9,cooldownMs:1500,suggestionCapacity:30,suggestionRetentionMs:90000,sttProvider:'whisper'},primaryTranslationCode:'MISSING',secondaryTranslationCode:'OTHER',followDetections:true,autoLive:true,customThemes:[{...BUILTIN_THEMES[0],id:'from-other-pc',name:'Imported Ọlọ́run gradient',builtin:false}]}}
+const subscribers=new Set<()=>void>();let debug=''
+function changed(){debug=JSON.stringify({mode,revision:profile.revision,savedBookNames:profile.sections.settings.bookDisplayOverrides??[],savedCode:profile.sections.bible.translationSelection?.code,savedGain:profile.sections.settings.gain,nativeActive,localKeyRetained:profile.sections.settings.deepgramApiKey==='FAKE-LOCAL-KEY',unknownRetained:profile.sections.settings.qaUnknown==='keep-local',themeCount:profile.sections.broadcast.customThemes?.length,monitor:profile.sections.broadcast.outputs?.[0]?.monitorIndex,writes,reads,legacyCalls,lastApplyBeforeRevision,lastApplyHasLocalKey,lastExport,nativeTranscribing});subscribers.forEach(fn=>fn())}
+changed();mockWindows('main')
+mockIPC(async(command,args:any)=>{
+ if(command==='plugin:dialog|message' && String(args.message).startsWith('No visible display'))return 'Go live anyway'
+ if(command==='read_local_profile'){reads++;changed();return structuredClone(profile)}
+ if(command==='write_local_profile'){if(mode==='reject')throw new Error('Synthetic disk-full profile save');if(args.expectedRevision!==profile.revision)throw new Error('Stale profile');profile={...profile,revision:profile.revision+1,sections:{...profile.sections,...structuredClone(args.updates)}};writes++;sessionStorage.setItem(storageKey,JSON.stringify(profile));changed();return {version:1,revision:profile.revision,sections:structuredClone(args.updates)}}
+ if(command==='apply_portable_preferences'){
+  lastApplyBeforeRevision=profile.revision;lastApplyHasLocalKey=JSON.stringify(args.preferences).includes('FAKE-LOCAL-KEY');changed()
+  if(args.expectedRevision!==profile.revision)return {status:'rejected',message:'Synthetic stale profile'}
+  if(mode==='reject')return {status:'rejected',message:'Synthetic disk-full failure. Existing preferences were retained.'}
+  const p=args.preferences;const primary=catalogue.find(t=>t.abbreviation===p.primaryTranslationCode);const secondary=p.secondaryTranslationCode?catalogue.find(t=>t.abbreviation===p.secondaryTranslationCode):null
+  if(!primary||p.secondaryTranslationCode&&!secondary)return {status:'rejected',message:'Synthetic unavailable edition'}
+  profile={...profile,revision:profile.revision+1,sections:{settings:{...profile.sections.settings,...p.settings},bible:{...profile.sections.bible,translationSelection:{version:1,code:primary.abbreviation,catalog:Object.fromEntries(catalogue.map(t=>[t.abbreviation,t.id])),...(secondary?{secondaryCode:secondary.abbreviation}:{})},followDetections:p.followDetections},broadcast:{...profile.sections.broadcast,customThemes:[...profile.sections.broadcast.customThemes,...p.customThemes],autoLive:p.autoLive}}};nativeActive=primary.id;startRevision++;sessionStorage.setItem(storageKey,JSON.stringify(profile));changed()
+  if(mode==='lost')throw new Error('Synthetic lost acknowledgement after commit')
+  if(mode==='delay')await new Promise(resolve=>setTimeout(resolve,10000))
+  return {status:'applied',receipt:{profile:structuredClone(profile),primary_translation_id:primary.id,primary_translation_code:primary.abbreviation,secondary_translation_code:secondary?.abbreviation??null}}
+ }
+ if(command==='read_import_document')return {name:mode==='recovery'?'Recovered.session.json':'Other-computer.preferences.json',text:mode==='recovery'?(sessionStorage.getItem(savedKey)??'{}'):JSON.stringify(imported)}
+ if(command==='save_export_document'){sessionStorage.setItem(savedKey,args.content);lastExport={bookNames:args.format==='json'?JSON.parse(args.content)?.preferences?.settings?.bookDisplayOverrides:null,format:args.format,bytes:new TextEncoder().encode(args.content).length,hasTranscript:args.content.includes('Retained Sunday transcript'),hasQueue:args.content.includes('Retained Queue verse'),hasLocalKey:args.content.includes('FAKE-LOCAL-KEY'),hasPartial:args.content.includes('UNFINISHED-QA-PARTIAL')};sessionStorage.setItem(savedKey+'-receipt',JSON.stringify(lastExport));changed();return true}
+ if(command==='read_bible_preferences')return structuredClone(profile.sections.bible)
+ if(command.startsWith('plugin:store|')){legacyCalls++;changed();throw new Error('Legacy store route must not be used')}
+ if(command==='list_translations')return catalogue
+ if(command==='list_books')return BIBLE_CANON.map((_,index)=>book(args.translationId,index+1))
+ if(command==='get_chapter')return [1,2,16,17,18].map(v=>row(args.translationId,args.chapter,v,args.bookNumber))
+ if(command==='get_verse')return row(args.translationId,args.chapter,args.verse,args.bookNumber)
+ if(command==='set_active_translation'){nativeActive=args.translationId;changed();return nativeActive}
+ if(command==='get_active_translation')return nativeActive
+ if(command==='read_transcription_start_revision')return startRevision
+ if(command==='start_transcription'){if(args.startRevision!==startRevision)throw new Error('Synthetic canceled start');nativeTranscribing=true;changed();return}
+ if(command==='stop_transcription'){nativeTranscribing=false;startRevision++;changed();return}
+ if(command==='get_osc_status'||command==='get_http_status')return {running:false,port:null}
+ if(command==='get_audio_devices')return [{id:'fixture',name:'Mock microphone — no capture',is_default:true}]
+ if(command==='get_ndi_status')return null
+ if(command==='get_ndi_output_ids')return []
+ if(command==='get_broadcast_process_identity')return 'preference-restore-fixture-process'
+ if(command==='plugin:window|get_all_windows')return ['main']
+ if(command==='plugin:window|available_monitors')return []
+ if(command==='plugin:window|is_visible')return false
+ if(command==='get_embedding_status')return {available:false,model_loaded:false,embeddings_loaded:false}
+ if(command==='list_system_fonts')return ['Georgia','Arial']
+ if(['get_recent_detections','search_context','search_verses','semantic_search','get_cross_references'].includes(command))return []
+ return undefined
+},{shouldMockEvents:true})
+async function boot(){
+ const [{useSettingsStore},{useBibleStore},{useBroadcastStore},{useTranscriptStore},{useQueueStore},{useDetectionStore},{useOperatorMaintenanceStore}]=await Promise.all([import('./src/stores/settings-store'),import('./src/stores/bible-store'),import('./src/stores/broadcast-store'),import('./src/stores/transcript-store'),import('./src/stores/queue-store'),import('./src/stores/detection-store'),import('./src/lib/operator-maintenance')])
+ let seeded=sessionStorage.getItem(seedKey)==='yes'
+ function Debug(){const settings=useSettingsStore(),bible=useBibleStore(),broadcast=useBroadcastStore(),transcript=useTranscriptStore(),queue=useQueueStore(),detections=useDetectionStore(),phase=useOperatorMaintenanceStore(s=>s.phase);const data=useSyncExternalStore(fn=>{subscribers.add(fn);return()=>subscribers.delete(fn)},()=>debug)
+  useEffect(()=>{if(seeded||settings.gain!==profile.sections.settings.gain||bible.translationSelectionStatus!=='ready'||broadcast.presentationRecovery!=='ready')return;seeded=true;sessionStorage.setItem(seedKey,'yes');const verse={...row(bible.activeTranslationId,3,16),text:'Retained Queue verse — Chineke Ọlọ́run'};useTranscriptStore.setState({segments:Array.from({length:5},(_,i)=>({id:`retained-${i}`,text:`Retained Sunday transcript ${i+1} — Ọlọ́run`,is_final:true,confidence:1,words:[],timestamp:Date.now()+i})),currentPartial:'UNFINISHED-QA-PARTIAL'});useQueueStore.setState({items:[{id:'retained-queue',verse,reference:'John 3:16',translation_code:bible.activeTranslationCode,confidence:1,source:'manual',added_at:Date.now()}],activeIndex:0});useDetectionStore.getState().addDetections([{book_number:43,book_name:'John',chapter:3,verse:16,verse_ref:'John 3:16',verse_text:verse.text,translation_id:bible.activeTranslationId,translation_code:bible.activeTranslationCode,confidence:.95,source:'direct',auto_queued:false,transcript_snippet:'QA retained detection',is_chapter_only:false,score_kind:'reference'}]);useBroadcastStore.setState({isLive:false,liveVerse:{reference:`Held John 3:16 (${bible.activeTranslationCode})`,segments:[{text:'Last valid retained frame'}]},liveSourceVerse:verse,hasExplicitClear:false})},[settings.gain,bible.translationSelectionStatus,broadcast.presentationRecovery])
+  return <><div style={{position:'fixed',top:2,left:125,zIndex:100,fontSize:9,color:'#fbbf24',pointerEvents:'none'}}>QA · actual production app · native storage/files/DB/audio/outputs mocked · Book display QA</div><label style={{position:'fixed',bottom:20,left:4,zIndex:100,fontSize:10,color:'#fbbf24',background:'#151515'}}>QA scenario <select aria-label="QA scenario" value={mode} onChange={e=>{mode=e.target.value;changed()}}><option value="apply">Apply</option><option value="reject">Reject</option><option value="delay">10s receipt</option><option value="lost">Lost receipt</option><option value="recovery">Open recovery export</option></select></label><pre data-testid="book-names-fixture-state" style={{position:'fixed',bottom:0,left:0,zIndex:100,fontSize:9,width:'100%',maxHeight:16,overflow:'auto',background:'#101010',color:'#fff',padding:1,pointerEvents:'none'}}>{JSON.stringify({phase,uiCode:bible.activeTranslationCode,selected:bible.selectedVerse?{book:bible.selectedVerse.book_number,chapter:bible.selectedVerse.chapter,verse:bible.selectedVerse.verse,translation:bible.selectedVerse.translation_id}:null,pending:bible.pendingNavigation,chapterRows:bible.currentChapter.map(row=>({book:row.book_number,chapter:row.chapter,translation:row.translation_id})),uiBookNames:settings.bookDisplayOverrides,uiGain:settings.gain,frame:broadcast.liveVerse?.reference,onAir:broadcast.isLive,queue:queue.items.map(item=>({id:item.id,text:item.verse.text,code:item.translation_code})),active:queue.activeIndex,transcriptCount:transcript.segments.length,detectionCount:detections.detections.length,uiAutoLive:broadcast.autoLive,uiFollow:bible.followDetections,uiThemeCount:broadcast.themes.filter(theme=>!theme.builtin).length,...JSON.parse(data)})}</pre></>
+ }
+ const debugHost=document.createElement('div');document.body.append(debugHost);createRoot(debugHost).render(<Debug/>);void import('./src/main')
+}
+void boot()

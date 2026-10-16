@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { seedFreeBoxesForTheme } from "@/lib/theme-migrations"
+import { useSettingsStore } from "@/stores/settings-store"
+import { applyBookDisplayNames } from "@/lib/book-display-names"
 import type { BroadcastTheme, ElementBox } from "@/types/broadcast"
 
 function ElementBoxControls({
@@ -89,6 +91,11 @@ function ElementBoxControls({
 }
 
 export function LayoutProperties() {
+  const bookNames = useSettingsStore((s) => s.bookDisplayOverrides)
+  const displaySample = applyBookDisplayNames(
+    BILINGUAL_DESIGN_SAMPLE,
+    bookNames
+  )
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const update = useBroadcastStore((s) => s.updateDraftNested)
   const updateDraft = useBroadcastStore((s) => s.updateDraft)
@@ -121,7 +128,7 @@ export function LayoutProperties() {
     }
     const patch: Partial<BroadcastTheme["layout"]> = { mode: "free" }
     if (!layout.referenceBox || !layout.verseBox || !layout.secondaryBox) {
-      const seeded = seedFreeBoxesForTheme(draftTheme, BILINGUAL_DESIGN_SAMPLE)
+      const seeded = seedFreeBoxesForTheme(draftTheme, displaySample)
       if (!seeded) return
       patch.referenceBox = seeded.referenceBox
       patch.verseBox = seeded.verseBox
@@ -168,10 +175,7 @@ export function LayoutProperties() {
               size="sm"
               variant="outline"
               onClick={() => {
-                const seeded = seedFreeBoxesForTheme(
-                  draftTheme,
-                  BILINGUAL_DESIGN_SAMPLE
-                )
+                const seeded = seedFreeBoxesForTheme(draftTheme, displaySample)
                 if (seeded) updateDraft({ layout: { ...layout, ...seeded } })
               }}
             >

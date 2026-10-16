@@ -12,6 +12,7 @@ const initial = {
 }
 const preferences = {
   settings: {
+    bookDisplayOverrides: [],
     gain: 2,
     autoMode: false,
     confidenceThreshold: 0.8,

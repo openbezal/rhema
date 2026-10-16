@@ -19,6 +19,37 @@ async function flushSave(): Promise<void> {
 }
 
 describe("settings store", () => {
+  it("blocks writes when persisted book names are invalid instead of silently discarding them", async () => {
+    mockGet.mockImplementation(async (key: string) =>
+      key === "bookDisplayOverrides"
+        ? [{ translationCode: "KJV", bookNumber: 66, label: "Bad\nName" }]
+        : null
+    )
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
+    const { useProfileStatusStore } = await import("@/lib/profile-status")
+    await hydrateSettings()
+    expect(useProfileStatusStore.getState().readFailed).toBe(true)
+    useSettingsStore.getState().setGain(1.5)
+    await flushSave()
+    expect(mockSave).not.toHaveBeenCalled()
+  })
+  it("hydrates and persists display names by stable edition code, including Unicode", async () => {
+    const names = [
+      { translationCode: "KJV", bookNumber: 66, label: "Revelation" },
+      { translationCode: "BIUO", bookNumber: 62, label: "1 Ọ̀rọ̀" },
+    ]
+    mockGet.mockImplementation(async (key: string) =>
+      key === "bookDisplayOverrides" ? names : null
+    )
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
+    await hydrateSettings()
+    expect(useSettingsStore.getState().bookDisplayOverrides).toEqual(names)
+    useSettingsStore.getState().setBookDisplayOverrides([names[0]])
+    await flushSave()
+    expect(mockSet).toHaveBeenCalledWith("bookDisplayOverrides", [names[0]])
+  })
   beforeEach(async () => {
     vi.useFakeTimers()
     mockGet.mockReset()

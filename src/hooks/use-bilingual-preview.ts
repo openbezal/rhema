@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useBibleStore } from "@/stores/bible-store"
+import { useSettingsStore } from "@/stores/settings-store"
 import type { Verse } from "@/types"
 import { translationCode } from "@/lib/translation-selection"
 import {
@@ -11,6 +12,7 @@ import {
 /** Preview keeps its source label until primary refresh settles. Optional text
  * can attach only to the same source object and current language selection. */
 export function useBilingualPreview(verse: Verse | null) {
+  const bookNames = useSettingsStore((state) => state.bookDisplayOverrides)
   const key = useBibleStore(presentationSelectionKey)
   const translations = useBibleStore((state) => state.translations)
   const [optional, setOptional] = useState<{
@@ -50,6 +52,7 @@ export function useBilingualPreview(verse: Verse | null) {
     code,
     optional?.source === verse && optional.key === key
       ? { verse: optional.row, code: optional.code }
-      : null
+      : null,
+    bookNames
   )
 }

@@ -42,7 +42,22 @@ export function SessionPreferencesSummary({
         <dd>{preferences.autoLive ? "Enabled" : "Disabled"}</dd>
         <dt className="text-muted-foreground">Saved custom themes</dt>
         <dd>{preferences.customThemes.length}</dd>
+        <dt className="text-muted-foreground">Book display names</dt>
+        <dd>{preferences.settings.bookDisplayOverrides?.length ?? 0}</dd>
       </dl>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Restoring replaces book display names. An empty list uses canonical
+        names.
+      </p>
+      {Boolean(preferences.settings.bookDisplayOverrides?.length) && (
+        <ul className="list-inside list-disc text-sm">
+          {preferences.settings.bookDisplayOverrides!.map((item) => (
+            <li key={`${item.translationCode}:${item.bookNumber}`}>
+              {item.translationCode} · Book {item.bookNumber}: {item.label}
+            </li>
+          ))}
+        </ul>
+      )}
       {preferences.customThemes.length > 0 && (
         <ul className="list-inside list-disc text-sm">
           {preferences.customThemes.map((theme, index) => (

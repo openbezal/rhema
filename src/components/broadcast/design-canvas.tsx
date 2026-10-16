@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import * as fabric from "fabric"
 import { useBroadcastStore } from "@/stores"
+import { useSettingsStore } from "@/stores/settings-store"
 import {
   onThemeFontsLoaded,
   renderVerse,
@@ -47,6 +48,7 @@ export function DesignCanvas() {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
   const selectedElement = useBroadcastStore((s) => s.selectedElement)
+  const bookNames = useSettingsStore((s) => s.bookDisplayOverrides)
   const [zoomLevel, setZoomLevel] = useState(0)
   const [fitWarning, setFitWarning] = useState("")
   const updateFitWarning = useCallback((metrics: VerseLayoutMetrics) => {
@@ -106,6 +108,10 @@ export function DesignCanvas() {
 
     setZoomLevel(Math.round(scale * 100))
   }, [resyncLatestTheme])
+
+  useEffect(() => {
+    resyncLatestTheme()
+  }, [bookNames, resyncLatestTheme])
 
   // Initialize Fabric canvas + workspace
   useEffect(() => {
@@ -698,7 +704,11 @@ function renderThemeBitmap(theme: BroadcastTheme): {
   const ctx = offscreen.getContext("2d")
   if (!ctx) return { bitmap: offscreen, metrics: null }
 
-  const metrics = renderDesignerSample(ctx, theme)
+  const metrics = renderDesignerSample(
+    ctx,
+    theme,
+    useSettingsStore.getState().bookDisplayOverrides
+  )
   if (theme.background.type === "transparent") {
     drawTransparencyCheckerboard(ctx)
   }

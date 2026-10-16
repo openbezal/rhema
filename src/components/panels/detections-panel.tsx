@@ -12,8 +12,15 @@ import { useBibleStore, useDetectionStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { mark } from "@/lib/latency-marks"
 import type { DetectionResult } from "@/types"
+import { useDisplayVerseReference } from "@/hooks/use-book-display-names"
 
 function DetectionCard({ detection }: { detection: DetectionResult }) {
+  const displayReference = useDisplayVerseReference()
+  const reference = displayReference(
+    detection,
+    detection.translation_code,
+    detection.is_chapter_only
+  )
   const handlePresent = () => {
     // Navigate book search panel to this verse
     if (detection.book_number > 0) {
@@ -40,18 +47,18 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
     <div
       data-operator-item={`${detection.translation_code}|${detection.verse_ref}`}
       tabIndex={0}
-      aria-label={detection.verse_ref}
+      aria-label={reference}
       className="group border-b border-border p-3 last:border-0 focus-visible:outline-2 focus-visible:outline-ring"
     >
       <div className="flex items-center gap-2">
         <ConfidenceDot confidence={detection.confidence} />
         <span className="flex-1 truncate text-sm font-semibold text-foreground">
-          {detection.verse_ref}
+          {reference}
         </span>
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={`Dismiss ${detection.verse_ref}`}
+          aria-label={`Dismiss ${reference}`}
           title="Dismiss"
           className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           onClick={() =>

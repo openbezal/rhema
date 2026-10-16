@@ -1,6 +1,13 @@
 import { revealVerseInList } from "@/lib/verse-reveal"
 import { useOperatorUiStore } from "@/lib/operator-ui"
 import {
+  currentDisplayBooks,
+  useDisplayVerseReference,
+} from "@/hooks/use-book-display-names"
+import { displayBooks, displayBookName } from "@/lib/book-display-names"
+import { useSettingsStore } from "@/stores/settings-store"
+import { translationCode } from "@/lib/translation-selection"
+import {
   useState,
   useEffect,
   useLayoutEffect,
@@ -222,6 +229,13 @@ export function SearchPanel() {
   } = useBible()
 
   const followDetections = useBibleStore((s) => s.followDetections)
+  const bookNames = useSettingsStore((s) => s.bookDisplayOverrides)
+  const activeCode = useBibleStore((s) => s.activeTranslationCode)
+  const displayReference = useDisplayVerseReference()
+  const visibleBooks = useMemo(
+    () => displayBooks(books, activeCode, bookNames),
+    [books, activeCode, bookNames]
+  )
   const queueItems = useQueueStore((s) => s.items)
   const queuedVerseKeys = useMemo(() => {
     return new Set(
@@ -366,10 +380,7 @@ export function SearchPanel() {
       // A fully-typed reference ("John 3:16", "jn 3 16", "1 cor 13:4") pins
       // the exact verse at the top; hybrid search still runs beneath it.
       let referenceResult: SemanticSearchResult | null = null
-      const reference = parseTypedReference(
-        query,
-        useBibleStore.getState().books
-      )
+      const reference = parseTypedReference(query, currentDisplayBooks())
       if (reference) {
         const verse = await invoke<Verse | null>("get_verse", {
           translationId,
@@ -480,8 +491,8 @@ export function SearchPanel() {
 
   // Derive autocomplete suggestion during render (no setState cascading)
   const autocompleteResult = useMemo(
-    () => getAutocompleteSuggestion(quickInput, books),
-    [quickInput, books]
+    () => getAutocompleteSuggestion(quickInput, visibleBooks),
+    [quickInput, visibleBooks]
   )
   const quickSuggestion = autocompleteResult.suggestion
   const quickSuggestionSuffix = getAutocompleteSuffix(
@@ -510,7 +521,7 @@ export function SearchPanel() {
       state.activeTranslationId !== quickOriginTranslationRef.current
     )
       return
-    const result = getAutocompleteSuggestion(quickInput, state.books)
+    const result = getAutocompleteSuggestion(quickInput, currentDisplayBooks())
     if (result.matchedBook && result.chapter && result.verse) {
       queueQuickNavigation({
         bookNumber: result.matchedBook.book_number,
@@ -742,7 +753,7 @@ export function SearchPanel() {
                     canComplete
                       ? completeTypedReferenceInput(
                           input.value,
-                          useBibleStore.getState().books
+                          currentDisplayBooks()
                         )
                       : input.value
                   )
@@ -756,7 +767,7 @@ export function SearchPanel() {
                       input.selectionEnd === input.value.length
                       ? completeTypedReferenceInput(
                           input.value,
-                          useBibleStore.getState().books
+                          currentDisplayBooks()
                         )
                       : input.value
                   )
@@ -872,7 +883,13 @@ export function SearchPanel() {
           <div className="flex min-h-9 shrink-0 items-center justify-between border-b border-border px-3 py-2">
             {selectedBook ? (
               <h3 className="text-sm font-semibold text-foreground">
-                {selectedBook.name} {chapter}
+                {displayBookName(
+                  selectedBook.name,
+                  selectedBook.book_number,
+                  activeCode,
+                  bookNames
+                )}{" "}
+                {chapter}
               </h3>
             ) : null}
             {selectedBook ? (
@@ -917,7 +934,7 @@ export function SearchPanel() {
                   data-operator-item={`verse-${verse.id}`}
                   data-operator-present
                   tabIndex={0}
-                  aria-label={`${verse.book_name} ${verse.chapter}:${verse.verse}`}
+                  aria-label={displayReference(verse)}
                   onClick={() => handleVerseClick(verse)}
                   className={cn(
                     "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors focus-visible:outline-2 focus-visible:outline-ring",
@@ -984,10 +1001,16 @@ export function SearchPanel() {
                             )}
                             onClick={(e) => {
                               e.stopPropagation()
+                              const source = translations.find(
+                                (item) => item.id === verse.translation_id
+                              )
                               useQueueStore.getState().addItem({
                                 id: crypto.randomUUID(),
                                 verse,
                                 reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+                                translation_code: source
+                                  ? translationCode(source)
+                                  : undefined,
                                 confidence: 1,
                                 source: "manual",
                                 added_at: Date.now(),
@@ -1035,7 +1058,7 @@ export function SearchPanel() {
                 data-operator-item={`context-${result.book_number}:${result.chapter}:${result.verse}`}
                 data-operator-present
                 tabIndex={0}
-                aria-label={result.verse_ref}
+                aria-label={displayReference(result, activeCode)}
                 onClick={() => {
                   const verse: Verse = {
                     id: 0,
@@ -1054,7 +1077,7 @@ export function SearchPanel() {
               >
                 <div className="flex shrink-0 flex-row items-start gap-2">
                   <span className="text-xs font-semibold">
-                    {result.book_name} {result.chapter}:{result.verse}
+                    {displayReference(result, activeCode)}
                   </span>
                   <ResultSourceBadges result={result} />
                 </div>
@@ -1124,6 +1147,7 @@ export function SearchPanel() {
                                 text: result.verse_text,
                               },
                               reference: `${result.book_name} ${result.chapter}:${result.verse}`,
+                              translation_code: activeCode ?? undefined,
                               confidence: result.similarity,
                               source: "manual",
                               added_at: Date.now(),

@@ -15,10 +15,12 @@ import {
   refreshLiveVerse,
   connectPresentationController,
   toVerseRenderData,
+  isPresentationIntentCurrent,
 } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { beginOperatorMaintenance } from "./operator-maintenance"
+import { useSettingsStore } from "@/stores/settings-store"
 const source: Verse = {
   id: 1,
   translation_id: 1,
@@ -34,6 +36,7 @@ const held = {
   segments: [{ text: "Held output" }],
 }
 beforeEach(() => {
+  useSettingsStore.setState({ bookDisplayOverrides: [] })
   invalidatePresentation()
   mocks.emit.mockClear()
   mocks.invoke.mockReset().mockResolvedValue(null)
@@ -60,6 +63,53 @@ beforeEach(() => {
   })
 })
 describe("verified primary text", () => {
+  it("uses the newest display preference when a pending verified lookup commits", async () => {
+    const lookup = deferred<Verse>()
+    mocks.invoke.mockImplementation(async (command) =>
+      command === "get_verse" ? lookup.promise : null
+    )
+    const pending = presentVerse(source)
+    useSettingsStore
+      .getState()
+      .setBookDisplayOverrides([
+        { translationCode: "ESV", bookNumber: 43, label: "Yohanan" },
+      ])
+    lookup.resolve(resolved)
+    await pending
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "Yohanan 3:16 (ESV)"
+    )
+    expect(useBroadcastStore.getState().liveVerse?.address?.bookName).toBe(
+      "John"
+    )
+    expect(useBroadcastStore.getState().liveSourceVerse?.book_name).toBe("John")
+  })
+  it("relabels a held verified frame without a lookup, new verse intent, text change or preview selection", async () => {
+    mocks.invoke.mockImplementation(async (command) =>
+      command === "get_verse" ? resolved : null
+    )
+    await presentVerse(source)
+    const live = useBroadcastStore.getState().liveVerse!
+    const selected = useBibleStore.getState().selectedVerse
+    cleanups.push(connectPresentationController())
+    const intent = reservePresentationIntent()
+    mocks.invoke.mockClear()
+    useSettingsStore
+      .getState()
+      .setBookDisplayOverrides([
+        { translationCode: "ESV", bookNumber: 43, label: "Yohanan" },
+      ])
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "Yohanan 3:16 (ESV)"
+    )
+    expect(useBroadcastStore.getState().liveVerse?.segments).toBe(live.segments)
+    expect(useBibleStore.getState().selectedVerse).toBe(selected)
+    expect(isPresentationIntentCurrent(intent)).toBe(true)
+    expect(
+      mocks.invoke.mock.calls.filter((call) => call[0] === "get_verse")
+    ).toHaveLength(0)
+    expect(useBroadcastStore.getState().isLive).toBe(true)
+  })
   it("attaches the verified primary address to the committed render payload", async () => {
     mocks.invoke.mockImplementation(async (command) =>
       command === "get_verse" ? resolved : null

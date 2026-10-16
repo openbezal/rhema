@@ -1,0 +1,10 @@
+{
+  "base": "3769e5aebad2b7543743c58c619d2241dcecedb0",
+  "scope": "Task9B2B: stable-code editable book display names and portable settings",
+  "frontend": { "files": 82, "tests": 967, "typecheck": "pass", "typecheckGuard": "pass", "lint": "pass; zero warnings", "productionBuild": "pass; existing bundle-size advisory" },
+  "native": { "platform": "macOS", "defaultTests": 479, "noDefaultTests": 479, "strictClippy": "pass", "fmt": "pass", "dependenciesAdded": false, "realSQLite": ["apply/reopen", "invalid/duplicate rejection before writes", "injected transaction ABORT/rollback/reopen"] },
+  "browser": { "viewport": "1024x600", "colorModes": ["light", "dark"], "production": ["main/App", "settings", "Search", "preview/live Canvas", "Fabric designer", "Queue", "archive/export", "restore review"], "mocked": ["profile", "Bible database", "audio", "windows/outputs", "dialogs/files", "no-output warning receipt"], "expectedWarnings": 1, "unexpectedWarningsOrErrors": 0, "artifacts": "book-display-names-browser-observations.json", "postBrowserAutomatedOnly": ["manual Queue source-code capture", "numbered legacy reference compatibility", "all-layout renamed-reference geometry assertions"] },
+  "review": { "status": "pending one fresh whole-branch review", "fixPasses": 0, "rulings": [] },
+  "limitations": ["Installed-platform save/restart and dialogs remain unverified", "Physical receivers and providers remain acceptance work", "Legacy string-only held frames remain verbatim until a new verified presentation", "Existing volatile-session reload policy is unchanged"],
+  "cleanup": { "qaFilesRemoved": true, "viteEntryRemoved": true, "serverStopped": true, "temporaryTabClosed": true, "viewportReset": true }
+}

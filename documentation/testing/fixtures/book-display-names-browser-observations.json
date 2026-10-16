@@ -1,0 +1,815 @@
+{
+  "viewport": {
+    "width": 1024,
+    "height": 600
+  },
+  "observations": [
+    {
+      "step": "Saved BIUO Revelation override",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Revelation 1:2 (BIUO)",
+        "onAir": false,
+        "queue": [
+          {
+            "id": "retained-queue",
+            "text": "Retained Queue verse — Chineke Ọlọ́run",
+            "code": "BIUO"
+          }
+        ],
+        "active": 0,
+        "transcriptCount": 5,
+        "detectionCount": 1,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "apply",
+        "revision": 2,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 2,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Reloaded override and typed alias presented; synthetic live confirmed",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Revelation 1:2 (BIUO)",
+        "onAir": true,
+        "queue": [],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "apply",
+        "revision": 4,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 1,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Unicode live rename and independent KJV override",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Ìṣípayá — Ọ̀rọ̀"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Ìṣípayá — Ọ̀rọ̀ 1:2 (BIUO)",
+        "onAir": true,
+        "queue": [],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "apply",
+        "revision": 6,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Ìṣípayá — Ọ̀rọ̀"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 3,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Unicode display alias presents canonical book66 verse17",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 17,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Ìṣípayá — Ọ̀rọ̀"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Ìṣípayá — Ọ̀rọ̀ 1:17 (BIUO)",
+        "onAir": true,
+        "queue": [],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "apply",
+        "revision": 6,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Ìṣípayá — Ọ̀rọ̀"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 3,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Synthetic disk-full save rejected with explicit session-only warning",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          },
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Last Book"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Last Book 1:2 (BIUO)",
+        "onAir": true,
+        "queue": [
+          {
+            "id": "ee9181b5-6386-473d-91c2-daba451bc33b",
+            "text": "Synthetic BIUO fixture for Revelation of John 1:2. Book display QA only."
+          }
+        ],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "reject",
+        "revision": 6,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Ìṣípayá — Ọ̀rọ̀"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 3,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Retry acknowledged, then reset current BIUO edition only",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Revelation of John 1:2 (BIUO)",
+        "onAir": true,
+        "queue": [
+          {
+            "id": "ee9181b5-6386-473d-91c2-daba451bc33b",
+            "text": "Synthetic BIUO fixture for Revelation of John 1:2. Book display QA only."
+          }
+        ],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "apply",
+        "revision": 8,
+        "savedBookNames": [
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 5,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": null,
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Exported three stable-code names without local keys",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 1,
+            "label": "Beginning"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Revelation 1:2 (BIUO)",
+        "onAir": true,
+        "queue": [
+          {
+            "id": "ee9181b5-6386-473d-91c2-daba451bc33b",
+            "text": "Synthetic BIUO fixture for Revelation of John 1:2. Book display QA only."
+          }
+        ],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "apply",
+        "revision": 10,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 1,
+            "label": "Beginning"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 7,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": {
+          "bookNames": [
+            {
+              "translationCode": "BIUO",
+              "bookNumber": 66,
+              "label": "Revelation"
+            },
+            {
+              "translationCode": "KJV",
+              "bookNumber": 1,
+              "label": "Beginning"
+            },
+            {
+              "translationCode": "KJV",
+              "bookNumber": 66,
+              "label": "Apocalypse"
+            }
+          ],
+          "format": "json",
+          "bytes": 3408,
+          "hasTranscript": false,
+          "hasQueue": false,
+          "hasLocalKey": false,
+          "hasPartial": false
+        },
+        "nativeTranscribing": false
+      }
+    },
+    {
+      "step": "Reopened full session export: one renamed Queue entry and three portable names; canonical source text retained",
+      "state": {
+        "phase": "idle",
+        "uiCode": "BIUO",
+        "selected": {
+          "book": 66,
+          "chapter": 1,
+          "verse": 2,
+          "translation": 10
+        },
+        "pending": null,
+        "chapterRows": [
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          },
+          {
+            "book": 66,
+            "chapter": 1,
+            "translation": 10
+          }
+        ],
+        "uiBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 1,
+            "label": "Beginning"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "uiGain": 1.6,
+        "frame": "Revelation 1:2 (BIUO)",
+        "onAir": true,
+        "queue": [
+          {
+            "id": "ee9181b5-6386-473d-91c2-daba451bc33b",
+            "text": "Synthetic BIUO fixture for Revelation of John 1:2. Book display QA only."
+          }
+        ],
+        "active": null,
+        "transcriptCount": 0,
+        "detectionCount": 0,
+        "uiAutoLive": false,
+        "uiFollow": false,
+        "uiThemeCount": 1,
+        "mode": "recovery",
+        "revision": 10,
+        "savedBookNames": [
+          {
+            "translationCode": "BIUO",
+            "bookNumber": 66,
+            "label": "Revelation"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 1,
+            "label": "Beginning"
+          },
+          {
+            "translationCode": "KJV",
+            "bookNumber": 66,
+            "label": "Apocalypse"
+          }
+        ],
+        "savedCode": "BIUO",
+        "savedGain": 1.6,
+        "nativeActive": 10,
+        "localKeyRetained": true,
+        "unknownRetained": true,
+        "themeCount": 1,
+        "monitor": 2,
+        "writes": 7,
+        "reads": 1,
+        "legacyCalls": 0,
+        "lastApplyBeforeRevision": null,
+        "lastApplyHasLocalKey": null,
+        "lastExport": {
+          "bookNames": [
+            {
+              "translationCode": "BIUO",
+              "bookNumber": 66,
+              "label": "Revelation"
+            },
+            {
+              "translationCode": "KJV",
+              "bookNumber": 1,
+              "label": "Beginning"
+            },
+            {
+              "translationCode": "KJV",
+              "bookNumber": 66,
+              "label": "Apocalypse"
+            }
+          ],
+          "format": "json",
+          "bytes": 3982,
+          "hasTranscript": false,
+          "hasQueue": false,
+          "hasLocalKey": false,
+          "hasPartial": false
+        },
+        "nativeTranscribing": false
+      }
+    }
+  ],
+  "logs": [
+    {
+      "level": "warn",
+      "message": "[settings] Failed to persist settings",
+      "timestamp": "2026-10-16T05:30:45.941Z",
+      "url": "http://127.0.0.1:56377/assets/main-BXN9z9dX.js"
+    }
+  ],
+  "notes": [
+    "Production main/App, settings, search, Canvas/Fabric and archive UI; all native storage/Bible/audio/output/file boundaries mocked",
+    "Explicit QA-only no-output warning mocked with plugin button label Go live anyway; initial boolean mock was corrected without production changes",
+    "First save retained existing transcript5/Queue1/detection1; intentional page reload follows existing volatile-session policy and cleared these; later one manual Queue entry was added and remained stable through naming/reset/export",
+    "Inherited receipt hasQueue/hasTranscript flags look for old retained sentinel strings, not generic collection counts; reopened session UI explicitly showed the new one-entry Queue",
+    "No real microphone, output receiver or native file dialog was used"
+  ]
+}

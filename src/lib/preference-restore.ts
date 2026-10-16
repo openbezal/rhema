@@ -2,9 +2,11 @@ import type { z } from "zod"
 import type { BroadcastTheme, Translation } from "@/types"
 import { PortablePreferencesSchema } from "./session-archive-schema"
 import { translationCode } from "./translation-selection"
+import { BookDisplayOverridesSchema } from "./book-display-names"
 
 type PortablePreferences = z.infer<typeof PortablePreferencesSchema>
 const RestoreSettingsSchema = PortablePreferencesSchema.shape.settings.extend({
+  bookDisplayOverrides: BookDisplayOverridesSchema.default([]),
   gain: PortablePreferencesSchema.shape.settings.shape.gain.max(
     2,
     "Input gain must be between 0× and 2×."

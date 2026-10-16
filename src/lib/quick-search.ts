@@ -10,6 +10,7 @@ export interface Book {
   name: string
   abbreviation: string
   testament: string
+  displayName?: string
 }
 
 export interface AutocompleteResult {
@@ -67,12 +68,14 @@ export function findMatchingBook(
     [book.name, book.abbreviation].map((label) =>
       normalizeInput(label).toLowerCase()
     )
-  const exact = books.filter((book) => labels(book).includes(normalized))
+  const canonicalExact = books.filter((book) => labels(book).includes(normalized))
+  const aliasExact = books.filter((book) => book.displayName && normalizeInput(book.displayName).toLowerCase() === normalized)
+  const exact = canonicalExact.length ? canonicalExact : aliasExact
   const prefix = /^(i|ii|iii)$/.test(normalized) ? normalized + " " : normalized
   const matches = exact.length
     ? exact
     : books.filter((book) =>
-        labels(book).some((label) => label.startsWith(prefix))
+        [...labels(book), ...(book.displayName ? [normalizeInput(book.displayName).toLowerCase()] : [])].some((label) => label.startsWith(prefix))
       )
   return new Set(matches.map((book) => book.book_number)).size === 1
     ? matches[0]
@@ -97,7 +100,7 @@ export function getAutocompleteSuggestion(
   // Installed Unicode labels, then optional chapter and a colon, dot or space
   // before the verse. Numbered-book aliases were normalized above.
   const match = normalizedInput.match(
-    /^([\p{L}\p{M}][\p{L}\p{M}\s.'’-]*?)\s*(?:(\d+)(?:(\s*[:.]\s*|\s+)(\d*))?)?$/u
+    /^(.+?)\s*(?:(\d+)(?:(\s*[:.]\s*|\s+)(\d*))?)?$/u
   )
 
   if (!match) {
@@ -118,7 +121,7 @@ export function getAutocompleteSuggestion(
   // Stage 1: Autocomplete book name + suggest 1:1
   if (!chapterNum) {
     return {
-      suggestion: matchingBook.name + " 1:1",
+      suggestion: (matchingBook.displayName ?? matchingBook.name) + " 1:1",
       matchedBook: matchingBook,
       chapter: 1,
       verse: 1,
@@ -133,7 +136,7 @@ export function getAutocompleteSuggestion(
   // Stage 2: Suggest colon after chapter
   if (!delimiter) {
     return {
-      suggestion: `${matchingBook.name} ${chapter}:1`,
+      suggestion: `${matchingBook.displayName ?? matchingBook.name} ${chapter}:1`,
       matchedBook: matchingBook,
       chapter,
       verse: 1,
@@ -182,7 +185,7 @@ export function completeTypedReferenceInput(
 ): string {
   const parsed = getAutocompleteSuggestion(input, books)
   if (!parsed.matchedBook) return input
-  const name = parsed.matchedBook.name
+  const name = parsed.matchedBook.displayName ?? parsed.matchedBook.name
   if (parsed.stage === "book" && /\s$/.test(input)) return `${name} `
   if (
     (parsed.stage === "chapter" && /\s$/.test(input)) ||

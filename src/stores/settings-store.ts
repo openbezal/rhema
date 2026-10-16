@@ -1,6 +1,10 @@
 import { create } from "zustand"
 import { useProfileStatusStore } from "@/lib/profile-status"
 import {
+  BookDisplayOverridesSchema,
+  type BookDisplayOverride,
+} from "@/lib/book-display-names"
+import {
   DEFAULT_SUGGESTION_OPTIONS,
   suggestionOptions,
 } from "@/lib/suggestion-history"
@@ -25,6 +29,7 @@ interface SettingsState {
   suggestionRetentionMs: number
   onboardingComplete: boolean
   sttProvider: SttProvider
+  bookDisplayOverrides: BookDisplayOverride[]
 
   setDeepgramApiKey: (key: string | null) => void
   setOpenaiApiKey: (key: string | null) => void
@@ -38,6 +43,7 @@ interface SettingsState {
   setSuggestionRetentionMs: (ms: number) => void
   setOnboardingComplete: (complete: boolean) => void
   setSttProvider: (provider: SttProvider) => void
+  setBookDisplayOverrides: (names: BookDisplayOverride[]) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -53,6 +59,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   suggestionRetentionMs: 60_000,
   onboardingComplete: false,
   sttProvider: "deepgram",
+  bookDisplayOverrides: [],
 
   setDeepgramApiKey: (deepgramApiKey) => set({ deepgramApiKey }),
   setOpenaiApiKey: (openaiApiKey) => set({ openaiApiKey }),
@@ -78,6 +85,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     })),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   setSttProvider: (sttProvider) => set({ sttProvider }),
+  setBookDisplayOverrides: (names) =>
+    set({ bookDisplayOverrides: BookDisplayOverridesSchema.parse(names) }),
 }))
 
 const PERSISTED_KEYS = [
@@ -93,6 +102,7 @@ const PERSISTED_KEYS = [
   "suggestionRetentionMs",
   "onboardingComplete",
   "sttProvider",
+  "bookDisplayOverrides",
 ] as const satisfies readonly (keyof SettingsState)[]
 
 let tauriStore: ProfileSectionStore | null = null
@@ -132,6 +142,14 @@ export function hydrateSettings(): Promise<void> {
       })
       patch.suggestionCapacity = validated.capacity
       patch.suggestionRetentionMs = validated.retentionMs
+      const bookNames = BookDisplayOverridesSchema.safeParse(
+        patch.bookDisplayOverrides ?? []
+      )
+      if (!bookNames.success) {
+        useProfileStatusStore.setState({ readFailed: true })
+        throw new Error("Saved book display names are unreadable")
+      }
+      patch.bookDisplayOverrides = bookNames.data
       if (Object.keys(patch).length > 0) {
         useSettingsStore.setState(patch)
       }
@@ -145,9 +163,9 @@ export function hydrateSettings(): Promise<void> {
         if (saveTimer) clearTimeout(saveTimer)
         saveTimer = setTimeout(() => {
           saveTimer = null
-          pendingSave = pendingSave.then(() =>
-            persistAll(useSettingsStore.getState())
-          ).catch(() => console.warn("[settings] Failed to persist settings"))
+          pendingSave = pendingSave
+            .then(() => persistAll(useSettingsStore.getState()))
+            .catch(() => console.warn("[settings] Failed to persist settings"))
         }, SAVE_DEBOUNCE_MS)
       })
     } catch {
@@ -170,12 +188,16 @@ async function persistAll(state: SettingsState): Promise<void> {
 }
 
 export async function flushSettingsPersistence(): Promise<void> {
-  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  if (useProfileStatusStore.getState().readFailed)
+    throw new Error("Restart Rhema before saving unreadable preferences")
   await hydrateSettings()
-  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  if (useProfileStatusStore.getState().readFailed)
+    throw new Error("Restart Rhema before saving unreadable preferences")
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = null
   const saved = pendingSave.then(() => persistAll(useSettingsStore.getState()))
-  pendingSave = saved.catch(() => console.warn("[settings] Failed to persist settings"))
+  pendingSave = saved.catch(() =>
+    console.warn("[settings] Failed to persist settings")
+  )
   await saved
 }

@@ -222,6 +222,15 @@ describe("independent reference and body verse numbers", () => {
         expect(noBodyNumbers.text.map((row) => row.text)).toContain(
           `John 3:16 (ESV${bilingual ? " · KJV" : ""})`
         )
+        data.address!.displayBookName = "Yohanan"
+        const renamed = recorder()
+        const renamedMetrics = renderVerse(renamed.ctx, t, data)!
+        expect(renamed.text.map((row) => row.text)).toContain(
+          `Yohanan 3:16 (ESV${bilingual ? " · KJV" : ""})`
+        )
+        expect(renamedMetrics.referenceRect!.width).toBeGreaterThan(
+          fullMetrics.referenceRect!.width
+        )
       })
     }
   }

@@ -80,6 +80,23 @@ const mockBooks: Book[] = [
 ]
 
 describe("unambiguous installed-book resolution", () => {
+  it("accepts custom display aliases while retaining canonical names and abbreviations", () => {
+    const books: Book[] = [...mockBooks, { id: 66, translation_id: 1, book_number: 66, name: "Revelation of John", abbreviation: "Rev", testament: "NT", displayName: "Apocalypse" }]
+    expect(parseTypedReference("Apocalypse 1:2", books)?.book.book_number).toBe(66)
+    expect(parseTypedReference("Revelation of John 1:2", books)?.book.book_number).toBe(66)
+    expect(parseTypedReference("Rev 1:2", books)?.book.book_number).toBe(66)
+    expect(getAutocompleteSuggestion("Apoc", books).suggestion).toBe("Apocalypse 1:1")
+    books[books.length - 1].displayName = "John"
+    expect(parseTypedReference("John 3:16", books)?.book.book_number).toBe(43)
+  })
+  it("does not guess between colliding custom aliases", () => {
+    const books = mockBooks.map((book) => ({ ...book, displayName: "Chosen" }))
+    expect(parseTypedReference("Chosen 1:2", books)).toBeNull()
+  })
+  it("accepts punctuation and Unicode in a custom typed book label", () => {
+    const books = [{ ...mockBooks[0], displayName: "Ọ̀rọ̀ (Beginning)" }]
+    expect(parseTypedReference("Ọ̀rọ̀ (Beginning) 1:2", books)?.book.book_number).toBe(1)
+  })
   const james: Book = {
     id: 59,
     translation_id: 1,

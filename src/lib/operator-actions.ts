@@ -9,6 +9,7 @@ import { useBibleStore } from "@/stores/bible-store"
 import { isOperatorMaintenanceActive } from "./operator-maintenance"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
+import { translationCode } from "./translation-selection"
 
 /**
  * Find the queue index of the verse currently on the live output.
@@ -88,10 +89,14 @@ export const operatorActions = {
     if (isOperatorMaintenanceActive()) return
     const { selectedVerse } = useBibleStore.getState()
     if (!selectedVerse) return
+    const source = useBibleStore
+      .getState()
+      .translations.find((item) => item.id === selectedVerse.translation_id)
     useQueueStore.getState().addItem({
       id: crypto.randomUUID(),
       verse: selectedVerse,
       reference: `${selectedVerse.book_name} ${selectedVerse.chapter}:${selectedVerse.verse}`,
+      translation_code: source ? translationCode(source) : undefined,
       confidence: 1,
       source: "manual",
       added_at: Date.now(),
@@ -103,17 +108,23 @@ export const operatorActions = {
 
   /** Present the next/previous Bible verse without moving the queue or going on air. */
   bibleNext: (intentOwner?: object) =>
-    isOperatorMaintenanceActive() ? Promise.resolve() : stepVerse("next", { present: true, intentOwner }),
+    isOperatorMaintenanceActive()
+      ? Promise.resolve()
+      : stepVerse("next", { present: true, intentOwner }),
   biblePrev: (intentOwner?: object) =>
-    isOperatorMaintenanceActive() ? Promise.resolve() : stepVerse("prev", { present: true, intentOwner }),
+    isOperatorMaintenanceActive()
+      ? Promise.resolve()
+      : stepVerse("prev", { present: true, intentOwner }),
 
   clearLive,
   setFollowDetections: (enabled: boolean) => {
-    if (!isOperatorMaintenanceActive()) useBibleStore.getState().setFollowDetections(enabled)
+    if (!isOperatorMaintenanceActive())
+      useBibleStore.getState().setFollowDetections(enabled)
   },
 
   setAutoLive: (enabled: boolean) => {
-    if (!isOperatorMaintenanceActive()) useBroadcastStore.getState().setAutoLive(enabled)
+    if (!isOperatorMaintenanceActive())
+      useBroadcastStore.getState().setAutoLive(enabled)
   },
   toggleAutoLive: () => {
     if (isOperatorMaintenanceActive()) return

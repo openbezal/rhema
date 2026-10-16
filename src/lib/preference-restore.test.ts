@@ -52,6 +52,33 @@ function preferences() {
   }
 }
 
+it("keeps old documents readable and explicitly defaults their restored book names to canonical", () => {
+  const source = preferences()
+  const parsed = PortablePreferencesSchema.parse(source)
+  expect(parsed.settings.bookDisplayOverrides).toBeUndefined()
+  const stage = stagePreferencesRestore(source, translations, [])
+  expect(
+    resolvePreferencesRestore(stage, "BIUO", "KJV", translations).settings
+      .bookDisplayOverrides
+  ).toEqual([])
+  expect(source.settings).not.toHaveProperty("bookDisplayOverrides")
+})
+it("restores portable book names without rewriting unrelated stable codes during primary mapping", () => {
+  const names = [
+    { translationCode: "FUTURE", bookNumber: 66, label: "Revelation" },
+  ]
+  const source = {
+    ...preferences(),
+    primaryTranslationCode: "MISSING",
+    settings: { ...preferences().settings, bookDisplayOverrides: names },
+  }
+  const stage = stagePreferencesRestore(source, translations, [])
+  expect(
+    resolvePreferencesRestore(stage, "BIUO", "KJV", translations).settings
+      .bookDisplayOverrides
+  ).toEqual(names)
+})
+
 it("stages detached portable data and new theme identities without changing the source or local themes", () => {
   const source = {
     ...preferences(),

@@ -11,6 +11,7 @@ import {
   type SuggestionCandidate,
 } from "@/lib/suggestion-history"
 import { translationCode } from "@/lib/translation-selection"
+import { useDisplayVerseReference } from "@/hooks/use-book-display-names"
 
 function SuggestionCard({
   candidate,
@@ -19,6 +20,12 @@ function SuggestionCard({
   candidate: SuggestionCandidate
   onDismiss: () => void
 }) {
+  const displayReference = useDisplayVerseReference()
+  const reference = displayReference(
+    candidate,
+    candidate.translation_code,
+    candidate.is_chapter_only
+  )
   const translations = useBibleStore((state) => state.translations)
   const known = translations.some(
     (item) =>
@@ -38,7 +45,7 @@ function SuggestionCard({
     try {
       if (action === "present") await presentSuggestion(candidate)
       else if (await queueSuggestion(candidate))
-        toast.success(`${candidate.verse_ref} queued`)
+        toast.success(`${reference} queued`)
     } catch (error) {
       toast.error(`Could not ${action} suggestion`, {
         description:
@@ -55,11 +62,11 @@ function SuggestionCard({
       data-suggestion-key={suggestionKey(candidate)}
       data-operator-item={suggestionKey(candidate)}
       tabIndex={0}
-      aria-label={`${candidate.translation_code} ${candidate.verse_ref}`}
+      aria-label={`${candidate.translation_code} ${reference}`}
       className="border-b border-border p-3 last:border-0 focus-visible:outline-2 focus-visible:outline-ring"
     >
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold">{candidate.verse_ref}</h3>
+        <h3 className="text-sm font-semibold">{reference}</h3>
         <span className="shrink-0 text-xs text-muted-foreground">
           {candidate.translation_code === "UNKNOWN"
             ? "Unknown translation"
@@ -90,7 +97,7 @@ function SuggestionCard({
         <Button
           size="sm"
           variant="ghost"
-          aria-label={`Dismiss ${candidate.translation_code} ${candidate.verse_ref}`}
+          aria-label={`Dismiss ${candidate.translation_code} ${reference}`}
           onClick={onDismiss}
         >
           Dismiss

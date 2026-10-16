@@ -27,5 +27,10 @@ export function formatVerseReference(
 
   const coordinate = `${address.chapter}${includeVerseNumbers ? `:${address.verse}` : ""}`
   const editions = `${address.translationCode}${address.secondaryTranslationCode ? ` · ${address.secondaryTranslationCode}` : ""}`
-  return `${address.bookName} ${coordinate} (${editions})`
+  const bookName =
+    typeof address.displayBookName === "string" &&
+    address.displayBookName.trim()
+      ? address.displayBookName
+      : address.bookName
+  return `${bookName} ${coordinate} (${editions})`
 }

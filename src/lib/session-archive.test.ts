@@ -62,6 +62,7 @@ beforeEach(() => {
     suggestionCapacity: 25,
     suggestionRetentionMs: 60_000,
     sttProvider: "deepgram",
+    bookDisplayOverrides: [],
   })
   useBroadcastStore.setState({
     themes: [...BUILTIN_THEMES],
@@ -151,6 +152,38 @@ it("exports portable preferences without keys, device identities or runtime stat
     autoLive: true,
     settings: { gain: 1, sttProvider: "deepgram" },
   })
+})
+
+it("retains bounded book names in portable settings without replacing canonical archived sources", () => {
+  const names = [
+    { translationCode: "KJV", bookNumber: 66, label: "Revelation" },
+  ]
+  useSettingsStore.setState({ bookDisplayOverrides: names })
+  useQueueStore
+    .getState()
+    .addItem({
+      id: "named",
+      verse: {
+        ...source,
+        book_number: 66,
+        book_name: "Revelation of John",
+        chapter: 1,
+        verse: 2,
+      },
+      reference: "Revelation of John 1:2",
+      translation_code: "KJV",
+      confidence: 1,
+      source: "manual",
+      added_at: 1000,
+    })
+  const archive = captureSessionArchive("Names", 3000)
+  expect(archive.preferences.settings.bookDisplayOverrides).toEqual(names)
+  expect(
+    parseSessionDocument(JSON.stringify(preferencesDocument(archive)))
+      .preferences.settings.bookDisplayOverrides
+  ).toEqual(names)
+  expect(archive.queue[0].reference).toBe("Revelation 1:2")
+  expect(archive.queue[0].verse.bookName).toBe("Revelation of John")
 })
 
 it("preserves Queue stable source codes instead of persisting numeric database IDs", () => {

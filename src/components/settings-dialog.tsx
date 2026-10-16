@@ -6,6 +6,9 @@ import { invoke } from "@tauri-apps/api/core"
 
 import { Button } from "@/components/ui/button"
 import { BibleDataNotices } from "@/components/bible-data-notices"
+import { BookDisplayNamesEditor } from "@/components/settings/book-display-names"
+import type { Translation } from "@/types"
+import { useBibleStore } from "@/stores/bible-store"
 import { DiagnosticsSection } from "@/components/settings/diagnostics-section"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -530,14 +533,10 @@ const sectionTitles: Record<NavSection, string> = {
 /*  Section: Bible Translation                                                */
 /* -------------------------------------------------------------------------- */
 
-interface TranslationInfo {
-  id: number
-  abbreviation: string
-  title: string
-  language: string
-}
+type TranslationInfo = Translation
 
 function BibleSection() {
+  const primaryCode = useBibleStore((state) => state.activeTranslationCode)
   const [translations, setTranslations] = useState<TranslationInfo[]>([])
   const [activeId, setActiveId] = useState<number>(1)
   const [loading, setLoading] = useState(true)
@@ -623,6 +622,7 @@ function BibleSection() {
             ` ${translations.length} translations available.`}
         </p>
       </div>
+      <BookDisplayNamesEditor translations={translations} primaryCode={primaryCode} />
       <div><BibleDataNotices /></div>
     </div>
   )

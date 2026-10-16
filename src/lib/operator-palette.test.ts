@@ -12,6 +12,7 @@ import {
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSettingsDialogStore } from "./settings-dialog"
+import { useSettingsStore } from "@/stores/settings-store"
 const translation = {
   id: 1,
   abbreviation: "KJV",
@@ -29,6 +30,7 @@ const book = {
   testament: "NT" as const,
 }
 beforeEach(() => {
+  useSettingsStore.setState({ bookDisplayOverrides: [] })
   mocks.invoke.mockReset()
   useBibleStore.setState({
     translations: [translation],
@@ -110,6 +112,29 @@ it("browses a complete verified reference without presenting or going on air", a
   })
   expect(useBroadcastStore.getState().isLive).toBe(false)
   expect(useBroadcastStore.getState().liveVerse).toBeNull()
+})
+
+it("resolves the exact custom display name without replacing canonical palette aliases", async () => {
+  useSettingsStore
+    .getState()
+    .setBookDisplayOverrides([
+      { translationCode: "KJV", bookNumber: 43, label: "Yohanan" },
+    ])
+  mocks.invoke.mockResolvedValue({
+    id: 316,
+    translation_id: 1,
+    book_number: 43,
+    book_name: "John",
+    book_abbreviation: "Jn",
+    chapter: 3,
+    verse: 16,
+    text: "Verified text",
+  })
+  await browsePaletteReference("Yohanan 3:16")
+  expect(useBibleStore.getState().pendingNavigation?.bookNumber).toBe(43)
+  await browsePaletteReference("Jn 3:16")
+  expect(useBibleStore.getState().pendingNavigation?.bookNumber).toBe(43)
+  expect(useBibleStore.getState().books[0].name).toBe("John")
 })
 it.each(["John 999:1", "J 3:16", "John words", "John 0:2"])(
   "does not navigate an invalid or ambiguous reference: %s",
