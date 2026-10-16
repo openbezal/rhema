@@ -1,0 +1,63 @@
+{
+  "base": "f33de300a2b192e6057b19a4956c6f29cc18fb53",
+  "reviewedSource": "5e5da04ac0f682c26ec7fd703d02d04f84a0c20f",
+  "fixedSource": "c94de99df8be3908bc10a886fad32b199aa1ddfc",
+  "browserSource": "5e5da04ac0f682c26ec7fd703d02d04f84a0c20f",
+  "review": {
+    "passes": 1,
+    "fixPasses": 1,
+    "critical": 0,
+    "important": 3,
+    "minor": 1,
+    "allFindingsFixed": true
+  },
+  "local": {
+    "platform": "macOS",
+    "frontendTests": 791,
+    "frontendFiles": 71,
+    "nativeDefaultTests": 465,
+    "nativeNoDefaultTests": 465,
+    "typecheck": true,
+    "seededTypecheckProbe": true,
+    "lintZeroWarnings": true,
+    "productionBuild": true,
+    "strictClippy": true,
+    "fmt": true,
+    "existingViteChunkAdvisory": true
+  },
+  "browser": {
+    "viewport": {
+      "width": 1024,
+      "height": 600
+    },
+    "actualAppAndMainStartup": true,
+    "nativeStorageDatabaseAudioOutputsMocked": true,
+    "reloadBacking": "synthetic sessionStorage",
+    "saveReload": true,
+    "neighboringSectionsAndFakeLocalKeyPreserved": true,
+    "failedSavePreservesCommittedRevision": true,
+    "subsequentEditRetries": true,
+    "unreadableProfileZeroWrites": true,
+    "onboardingSuppressedOnReadFailure": true,
+    "expectedInjectedFailureWarnings": true,
+    "unexpectedErrorsObserved": false,
+    "temporaryFilesServerTabViewportCleaned": true
+  },
+  "postReviewRegressionEvidence": [
+    "truncated canonical profile rejected without stale legacy fallback",
+    "preexisting version-zero canonical database rejected without modification",
+    "failed initial migration leaves canonical absent and can retry",
+    "concurrent initializers cannot replace committed profile",
+    "transient read recovery does not persist session-only Bible selection",
+    "separate checked Bible read failure latches warning and disables persistence",
+    "selection invalidated while waiting on settings write does not commit",
+    "canceled staged choice does not leak into subsequent edit"
+  ],
+  "unverified": [
+    "installed macOS/Windows/Linux profile migration and process restart",
+    "real permission/interruption behavior in installed packages",
+    "native document dialogs",
+    "portable preference application and machine mapping",
+    "new-session reset and complete session-event epoch barrier"
+  ]
+}
