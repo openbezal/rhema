@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { load } from "@tauri-apps/plugin-store"
+import { openProfileSection } from "@/lib/profile-persistence"
 import { useSettingsStore } from "./settings-store"
 
 interface TutorialState {
@@ -17,7 +17,7 @@ export const useTutorialStore = create<TutorialState>((set) => ({
 /** Load onboardingComplete from disk into settings store. */
 export async function hydrateOnboardingState(): Promise<void> {
   try {
-    const store = await load("settings.json", { autoSave: false, defaults: {} })
+    const store = await openProfileSection("settings")
     const completed = await store.get<boolean>("onboardingComplete")
     if (completed) {
       useSettingsStore.getState().setOnboardingComplete(true)
@@ -31,7 +31,7 @@ export async function hydrateOnboardingState(): Promise<void> {
 export async function persistOnboardingComplete(): Promise<void> {
   useSettingsStore.getState().setOnboardingComplete(true)
   try {
-    const store = await load("settings.json", { autoSave: false, defaults: {} })
+    const store = await openProfileSection("settings")
     await store.set("onboardingComplete", true)
     await store.save()
   } catch {

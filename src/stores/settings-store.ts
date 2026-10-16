@@ -3,7 +3,10 @@ import {
   DEFAULT_SUGGESTION_OPTIONS,
   suggestionOptions,
 } from "@/lib/suggestion-history"
-import { load, type Store } from "@tauri-apps/plugin-store"
+import {
+  openProfileSection,
+  type ProfileSectionStore,
+} from "@/lib/profile-persistence"
 
 type SttProvider = "deepgram" | "whisper"
 
@@ -90,12 +93,12 @@ const PERSISTED_KEYS = [
   "sttProvider",
 ] as const satisfies readonly (keyof SettingsState)[]
 
-let tauriStore: Store | null = null
+let tauriStore: ProfileSectionStore | null = null
 let hydrationPromise: Promise<void> | null = null
 
-async function getStore(): Promise<Store> {
+async function getStore(): Promise<ProfileSectionStore> {
   if (!tauriStore) {
-    tauriStore = await load("settings.json", { autoSave: false, defaults: {} })
+    tauriStore = await openProfileSection("settings")
   }
   return tauriStore
 }

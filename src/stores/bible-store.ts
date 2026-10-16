@@ -1,6 +1,6 @@
 import { resolveSecondaryTranslation, resolveTranslationSelection, saveTranslationSelection, translationCode, type TranslationSelectionStatus } from "@/lib/translation-selection"
 import { create } from "zustand"
-import { load } from "@tauri-apps/plugin-store"
+import { openProfileSection } from "@/lib/profile-persistence"
 import { invoke } from "@tauri-apps/api/core"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
@@ -127,8 +127,7 @@ export async function hydrateBibleStore(): Promise<void> {
   let saved: unknown = null
   let legacyId: unknown = null
   try {
-    // plugin-store suppresses initial disk/JSON errors, so hydration uses a
-    // checked native read. Its absent-file result is distinct from failure.
+    // The checked profile reader distinguishes absent preferences from errors.
     const preferences = await invoke<{ translationSelection?: unknown; activeTranslationId?: unknown } | null>("read_bible_preferences")
     saved = preferences?.translationSelection
     legacyId = preferences?.activeTranslationId
@@ -168,7 +167,7 @@ export async function activateTranslation(id: number): Promise<void> {
 /** Persist stable identity and its current catalog, with ordered disk writes. */
 export async function initBiblePersistence(): Promise<() => void> {
   try {
-    const store = await load("bible.json", { autoSave: false, defaults: {} })
+    const store = await openProfileSection("bible")
     let timer: ReturnType<typeof setTimeout> | null = null
     let writes = Promise.resolve()
     let previousCode: string | null = null
@@ -190,6 +189,8 @@ export async function initBiblePersistence(): Promise<() => void> {
         timer = null
         writes = writes.then(async () => {
           if (stopped) return
+          const current = useBibleStore.getState()
+          if (current.translationSelectionStatus !== "ready" || `${current.activeTranslationCode}|${current.secondaryTranslationCode ?? ""}` !== key) return
           await store.set("translationSelection", selection)
           await store.delete("activeTranslationId")
           await store.save()

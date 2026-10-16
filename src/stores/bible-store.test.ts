@@ -4,7 +4,7 @@ import type { Translation } from "@/types"
 const { mockGet, mockSet, mockSave, mockDelete, mockLoad, mockInvoke } = vi.hoisted(() => ({
   mockGet: vi.fn(), mockSet: vi.fn(), mockSave: vi.fn(), mockDelete: vi.fn(), mockLoad: vi.fn(), mockInvoke: vi.fn(),
 }))
-vi.mock("@tauri-apps/plugin-store", () => ({ load: mockLoad }))
+vi.mock("@/lib/profile-persistence", () => ({ openProfileSection: mockLoad }))
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mockInvoke }))
 
 function translation(id: number, abbreviation: string): Translation {
@@ -81,9 +81,8 @@ describe("stable Bible translation persistence", () => {
     expect(useBibleStore.getState().translationSelectionStatus).toBe("needs_confirmation")
   })
 
-  it("requires confirmation when the actual plugin suppresses a corrupt-file load error", async () => {
-    // plugin-store 2.4.4 resolves load() with an empty map after JSON/IO failure.
-    // The checked native read must independently report that existing-file error.
+  it("requires confirmation when the checked profile rejects an existing corrupt file", async () => {
+    // A persisted read error must remain distinct from an absent selection.
     mockInvoke.mockImplementation((command) => {
       if (command === "list_translations") return Promise.resolve(catalog)
       if (command === "read_bible_preferences") return Promise.reject(new Error("Invalid Bible preferences"))
@@ -201,6 +200,24 @@ describe("stable Bible translation persistence", () => {
     stop?.()
     await vi.advanceTimersByTimeAsync(500)
     expect(mockSet).toHaveBeenCalledTimes(1)
+  })
+
+  it("skips a queued choice invalidated while an earlier write is still finishing", async () => {
+    vi.useFakeTimers()
+    let finish!: () => void
+    mockSet.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+    const { initBiblePersistence, useBibleStore } = await import("./bible-store")
+    useBibleStore.getState().setTranslations(catalog)
+    cleanups.push(await initBiblePersistence())
+    useBibleStore.getState().setActiveTranslation(9)
+    await vi.advanceTimersByTimeAsync(500)
+    useBibleStore.getState().setActiveTranslation(4)
+    await vi.advanceTimersByTimeAsync(500)
+    useBibleStore.setState({ translationSelectionStatus: "needs_confirmation" })
+    finish()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockSet).toHaveBeenCalledTimes(1)
+    expect(mockSet).toHaveBeenCalledWith("translationSelection", expect.objectContaining({ code: "ESV" }))
   })
 })
 

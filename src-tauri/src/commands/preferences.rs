@@ -1,8 +1,5 @@
-use std::{fs, io::ErrorKind, path::Path};
-
 use serde::Serialize;
-use serde_json::Value;
-use tauri::Manager;
+use serde_json::{Map, Value};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,39 +8,40 @@ pub struct BiblePreferences {
     active_translation_id: Option<Value>,
 }
 
-/// Unlike plugin-store's initial load, preserve errors from existing files.
-fn read_preferences_file(path: &Path) -> Result<Option<BiblePreferences>, String> {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(format!("Cannot read Bible preferences: {error}")),
-    };
-    let values: serde_json::Map<String, Value> = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("Invalid Bible preferences: {error}"))?;
-    Ok(Some(BiblePreferences {
+fn preferences_from_section(values: &Map<String, Value>) -> Option<BiblePreferences> {
+    if values.is_empty() {
+        return None;
+    }
+    Some(BiblePreferences {
         translation_selection: values.get("translationSelection").cloned(),
         active_translation_id: values.get("activeTranslationId").cloned(),
-    }))
+    })
 }
 
-/// Reads only the fixed Bible preference file in this application's data directory.
+/// Preserve the stable selection API while reading the checked canonical profile.
 #[tauri::command]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Tauri extracts an owned AppHandle for commands"
-)]
-pub fn read_bible_preferences(app: tauri::AppHandle) -> Result<Option<BiblePreferences>, String> {
-    let directory = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| error.to_string())?;
-    read_preferences_file(&directory.join("bible.json"))
+pub async fn read_bible_preferences(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<Option<BiblePreferences>, String> {
+    let profile = super::profile::read_local_profile(app, window).await?;
+    Ok(preferences_from_section(&profile.sections.bible))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    fn read_preferences_file(path: &Path) -> Result<Option<BiblePreferences>, String> {
+        let mut profile = crate::operator_profile::ProfileDb::open(path.parent().unwrap())?;
+        Ok(preferences_from_section(
+            &profile.snapshot()?.sections.bible,
+        ))
+    }
 
     struct Fixture(PathBuf);
     impl Fixture {
@@ -108,6 +106,36 @@ mod tests {
             serde_json::json!({
                 "translationSelection": {"version": 1, "code": "ESV"}, "activeTranslationId": 2,
             })
+        );
+    }
+
+    #[test]
+    fn canonical_bible_selection_takes_precedence_over_preserved_legacy_json() {
+        let fixture = Fixture::new("canonical");
+        fs::write(
+            fixture.path(),
+            r#"{"translationSelection":{"version":1,"code":"KJV"}}"#,
+        )
+        .unwrap();
+        let mut profile = crate::operator_profile::ProfileDb::open(&fixture.0).unwrap();
+        profile
+            .write(
+                0,
+                crate::operator_profile::ProfileUpdates {
+                    bible: Some(
+                        serde_json::json!({"translationSelection":{"version":1,"code":"BIUO"}})
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                    ),
+                    ..crate::operator_profile::ProfileUpdates::default()
+                },
+            )
+            .unwrap();
+        let preferences = read_preferences_file(&fixture.path()).unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(preferences).unwrap()["translationSelection"]["code"],
+            "BIUO"
         );
     }
 }

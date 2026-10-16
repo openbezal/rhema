@@ -5,8 +5,8 @@ const mockSet = vi.fn()
 const mockSave = vi.fn()
 const mockLoad = vi.fn()
 
-vi.mock("@tauri-apps/plugin-store", () => ({
-  load: (...args: unknown[]) => mockLoad(...args),
+vi.mock("@/lib/profile-persistence", () => ({
+  openProfileSection: (...args: unknown[]) => mockLoad(...args),
 }))
 
 describe("tutorial store", () => {
@@ -44,10 +44,7 @@ describe("tutorial store", () => {
   it("persistOnboardingComplete calls store.set and store.save", async () => {
     const { persistOnboardingComplete } = await import("./tutorial-store")
     await persistOnboardingComplete()
-    expect(mockLoad).toHaveBeenCalledWith("settings.json", {
-      autoSave: false,
-      defaults: {},
-    })
+    expect(mockLoad).toHaveBeenCalledWith("settings")
     expect(mockSet).toHaveBeenCalledWith("onboardingComplete", true)
     expect(mockSave).toHaveBeenCalled()
   })

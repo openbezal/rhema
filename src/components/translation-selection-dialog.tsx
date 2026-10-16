@@ -3,10 +3,12 @@ import { activateTranslation, hydrateBibleStore, useBibleStore } from "@/stores/
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useProfileStatusStore } from "@/lib/profile-status"
 
 export function TranslationSelectionDialog() {
   const status = useBibleStore((state) => state.translationSelectionStatus)
   const translations = useBibleStore((state) => state.translations)
+  const profileReadFailed = useProfileStatusStore((state) => state.readFailed)
   const [selectedId, setSelectedId] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +35,9 @@ export function TranslationSelectionDialog() {
         <DialogHeader>
           <DialogTitle>Choose your Bible translation</DialogTitle>
           <DialogDescription>
-            Choose an installed translation before presenting verses. Your choice will be saved for future Bible data updates.
+            {profileReadFailed
+              ? "Saved preferences could not be loaded. Choose an installed translation for this session. Restart Rhema to retry your saved preferences."
+              : "Choose an installed translation before presenting verses. Your choice will be saved for future Bible data updates."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">

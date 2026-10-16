@@ -10,11 +10,13 @@ import {
 import { TUTORIAL_STEPS } from "./tutorial-steps"
 import { TutorialTooltip } from "./tutorial-tooltip"
 import { useTheme } from "@/components/theme-provider"
+import { useProfileStatusStore } from "@/lib/profile-status"
 
 export function TutorialOverlay() {
   const [isHydrated, setIsHydrated] = useState(false)
   const isRunning = useTutorialStore((s) => s.isRunning)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)
+  const profileReadFailed = useProfileStatusStore((s) => s.readFailed)
   const { theme } = useTheme()
 
   const [arrowColor, setArrowColor] = useState<string | undefined>()
@@ -44,13 +46,13 @@ export function TutorialOverlay() {
   }, [])
 
   useEffect(() => {
-    if (isHydrated && !onboardingComplete) {
+    if (isHydrated && !onboardingComplete && !profileReadFailed) {
       const timer = setTimeout(() => {
         useTutorialStore.getState().startTutorial()
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isHydrated, onboardingComplete])
+  }, [isHydrated, onboardingComplete, profileReadFailed])
 
   const handleEvent = useCallback((data: EventData) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
@@ -65,7 +67,7 @@ export function TutorialOverlay() {
     }
   }, [])
 
-  if (!isHydrated) return null
+  if (!isHydrated || profileReadFailed) return null
 
   return (
     <Joyride

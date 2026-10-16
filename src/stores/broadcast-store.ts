@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
-import { load, type Store } from "@tauri-apps/plugin-store"
+import { openProfileSection, type ProfileSectionStore } from "@/lib/profile-persistence"
 import type {
   OutputClearMode,
   BroadcastOutput,
@@ -467,14 +467,14 @@ useBroadcastStore.subscribe((state) => {
   else if (state.presentationRecovery === "unknown") forgetBroadcastSession()
 })
 
-// ── Theme persistence via tauri-plugin-store ──
+// Theme persistence shares the transactional operator profile.
 
-let tauriStore: Store | null = null
+let tauriStore: ProfileSectionStore | null = null
 let hydrationPromise: Promise<void> | null = null
 
-async function getThemeStore(): Promise<Store> {
+async function getThemeStore(): Promise<ProfileSectionStore> {
   if (!tauriStore) {
-    tauriStore = await load("broadcast-themes.json", { autoSave: false, defaults: {} })
+    tauriStore = await openProfileSection("broadcast")
   }
   return tauriStore
 }

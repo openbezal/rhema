@@ -7,6 +7,7 @@ import { SearchPanel } from "@/components/panels/search-panel"
 import { SuggestionsPanel } from "@/components/panels/suggestions-panel"
 import { DetectionsPanel } from "@/components/panels/detections-panel"
 import { EmbeddingWarningBanner } from "@/components/ui/embedding-warning-banner"
+import { ProfileWarningBanner } from "@/components/ui/profile-warning-banner"
 
 export function Dashboard() {
   return (
@@ -28,7 +29,10 @@ export function Dashboard() {
       </div>
 
       {/* Row 2: warning banner (collapses when healthy) */}
-      <EmbeddingWarningBanner />
+      <div className="col-span-4">
+        <ProfileWarningBanner />
+        <EmbeddingWarningBanner />
+      </div>
 
       {/* Operator views retain readable heights when the workspace narrows. */}
       <div className="col-span-4 grid min-h-0 auto-rows-[minmax(15rem,1fr)] grid-cols-2 gap-3 overflow-y-auto p-3 min-[1024px]:auto-rows-[minmax(0,1fr)] min-[1024px]:grid-cols-4">

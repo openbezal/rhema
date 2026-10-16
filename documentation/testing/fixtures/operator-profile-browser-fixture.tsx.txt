@@ -1,0 +1,45 @@
+import {mockIPC,mockWindows} from '@tauri-apps/api/mocks'
+import {createRoot} from 'react-dom/client'
+import {useSyncExternalStore} from 'react'
+import {BUILTIN_THEMES} from './src/lib/builtin-themes'
+import {defaultNdiSettings} from './src/types'
+import './src/index.css'
+const catalogue=[{id:8,abbreviation:'OYCB',title:'Open Yoruba Contemporary Bible',language:'yo',is_downloaded:true,is_copyrighted:true},{id:9,abbreviation:'BSRK',title:'Open Hausa Contemporary Bible',language:'ha',is_downloaded:true,is_copyrighted:true},{id:10,abbreviation:'BIUO',title:'Open Igbo Contemporary Bible',language:'ig',is_downloaded:true,is_copyrighted:true},{id:1,abbreviation:'KJV',title:'King James Version',language:'en',is_downloaded:true,is_copyrighted:false},{id:2,abbreviation:'ESV',title:'English Standard Version',language:'en',is_downloaded:true,is_copyrighted:true}]
+const book=(id:number,b=43)=>({id:id*100+b,translation_id:id,book_number:b,name:b===62?'I John':'John',abbreviation:b===62?'1Jn':'Jn',testament:'NT'})
+const row=(id:number,chapter:number,verse:number,b=43)=>({id:id*1000+chapter*100+verse,translation_id:id,book_number:b,book_name:b===62?'I John':'John',book_abbreviation:b===62?'1Jn':'Jn',chapter,verse,text:`Synthetic ${catalogue.find(t=>t.id===id)?.abbreviation} fixture for ${b===62?'I John':'John'} ${chapter}:${verse}. Archive workflow only.`})
+
+const storageKey='rhema-qa-transactional-profile-v1'
+const unreadable=new URL(location.href).searchParams.get('mode')==='unreadable'
+let writes=0,legacyCalls=0,reads=0,failWrites=false
+let profile=JSON.parse(sessionStorage.getItem(storageKey)??'null')??{version:1,revision:0,sections:{settings:{gain:1.6,deepgramApiKey:'FAKE-LOCAL-KEY',sttProvider:'whisper',onboardingComplete:true,qaUnknown:'keep-local'},bible:{translationSelection:{version:1,code:'BIUO',catalog:{KJV:1,BIUO:10}}},broadcast:{customThemes:[{...BUILTIN_THEMES[0],id:'qa-custom',name:'Chineke Ọlọ́run',builtin:false}],outputs:[{id:'main',name:'Main',type:'display',themeId:'qa-custom',monitorIndex:2,ndi:defaultNdiSettings('Rhema Output')}],autoLive:false}}}
+const subscribers=new Set<()=>void>();let debug=''
+function changed(){debug=JSON.stringify({revision:profile.revision,gain:profile.sections.settings.gain,savedCode:profile.sections.bible.translationSelection?.code,theme:profile.sections.broadcast.customThemes?.[0]?.name,monitor:profile.sections.broadcast.outputs?.[0]?.monitorIndex,localKeyRetained:profile.sections.settings.deepgramApiKey==='FAKE-LOCAL-KEY',unknownRetained:profile.sections.settings.qaUnknown==='keep-local',writes,reads,legacyCalls,readMode:unreadable?'unreadable':'healthy',failWrites});subscribers.forEach(fn=>fn())}
+changed()
+mockWindows('main')
+mockIPC(async(command,args:any)=>{
+ if(command==='read_local_profile'){reads++;changed();if(unreadable)throw new Error('Synthetic unreadable profile');return structuredClone(profile)}
+ if(command==='write_local_profile'){if(unreadable)throw new Error('Must not replace unreadable preferences');if(failWrites)throw new Error('Synthetic disk full');if(args.expectedRevision!==profile.revision)throw new Error('Stale profile');profile={...profile,revision:profile.revision+1,sections:{...profile.sections,...structuredClone(args.updates)}};writes++;sessionStorage.setItem(storageKey,JSON.stringify(profile));changed();return {version:1,revision:profile.revision,sections:structuredClone(args.updates)}}
+ if(command==='read_bible_preferences'){if(unreadable)throw new Error('Synthetic unreadable profile');return structuredClone(profile.sections.bible)}
+ if(command.startsWith('plugin:store|')){legacyCalls++;changed();throw new Error('Legacy store route must not be used')}
+ if(command==='list_translations')return catalogue
+ if(command==='list_books')return [book(args.translationId),book(args.translationId,62)]
+ if(command==='get_chapter')return [1,2,16,17,18].map(v=>row(args.translationId,args.chapter,v,args.bookNumber))
+ if(command==='get_verse')return row(args.translationId,args.chapter,args.verse,args.bookNumber)
+ if(command==='get_active_translation')return 10
+ if(command==='get_osc_status'||command==='get_http_status')return {running:false,port:null}
+ if(command==='get_audio_devices')return [{id:'fixture',name:'Mock microphone — no capture',is_default:true}]
+ if(command==='get_ndi_status')return null
+ if(command==='get_ndi_output_ids')return []
+ if(command==='get_broadcast_process_identity')return 'profile-fixture-process'
+ if(command==='plugin:window|get_all_windows')return ['main']
+ if(command==='plugin:window|available_monitors')return []
+ if(command==='plugin:window|is_visible')return false
+ if(command==='get_embedding_status')return {available:false,model_loaded:false,embeddings_loaded:false}
+ if(command==='list_system_fonts')return ['Georgia','Arial']
+ if(['get_recent_detections','search_context','search_verses','semantic_search','get_cross_references'].includes(command))return []
+ return undefined
+},{shouldMockEvents:true})
+function Debug(){const state=useSyncExternalStore(fn=>{subscribers.add(fn);return()=>subscribers.delete(fn)},()=>debug)
+ return <><div style={{position:'fixed',top:2,left:130,zIndex:100,fontSize:9,color:'#fbbf24',pointerEvents:'none'}}>QA · actual startup/store hydration · native DB/audio/outputs mocked</div><label style={{position:'fixed',top:30,left:130,zIndex:100,fontSize:10,color:'#fbbf24'}}>QA writes <select aria-label="QA writes" value={failWrites?'fail':'save'} onChange={e=>{failWrites=e.target.value==='fail';changed()}}><option value="save">Save</option><option value="fail">Fail</option></select></label><pre data-testid="profile-fixture-state" style={{position:'fixed',bottom:0,left:0,zIndex:100,fontSize:9,maxWidth:'100%',maxHeight:28,overflow:'auto',background:'#101010',color:'#fff',padding:3}}>{state}</pre></>}
+const debugHost=document.createElement('div');document.body.append(debugHost);createRoot(debugHost).render(<Debug/>);
+void import('./src/main')

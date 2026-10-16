@@ -2,6 +2,7 @@ mod commands;
 mod document_files;
 mod events;
 mod memstats;
+mod operator_profile;
 mod state;
 mod transcription_session;
 
@@ -91,6 +92,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(Mutex::new(state::AppState::new()))
+        .manage(operator_profile::ProfileRuntime::default())
         .manage(Mutex::new(rhema_detection::DetectionPipeline::new()))
         .manage(Mutex::new(rhema_broadcast::ndi::NdiRuntime::default()))
         .manage(Mutex::new(rhema_detection::DirectDetector::new()))
@@ -100,6 +102,8 @@ pub fn run() {
         .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
             commands::preferences::read_bible_preferences,
+            commands::profile::read_local_profile,
+            commands::profile::write_local_profile,
             commands::documents::save_export_document,
             commands::documents::read_import_document,
             commands::bible::list_translations,

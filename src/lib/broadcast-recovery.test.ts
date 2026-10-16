@@ -25,8 +25,8 @@ vi.mock("@tauri-apps/api/window", () => ({
       : []
   ),
 }))
-vi.mock("@tauri-apps/plugin-store", () => ({
-  load: async () => ({
+vi.mock("@/lib/profile-persistence", () => ({
+  openProfileSection: async () => ({
     get: async () => undefined,
     set: vi.fn(),
     save: vi.fn(),

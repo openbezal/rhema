@@ -5,8 +5,8 @@ const mockSet = vi.fn()
 const mockSave = vi.fn()
 const mockLoad = vi.fn()
 
-vi.mock("@tauri-apps/plugin-store", () => ({
-  load: (...args: unknown[]) => mockLoad(...args),
+vi.mock("@/lib/profile-persistence", () => ({
+  openProfileSection: (...args: unknown[]) => mockLoad(...args),
 }))
 
 async function flushSave(): Promise<void> {
