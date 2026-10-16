@@ -1,5 +1,5 @@
 {
-  "sourceCommit": "02ac92686fadf19679eac47c6b83f89d80a61130",
+  "sourceCommit": "f30d00bf5e2a243da340b49fafad63038db9c48c",
   "base": "94f9339",
   "integratedReviewedHeads": {
     "codex/operator-keyboard": "94f9339e6177962331533e0b564b38c91a057c63",
@@ -10,11 +10,12 @@
     "codex/hausa-igbo-bibles": "3d32b9cc770f60e3070230d2c86cbd5660a0ec81"
   },
   "frontend": {
-    "tests": 719,
-    "files": 62,
+    "tests": 723,
+    "files": 64,
     "typecheck": "passed",
     "lint": "passed",
-    "build": "passed"
+    "build": "passed",
+    "seededTypecheck": "passed"
   },
   "native": {
     "default": {
@@ -26,7 +27,18 @@
       "failures": 0
     },
     "strictClippy": "passed",
-    "format": "passed"
+    "format": "passed",
+    "sourceCommit": "02ac926",
+    "unchangedAfterReviewFix": true
   },
-  "scope": "Local combined-source checks and mock-backed browser interactions; not native UI/receiver/platform-package acceptance."
+  "scope": "Local combined-source checks and mock-backed browser interactions; not native UI/receiver/platform-package acceptance.",
+  "review": {
+    "critical": 0,
+    "important": 1,
+    "minor": 0,
+    "fixPasses": 1,
+    "status": "Important reproduced and fixed; no second review requested",
+    "mountedRegression": "src/components/panels/suggestions-integration.test.tsx",
+    "primaryCompletionCases": "verified primary, missing primary, failed lookup"
+  }
 }
