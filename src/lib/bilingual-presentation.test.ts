@@ -15,6 +15,7 @@ import {
 } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { formatVerseReference } from "./verse-reference"
 const primary: Verse = {
   id: 16,
   translation_id: 2,
@@ -202,6 +203,7 @@ it("removes an already displayed secondary immediately without waiting for a fre
   disconnect = connectPresentationController()
   await presentVerse(primary)
   expect(useBroadcastStore.getState().liveVerse?.secondary).toBeDefined()
+  const previous = useBroadcastStore.getState().liveVerse!
   const slow = deferred<Verse>()
   mocks.invoke.mockImplementation(() => slow.promise)
   useBibleStore.getState().setSecondaryTranslation(null)
@@ -209,6 +211,19 @@ it("removes an already displayed secondary immediately without waiting for a fre
   expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
     primary.text
   )
+  expect(formatVerseReference(useBroadcastStore.getState().liveVerse!)).toBe(
+    "John 3:16 (ESV)"
+  )
+  expect(
+    formatVerseReference(useBroadcastStore.getState().liveVerse!, false)
+  ).toBe("John 3 (ESV)")
+  expect(previous.address?.secondaryTranslationCode).toBe("KJV")
+  expect(previous.secondary?.translationCode).toBe("KJV")
+  const emitted = mocks.emit.mock.calls
+    .filter((call) => call[1] === "broadcast:verse-update")
+    .at(-1)![2].verse
+  expect(formatVerseReference(emitted)).toBe("John 3:16 (ESV)")
+  expect(formatVerseReference(emitted, false)).toBe("John 3 (ESV)")
   slow.resolve(primary)
   await settle()
 })
@@ -249,6 +264,12 @@ it.each([null, "reject"])(
     expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
       "John 3:16 (ESV)"
     )
+    expect(formatVerseReference(useBroadcastStore.getState().liveVerse!)).toBe(
+      "John 3:16 (ESV)"
+    )
+    expect(
+      formatVerseReference(useBroadcastStore.getState().liveVerse!, false)
+    ).toBe("John 3 (ESV)")
     expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
       primary.text
     )
@@ -258,6 +279,12 @@ it.each([null, "reject"])(
       "John 3:16 (ESV)"
     )
     expect(useBroadcastStore.getState().liveVerse?.secondary).toBeUndefined()
+    expect(formatVerseReference(useBroadcastStore.getState().liveVerse!)).toBe(
+      "John 3:16 (ESV)"
+    )
+    expect(
+      formatVerseReference(useBroadcastStore.getState().liveVerse!, false)
+    ).toBe("John 3 (ESV)")
   }
 )
 it("does not borrow preview permission from a committed primary awaiting optional text", async () => {

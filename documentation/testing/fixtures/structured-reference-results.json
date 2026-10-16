@@ -4,7 +4,12 @@
   "frontend": { "files": 79, "tests": 928, "focusedTests": 110, "typecheck": "pass", "typecheckGuard": "pass", "lint": "pass; zero warnings", "productionBuild": "pass; existing bundle-size advisory" },
   "native": { "sourceChanged": false, "dependenciesChanged": false, "localRerun": false, "inheritedBase204": "476 default and 476 no-default macOS tests; not a new run" },
   "browser": { "viewport": "1024x600", "themes": ["light", "dark"], "production": ["Canvas", "Fabric", "theme designer", "theme library export", "profile facade"], "mocked": ["native profile", "native file dialogs and write", "window events"], "unexpectedWarningsOrErrors": 0, "artifacts": "structured-reference-browser-observations.json" },
-  "review": { "status": "pending one fresh whole-branch review", "fixPasses": 0, "rulings": [] },
+  "review": { "status": "one fresh Astra/high whole-branch review; one Important reproduced and fixed; no rereview", "reviewedHead": "f891fd5f32cacecedfe1c58e54e87c5db991d355", "fixPasses": 1, "redCases": 3, "rulings": [
+    { "finding": "Important: secondary None retained address.secondaryTranslationCode while primary refresh was pending or failed", "ruling": "Fixed in one test-first pass; copy address/remove optional code; both formats and output payload covered; prior frame immutable" },
+    { "declined": "Book display overrides", "ruling": "Accepted next separate Task9B2B slice, not complete" },
+    { "declined": "New structured ranges or expanded canon", "ruling": "Accepted current one-verse/66-book contract; legacy ranges preserved verbatim" },
+    { "declined": "Installed platforms, physical receivers, provider audio", "ruling": "Accepted separate native acceptance work; not established by this browser fixture" }
+  ], "tokenUsage": null, "monetaryCost": null, "usageUnavailable": true },
   "limitations": ["String-only held frames remain verbatim until a verified presentation supplies an address", "Book display overrides are the next slice", "Installed-platform and physical receiver acceptance remain outstanding"],
   "cleanup": { "qaFilesRemoved": true, "viteEntryRemoved": true, "serverStopped": true, "temporaryTabClosed": true, "viewportReset": true }
 }

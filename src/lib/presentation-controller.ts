@@ -342,6 +342,10 @@ function connectActivePresentationController(): () => void {
         if (primaryOnly.reference.endsWith(suffix))
           primaryOnly.reference =
             primaryOnly.reference.slice(0, -suffix.length) + ")"
+        if (primaryOnly.address) {
+          primaryOnly.address = { ...primaryOnly.address }
+          delete primaryOnly.address.secondaryTranslationCode
+        }
         delete primaryOnly.secondary
         live.setLiveVerse(primaryOnly, live.liveSourceVerse)
       }

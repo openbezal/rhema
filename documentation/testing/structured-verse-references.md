@@ -36,3 +36,9 @@ No warning or error logs were observed. The temporary fixture entry, files, loca
 ![Full reference with body verse numbers hidden](assets/structured-reference-no-body-dark-minimum.png)
 
 These browser checks establish the real rendering and UI behavior with mocked native boundaries. Installed-platform dialogs, native profile restart, physical output receivers and provider audio remain separate acceptance work. No original issue or PR is closed by this draft.
+
+## Whole-branch review
+
+One fresh Astra/high reviewer examined source commit `f891fd5`. One Important finding: selecting secondary **None** removed the secondary body and legacy label immediately but left its code in the structured address. A pending, null or rejected replacement primary lookup could therefore retain incorrect translation attribution on the held frame. Three controller lifecycle regressions reproduced this before the single fix pass. The immediate transition now copies the address and removes the optional code together with the secondary body; the previous frame remains unchanged. Tests assert both full and chapter-only labels immediately, after null/rejected lookups and in the emitted output payload. No second review was requested. These additional lifecycle paths have automated evidence; the browser artifacts precede this fix.
+
+The review set aside book display editing (next slice), new structured ranges/expanded canon (current verified model is one verse/66 books; old range strings remain intact), and installed-platform/provider/physical acceptance (separate integration work). All three boundaries are accepted explicitly; none is claimed complete here. No Critical or Minor findings were reported. Exact reviewer token and monetary usage were unavailable.
