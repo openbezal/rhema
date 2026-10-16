@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-16",
+  "sourceCommit": "11f059b5cc3841682fb4a6bcffe33959d4f7c86d",
+  "baseCommit": "27658162638876113f6654e703ce0fd7bf2735aa",
+  "reviewedCommit": "903cc023ad0c998e0ff724102ec13dd05cc6edca",
+  "review": { "reviewers": 1, "fixPasses": 1, "reReview": false },
+  "localPlatform": "macOS",
+  "frontend": { "passed": 729, "files": 65 },
+  "native": { "defaultPassed": 445, "noDefaultPassed": 445, "documentTests": 14, "unixOnlyDocumentTests": 1 },
+  "gates": { "typecheck": true, "seededErrorProbe": true, "lintZeroWarnings": true, "productionBuild": true, "strictClippy": true, "fmt": true },
+  "nativeDialogAcceptance": false,
+  "packagedRoutingAcceptance": false,
+  "issue140Complete": false
+}

@@ -17,6 +17,8 @@ Reads require a regular file, check its size, read at most the limit plus one by
 
 Required checks: `bun run test --run`, `bun run typecheck`, `bun run verify:typecheck`, `bun run lint --max-warnings 0`, `bun run build`; `cargo test --workspace --locked` and `--no-default-features`, strict workspace Clippy, and `cargo fmt --all -- --check` from `src-tauri`.
 
+Final local results: 729 frontend/data tests in 65 files and 445 Rust tests in each configuration on macOS, with all listed gates passing. See [source-specific result manifest](fixtures/atomic-document-files-results.json). The existing Vite large-chunk advisory remains. No other test failures are deferred.
+
 ## Native acceptance still required
 
 Run on macOS, Windows and Linux with a separate test profile. Cancel both dialogs and confirm existing state/files stay unchanged. Export a theme with Yoruba/Igbo/Hausa text to a new file, replace an existing file, reopen it and compare its content. Test an unwritable destination and confirm the prior file remains readable. Import BOM JSON, malformed JSON and an oversized file; confirm failed import leaves the current theme intact. Verify overwrite confirmation, parent-window behavior, platform filename handling and packaged command routing. These manual dialog/package checks have not yet been performed for this branch. Filesystem unit tests and CI do not establish them.
