@@ -1,0 +1,2 @@
+  Verified embedding models and pinned toolchain receipt; skipping export.
+{"changed":false,"fingerprint":"588ff5fe2c9c95ddf6efd03345873d58bfb8ce093d14f60f62edb23701032c72"}

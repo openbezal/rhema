@@ -20,7 +20,7 @@
 //! minister actually quotes: N random KJV verses are sampled (deterministic
 //! seed, any of the ~31k verses) and each contributes three queries — the
 //! first, middle, and last 8 words of the verse — reported as the
-//! frag_start / frag_middle / frag_end categories. Any verse containing the
+//! `frag_start` / `frag_middle` / `frag_end` categories. Any verse containing the
 //! exact fragment counts as a correct answer, so common phrases that appear
 //! in several verses are scored fairly.
 
@@ -44,7 +44,7 @@ const FRAGMENT_WORDS: usize = 8;
 const FRAGMENT_MIN_WORDS: usize = 12;
 
 /// Fixed seed for fragment sampling — results must be reproducible run-to-run.
-const FRAGMENT_SEED: u64 = 0x5EED_0F_B1B1E;
+const FRAGMENT_SEED: u64 = 0x05EE_D0FB_1B1E;
 
 /// Query formats compared by the `--probe-prefix` query-format probe.
 /// "passage: " is the E5-style prefix used by the precompute binary; the
@@ -179,9 +179,8 @@ fn main() {
 
     let db = BibleDb::open(Path::new(&db_path)).expect("open bible db");
 
-    let fragments: usize = get_arg(&args, "--fragments")
-        .map(|n| n.parse().expect("--fragments takes a number"))
-        .unwrap_or(0);
+    let fragments: usize =
+        get_arg(&args, "--fragments").map_or(0, |n| n.parse().expect("--fragments takes a number"));
     if fragments > 0 {
         let generated = generate_fragment_queries(&db, fragments);
         log::info!(

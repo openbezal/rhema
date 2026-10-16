@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-16",
+  "scope": "macOS arm64 full-model developer tooling; no installed app/provider/receiver claim",
+  "sourceRevision": "c54f2e6e80b2d7b7de06f51cec4959f6b3e03418",
+  "statuses": {
+    "unsupportedOriginalArgument": 2,
+    "actualSharedWorkflow": 0,
+    "matchingReceiptRepeat": 0,
+    "numericalAcceptance": 1,
+    "rustCombinedAcceptance": 1,
+    "rustRetrievalOnly": true
+  },
+  "index": {
+    "verses": 65,
+    "vectorsSha256": "06036fa87ccbf64ce724161ebaa9249354450d091419d17b2e3c16c44b32ca0d",
+    "idsSha256": "75b559de105c6c4a7c05e86a39bc758b5faaf25353a0e5713560eb4e1562f2fe"
+  },
+  "retainedFiles": {
+    "actual-workflow-repeat.txt": "90e8c82ff6e18cf13663ee5e87c18b71c4c0d3720fb03962611998d0ad323984",
+    "actual-workflow.txt": "df1b1c48c098109ff6445fd4dcc405d5df81c39b6a12daa8087e3cc7697adc55",
+    "export-transformers.txt": "3fb057caf544c2f00105a6f89b8d833291ae799cef74a2262d14a6fe9b027fc7",
+    "model-receipt.json": "eda188d08e5d5df8be1e07d42c8ea8b5eabd515e03310af9b780e5702d52bfba",
+    "numerical-original-single.json": "b5d6bf3ea69154266c587797342ac95f3c25956716f8547ec8151b41825f9db0",
+    "numerical-per-channel.json": "4d63606fb1304ee75aad779c20b18aaa90ef47301efb4b2acac0adcbee631de9",
+    "numerical-weight-only8-block16.json": "6e573f3059ef5e7579c6e68d023d47075c269bab965bfede4e483f1c52f3656a",
+    "numerical-weight-only8.json": "e76b425f6d7178f4b347aa82c279769e43ebbef737d657190014246cd3792a5b",
+    "probe-queries.json": "f7268566a1982c17458749bc4dfd1447e6b32bc05699b8367d5b1561aa1b9a63",
+    "probe-verses.json": "d2485a9950def4482c2a969838038b637939d2cd15f55c45542b97df8f9faf83",
+    "quantize-per-channel.txt": "e1ed3a1ea3dc874a11df93c88a36b1dec81afa9c75a8470376021785b6deed18",
+    "quantize-transformers.txt": "e1ed3a1ea3dc874a11df93c88a36b1dec81afa9c75a8470376021785b6deed18",
+    "quantize-weight-only8-block16.txt": "f43973193513a2d44a2e03d88caa86f8692836284462be8874832701c94f1447",
+    "quantize-weight-only8.txt": "ee09bc3f09ad6e75b48a0f242d2c0fe037cc7ff1bb55f1a5d53066f4689ab76d",
+    "rust-probe.json": "13503cefefd07c9c5f31fafc61b642b5e527212d2289be479e506cc0ba7fdf03",
+    "unsupported-quantize-red.txt": "f8958dcb3177eb42c78dca786549f211b01e19da489c6975e9327b8a5cfe21bc"
+  }
+}

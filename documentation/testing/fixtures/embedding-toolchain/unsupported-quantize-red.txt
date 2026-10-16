@@ -1,0 +1,2 @@
+usage: optimum-cli
+Optimum CLI tool: error: unrecognized arguments: --library-name transformers

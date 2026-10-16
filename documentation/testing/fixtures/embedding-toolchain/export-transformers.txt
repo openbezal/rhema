@@ -1,0 +1,13 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/transformers/masking_utils.py:207: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if (padding_length := kv_length + kv_offset - attention_mask.shape[-1]) > 0:
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/transformers/masking_utils.py:235: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if padding_mask is not None and padding_mask.shape[-1] > kv_length:
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/transformers/integrations/sdpa_attention.py:81: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  is_causal = query.shape[2] > 1 and attention_mask is None and getattr(module, "is_causal", True)
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:954: UserWarning: Exporting aten::index operator of advanced indexing in opset 18 is achieved by combination of multiple ONNX operators, including Reshape, Transpose, Concat, and Gather. If indices include negative values, the exported graph will produce incorrect results.
+  return opset9.index(g, self, index)
+		-[x] values not close enough, max diff: 0.0006999969482421875 (atol: 1e-05)
+The ONNX export succeeded with the warning: The maximum absolute difference between the output of the reference model and the ONNX exported model is not within the set tolerance 1e-05:
+- last_hidden_state: max diff = 0.0006999969482421875.
+ The exported model was saved at: /tmp/rhema-embedding-toolchain-validation/transformers-fp32

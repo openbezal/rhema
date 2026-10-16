@@ -8,8 +8,9 @@
 
 import { join } from "node:path"
 import { existsSync } from "node:fs"
+import { fileURLToPath } from "node:url"
 
-export const PROJECT_ROOT = join(import.meta.dir, "..", "..")
+export const PROJECT_ROOT = fileURLToPath(new URL("../..", import.meta.url))
 export const VENV_DIR = join(PROJECT_ROOT, ".venv")
 export const MIN_PYTHON_VERSION: [number, number, number] = [3, 9, 0]
 
@@ -20,7 +21,9 @@ export function getVenvBin(name: string): string {
   return join(VENV_DIR, "bin", name)
 }
 
-export async function findPython(): Promise<string> {
+export async function findPython(
+  minimum = MIN_PYTHON_VERSION
+): Promise<string> {
   for (const candidate of [
     "python3.12",
     "python3.11",
@@ -35,7 +38,10 @@ export async function findPython(): Promise<string> {
       })
       const output = await new Response(proc.stdout).text()
       const exitCode = await proc.exited
-      if (exitCode === 0 && output.includes("Python")) {
+      if (
+        exitCode === 0 &&
+        isVersionSufficient(parsePythonVersion(output), minimum)
+      ) {
         return candidate
       }
     } catch {
@@ -43,16 +49,10 @@ export async function findPython(): Promise<string> {
     }
   }
 
-  console.error("\n❌ Python not found.")
-  console.error(
-    "   Please install Python >= 3.9.0 and ensure it is in your PATH."
-  )
-  process.exit(1)
+  throw new Error(`Python >= ${minimum.join(".")} not found in PATH`)
 }
 
-export function parsePythonVersion(
-  output: string
-): [number, number, number] {
+export function parsePythonVersion(output: string): [number, number, number] {
   const match = output.trim().match(/Python\s+(\d+)\.(\d+)\.(\d+)/)
   if (!match) {
     throw new Error(`Could not parse Python version from: ${output.trim()}`)
@@ -61,20 +61,19 @@ export function parsePythonVersion(
 }
 
 export function isVersionSufficient(
-  version: [number, number, number]
+  version: [number, number, number],
+  minimum = MIN_PYTHON_VERSION
 ): boolean {
   for (let i = 0; i < 3; i++) {
-    if (version[i] > MIN_PYTHON_VERSION[i]) return true
-    if (version[i] < MIN_PYTHON_VERSION[i]) return false
+    if (version[i] > minimum[i]) return true
+    if (version[i] < minimum[i]) return false
   }
   return true
 }
 
 export async function ensureVenv(pythonCmd: string): Promise<void> {
   const venvPython =
-    process.platform === "win32"
-      ? getVenvBin("python")
-      : getVenvBin("python3")
+    process.platform === "win32" ? getVenvBin("python") : getVenvBin("python3")
 
   if (existsSync(venvPython)) {
     console.log(`  ⏭ Virtual environment already exists at ${VENV_DIR}`)
@@ -114,11 +113,17 @@ export async function installPipDeps(packages: string[]): Promise<void> {
  * install packages. Returns the path to the venv Python binary.
  */
 export async function ensurePythonEnv(
-  packages: string[]
+  packages: string[],
+  minimum = MIN_PYTHON_VERSION,
+  pathExists: (path: string) => boolean = existsSync
 ): Promise<string> {
   console.log("\n🐍 Setting up Python environment...\n")
 
-  const pythonCmd = await findPython()
+  const venvPython = getVenvBin(
+    process.platform === "win32" ? "python" : "python3"
+  )
+  const alreadyExists = pathExists(venvPython)
+  const pythonCmd = alreadyExists ? venvPython : await findPython(minimum)
 
   const versionProc = Bun.spawn([pythonCmd, "--version"], {
     stdout: "pipe",
@@ -129,15 +134,14 @@ export async function ensurePythonEnv(
   const version = parsePythonVersion(versionOutput)
   console.log(`  Found ${pythonCmd} version ${version.join(".")}`)
 
-  if (!isVersionSufficient(version)) {
-    console.error(
-      `\n❌ Python >= ${MIN_PYTHON_VERSION.join(".")} is required, found ${version.join(".")}`
+  if (!isVersionSufficient(version, minimum)) {
+    throw new Error(
+      `Python >= ${minimum.join(".")} is required, found ${version.join(".")} at ${pythonCmd}; recreate the virtual environment with a compatible interpreter`
     )
-    process.exit(1)
   }
 
-  await ensureVenv(pythonCmd)
+  if (!alreadyExists) await ensureVenv(pythonCmd)
   await installPipDeps(packages)
 
-  return getVenvBin(process.platform === "win32" ? "python" : "python3")
+  return venvPython
 }

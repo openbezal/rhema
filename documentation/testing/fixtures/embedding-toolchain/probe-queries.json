@@ -1,0 +1,107 @@
+[
+  {
+    "category": "exact",
+    "text": "In the beginning God created the heaven and the earth.",
+    "accept": [
+      62207
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "The Lord is my shepherd; I shall not want.",
+    "accept": [
+      76443
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.",
+    "accept": [
+      88343
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "For God sent not his Son into the world to condemn the world; but that the world through him might be saved.",
+    "accept": [
+      88344
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "And we know that all things work together for good to them that love God, to them who are the called according to his purpose.",
+    "accept": [
+      90351
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "I can do all things through Christ which strengtheneth me.",
+    "accept": [
+      91662
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "And now abideth faith, hope, charity, these three; but the greatest of these is charity. ",
+    "accept": [
+      90885
+    ]
+  },
+  {
+    "category": "exact",
+    "text": "And God shall wipe away all tears from their eyes; and there shall be no more death, neither sorrow, nor crying, neither shall there be any more pain: for the former things are passed away.",
+    "accept": [
+      93264
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "God loved the world so much that he gave his only Son",
+    "accept": [
+      88343
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "God sent his Son to save the world rather than condemn it",
+    "accept": [
+      88344
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "The Lord is my shepherd and provides everything I need",
+    "accept": [
+      76443
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "I can do anything through Christ who gives me strength",
+    "accept": [
+      91662
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "Nothing can separate us from the love of God in Christ",
+    "accept": [
+      90362
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "Faith hope and love remain, and love is the greatest",
+    "accept": [
+      90885
+    ]
+  },
+  {
+    "category": "paraphrase",
+    "text": "I saw a new heaven and a new earth",
+    "accept": [
+      93261
+    ]
+  }
+]

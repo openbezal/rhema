@@ -9,8 +9,8 @@
  *   Phase 6 – Pre-compute verse embeddings
  *   Phase 7 – Download Whisper model for local STT
  *
- * Every phase is idempotent: if its output artifacts already exist it is
- * skipped. Pass --force to re-run everything regardless.
+ * Model and index reuse requires matching integrity/provenance receipts.
+ * Other phases retain their existing freshness rules. Pass --force to rebuild.
  *
  * Run: bun run setup:all
  *      bun run setup:all --force
@@ -19,31 +19,31 @@
 import { join } from "node:path"
 import { ensureBibleAssets } from "./lib/bible-assets"
 import { existsSync } from "node:fs"
-import { ensurePythonEnv, getVenvBin, PROJECT_ROOT } from "./lib/python-env"
+import { ensurePythonEnv, PROJECT_ROOT } from "./lib/python-env"
+import {
+  EMBEDDING_REQUIREMENTS,
+  EMBEDDING_MINIMUM_PYTHON,
+  createEmbeddingPlan,
+  prepareEmbeddingModels,
+  isEmbeddingIndexCurrent,
+  recordEmbeddingIndex,
+} from "./lib/embedding-toolchain"
 
 // ── Paths ────────────────────────────────────────────────────────────
 const directoryIndex = process.argv.indexOf("--data-dir")
-const DATA_DIR = directoryIndex >= 0 ? process.argv[directoryIndex + 1] : join(PROJECT_ROOT, "data")
+const DATA_DIR =
+  directoryIndex >= 0
+    ? process.argv[directoryIndex + 1]
+    : join(PROJECT_ROOT, "data")
 if (!DATA_DIR) throw new Error("--data-dir requires a directory")
-const MODELS_DIR = join(PROJECT_ROOT, "models", "qwen3-embedding-0.6b")
-const MODELS_DIR_INT8 = join(
-  PROJECT_ROOT,
-  "models",
-  "qwen3-embedding-0.6b-int8"
-)
 
 const DB_PATH = join(DATA_DIR, "rhema.db")
-const VERSES_JSON = join(DATA_DIR, "verses-for-embedding.json")
-const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b.bin")
-const IDS_BIN = join(PROJECT_ROOT, "embeddings", "kjv-qwen3-0.6b-ids.bin")
 const WHISPER_MODEL = join(
   PROJECT_ROOT,
   "models",
   "whisper",
   "ggml-large-v3-turbo-q8_0.bin"
 )
-const MODEL_ONNX = join(MODELS_DIR, "model.onnx")
-const MODEL_INT8 = join(MODELS_DIR_INT8, "model_quantized.onnx")
 
 const force = process.argv.includes("--force")
 
@@ -82,6 +82,10 @@ async function run(
 
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
+  if (process.argv.includes("--plan")) {
+    console.log(JSON.stringify(createEmbeddingPlan(PROJECT_ROOT), null, 2))
+    return
+  }
   if (process.argv.includes("--bible-only")) {
     await ensureBibleAssets(DATA_DIR, { force })
     return
@@ -104,15 +108,7 @@ async function main() {
   // Only the embedding phases (4-6) consume the Python toolchain.
   console.log("\n━━━ Phase 1/7: Python environment ━━━")
   if (withEmbedding) {
-    await ensurePythonEnv([
-      "optimum-onnx[onnxruntime]",
-      "sentence-transformers<5.0.0",
-      "accelerate",
-      "tokenizers",
-      "numpy",
-      "torch",
-      "meaningless",
-    ])
+    await ensurePythonEnv(EMBEDDING_REQUIREMENTS, EMBEDDING_MINIMUM_PYTHON)
   } else {
     console.log("  ⏭ Skip: only needed for --with-embedding")
   }
@@ -123,62 +119,18 @@ async function main() {
 
   // ── Phase 4: ONNX model download + quantize ────────────────────
   console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")
+  let modelFingerprint = ""
   if (!withEmbedding) {
     console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
-  } else if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
-    const optimumCli = getVenvBin("optimum-cli")
-
-    // Export FP32
-    if (force || !existsSync(MODEL_ONNX)) {
-      console.log(
-        "\n  🧠 Exporting Qwen3-Embedding-0.6B to ONNX (feature-extraction)..."
-      )
-      console.log("     This may take a few minutes on first run.\n")
-      await run([
-        optimumCli,
-        "export",
-        "onnx",
-        "--model",
-        "Qwen/Qwen3-Embedding-0.6B",
-        "--task",
-        "feature-extraction",
-        MODELS_DIR,
-        "--library-name",
-        "transformers",
-      ])
-      console.log(`  ✓ Model exported to ${MODELS_DIR}`)
-    }
-
-    // Quantize to INT8
-    if (force || !existsSync(MODEL_INT8)) {
-      console.log("\n  ⚡ Quantizing to INT8 (ARM64)...")
-      try {
-        await run([
-          optimumCli,
-          "onnxruntime",
-          "quantize",
-          "--onnx_model",
-          MODELS_DIR,
-          "--arm64",
-          "-o",
-          MODELS_DIR_INT8,
-          "--library-name",
-          "transformers",
-        ])
-        console.log(`  ✓ INT8 model saved to ${MODELS_DIR_INT8}`)
-      } catch {
-        console.error(
-          "  ⚠️  Quantization failed. The FP32 model is still usable."
-        )
-      }
-    }
+  } else {
+    modelFingerprint = (await prepareEmbeddingModels({ force })).fingerprint
   }
 
   // ── Phase 5: Export verses to JSON ─────────────────────────────
   console.log("\n━━━ Phase 5/7: Export verses to JSON ━━━")
   if (!withEmbedding) {
     console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
-  } else if (!shouldSkip("verses JSON", VERSES_JSON)) {
+  } else {
     if (!existsSync(DB_PATH)) {
       console.error(
         "  ❌ rhema.db not found. Run phases 2-3 first (or remove --force skip)."
@@ -192,13 +144,21 @@ async function main() {
   console.log("\n━━━ Phase 6/7: Pre-compute verse embeddings ━━━")
   if (!withEmbedding) {
     console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
-  } else if (!shouldSkip("precomputed embeddings", EMB_BIN, IDS_BIN)) {
+  } else if (
+    force ||
+    !(await isEmbeddingIndexCurrent(PROJECT_ROOT, modelFingerprint))
+  ) {
     // Use the Rust precompute binary — it embeds with the SAME ONNX model
     // and pooling the app uses at runtime and writes the provenance sidecar.
     // (The old sentence-transformers path produced vectors that did not
     // match the runtime embedder — that mismatch crippled vector search
     // until the 2026-08 regeneration.)
     await run(["bun", "run", "precompute:embeddings"])
+    await recordEmbeddingIndex(PROJECT_ROOT, modelFingerprint)
+  } else {
+    console.log(
+      "  Verified index model/source/binary hashes; skipping pre-computation."
+    )
   }
 
   // ── Phase 7: Whisper model ────────────────────────────────────
@@ -212,9 +172,7 @@ async function main() {
   console.log("║   ✅ Setup complete!                          ║")
   console.log("╚══════════════════════════════════════════════╝")
   if (!withEmbedding) {
-    console.log(
-      "  Note: embedding re-ranking assets were skipped (optional)."
-    )
+    console.log("  Note: embedding re-ranking assets were skipped (optional).")
     console.log(
       "  Gain: better paraphrase search in the Context tab. Cost: ~2.5h build,"
     )

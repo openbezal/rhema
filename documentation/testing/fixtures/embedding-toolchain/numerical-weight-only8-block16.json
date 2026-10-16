@@ -1,0 +1,247 @@
+{
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "python": "3.14.7",
+  "versions": {
+    "optimum": "2.1.0",
+    "optimum-onnx": "0.1.0",
+    "transformers": "4.57.6",
+    "sentence-transformers": "4.1.0",
+    "torch": "2.11.0",
+    "onnx": "1.21.0",
+    "onnxruntime": "1.24.4",
+    "tokenizers": "0.22.2",
+    "accelerate": "1.13.0",
+    "numpy": "2.4.4",
+    "huggingface-hub": "0.36.2"
+  },
+  "source": {
+    "model.safetensors": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd",
+    "config.json": "b5bf1f51fc45be473a54718cef92448d90a1be001bf9b9a44b8c7f10a19feaa9",
+    "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a"
+  },
+  "assets": {
+    "fp32": {
+      "valid": true,
+      "fingerprint": "ea1f6f0fd3971205e2e645c9c1d9f8ce3405ac8f34d39ad923587e368ad9bc3f",
+      "files": {
+        "model.onnx": "16f969b11aff0824e7713fd4e25bfa77b2e5d5ca085313700bb2b7f6e3ebcfdf",
+        "model.onnx_data": "a585477de21c0a89e021dd64f4d3be34483eb4aaed7ae93fc047e3edf74545da",
+        "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a"
+      },
+      "outputs": {
+        "last_hidden_state": [
+          "batch_size",
+          "sequence_length",
+          1024
+        ]
+      }
+    },
+    "int8": {
+      "valid": true,
+      "fingerprint": "25afe73df3bedfc0f78090f93ba8b23c2f340aa762910a37b215f92ee6240daa",
+      "files": {
+        "model_quantized.onnx": "232e82acd68c73be700f093441eb522dcd09820ca286c90aacb96599e0079763",
+        "model_quantized.onnx.data": "1b0d887a932248b79a2b6b96098c11b1e2c7a085ad0a81d03c34ad0773091cf3",
+        "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a"
+      },
+      "outputs": {
+        "last_hidden_state": [
+          "batch_size",
+          "sequence_length",
+          1024
+        ]
+      }
+    }
+  },
+  "checks": [
+    {
+      "model": "fp32",
+      "shape": [
+        1,
+        1
+      ],
+      "outputShape": [
+        1,
+        1,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 7.575750350952148e-05,
+      "pooledCosines": [
+        1.0
+      ],
+      "norms": [
+        1.0
+      ]
+    },
+    {
+      "model": "int8",
+      "shape": [
+        1,
+        1
+      ],
+      "outputShape": [
+        1,
+        1,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 14.236464500427246,
+      "pooledCosines": [
+        0.9245081543922424
+      ],
+      "norms": [
+        0.9999999403953552
+      ]
+    },
+    {
+      "model": "fp32",
+      "shape": [
+        1,
+        32
+      ],
+      "outputShape": [
+        1,
+        32,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 0.0001850128173828125,
+      "pooledCosines": [
+        0.9999999403953552
+      ],
+      "norms": [
+        0.9999999403953552
+      ]
+    },
+    {
+      "model": "int8",
+      "shape": [
+        1,
+        32
+      ],
+      "outputShape": [
+        1,
+        32,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 14.236392974853516,
+      "pooledCosines": [
+        0.9992459416389465
+      ],
+      "norms": [
+        1.0
+      ]
+    },
+    {
+      "model": "fp32",
+      "shape": [
+        2,
+        128
+      ],
+      "outputShape": [
+        2,
+        128,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 0.0006809234619140625,
+      "pooledCosines": [
+        0.9999999403953552,
+        1.0
+      ],
+      "norms": [
+        0.9999999403953552,
+        0.9999999403953552
+      ]
+    },
+    {
+      "model": "int8",
+      "shape": [
+        2,
+        128
+      ],
+      "outputShape": [
+        2,
+        128,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 17.308969497680664,
+      "pooledCosines": [
+        0.9992459416389465,
+        0.9987714290618896
+      ],
+      "norms": [
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "model": "fp32",
+      "shape": [
+        4,
+        128
+      ],
+      "outputShape": [
+        4,
+        128,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 0.0006809234619140625,
+      "pooledCosines": [
+        0.9999999403953552,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "norms": [
+        0.9999999403953552,
+        0.9999999403953552,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "model": "int8",
+      "shape": [
+        4,
+        128
+      ],
+      "outputShape": [
+        4,
+        128,
+        1024
+      ],
+      "finite": true,
+      "activeHiddenMaxAbsDifference": 22.665035247802734,
+      "pooledCosines": [
+        0.9992459416389465,
+        0.9987714290618896,
+        0.9995039105415344,
+        0.999706506729126
+      ],
+      "norms": [
+        1.0,
+        1.0,
+        1.0,
+        0.9999999403953552
+      ]
+    }
+  ],
+  "texts": [
+    "For God so loved the world, that he gave his only begotten Son.",
+    "The LORD is my shepherd; I shall not want.",
+    "\u1eccl\u1ecd\u0301run f\u1eb9\u0301 ay\u00e9. Chineke h\u1ee5r\u1ee5 \u1ee5wa n\u2019anya. Allah yana \u0199aunar duniya.",
+    "Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. Long input for truncation. "
+  ],
+  "contract": {
+    "maxTokens": 128,
+    "pooling": "masked-mean",
+    "prefix": "",
+    "padId": 0
+  },
+  "referenceVectors": "Omitted from compact evidence; regenerate with scripts/probe-embedding-toolchain.py"
+}

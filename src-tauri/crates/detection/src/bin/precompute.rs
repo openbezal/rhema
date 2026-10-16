@@ -10,6 +10,12 @@
 
 use std::path::PathBuf;
 
+#[derive(serde::Deserialize)]
+struct VerseEntry {
+    id: i64,
+    text: String,
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -28,11 +34,11 @@ fn main() {
         .unwrap_or_else(|| "embeddings/kjv-qwen3-0.6b-ids.bin".to_string());
 
     log::info!("=== Rhema Verse Embedding Pre-computation ===");
-    log::info!("Model: {}", model_path);
-    log::info!("Tokenizer: {}", tokenizer_path);
-    log::info!("Verses: {}", verses_path);
-    log::info!("Output embeddings: {}", output_embeddings);
-    log::info!("Output IDs: {}", output_ids);
+    log::info!("Model: {model_path}");
+    log::info!("Tokenizer: {tokenizer_path}");
+    log::info!("Verses: {verses_path}");
+    log::info!("Output embeddings: {output_embeddings}");
+    log::info!("Output IDs: {output_ids}");
 
     // Create output directory
     if let Some(parent) = PathBuf::from(&output_embeddings).parent() {
@@ -58,16 +64,8 @@ fn main() {
     );
 
     // Read verses JSON
-    log::info!("Reading verses from {}...", verses_path);
+    log::info!("Reading verses from {verses_path}...");
     let verses_json = std::fs::read_to_string(&verses_path).expect("Failed to read verses JSON");
-
-    #[derive(serde::Deserialize)]
-    struct VerseEntry {
-        id: i64,
-        text: String,
-        #[allow(dead_code)]
-        r#ref: String,
-    }
 
     let entries: Vec<VerseEntry> =
         serde_json::from_str(&verses_json).expect("Failed to parse verses JSON");
@@ -86,7 +84,7 @@ fn main() {
     )
     .expect("Pre-computation failed");
 
-    write_meta_sidecar(&output_embeddings, &model_path, &verses.len());
+    write_meta_sidecar(&output_embeddings, &model_path, verses.len());
 
     log::info!("=== Done! ===");
 }
@@ -95,7 +93,7 @@ fn main() {
 /// regenerations) can tell how the index was built. The previous index
 /// shipped with no provenance and turned out not to match the runtime
 /// embedder at all (self-similarity 0.65 instead of ~1.0).
-fn write_meta_sidecar(output_embeddings: &str, model_path: &str, count: &usize) {
+fn write_meta_sidecar(output_embeddings: &str, model_path: &str, count: usize) {
     let meta_path = PathBuf::from(output_embeddings).with_extension("meta.json");
     let model_file = PathBuf::from(model_path)
         .file_name()

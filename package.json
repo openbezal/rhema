@@ -16,7 +16,7 @@
     "build:bible": "bun run data/build-bible-db.ts",
     "download:model": "bun run data/download-model.ts",
     "export:verses": "bun run data/compute-embeddings.ts",
-    "quantize:model": "optimum-cli onnxruntime quantize --onnx_model models/qwen3-embedding-0.6b/ --arm64 -o models/qwen3-embedding-0.6b-int8/",
+    "quantize:model": "bun run data/download-model.ts",
     "precompute:embeddings-onnx": "python3 data/precompute-embeddings-onnx.py",
     "precompute:embeddings-py": "python3 data/precompute-embeddings.py",
     "precompute:embeddings": "cd src-tauri && cargo run -p rhema-detection --features precompute-bin --release --bin precompute -- --model ../models/qwen3-embedding-0.6b-int8/model_quantized.onnx --tokenizer ../models/qwen3-embedding-0.6b/tokenizer.json --verses ../data/verses-for-embedding.json --output-embeddings ../embeddings/kjv-qwen3-0.6b.bin --output-ids ../embeddings/kjv-qwen3-0.6b-ids.bin",

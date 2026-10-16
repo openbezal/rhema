@@ -41,3 +41,8 @@ required-features = ["precompute-bin"]
 name = "search_bench"
 path = "src/bin/search_bench.rs"
 required-features = ["bench-bin"]
+
+[[example]]
+name = "embedding_toolchain_probe"
+path = "examples/embedding_toolchain_probe.rs"
+required-features = ["precompute-bin"]

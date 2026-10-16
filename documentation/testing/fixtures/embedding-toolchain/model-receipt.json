@@ -1,0 +1,37 @@
+{
+  "toolchain": {
+    "schemaVersion": 1,
+    "modelId": "Qwen/Qwen3-Embedding-0.6B",
+    "revision": "c54f2e6e80b2d7b7de06f51cec4959f6b3e03418",
+    "minimumPython": [
+      3,
+      11,
+      0
+    ],
+    "requirements": [
+      "optimum==2.1.0",
+      "optimum-onnx[onnxruntime]==0.1.0",
+      "transformers==4.57.6",
+      "sentence-transformers==4.1.0",
+      "torch==2.11.0",
+      "onnx==1.21.0",
+      "onnxruntime==1.24.4",
+      "tokenizers==0.22.2",
+      "accelerate==1.13.0",
+      "numpy==2.4.4",
+      "huggingface-hub==0.36.2"
+    ],
+    "contract": {
+      "output": "last_hidden_state",
+      "pooling": "masked-mean",
+      "maxTokens": 128,
+      "prefix": "",
+      "dimensions": 1024,
+      "quantization": "arm64"
+    }
+  },
+  "assets": [
+    "ea1f6f0fd3971205e2e645c9c1d9f8ce3405ac8f34d39ad923587e368ad9bc3f",
+    "ab779b56040bb7bec48889a781fbae4fc88f7e7518715e55a4df2db02281ccb7"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "modelId": "Qwen/Qwen3-Embedding-0.6B",
+  "revision": "c54f2e6e80b2d7b7de06f51cec4959f6b3e03418",
+  "minimumPython": [3, 11, 0],
+  "requirements": [
+    "optimum==2.1.0",
+    "optimum-onnx[onnxruntime]==0.1.0",
+    "transformers==4.57.6",
+    "sentence-transformers==4.1.0",
+    "torch==2.11.0",
+    "onnx==1.21.0",
+    "onnxruntime==1.24.4",
+    "tokenizers==0.22.2",
+    "accelerate==1.13.0",
+    "numpy==2.4.4",
+    "huggingface-hub==0.36.2"
+  ],
+  "contract": {
+    "output": "last_hidden_state",
+    "pooling": "masked-mean",
+    "maxTokens": 128,
+    "prefix": "",
+    "dimensions": 1024,
+    "quantization": "arm64"
+  }
+}

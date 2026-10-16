@@ -1,0 +1,16 @@
+`torch_dtype` is deprecated! Use `dtype` instead!
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/transformers/masking_utils.py:207: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if (padding_length := kv_length + kv_offset - attention_mask.shape[-1]) > 0:
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/transformers/masking_utils.py:235: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if padding_mask is not None and padding_mask.shape[-1] > kv_length:
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/transformers/integrations/sdpa_attention.py:81: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  is_causal = query.shape[2] > 1 and attention_mask is None and getattr(module, "is_causal", True)
+/Users/faithful/Apps/openbezal/rhema/.venv/lib/python3.14/site-packages/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:954: UserWarning: Exporting aten::index operator of advanced indexing in opset 18 is achieved by combination of multiple ONNX operators, including Reshape, Transpose, Concat, and Gather. If indices include negative values, the exported graph will produce incorrect results.
+  return opset9.index(g, self, index)
+		-[x] values not close enough, max diff: 0.0009632110595703125 (atol: 1e-05)
+The ONNX export succeeded with the warning: The maximum absolute difference between the output of the reference model and the ONNX exported model is not within the set tolerance 1e-05:
+- last_hidden_state: max diff = 0.0009632110595703125.
+ The exported model was saved at: /tmp/rhema-embedding-toolchain-validation/workflow-project/models/.rhema-embedding-BTptBb/qwen3-embedding-0.6b
+The tokenizer you are loading from '/tmp/rhema-embedding-toolchain-validation/workflow-project/models/.rhema-embedding-BTptBb/qwen3-embedding-0.6b' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+The tokenizer you are loading from '/tmp/rhema-embedding-toolchain-validation/workflow-project/models/.rhema-embedding-BTptBb/qwen3-embedding-0.6b' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+{"changed":true,"fingerprint":"588ff5fe2c9c95ddf6efd03345873d58bfb8ce093d14f60f62edb23701032c72"}
