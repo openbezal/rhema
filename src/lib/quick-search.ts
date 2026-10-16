@@ -31,11 +31,16 @@ export function numberToRoman(num: number): string {
 }
 
 /**
- * Normalize input: convert leading numbers to Roman numerals for matching
- * Examples: "1 S" -> "I S", "2 C" -> "II C", "3 J" -> "III J"
+ * Normalize a leading numeric or written ordinal to Roman form for matching.
+ * Stored display names remain unchanged.
  */
 export function normalizeInput(input: string): string {
-  const trimmed = input.trim()
+  const trimmed = input.trim().replace(/\s+/g, " ")
+  const ordinal = trimmed.match(/^(first|second|third)\b\s*(.*)$/i)
+  if (ordinal) {
+    const number = { first: 1, second: 2, third: 3 }[ordinal[1].toLowerCase() as "first" | "second" | "third"]
+    return numberToRoman(number) + (ordinal[2] ? " " + ordinal[2] : "")
+  }
   const leadingNumberMatch = trimmed.match(/^(\d+)\s*(.*)$/)
 
   if (leadingNumberMatch) {
@@ -51,11 +56,11 @@ export function normalizeInput(input: string): string {
  * Find matching book by name or abbreviation (case insensitive)
  */
 export function findMatchingBook(bookInput: string, books: Book[]): Book | undefined {
-  const normalized = bookInput.toLowerCase()
+  const normalized = normalizeInput(bookInput).toLowerCase()
   return books.find(
     b =>
-      b.name.toLowerCase().startsWith(normalized) ||
-      b.abbreviation.toLowerCase().startsWith(normalized)
+      normalizeInput(b.name).toLowerCase().startsWith(normalized) ||
+      normalizeInput(b.abbreviation).toLowerCase().startsWith(normalized)
   )
 }
 
@@ -74,14 +79,13 @@ export function getAutocompleteSuggestion(
 
   const normalizedInput = normalizeInput(trimmed)
 
-  // Check if it's just a number (for numbered books like "1", "2", "3")
-  if (/^\d+$/.test(trimmed)) {
-    const matchingBook = books.find(b => b.name.startsWith(normalizedInput + " "))
+  // An ordinal alone suggests the first installed book with that ordinal.
+  if (/^(I|II|III)$/i.test(normalizedInput)) {
+    const matchingBook = books.find(b => normalizeInput(b.name).toLowerCase().startsWith(normalizedInput.toLowerCase() + " "))
 
     if (matchingBook) {
-      const remainder = matchingBook.name.slice(normalizedInput.length)
       return {
-        suggestion: normalizedInput + remainder + " 1:1",
+        suggestion: matchingBook.name + " 1:1",
         matchedBook: matchingBook,
         chapter: 1,
         verse: 1,
@@ -211,18 +215,19 @@ export function getTabNavigationResult(
   const suggestionTrimmed = currentSuggestion.trim()
 
   // Extract the full book name from the suggestion
-  const bookNameMatch = suggestionTrimmed.match(/^(([IVX]+\s+)?[a-zA-Z\s]+)\s+\d+:\d+$/)
+  const bookNameMatch = suggestionTrimmed.match(/^(.+?)\s+\d+:\d+$/)
 
   if (bookNameMatch) {
     const fullBookName = bookNameMatch[1]
 
     // Check if current input matches the COMPLETE book name
-    const currentIsCompleteBookName =
-      trimmed === fullBookName + " " || trimmed === fullBookName
+    const normalizedBook = normalizeInput(fullBookName).toLowerCase()
+    const normalizedCurrent = normalizeInput(trimmed).toLowerCase()
+    const currentIsCompleteBookName = normalizedCurrent === normalizedBook
 
     // Check if current input has a chapter number
     const hasChapter =
-      new RegExp(`^${fullBookName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+\\d+`, 'i').test(trimmed) &&
+      new RegExp(`^${normalizedBook.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+\\d+`, 'i').test(normalizedCurrent) &&
       !trimmed.includes(':')
 
     // Stage 1: Still typing book name -> advance to complete book name
@@ -232,7 +237,7 @@ export function getTabNavigationResult(
 
     // Stage 2: Has chapter -> advance to chapter with colon
     if (hasChapter) {
-      const chapterMatch = suggestionTrimmed.match(/^(([IVX]+\s+)?[a-zA-Z\s]+\s+\d+):\d+$/)
+      const chapterMatch = suggestionTrimmed.match(/^(.+\s+\d+):\d+$/)
       if (chapterMatch) {
         return chapterMatch[1] + ":"
       }
@@ -241,4 +246,19 @@ export function getTabNavigationResult(
 
   // Default: accept full suggestion
   return currentSuggestion
+}
+
+/** Text drawn after the typed alias in the autocomplete overlay. */
+export function getAutocompleteSuffix(input: string, suggestion: string): string | null {
+  const normalized = normalizeInput(input).toLowerCase()
+  if (!normalized) return null
+  // Find the equivalent prefix in the stored spelling; its length can differ
+  // from the typed alias ("First J" versus "I J" or "1 J").
+  for (let end = 1; end <= suggestion.length; end++) {
+    if (normalizeInput(suggestion.slice(0, end)).toLowerCase() === normalized) {
+      const suffix = suggestion.slice(end)
+      return /\s$/.test(input) ? suffix.trimStart() : suffix
+    }
+  }
+  return null
 }

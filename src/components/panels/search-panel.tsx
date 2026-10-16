@@ -13,6 +13,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { Button } from "@/components/ui/button"
 import {
   getAutocompleteSuggestion,
+  getAutocompleteSuffix,
   getTabNavigationResult,
   parseTypedReference,
 } from "@/lib/quick-search"
@@ -398,6 +399,8 @@ export function SearchPanel() {
     [quickInput, books]
   )
   const quickSuggestion = autocompleteResult.suggestion
+  const quickSuggestionSuffix = getAutocompleteSuffix(quickInput, quickSuggestion)
+  const hasQuickSuggestion = Boolean(quickSuggestion && quickSuggestion !== quickInput && quickSuggestionSuffix !== null)
 
   // Side effects only: navigation + verse loading
   useEffect(() => {
@@ -560,12 +563,12 @@ export function SearchPanel() {
             {/* EasyWorship-style autocomplete */}
             <div className="relative flex-1">
               {/* Suggestion overlay */}
-              {quickSuggestion && quickSuggestion !== quickInput && (
+              {hasQuickSuggestion && (
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center px-3">
                   <span className="text-xs font-normal">
                     <span className="text-foreground">{quickInput}</span>
                     <span className="text-gray-500 dark:text-gray-400">
-                      {quickSuggestion.slice(quickInput.length)}
+                      {quickSuggestionSuffix}
                     </span>
                   </span>
                 </div>
@@ -582,12 +585,10 @@ export function SearchPanel() {
                 placeholder="Type: J → John 3:16"
                 className={cn(
                   "relative h-7 bg-background text-xs",
-                  quickSuggestion && quickSuggestion !== quickInput
-                    ? "text-transparent"
-                    : ""
+                  hasQuickSuggestion ? "text-transparent" : ""
                 )}
                 style={
-                  quickSuggestion && quickSuggestion !== quickInput
+                  hasQuickSuggestion
                     ? {
                         caretColor: "var(--foreground)",
                       }
