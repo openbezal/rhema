@@ -133,7 +133,7 @@ const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
  * transcript panel's meter).
  */
 function AudioTestRow() {
-  const { isTesting, level, toggle } = useAudioTest()
+  const { isTesting, isStarting, level, toggle } = useAudioTest()
   const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
 
   return (
@@ -146,10 +146,10 @@ function AudioTestRow() {
         <Button
           size="sm"
           variant={isTesting ? "destructive" : "outline"}
-          disabled={isTranscribing}
+          disabled={isTranscribing || isStarting}
           onClick={() => void toggle()}
         >
-          {isTesting ? "Stop" : "Test"}
+          {isStarting ? "Opening…" : isTesting ? "Stop" : "Test"}
         </Button>
       </div>
       <p className="text-[0.625rem] text-muted-foreground">
@@ -622,8 +622,13 @@ function BibleSection() {
             ` ${translations.length} translations available.`}
         </p>
       </div>
-      <BookDisplayNamesEditor translations={translations} primaryCode={primaryCode} />
-      <div><BibleDataNotices /></div>
+      <BookDisplayNamesEditor
+        translations={translations}
+        primaryCode={primaryCode}
+      />
+      <div>
+        <BibleDataNotices />
+      </div>
     </div>
   )
 }

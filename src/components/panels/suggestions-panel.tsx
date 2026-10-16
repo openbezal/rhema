@@ -12,6 +12,11 @@ import {
 } from "@/lib/suggestion-history"
 import { translationCode } from "@/lib/translation-selection"
 import { useDisplayVerseReference } from "@/hooks/use-book-display-names"
+import { useOperatorUiStore } from "@/lib/operator-ui"
+import {
+  isOperatorWorkCurrent,
+  useOperatorMaintenanceStore,
+} from "@/lib/operator-maintenance"
 
 function SuggestionCard({
   candidate,
@@ -20,6 +25,9 @@ function SuggestionCard({
   candidate: SuggestionCandidate
   onDismiss: () => void
 }) {
+  const originRevision = useOperatorMaintenanceStore((state) =>
+    state.phase === "idle" ? state.revision : -1
+  )
   const displayReference = useDisplayVerseReference()
   const reference = displayReference(
     candidate,
@@ -41,12 +49,15 @@ function SuggestionCard({
           ? "Combined search"
           : "Search match"
   async function actOnCandidate(action: "present" | "queue") {
+    if (!isOperatorWorkCurrent(originRevision)) return
     setBusy(true)
     try {
-      if (action === "present") await presentSuggestion(candidate)
-      else if (await queueSuggestion(candidate))
+      if (action === "present")
+        await presentSuggestion(candidate, originRevision)
+      else if (await queueSuggestion(candidate, originRevision))
         toast.success(`${reference} queued`)
     } catch (error) {
+      if (!isOperatorWorkCurrent(originRevision)) return
       toast.error(`Could not ${action} suggestion`, {
         description:
           error instanceof Error
@@ -98,7 +109,9 @@ function SuggestionCard({
           size="sm"
           variant="ghost"
           aria-label={`Dismiss ${candidate.translation_code} ${reference}`}
-          onClick={onDismiss}
+          onClick={() => {
+            if (isOperatorWorkCurrent(originRevision)) onDismiss()
+          }}
         >
           Dismiss
         </Button>
@@ -113,6 +126,10 @@ function SuggestionCard({
 }
 
 export function SuggestionsPanel() {
+  const revision = useOperatorUiStore((state) => state.sessionResetRevision)
+  return <SessionSuggestions key={revision} />
+}
+function SessionSuggestions() {
   const available = useDetectionStore((state) => state.suggestions)
   const prune = useDetectionStore((state) => state.pruneSuggestions)
   const retentionMs = useSettingsStore((state) => state.suggestionRetentionMs)

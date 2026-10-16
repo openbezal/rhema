@@ -7,6 +7,8 @@ import { useDetectionStore } from "@/stores/detection-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useBibleStore } from "@/stores/bible-store"
 import type { DetectionResult } from "@/types"
+import { useOperatorUiStore } from "@/lib/operator-ui"
+import { beginOperatorMaintenance } from "@/lib/operator-maintenance"
 
 const mocks = vi.hoisted(() => ({ present: vi.fn(), queue: vi.fn() }))
 vi.mock("@/lib/suggestion-actions", () => ({
@@ -110,6 +112,25 @@ describe("stable Suggestions interaction", () => {
     )!
     await act(async () => present.click())
     expect(mocks.present.mock.calls[0][0].verse).toBe(16)
+  })
+  it("clears a frozen snapshot on acknowledged session reset and rejects retained controls", async () => {
+    await mount()
+    const inspected = card(),
+      present = inspected.querySelector<HTMLButtonElement>("button")!
+    await act(async () =>
+      inspected.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }))
+    )
+    await act(async () => {
+      const lease = beginOperatorMaintenance()
+      useDetectionStore.getState().clearDetections()
+      useOperatorUiStore.setState((state) => ({
+        sessionResetRevision: state.sessionResetRevision + 1,
+      }))
+      lease.release()
+      present.click() // Retained DOM before React commits the replacement tree.
+    })
+    expect(container.querySelectorAll("[data-suggestion-key]")).toHaveLength(0)
+    expect(mocks.present).not.toHaveBeenCalled()
   })
   it("applies pending ranking only on the operator's action", async () => {
     await mount()

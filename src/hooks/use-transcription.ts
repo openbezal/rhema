@@ -24,6 +24,8 @@ const NOT_RUNNING_ERROR = "Transcription is not running"
 let actionRevision = 0
 let starting: Promise<void> | null = null
 let stopping: Promise<void> | null = null
+export const hasPendingTranscriptionChange = () =>
+  starting !== null || stopping !== null
 
 export const transcriptionActions = {
   start(onMissingApiKey?: () => void): Promise<void> {

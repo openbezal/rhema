@@ -4,6 +4,7 @@ import { ZodError } from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PreferencesRestoreDialog } from "@/components/preferences-restore-dialog"
+import { NewSessionDialog } from "@/components/new-session-dialog"
 import { SessionPreferencesSummary } from "@/components/session-preferences-summary"
 import {
   Sheet,
@@ -328,6 +329,7 @@ export function SessionArchivePanel() {
                 Export preferences JSON
               </Button>
             </div>
+            <NewSessionDialog disabled={busy} />
             <p className="text-xs leading-relaxed text-muted-foreground">
               Session JSON includes the final transcript, current Queue,
               retained detections and quotation history, portable preferences

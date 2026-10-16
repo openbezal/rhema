@@ -6,6 +6,7 @@ import { presentPrimaryVerse } from "./presentation-controller"
 import { translationCode } from "./translation-selection"
 import type { SuggestionCandidate } from "./suggestion-history"
 import type { Verse } from "@/types"
+import { isOperatorWorkCurrent, operatorRevision } from "./operator-maintenance"
 
 function sourceTranslation(candidate: SuggestionCandidate) {
   const metadata = useBibleStore
@@ -22,8 +23,10 @@ function sourceTranslation(candidate: SuggestionCandidate) {
   return metadata
 }
 export async function presentSuggestion(
-  candidate: SuggestionCandidate
+  candidate: SuggestionCandidate,
+  originRevision = operatorRevision()
 ): Promise<void> {
+  if (!isOperatorWorkCurrent(originRevision)) return
   const metadata = sourceTranslation(candidate)
   await presentPrimaryVerse({
     id: 0,
@@ -37,15 +40,21 @@ export async function presentSuggestion(
   })
 }
 export async function queueSuggestion(
-  candidate: SuggestionCandidate
+  candidate: SuggestionCandidate,
+  originRevision = operatorRevision()
 ): Promise<boolean> {
+  if (!isOperatorWorkCurrent(originRevision)) return false
   const metadata = sourceTranslation(candidate)
   const verse = await invoke<Verse | null>("get_verse", {
     translationId: metadata.id,
     bookNumber: candidate.book_number,
     chapter: candidate.chapter,
     verse: candidate.verse,
+  }).catch((error: unknown) => {
+    if (!isOperatorWorkCurrent(originRevision)) return null
+    throw error
   })
+  if (!isOperatorWorkCurrent(originRevision)) return false
   if (
     !verse ||
     verse.translation_id !== metadata.id ||

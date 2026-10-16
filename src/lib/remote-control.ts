@@ -4,6 +4,7 @@ import { useSettingsStore } from "@/stores/settings-store"
 import { REMOTE_EVENTS, type RemoteEventName } from "@/lib/remote-events"
 import { operatorActions } from "@/lib/operator-actions"
 import { connectOutsideMaintenance } from "./operator-maintenance"
+import { ensureSessionRevision, readSessionPayload } from "./session-revision"
 
 /** App-owned event subscriptions, independent of panel visibility. */
 export function connectRemoteControl(): () => void {
@@ -16,21 +17,37 @@ function connectActiveRemoteControl(): () => void {
   // next step reads its cursor, otherwise overlapping probes collapse inputs.
   let navigation = Promise.resolve()
   const step = (action: () => Promise<void>) => {
-    navigation = navigation.then(async () => {
-      if (!cancelled) await action()
-    }).catch((error: unknown) => {
-      if (!cancelled) console.warn("[remote-control] navigation failed:", error)
-    })
+    navigation = navigation
+      .then(async () => {
+        if (!cancelled) await action()
+      })
+      .catch((error: unknown) => {
+        if (!cancelled)
+          console.warn("[remote-control] navigation failed:", error)
+      })
   }
-  const register = (event: RemoteEventName, handler: (payload: unknown) => void) => {
-    void listen<unknown>(event, ({ payload }) => {
-      if (!cancelled) handler(payload)
-    }).then((unlisten) => {
-      if (cancelled) unlisten()
-      else unlisteners.push(unlisten)
-    }).catch((error: unknown) => {
-      if (!cancelled) console.warn(`[remote-control] failed to listen for ${event}:`, error)
-    })
+  const register = (
+    event: RemoteEventName,
+    handler: (payload: unknown) => void
+  ) => {
+    void ensureSessionRevision()
+      .then(() => {
+        if (cancelled) return null
+        return listen<unknown>(`session:${event}`, ({ payload }) => {
+          if (cancelled) return
+          const current = readSessionPayload(payload)
+          if (current) handler(current.payload)
+        })
+      })
+      .then((unlisten) => {
+        if (!unlisten) return
+        if (cancelled) unlisten()
+        else unlisteners.push(unlisten)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled)
+          console.warn(`[remote-control] failed to listen for ${event}:`, error)
+      })
   }
 
   register(REMOTE_EVENTS.next, operatorActions.queueNext)
@@ -50,7 +67,9 @@ function connectActiveRemoteControl(): () => void {
     const name = parsePayload(raw)?.name
     if (typeof name !== "string" || !name) return
     const state = useBroadcastStore.getState()
-    const theme = state.themes.find((theme) => theme.name.toLowerCase() === name.toLowerCase())
+    const theme = state.themes.find(
+      (theme) => theme.name.toLowerCase() === name.toLowerCase()
+    )
     if (theme) state.setActiveTheme(theme.id)
   })
   register(REMOTE_EVENTS.opacity, () => {
@@ -77,7 +96,11 @@ function connectActiveRemoteControl(): () => void {
 function parsePayload(raw: unknown): Record<string, unknown> | null {
   let value = raw
   if (typeof raw === "string") {
-    try { value = JSON.parse(raw) } catch { return null }
+    try {
+      value = JSON.parse(raw)
+    } catch {
+      return null
+    }
   }
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return value as Record<string, unknown>

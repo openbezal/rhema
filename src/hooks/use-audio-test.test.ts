@@ -38,6 +38,62 @@ describe("use-audio-test", () => {
   })
 
   describe("audioTestActions.start", () => {
+    it("exposes a pending opening to reset guards and deduplicates it", async () => {
+      let finish!: () => void
+      mockInvoke.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve
+          })
+      )
+      const { useAudioStore, audioTestActions } = await loadModules()
+      const job = audioTestActions.start()
+      const duplicate = audioTestActions.start()
+      expect(useAudioStore.getState().isTestStarting).toBe(true)
+      expect(mockInvoke).toHaveBeenCalledTimes(1)
+      finish()
+      await Promise.all([job, duplicate])
+      expect(useAudioStore.getState()).toMatchObject({
+        isTestStarting: false,
+        isTesting: true,
+      })
+    })
+    it("cannot resurrect a stopped test when its opening acknowledgement arrives late", async () => {
+      let finish!: () => void
+      mockInvoke.mockImplementation((command) =>
+        command === "start_audio_test"
+          ? new Promise<void>((resolve) => {
+              finish = resolve
+            })
+          : Promise.resolve()
+      )
+      const { useAudioStore, audioTestActions } = await loadModules()
+      const job = audioTestActions.start()
+      await audioTestActions.stop()
+      expect(useAudioStore.getState().isTestStarting).toBe(true)
+      finish()
+      await job
+      expect(useAudioStore.getState()).toMatchObject({
+        isTestStarting: false,
+        isTesting: false,
+      })
+    })
+    it("does not dispatch a test during session maintenance", async () => {
+      const { useAudioStore, audioTestActions } = await loadModules()
+      const { beginOperatorMaintenance } =
+        await import("@/lib/operator-maintenance")
+      const lease = beginOperatorMaintenance()
+      try {
+        await audioTestActions.start()
+        expect(mockInvoke).not.toHaveBeenCalled()
+        expect(useAudioStore.getState()).toMatchObject({
+          isTestStarting: false,
+          isTesting: false,
+        })
+      } finally {
+        lease.release()
+      }
+    })
     it("invokes start_audio_test with settings-derived device and gain", async () => {
       mockInvoke.mockResolvedValue(undefined)
       const { useAudioStore, useSettingsStore, audioTestActions } =

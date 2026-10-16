@@ -61,7 +61,7 @@ pub fn read_operator_session_revision(
 #[serde(tag = "status", rename_all = "lowercase")]
 pub enum SessionResetOutcome {
     Reset { revision: u64 },
-    Rejected { message: String },
+    Rejected { message: String, revision: u64 },
 }
 
 #[tauri::command]
@@ -95,7 +95,10 @@ pub async fn reset_operator_session(
         });
         match result {
             Ok(revision) => SessionResetOutcome::Reset { revision },
-            Err(message) => SessionResetOutcome::Rejected { message },
+            Err(message) => SessionResetOutcome::Rejected {
+                message,
+                revision: app.state::<SessionRevision>().current(),
+            },
         }
     })
     .await
@@ -110,6 +113,17 @@ mod tests {
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     };
+
+    #[test]
+    fn a_known_refusal_reports_its_current_session_revision() {
+        let outcome = SessionResetOutcome::Rejected {
+            message: "Stop the audio test".into(),
+            revision: 7,
+        };
+        let value = serde_json::to_value(outcome).unwrap();
+        assert_eq!(value["status"], "rejected");
+        assert_eq!(value["revision"], 7);
+    }
 
     #[test]
     fn reset_is_stopped_atomic_and_preserves_configuration() {

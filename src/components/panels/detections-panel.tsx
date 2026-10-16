@@ -13,8 +13,15 @@ import { presentVerse } from "@/hooks/use-broadcast"
 import { mark } from "@/lib/latency-marks"
 import type { DetectionResult } from "@/types"
 import { useDisplayVerseReference } from "@/hooks/use-book-display-names"
+import {
+  isOperatorWorkCurrent,
+  useOperatorMaintenanceStore,
+} from "@/lib/operator-maintenance"
 
 function DetectionCard({ detection }: { detection: DetectionResult }) {
+  const originRevision = useOperatorMaintenanceStore((state) =>
+    state.phase === "idle" ? state.revision : -1
+  )
   const displayReference = useDisplayVerseReference()
   const reference = displayReference(
     detection,
@@ -22,6 +29,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
     detection.is_chapter_only
   )
   const handlePresent = () => {
+    if (!isOperatorWorkCurrent(originRevision)) return
     // Navigate book search panel to this verse
     if (detection.book_number > 0) {
       bibleActions.navigateToVerse(
@@ -62,6 +70,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           title="Dismiss"
           className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
           onClick={() =>
+            isOperatorWorkCurrent(originRevision) &&
             detectionActions.dismissDetection(
               detection.verse_ref,
               detection.source
@@ -93,17 +102,23 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           size="sm"
           className="gap-1"
           onClick={() => {
-            void queueSuggestion({
-              ...detectionCandidate(detection),
-              firstSeenAt: Date.now(),
-              lastSeenAt: Date.now(),
-            }).catch((error: unknown) =>
-              toast.error("Could not queue detection", {
-                description:
-                  error instanceof Error
-                    ? error.message
-                    : "Check the source translation.",
-              })
+            if (!isOperatorWorkCurrent(originRevision)) return
+            void queueSuggestion(
+              {
+                ...detectionCandidate(detection),
+                firstSeenAt: Date.now(),
+                lastSeenAt: Date.now(),
+              },
+              originRevision
+            ).catch(
+              (error: unknown) =>
+                isOperatorWorkCurrent(originRevision) &&
+                toast.error("Could not queue detection", {
+                  description:
+                    error instanceof Error
+                      ? error.message
+                      : "Check the source translation.",
+                })
             )
           }}
         >
@@ -116,6 +131,9 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
 }
 
 export function DetectionsPanel() {
+  const originRevision = useOperatorMaintenanceStore((state) =>
+    state.phase === "idle" ? state.revision : -1
+  )
   const { detections } = useDetection()
 
   // Latency debugging: when the list changes, mark the React commit and the
@@ -145,7 +163,10 @@ export function DetectionsPanel() {
     >
       <PanelHeader title="Direct detections">
         <button
-          onClick={() => useDetectionStore.getState().clearDirectDetections()}
+          onClick={() =>
+            isOperatorWorkCurrent(originRevision) &&
+            useDetectionStore.getState().clearDirectDetections()
+          }
           className="text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
         >
           Clear all

@@ -59,6 +59,8 @@ interface BibleState {
   semanticResults: SemanticSearchResult[]
   semanticResultSource: ContextResultSource | null
   selectedVerse: Verse | null
+  /** Explicit new-session reset keeps preview empty until a new operator intent. */
+  allowAutomaticPreview: boolean
   currentChapter: Verse[]
   crossReferences: CrossReference[]
   pendingNavigation: PendingNavigation | null
@@ -123,6 +125,7 @@ export const useBibleStore = create<BibleState>((set, get) => ({
   semanticResults: [],
   semanticResultSource: null,
   selectedVerse: null,
+  allowAutomaticPreview: true,
   currentChapter: [],
   crossReferences: [],
   pendingNavigation: null,
@@ -190,7 +193,11 @@ export const useBibleStore = create<BibleState>((set, get) => ({
       return
     set({ semanticResults, semanticResultSource })
   },
-  selectVerse: (selectedVerse) => set({ selectedVerse }),
+  selectVerse: (selectedVerse) =>
+    set({
+      selectedVerse,
+      ...(selectedVerse ? { allowAutomaticPreview: true } : {}),
+    }),
   setCurrentChapter: (currentChapter) => set({ currentChapter }),
   setCrossReferences: (crossReferences) => set({ crossReferences }),
   setPendingNavigation: (pendingNavigation) => set({ pendingNavigation }),

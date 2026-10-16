@@ -14,6 +14,7 @@ import {
   useCallback,
   useRef,
   useMemo,
+  type SyntheticEvent,
 } from "react"
 import { invoke } from "@tauri-apps/api/core"
 // Using native overflow-y-auto instead of Radix ScrollArea for reliable scrolling in flex layouts
@@ -140,6 +141,16 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 
 export function SearchPanel() {
   const maintenancePhase = useOperatorMaintenanceStore((state) => state.phase)
+  const actionRevision = useOperatorMaintenanceStore((state) =>
+    state.phase === "idle" ? state.revision : -1
+  )
+  // Retained rows must not acquire a fresh intent between reset publication
+  // and React's next commit, including a render made while maintenance ran.
+  const guardOperatorEvent = (event: SyntheticEvent) => {
+    if (isOperatorWorkCurrent(actionRevision)) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
   const [selectedBook, setSelectedBook] = useState<Book | null>(() => {
     const state = useBibleStore.getState()
@@ -685,6 +696,11 @@ export function SearchPanel() {
     <div
       ref={panelRef}
       data-slot="search-panel"
+      onClickCapture={guardOperatorEvent}
+      onKeyDownCapture={guardOperatorEvent}
+      onInputCapture={guardOperatorEvent}
+      onPointerDownCapture={guardOperatorEvent}
+      onCompositionEndCapture={guardOperatorEvent}
       className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card outline-none"
       aria-label="Search panel"
       tabIndex={-1}

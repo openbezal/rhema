@@ -5,26 +5,54 @@ import { useAudioStore } from "@/stores/audio-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import type { AudioLevel } from "@/types"
 import { useTauriEvent } from "./use-tauri-event"
+import {
+  isOperatorMaintenanceActive,
+  isOperatorWorkCurrent,
+  operatorRevision,
+} from "@/lib/operator-maintenance"
 
 interface AudioTestStoppedPayload {
   reason: "stopped" | "timeout" | "device_lost" | (string & {})
 }
+let audioActionRevision = 0
+let pendingStart: Promise<void> | null = null
 
 export const audioTestActions = {
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    if (isOperatorMaintenanceActive()) return Promise.resolve()
+    if (pendingStart) return pendingStart
+    if (useAudioStore.getState().isTesting) return Promise.resolve()
+    const epoch = operatorRevision(),
+      revision = ++audioActionRevision
+    const current = () =>
+      audioActionRevision === revision && isOperatorWorkCurrent(epoch)
     const settings = useSettingsStore.getState()
-    try {
-      await invoke("start_audio_test", {
-        deviceId: settings.audioDeviceId,
-        gain: settings.gain,
-      })
-      useAudioStore.getState().setTesting(true)
-    } catch (e) {
-      toast.error("Could not start audio test", { description: String(e) })
+    useAudioStore.setState({ isTestStarting: true })
+    const job = (async () => {
+      try {
+        await invoke("start_audio_test", {
+          deviceId: settings.audioDeviceId,
+          gain: settings.gain,
+        })
+        if (current()) useAudioStore.getState().setTesting(true)
+      } catch (e) {
+        if (current())
+          toast.error("Could not start audio test", { description: String(e) })
+      }
+    })()
+    pendingStart = job
+    const finish = () => {
+      if (pendingStart === job) {
+        pendingStart = null
+        useAudioStore.setState({ isTestStarting: false })
+      }
     }
+    void job.then(finish, finish)
+    return job
   },
 
   async stop(): Promise<void> {
+    ++audioActionRevision
     try {
       await invoke("stop_audio_test")
     } catch {
@@ -37,7 +65,10 @@ export const audioTestActions = {
   },
 
   async toggle(): Promise<void> {
-    if (useAudioStore.getState().isTesting) {
+    if (
+      useAudioStore.getState().isTesting ||
+      useAudioStore.getState().isTestStarting
+    ) {
       await audioTestActions.stop()
     } else {
       await audioTestActions.start()
@@ -57,6 +88,7 @@ export const audioTestActions = {
  */
 export function useAudioTest() {
   const isTesting = useAudioStore((s) => s.isTesting)
+  const isStarting = useAudioStore((s) => s.isTestStarting)
   const levelRms = useAudioStore((s) => s.level.rms)
   const audioDeviceId = useSettingsStore((s) => s.audioDeviceId)
 
@@ -84,7 +116,10 @@ export function useAudioTest() {
   // The capture is bound to the device chosen at start — stop the test when
   // the selection changes so the meter never reflects a stale device.
   useEffect(() => {
-    if (useAudioStore.getState().isTesting) {
+    if (
+      useAudioStore.getState().isTesting ||
+      useAudioStore.getState().isTestStarting
+    ) {
       void audioTestActions.stop()
     }
   }, [audioDeviceId])
@@ -92,7 +127,10 @@ export function useAudioTest() {
   // Leak guard: dialog closed or section switched while testing.
   useEffect(
     () => () => {
-      if (useAudioStore.getState().isTesting) {
+      if (
+        useAudioStore.getState().isTesting ||
+        useAudioStore.getState().isTestStarting
+      ) {
         void audioTestActions.stop()
       }
     },
@@ -101,6 +139,7 @@ export function useAudioTest() {
 
   return {
     isTesting,
+    isStarting,
     /** RMS level 0..1 while testing; pinned to 0 otherwise. */
     level: isTesting ? levelRms : 0,
     toggle: audioTestActions.toggle,

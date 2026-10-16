@@ -3,6 +3,10 @@ import { queueSuggestion, presentSuggestion } from "./suggestion-actions"
 import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
 import type { SuggestionCandidate } from "./suggestion-history"
+import {
+  beginOperatorMaintenance,
+  operatorRevision,
+} from "./operator-maintenance"
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   present: vi.fn(),
@@ -83,6 +87,38 @@ describe("explicit suggestion actions", () => {
       translation_code: "KJV",
       verse: { translation_id: 1, text: "Verified KJV text" },
     })
+  })
+  it.each(["during", "after"] as const)(
+    "drops a Queue lookup completed %s session maintenance",
+    async (phase) => {
+      let finish!: (value: typeof row) => void
+      mocks.invoke.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          })
+      )
+      const pending = queueSuggestion(candidate)
+      const lease = beginOperatorMaintenance()
+      try {
+        if (phase === "after") lease.release()
+        finish(row)
+        await expect(pending).resolves.toBe(false)
+        expect(useQueueStore.getState().items).toEqual([])
+        expect(mocks.info).not.toHaveBeenCalled()
+      } finally {
+        lease.release()
+      }
+    }
+  )
+  it("refuses actions from an earlier rendered session after maintenance has ended", async () => {
+    const origin = operatorRevision(),
+      lease = beginOperatorMaintenance()
+    lease.release()
+    await expect(queueSuggestion(candidate, origin)).resolves.toBe(false)
+    await presentSuggestion(candidate, origin)
+    expect(mocks.invoke).not.toHaveBeenCalled()
+    expect(mocks.present).not.toHaveBeenCalled()
   })
   it("looks up stable code after numeric IDs change", async () => {
     useBibleStore.getState().setTranslations([

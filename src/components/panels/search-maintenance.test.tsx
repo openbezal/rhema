@@ -55,6 +55,7 @@ async function type(selector: string, value: string, inputType = "insertText") {
   })
 }
 beforeEach(async () => {
+  useQueueStore.getState().clearQueue()
   useSettingsStore.setState({ bookDisplayOverrides: [] })
   vi.useFakeTimers()
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
@@ -455,6 +456,38 @@ async function addJamesAndJude() {
     })
   })
 }
+it.each([false, true])(
+  "rejects retained Bible row and Queue controls across reset, including busy render=%s",
+  async (busyRender) => {
+    let lease: ReturnType<typeof beginOperatorMaintenance> | undefined
+    if (busyRender)
+      await act(async () => {
+        lease = beginOperatorMaintenance()
+      })
+    const row = host.querySelector<HTMLElement>(
+      '[data-operator-item="verse-1"]'
+    )!
+    const add = row.querySelector<HTMLButtonElement>("button")!
+    await act(async () => {
+      lease ??= beginOperatorMaintenance()
+      useBibleStore.setState({
+        selectedVerse: null,
+        allowAutomaticPreview: false,
+      })
+      useQueueStore.getState().clearQueue()
+      lease.release()
+      row.click()
+      add.click()
+    })
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useBroadcastStore.getState().liveVerse).toBeNull()
+    expect(useQueueStore.getState().items).toEqual([])
+    await act(async () =>
+      host.querySelector<HTMLElement>('[data-operator-item="verse-1"]')!.click()
+    )
+    expect(useBibleStore.getState().selectedVerse).toBe(oldVerse)
+  }
+)
 it("leaves ambiguous J alone and completes JA on a delimiter and JA 2 2 on paste", async () => {
   await addJamesAndJude()
   await type('[aria-label="Bible reference search"]', "J")

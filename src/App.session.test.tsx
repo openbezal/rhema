@@ -98,7 +98,7 @@ const detected: DetectionResult = {
 let root: Root
 let host: HTMLDivElement
 const send = (event: string, payload: unknown) => {
-  const session = !event.includes(":")
+  const session = !event.includes(":") || event.startsWith("remote:")
   for (const handler of mocks.listeners.get(
     session ? `session:${event}` : event
   ) ?? [])

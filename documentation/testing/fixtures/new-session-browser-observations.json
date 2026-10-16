@@ -1,0 +1,387 @@
+{
+  "reviewDark": {
+    "active": "Export session JSON",
+    "dialogs": [
+      {
+        "rect": {
+          "bottom": 600,
+          "left": 352,
+          "right": 1024,
+          "top": 0
+        },
+        "text": "Session archiveSave this session and open past sessions for reference.Current session5 completed segments, 1 Queue entries, 2 recent detectionsSession nameExport session JSONExport transcript TXTExport preferences JSONNew sessionSession JSON includes the final transcript, current Queue, retained detections and quotation history, portable preferences and saved custom themes. API keys and this computer’s audio and output mappings are excluded.Saved referenceOpen saved archiveOpen a session or preferences JSON file to review its saved content here.Close"
+      },
+      {
+        "rect": {
+          "bottom": 539,
+          "left": 224,
+          "right": 800,
+          "top": 61
+        },
+        "text": "Start a new sessionReview and export your current session before clearing it.5 completed transcript segments1 Queue entry1 direct detection1 SuggestionStarting a new session clears these histories, partial text, dismissals, reading context, the current preview and the held presentation.Your saved preferences, API keys, microphone, output assignments, themes and Bible language choices stay in place. Auto and Follow stay as set.Exports include the final transcript, Queue and candidate history. Keep a copy before clearing anything you need.Export session JSONExport transcript TXTCancelStart new sessionClose"
+      }
+    ],
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "apply",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 1,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 1
+    }
+  },
+  "jsonExport": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":1,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":7,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"apply\",\"revision\":1,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":1,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":[],\"format\":\"json\",\"bytes\":5656,\"hasTranscript\":true,\"hasQueue\":true,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "txtExport": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":1,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":7,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"apply\",\"revision\":1,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":1,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "cancel": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":1,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":7,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"apply\",\"revision\":1,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":1,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "exportCancel": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":0,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":7,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"export-cancel\",\"revision\":1,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":1,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "exportFailure": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":0,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":7,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"export-fail\",\"revision\":1,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":1,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "knownRefusal": {
+    "alert": "Synthetic native refusal. Stop Test and review again.",
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": {
+        "bookNames": null,
+        "bytes": 437,
+        "format": "text",
+        "hasLocalKey": false,
+        "hasPartial": false,
+        "hasQueue": false,
+        "hasTranscript": true
+      },
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "reject",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 1,
+      "revision": 4,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 4
+    },
+    "theme": "light"
+  },
+  "busy": {
+    "buttons": [
+      {
+        "disabled": false,
+        "text": "Export session JSON"
+      },
+      {
+        "disabled": false,
+        "text": "Export transcript TXT"
+      },
+      {
+        "disabled": false,
+        "text": "Export preferences JSON"
+      },
+      {
+        "disabled": true,
+        "text": "New session"
+      },
+      {
+        "disabled": false,
+        "text": "Open saved archive"
+      },
+      {
+        "disabled": false,
+        "text": "Close"
+      },
+      {
+        "disabled": true,
+        "text": "Export session JSON"
+      },
+      {
+        "disabled": true,
+        "text": "Export transcript TXT"
+      },
+      {
+        "disabled": true,
+        "text": "Cancel"
+      },
+      {
+        "disabled": true,
+        "text": "Start new session"
+      }
+    ],
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": {
+        "bookNames": null,
+        "bytes": 437,
+        "format": "text",
+        "hasLocalKey": false,
+        "hasPartial": false,
+        "hasQueue": false,
+        "hasTranscript": true
+      },
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "delay",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "committing",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 2,
+      "revision": 7,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 8,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 7
+    }
+  },
+  "success": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":null,\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"onAir\":false,\"queue\":[],\"active\":null,\"transcriptCount\":0,\"detectionCount\":0,\"suggestionCount\":0,\"partial\":\"\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":2,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"delay\",\"revision\":7,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":7,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "oldPackets": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":null,\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"onAir\":false,\"queue\":[],\"active\":null,\"transcriptCount\":0,\"detectionCount\":0,\"suggestionCount\":0,\"partial\":\"\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":2,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"delay\",\"revision\":7,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":7,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "currentPacket": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":null,\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"onAir\":false,\"queue\":[{\"id\":\"b671cfce-7610-488c-bd78-ed37066f2475\",\"text\":\"Synthetic BIUO fixture for John 3:17. New session QA only.\",\"code\":\"BIUO\"}],\"active\":null,\"transcriptCount\":1,\"detectionCount\":1,\"suggestionCount\":0,\"partial\":\"\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":2,\"bootstrapReads\":1,\"currentSends\":1,\"mode\":\"delay\",\"revision\":7,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":7,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "transcribingBlocked": "Start a new session\n\nReview and export your current session before clearing it.\n\n1 completed transcript segment\n1 Queue entry\n1 direct detection\n0 Suggestions\n\nStarting a new session clears these histories, partial text, dismissals, reading context, the current preview and the held presentation.\n\nYour saved preferences, API keys, microphone, output assignments, themes and Bible language choices stay in place. Auto and Follow stay as set.\n\nExports include the final transcript, Queue and candidate history. Keep a copy before clearing anything you need.\n\nExport session JSON\nExport transcript TXT\n\nStop transcription and wait for it to finish before starting a new session.\n\nCancel\nStart new session\nClose",
+  "recovery": "{\"phase\":\"recovery\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":1,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":1,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"lost\",\"revision\":4,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":4,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":null,\"nativeTranscribing\":false}",
+  "recoveryJson": "{\"phase\":\"recovery\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":1,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":1,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"lost\",\"revision\":4,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":4,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":[],\"format\":\"json\",\"bytes\":5656,\"hasTranscript\":true,\"hasQueue\":true,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "recoveryTxt": "{\"phase\":\"recovery\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":1,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":1,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"lost\",\"revision\":4,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":4,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "afterRecoveryReload": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"onAir\":false,\"queue\":[],\"active\":null,\"transcriptCount\":0,\"detectionCount\":0,\"suggestionCount\":0,\"partial\":\"\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"sessionRevision\":8,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"apply\",\"revision\":4,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":0,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":{\"bookNames\":null,\"format\":\"text\",\"bytes\":437,\"hasTranscript\":true,\"hasQueue\":false,\"hasLocalKey\":false,\"hasPartial\":false},\"nativeTranscribing\":false}",
+  "consoleMain": [
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 513950228. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:21.792Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 2139916818. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:21.792Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 3899357847. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:21.792Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 2874352109. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:21.792Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 513950228. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:48.894Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 2139916818. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:48.894Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 3899357847. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:48.896Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    },
+    {
+      "level": "warn",
+      "message": "[TAURI] Couldn't find callback id 2874352109. This might happen when the app is reloaded while Rust is running an asynchronous operation.",
+      "timestamp": "2026-10-16T06:56:48.896Z",
+      "url": "http://127.0.0.1:56431/assets/main-DiS7fdJT.js"
+    }
+  ],
+  "consoleRecovery": []
+}

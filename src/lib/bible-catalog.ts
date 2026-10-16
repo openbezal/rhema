@@ -36,6 +36,7 @@ function connectActiveBibleCatalog(): () => void {
       const now = useBibleStore.getState()
       if (now.pendingNavigation || !books.length) return
       const source = now.selectedVerse
+      if (!source && !now.allowAutomaticPreview) return
       if (source && now.currentChapter[0]?.translation_id === id) return
       const target = source
         ? {

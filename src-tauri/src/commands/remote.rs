@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use tauri::{AppHandle, Emitter, State};
+use crate::session_events::SessionEmitter;
+use tauri::{AppHandle, State};
 
 use rhema_api::{
     new_shared_status, start_http_server, start_osc_listener, CommandError, CommandSink,
@@ -18,7 +19,7 @@ struct TauriSink {
 impl CommandSink for TauriSink {
     fn emit_event(&self, event: &str, payload: &str) -> Result<(), CommandError> {
         self.app
-            .emit(event, payload.to_string())
+            .emit_session(event, payload.to_string())
             .map_err(|e| CommandError::DispatchFailed(format!("Tauri emit failed: {e}")))
     }
 
@@ -27,18 +28,18 @@ impl CommandSink for TauriSink {
             "show_broadcast" => {
                 log::info!("Remote control: show broadcast");
                 self.app
-                    .emit("remote:show", "{}")
+                    .emit_session("remote:show", "{}")
                     .map_err(|e| CommandError::DispatchFailed(e.to_string()))
             }
             "hide_broadcast" => {
                 log::info!("Remote control: hide broadcast");
                 self.app
-                    .emit("remote:hide", "{}")
+                    .emit_session("remote:hide", "{}")
                     .map_err(|e| CommandError::DispatchFailed(e.to_string()))
             }
             "set_confidence" => self
                 .app
-                .emit("remote:confidence", args.to_string())
+                .emit_session("remote:confidence", args.to_string())
                 .map_err(|e| CommandError::DispatchFailed(e.to_string())),
             _ => Err(CommandError::DispatchFailed(format!(
                 "Unknown backend action: {action}"

@@ -1,0 +1,41 @@
+{
+  "base": "5ff6fb39a9ca59f1b6e01a2388edf72214b4bed4",
+  "stage": "before-independent-review",
+  "frontend": {
+    "tests": 1038,
+    "files": 89,
+    "typecheck": "pass",
+    "intentional_type_error_probe": "pass",
+    "lint": "pass, zero warnings",
+    "production_build": "pass"
+  },
+  "native": {
+    "default": 489,
+    "no_default": 489,
+    "strict_workspace_all_targets_clippy": "pass",
+    "format": "pass",
+    "platform": "macOS",
+    "exploratory_all_features_clippy": "failed: unchanged optional search_bench lints; new audio helper lints fixed"
+  },
+  "browser": {
+    "size": [
+      1024,
+      600
+    ],
+    "modes": [
+      "light",
+      "dark"
+    ],
+    "native_boundaries": "mocked",
+    "observations": "new-session-browser-observations.json",
+    "warnings": {
+      "main": 8,
+      "recovery": 0,
+      "cause": "documented Tauri eventId/id mock unlisten mismatch"
+    },
+    "console_errors": 0
+  },
+  "review": "pending",
+  "installed_native_acceptance": "pending",
+  "original_prs_and_issues": "unchanged"
+}

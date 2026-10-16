@@ -110,12 +110,16 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       activeIndex,
       selectionRevision: state.selectionRevision + 1,
     })),
-  clearQueue: () =>
+  clearQueue: () => {
+    if (flashTimer) clearTimeout(flashTimer)
+    flashTimer = null
     set((state) => ({
       items: [],
       activeIndex: null,
+      highlightedId: null,
       selectionRevision: state.selectionRevision + 1,
-    })),
+    }))
+  },
   flashItem: (id) => {
     if (flashTimer) clearTimeout(flashTimer)
     set({ highlightedId: id })

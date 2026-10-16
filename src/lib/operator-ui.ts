@@ -4,8 +4,10 @@ export const useOperatorUiStore = create<{
   commandsOpen: boolean
   shortcutsOpen: boolean
   searchFocusRevision: number
+  sessionResetRevision: number
 }>(() => ({
   commandsOpen: false,
   shortcutsOpen: false,
   searchFocusRevision: 0,
+  sessionResetRevision: 0,
 }))

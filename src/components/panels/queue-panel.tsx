@@ -7,6 +7,10 @@ import { useQueueStore } from "@/stores"
 import { operatorActions } from "@/lib/operator-actions"
 import type { QueueItem } from "@/types"
 import { useDisplayVerseReference } from "@/hooks/use-book-display-names"
+import {
+  isOperatorWorkCurrent,
+  useOperatorMaintenanceStore,
+} from "@/lib/operator-maintenance"
 
 function QueueItemRow({
   item,
@@ -19,6 +23,9 @@ function QueueItemRow({
   isActive: boolean
   isHighlighted: boolean
 }) {
+  const originRevision = useOperatorMaintenanceStore((state) =>
+    state.phase === "idle" ? state.revision : -1
+  )
   const displayReference = useDisplayVerseReference()
   const reference = displayReference(
     item.verse,
@@ -27,11 +34,16 @@ function QueueItemRow({
     item.reference
   )
   const handlePresent = () => {
-    void operatorActions.presentQueueItem(index)
+    if (!isOperatorWorkCurrent(originRevision)) return
+    const currentIndex = useQueueStore
+      .getState()
+      .items.findIndex((current) => current.id === item.id)
+    if (currentIndex >= 0) void operatorActions.presentQueueItem(currentIndex)
   }
 
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!isOperatorWorkCurrent(originRevision)) return
     useQueueStore.getState().removeItem(item.id)
   }
 
@@ -109,6 +121,9 @@ function QueueItemRow({
 }
 
 export function QueuePanel() {
+  const originRevision = useOperatorMaintenanceStore((state) =>
+    state.phase === "idle" ? state.revision : -1
+  )
   const items = useQueueStore((s) => s.items)
   const activeIndex = useQueueStore((s) => s.activeIndex)
   const highlightedId = useQueueStore((s) => s.highlightedId)
@@ -125,7 +140,10 @@ export function QueuePanel() {
         <div className="flex items-center gap-2">
           <Badge variant="outline">{items.length}</Badge>
           <button
-            onClick={() => useQueueStore.getState().clearQueue()}
+            onClick={() =>
+              isOperatorWorkCurrent(originRevision) &&
+              useQueueStore.getState().clearQueue()
+            }
             className="text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
           >
             Clear all
