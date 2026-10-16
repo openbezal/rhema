@@ -7,6 +7,7 @@ import { useProfileStatusStore } from "@/lib/profile-status"
 import { useOperatorMaintenanceStore } from "@/lib/operator-maintenance"
 import { subscribeOutputChanges } from "@/lib/output-safety"
 import { newSessionBlockedReason } from "@/lib/session-reset-controller"
+import { subscribeTranscriptionChanges } from "./use-transcription"
 function subscribe(listener: () => void): () => void {
   const stops = [
     useBibleStore,
@@ -17,6 +18,7 @@ function subscribe(listener: () => void): () => void {
     useOperatorMaintenanceStore,
   ].map((store) => store.subscribe(listener))
   stops.push(subscribeOutputChanges(listener))
+  stops.push(subscribeTranscriptionChanges(listener))
   return () => stops.forEach((stop) => stop())
 }
 export function useNewSessionReadiness(): string | null {

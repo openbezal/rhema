@@ -26,6 +26,18 @@ let starting: Promise<void> | null = null
 let stopping: Promise<void> | null = null
 export const hasPendingTranscriptionChange = () =>
   starting !== null || stopping !== null
+const changeListeners = new Set<() => void>()
+export function subscribeTranscriptionChanges(
+  listener: () => void
+): () => void {
+  changeListeners.add(listener)
+  return () => {
+    changeListeners.delete(listener)
+  }
+}
+function notifyTranscriptionChanges() {
+  changeListeners.forEach((listener) => listener())
+}
 
 export const transcriptionActions = {
   start(onMissingApiKey?: () => void): Promise<void> {
@@ -72,9 +84,13 @@ export const transcriptionActions = {
       }
     })()
     starting = job
-    void job.then(() => {
-      if (starting === job) starting = null
-    })
+    notifyTranscriptionChanges()
+    const finish = () => {
+      if (starting !== job) return
+      starting = null
+      notifyTranscriptionChanges()
+    }
+    void job.then(finish, finish)
     return job
   },
 
@@ -101,9 +117,13 @@ export const transcriptionActions = {
       transcript.setConnectionStatus("disconnected")
     })()
     stopping = job
-    void job.then(() => {
-      if (stopping === job) stopping = null
-    })
+    notifyTranscriptionChanges()
+    const finish = () => {
+      if (stopping !== job) return
+      stopping = null
+      notifyTranscriptionChanges()
+    }
+    void job.then(finish, finish)
     return job
   },
 }

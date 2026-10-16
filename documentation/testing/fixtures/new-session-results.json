@@ -1,9 +1,9 @@
 {
   "base": "5ff6fb39a9ca59f1b6e01a2388edf72214b4bed4",
-  "stage": "before-independent-review",
+  "stage": "after-single-review-fix-pass",
   "frontend": {
-    "tests": 1038,
-    "files": 89,
+    "tests": 1040,
+    "files": 90,
     "typecheck": "pass",
     "intentional_type_error_probe": "pass",
     "lint": "pass, zero warnings",
@@ -35,7 +35,20 @@
     },
     "console_errors": 0
   },
-  "review": "pending",
+  "review": {
+    "reviewed": "a44d26ab365b8cacf089a015bcc751697a05dce4",
+    "reviewer": "fresh Astra/high",
+    "critical": 0,
+    "important": 1,
+    "additional_actionable_minor": 0,
+    "fixed": "pending transcription start/stop changes notify mounted reset readiness",
+    "regressions": "delayed Stop and failed Start both RED then GREEN",
+    "focused_tests": 34,
+    "fix_passes": 1,
+    "rereview": false,
+    "exact_usage_cost": "unavailable",
+    "browser": "precedes review fix; final notifier paths automated only"
+  },
   "installed_native_acceptance": "pending",
   "original_prs_and_issues": "unchanged"
 }
