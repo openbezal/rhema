@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 import { operatorActions } from "./operator-actions"
 import { useOperatorUiStore } from "./operator-ui"
+import { isOperatorMaintenanceActive } from "./operator-maintenance"
 import { isEditableTarget, type ShortcutId } from "./shortcut-registry"
 import { transcriptionActions } from "@/hooks/use-transcription"
 import { fetchChapter } from "@/hooks/use-bible"
@@ -35,6 +36,7 @@ export async function stepChapter(
   direction: "next" | "prev",
   owner?: object
 ): Promise<void> {
+  if (isOperatorMaintenanceActive()) return
   const state = useBibleStore.getState()
   if (state.translationSelectionStatus !== "ready") return
   const cursor =
@@ -112,6 +114,7 @@ export async function runShortcutCommand(
   id: ShortcutId,
   event: KeyboardEvent
 ): Promise<void> {
+  if (isOperatorMaintenanceActive()) return
   if (id === "toggle-live")
     return operatorActions.toggleOnAir(!useBroadcastStore.getState().isLive)
   if (id === "toggle-transcription") {

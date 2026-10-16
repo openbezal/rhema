@@ -13,6 +13,7 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { requestOnAir, setOutputEnabled, removeOutputSafely, updateOutputSafely } from "./output-safety"
 import { remoteActions } from "./remote-actions"
 import { broadcastActions } from "@/hooks/use-broadcast"
+import { beginOperatorMaintenance } from "./operator-maintenance"
 
 const output: BroadcastOutput = { id: "ndi-a", name: "Stage feed", type: "ndi", themeId: "", monitorIndex: 0, ndi: defaultNdiSettings("Stage") }
 const visible = (id: string, shown: boolean) => ({ label: `broadcast-${id}`, isVisible: vi.fn().mockResolvedValue(shown) })
@@ -228,4 +229,26 @@ describe("editing an output transport", () => {
     expect(stopCalls()).toHaveLength(0)
     expect(mocks.ask).not.toHaveBeenCalled()
   })
+})
+
+it("does not inspect or prompt for on-air changes during maintenance", async () => {
+  const lease=beginOperatorMaintenance()
+  try {
+    expect(await requestOnAir(true)).toBe(false)
+    expect(mocks.windows).not.toHaveBeenCalled()
+    expect(mocks.ask).not.toHaveBeenCalled()
+  } finally {lease.release()}
+})
+
+it("does not let an old on-air prompt commit or absorb a fresh request after maintenance", async () => {
+  const prompt=deferred<boolean>()
+  mocks.ask.mockReturnValueOnce(prompt.promise).mockResolvedValue(true)
+  const old=requestOnAir(true)
+  await vi.waitFor(()=>expect(mocks.ask).toHaveBeenCalledTimes(1))
+  const lease=beginOperatorMaintenance();lease.release()
+  const fresh=requestOnAir(true)
+  prompt.resolve(true)
+  expect(fresh).not.toBe(old)
+  expect(await old).toBe(false)
+  expect(await fresh).toBe(true)
 })

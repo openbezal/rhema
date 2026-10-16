@@ -1,10 +1,12 @@
 import { create } from "zustand"
+import { useProfileStatusStore } from "@/lib/profile-status"
 import {
   DEFAULT_SUGGESTION_OPTIONS,
   suggestionOptions,
 } from "@/lib/suggestion-history"
 import {
   openProfileSection,
+  isPublishingRestoredProfile,
   type ProfileSectionStore,
 } from "@/lib/profile-persistence"
 
@@ -137,6 +139,7 @@ export function hydrateSettings(): Promise<void> {
       // Attach only after successful hydration so as not to overwrite disk with defaults.
       // Debounce writes, so a dragged slider (e.g. gain) coalesces into a single disk write.
       useSettingsStore.subscribe((state, prevState) => {
+        if (isPublishingRestoredProfile()) return
         const changed = PERSISTED_KEYS.some((k) => state[k] !== prevState[k])
         if (!changed) return
         if (saveTimer) clearTimeout(saveTimer)
@@ -144,7 +147,7 @@ export function hydrateSettings(): Promise<void> {
           saveTimer = null
           pendingSave = pendingSave.then(() =>
             persistAll(useSettingsStore.getState())
-          )
+          ).catch(() => console.warn("[settings] Failed to persist settings"))
         }, SAVE_DEBOUNCE_MS)
       })
     } catch {
@@ -159,13 +162,20 @@ let pendingSave: Promise<void> = Promise.resolve()
 const SAVE_DEBOUNCE_MS = 250
 
 async function persistAll(state: SettingsState): Promise<void> {
-  try {
-    const store = await getStore()
-    for (const key of PERSISTED_KEYS) {
-      await store.set(key, state[key] as unknown)
-    }
-    await store.save()
-  } catch {
-    console.warn("[settings] Failed to persist settings")
+  const store = await getStore()
+  for (const key of PERSISTED_KEYS) {
+    await store.set(key, state[key] as unknown)
   }
+  await store.save()
+}
+
+export async function flushSettingsPersistence(): Promise<void> {
+  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  await hydrateSettings()
+  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  const saved = pendingSave.then(() => persistAll(useSettingsStore.getState()))
+  pendingSave = saved.catch(() => console.warn("[settings] Failed to persist settings"))
+  await saved
 }

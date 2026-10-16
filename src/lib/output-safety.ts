@@ -2,29 +2,39 @@ import { ask } from "@tauri-apps/plugin-dialog"
 import { toast } from "sonner"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { MAIN_OUTPUT_ID, type BroadcastOutput } from "@/types"
+import { isOperatorMaintenanceActive, isOperatorWorkCurrent, operatorRevision } from "./operator-maintenance"
 import { disableOutput, enableOutput, inspectOutput, outputRuntimeVersion, transportChanged } from "./broadcast-output-control"
 
 let liveRevision = 0
 let pendingLive: Promise<boolean> | null = null
+let pendingLiveEpoch = -1
 const outputJobs = new Map<string, Promise<boolean>>()
+const outputObservers = new Set<() => void>()
+export function subscribeOutputChanges(listener: () => void): () => void {
+  outputObservers.add(listener)
+  return () => { outputObservers.delete(listener) }
+}
+const notifyOutputChanges = () => outputObservers.forEach(listener => listener())
 const currentOutput = (id: string) => useBroadcastStore.getState().outputs.find(item => item.id === id)
 
 /** All control surfaces share the same latest operator intent and no-output warning. */
 export function requestOnAir(active: boolean): Promise<boolean> {
-  if (useBroadcastStore.getState().presentationRecovery !== "ready") return Promise.resolve(false)
+  if (isOperatorMaintenanceActive() || useBroadcastStore.getState().presentationRecovery !== "ready") return Promise.resolve(false)
+  const epoch = operatorRevision()
   if (!active) {
     liveRevision++
     pendingLive = null
+    pendingLiveEpoch = -1
     useBroadcastStore.getState().setLive(false)
     return Promise.resolve(true)
   }
   if (useBroadcastStore.getState().isLive) return Promise.resolve(true)
-  if (pendingLive) return pendingLive
+  if (pendingLive && pendingLiveEpoch === epoch) return pendingLive
   const revision = ++liveRevision
   const job = (async () => {
     const outputs = useBroadcastStore.getState().outputs
     const versions = outputs.map(output => outputRuntimeVersion(output.id))
-    const unchanged = () => useBroadcastStore.getState().outputs.length === outputs.length &&
+    const unchanged = () => isOperatorWorkCurrent(epoch) && useBroadcastStore.getState().outputs.length === outputs.length &&
       outputs.every((output, index) => currentOutput(output.id) === output && outputRuntimeVersion(output.id) === versions[index])
     const states = await Promise.all(outputs.map(inspectOutput))
     if (revision !== liveRevision || !unchanged()) return false
@@ -36,24 +46,29 @@ export function requestOnAir(active: boolean): Promise<boolean> {
     useBroadcastStore.getState().setLive(true)
     return true
   })().catch(error => {
-    toast.error("Could not change on-air state", { description: String(error) })
+    if (isOperatorWorkCurrent(epoch)) toast.error("Could not change on-air state", { description: String(error) })
     return false
   }).finally(() => { if (pendingLive === job) pendingLive = null })
   pendingLive = job
+  pendingLiveEpoch = epoch
   return job
 }
 
 /** Keep one operation per output while native dialogs/commands are pending. */
 function outputJob(id: string, action: () => Promise<boolean>): Promise<boolean> {
+  if (isOperatorMaintenanceActive()) return Promise.resolve(false)
   const pending = outputJobs.get(id)
   if (pending) return pending
   const job = action().catch(error => {
     toast.error("Could not change output", { description: String(error) })
     return false
-  }).finally(() => { if (outputJobs.get(id) === job) outputJobs.delete(id) })
+  }).finally(() => { if (outputJobs.get(id) === job) { outputJobs.delete(id); notifyOutputChanges() } })
   outputJobs.set(id, job)
+  notifyOutputChanges()
   return job
 }
+
+export const hasPendingOutputChanges = () => outputJobs.size > 0
 
 async function confirmStop(output: BroadcastOutput, action: string) {
   const inspection = await inspectOutput(output)

@@ -17,6 +17,7 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { invalidatePresentation } from "./presentation-controller"
 import { useOperatorUiStore } from "./operator-ui"
+import { beginOperatorMaintenance } from "./operator-maintenance"
 import type { Verse } from "@/types"
 const verse: Verse = {
   id: 1,
@@ -291,18 +292,36 @@ it("does not issue duplicate starts while a start command is still pending", asy
   })
   let finish!: (value: undefined) => void
   mocks.invoke.mockImplementation(
-    () =>
+    (command) => command === "read_transcription_start_revision" ? Promise.resolve(0) :
       new Promise<undefined>((resolve) => {
         finish = resolve
       })
   )
   const task = runShortcutCommand("toggle-transcription", event())
   await runShortcutCommand("toggle-transcription", event())
-  expect(
+  await vi.waitFor(() => expect(
     mocks.invoke.mock.calls.filter(
       ([command]) => command === "start_transcription"
     )
-  ).toHaveLength(1)
+  ).toHaveLength(1))
   finish(undefined)
   await task
+})
+
+it("blocks shared keyboard and direct operator actions during preference maintenance", async () => {
+  useBibleStore.setState({followDetections:false})
+  useQueueStore.setState({items:[{id:"held",verse:{...verse,verse:2},reference:"John 3:2",confidence:1,source:"manual",added_at:1}],activeIndex:null})
+  const lease=beginOperatorMaintenance()
+  try {
+    await runShortcutCommand("show-commands",event())
+    await runShortcutCommand("focus-search",event())
+    operatorActions.addToQueue()
+    operatorActions.setFollowDetections(true)
+    operatorActions.toggleAutoLive()
+    await operatorActions.presentQueueItem(0)
+    expect(useOperatorUiStore.getState()).toMatchObject({commandsOpen:false,searchFocusRevision:0})
+    expect(useQueueStore.getState()).toMatchObject({activeIndex:null,items:[expect.objectContaining({id:"held"})]})
+    expect(useBibleStore.getState().followDetections).toBe(false)
+    expect(useBroadcastStore.getState().autoLive).toBe(false)
+  } finally {lease.release()}
 })

@@ -39,6 +39,19 @@ fn truncate_safe(s: &str, max_bytes: usize) -> &str {
 use rhema_audio::{AudioConfig, AudioFrame};
 use rhema_stt::{DeepgramClient, SttConfig, SttProvider, TranscriptEvent};
 
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri command extractors require pass-by-value"
+)]
+pub fn read_transcription_start_revision(state: State<'_, Mutex<AppState>>) -> Result<u64, String> {
+    let sessions = {
+        let state = state.lock().map_err(|error| error.to_string())?;
+        state.transcription_sessions.clone()
+    };
+    sessions.begin_start()
+}
+
 /// Start the full audio-capture-to-transcription pipeline.
 ///
 /// 1. Opens the microphone via cpal (on a dedicated thread so the non-Send
@@ -59,6 +72,7 @@ pub async fn start_transcription(
     device_id: Option<String>,
     gain: Option<f32>,
     provider: Option<String>,
+    start_revision: Option<u64>,
 ) -> Result<(), String> {
     // ── 1. Guard: already running? ──────────────────────────────────────
     let (sessions, audio_test_active) = {
@@ -71,6 +85,11 @@ pub async fn start_transcription(
             app_state.audio_test_active.clone(),
         )
     };
+    let current_revision = sessions.begin_start()?;
+    if start_revision.is_some_and(|revision| revision != current_revision) {
+        return Err("Transcription start was cancelled".into());
+    }
+    let start_revision = current_revision;
 
     // Transcription preempts a running audio test — both would open the same
     // capture device. Clearing the flag makes the test thread exit within
@@ -155,7 +174,7 @@ pub async fn start_transcription(
         }
     };
 
-    let session = sessions.start(|| reset_detection_context(&app))?;
+    let session = sessions.start_reserved(start_revision, || reset_detection_context(&app))?;
 
     // ── 3. Prepare channels ─────────────────────────────────────────────
     let (audio_send_tx, audio_send_rx) = crossbeam_channel::bounded::<Vec<i16>>(64);

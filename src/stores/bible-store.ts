@@ -1,7 +1,8 @@
 import { resolveSecondaryTranslation, resolveTranslationSelection, saveTranslationSelection, translationCode, type TranslationSelectionStatus } from "@/lib/translation-selection"
 import { create } from "zustand"
-import { openProfileSection } from "@/lib/profile-persistence"
+import { openProfileSection, isPublishingRestoredProfile } from "@/lib/profile-persistence"
 import { useProfileStatusStore } from "@/lib/profile-status"
+import { isOperatorMaintenanceActive, isOperatorWorkCurrent, operatorRevision } from "@/lib/operator-maintenance"
 import { invoke } from "@tauri-apps/api/core"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
@@ -28,6 +29,7 @@ interface BibleState {
   setFollowDetections: (enabled: boolean) => void
   translations: Translation[]
   activeTranslationId: number
+  pendingTranslationChanges: number
   secondaryTranslationCode: string | null
   setSecondaryTranslation: (code: string | null) => void
   activeTranslationCode: string | null
@@ -69,6 +71,7 @@ export const useBibleStore = create<BibleState>((set, get) => ({
   setFollowDetections: (followDetections) => set(state => state.followDetections === followDetections ? state : ({ followDetections, followRevision: state.followRevision + 1, ...(!followDetections && state.pendingNavigation?.follow ? { pendingNavigation: null } : {}) })),
   translations: [],
   activeTranslationId: 1, // Resolved against installed metadata during hydration.
+  pendingTranslationChanges: 0,
   activeTranslationCode: "KJV",
   secondaryTranslationCode: null,
   setSecondaryTranslation: (code) => set((state) => ({ secondaryTranslationCode:
@@ -127,11 +130,13 @@ export async function hydrateBibleStore(): Promise<void> {
   }
   let saved: unknown = null
   let legacyId: unknown = null
+  let followDetections: boolean | undefined
   try {
     // The checked profile reader distinguishes absent preferences from errors.
-    const preferences = await invoke<{ translationSelection?: unknown; activeTranslationId?: unknown } | null>("read_bible_preferences")
+    const preferences = await invoke<{ translationSelection?: unknown; activeTranslationId?: unknown; followDetections?: boolean } | null>("read_bible_preferences")
     saved = preferences?.translationSelection
     legacyId = preferences?.activeTranslationId
+    if (typeof preferences?.followDetections === "boolean") followDetections = preferences.followDetections
   } catch (error) {
     // Missing provenance is not a fresh installation. Ask the operator.
     legacyId = "unreadable"
@@ -140,6 +145,7 @@ export async function hydrateBibleStore(): Promise<void> {
   }
   const selection = resolveTranslationSelection(translations, saved, legacyId)
   useBibleStore.setState({
+    ...(followDetections === undefined ? {} : {followDetections}),
     ...(selection.translation ? { activeTranslationId: selection.translation.id } : {}),
     activeTranslationCode: selection.status === "ready" && selection.translation ? translationCode(selection.translation) : null,
     translationSelectionStatus: selection.status === "ready" ? "loading" : selection.status,
@@ -156,17 +162,35 @@ export async function hydrateBibleStore(): Promise<void> {
 }
 
 /** Activate an explicitly chosen installed translation before confirming it. */
+export const hasPendingTranslationChange = () => useBibleStore.getState().pendingTranslationChanges > 0
 export async function activateTranslation(id: number): Promise<void> {
+  if (isOperatorMaintenanceActive()) throw new Error("Wait until preferences have been restored")
   const selected = useBibleStore.getState().translations.find((item) => item.id === id && item.is_downloaded)
   if (!selected) throw new Error("Choose an installed Bible translation.")
   const code = translationCode(selected)
-  await invoke("set_active_translation", { translationId: id })
-  const current = useBibleStore.getState().translations.find((item) => item.id === id && item.is_downloaded)
-  if (!current || translationCode(current) !== code) throw new Error("Bible data changed. Choose the translation again.")
-  useBibleStore.getState().setActiveTranslation(id)
+  const epoch = operatorRevision()
+  useBibleStore.setState(state => ({pendingTranslationChanges:state.pendingTranslationChanges+1}))
+  try {
+    await invoke("set_active_translation", { translationId: id })
+    if (!isOperatorWorkCurrent(epoch)) throw new Error("Translation change was superseded")
+    const current = useBibleStore.getState().translations.find((item) => item.id === id && item.is_downloaded)
+    if (!current || translationCode(current) !== code) throw new Error("Bible data changed. Choose the translation again.")
+    useBibleStore.getState().setActiveTranslation(id)
+  } finally {
+    useBibleStore.setState(state => ({pendingTranslationChanges:Math.max(0,state.pendingTranslationChanges-1)}))
+  }
 }
 
-/** Persist stable identity and its current catalog, with ordered disk writes. */
+const persistenceFlushers = new Set<() => Promise<void>>()
+const preferenceKey = (state: ReturnType<typeof useBibleStore.getState>) =>
+  `${state.activeTranslationCode}|${state.secondaryTranslationCode ?? ""}|${state.followDetections ? 1 : 0}`
+
+export async function flushBiblePersistence(): Promise<void> {
+  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  await Promise.all([...persistenceFlushers].map(flush => flush()))
+}
+
+/** Persist stable identity, Follow and provenance with ordered disk writes. */
 export async function initBiblePersistence(): Promise<() => void> {
   if (useProfileStatusStore.getState().readFailed) return () => {}
   try {
@@ -174,41 +198,60 @@ export async function initBiblePersistence(): Promise<() => void> {
     if (useProfileStatusStore.getState().readFailed) return () => {}
     let timer: ReturnType<typeof setTimeout> | null = null
     let writes = Promise.resolve()
-    let previousCode: string | null = null
+    let previousKey: string | null = null
     let stopped = false
+    const queueSnapshot = (state: ReturnType<typeof useBibleStore.getState>) => {
+      if (state.translationSelectionStatus !== "ready" || !state.activeTranslationCode) return writes
+      const key = preferenceKey(state)
+      const selection = saveTranslationSelection(state.activeTranslationCode, state.translations, state.secondaryTranslationCode)
+      const saved = writes.then(async () => {
+        const isCurrent = () => {
+          const current = useBibleStore.getState()
+          return !stopped && !useProfileStatusStore.getState().readFailed && current.translationSelectionStatus === "ready" && preferenceKey(current) === key
+        }
+        if (!isCurrent()) return
+        await store.set("followDetections", state.followDetections)
+        await store.set("translationSelection", selection)
+        await store.delete("activeTranslationId")
+        await store.save(isCurrent)
+      })
+      writes = saved.catch((error: unknown) => console.warn("[bible] Failed to save translation preference:", error))
+      return saved
+    }
     const schedule = () => {
       const state = useBibleStore.getState()
+      if (isPublishingRestoredProfile()) {
+        if (timer) clearTimeout(timer)
+        timer = null
+        previousKey = preferenceKey(state)
+        return
+      }
       if (state.translationSelectionStatus !== "ready" || !state.activeTranslationCode) {
         if (timer) clearTimeout(timer)
         timer = null
-        previousCode = null
+        previousKey = null
         return
       }
-      const key = `${state.activeTranslationCode}|${state.secondaryTranslationCode ?? ""}`
-      if (key === previousCode) return
-      previousCode = key
+      const key = preferenceKey(state)
+      if (key === previousKey) return
+      previousKey = key
       if (timer) clearTimeout(timer)
-      const selection = saveTranslationSelection(state.activeTranslationCode, state.translations, state.secondaryTranslationCode)
-      timer = setTimeout(() => {
-        timer = null
-        writes = writes.then(async () => {
-          if (stopped) return
-          const isCurrent = () => {
-            const current = useBibleStore.getState()
-            return !stopped && !useProfileStatusStore.getState().readFailed && current.translationSelectionStatus === "ready" && `${current.activeTranslationCode}|${current.secondaryTranslationCode ?? ""}` === key
-          }
-          if (!isCurrent()) return
-          await store.set("translationSelection", selection)
-          await store.delete("activeTranslationId")
-          await store.save(isCurrent)
-        }).catch((error: unknown) => console.warn("[bible] Failed to save translation preference:", error))
-      }, 500)
+      timer = setTimeout(() => { timer = null; void queueSnapshot(state) }, 500)
     }
+    const flush = () => {
+      if (timer) clearTimeout(timer)
+      timer = null
+      const state = useBibleStore.getState()
+      previousKey = preferenceKey(state)
+      return queueSnapshot(state)
+    }
+    persistenceFlushers.add(flush)
     const unsubscribe = useBibleStore.subscribe(schedule)
     schedule()
     return () => {
       stopped = true
       if (timer) clearTimeout(timer)
+      persistenceFlushers.delete(flush)
       unsubscribe()
     }
   } catch (error) {

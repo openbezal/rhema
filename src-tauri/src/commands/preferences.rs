@@ -6,6 +6,8 @@ use serde_json::{Map, Value};
 pub struct BiblePreferences {
     translation_selection: Option<Value>,
     active_translation_id: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    follow_detections: Option<bool>,
 }
 
 fn preferences_from_section(values: &Map<String, Value>) -> Option<BiblePreferences> {
@@ -15,6 +17,7 @@ fn preferences_from_section(values: &Map<String, Value>) -> Option<BiblePreferen
     Some(BiblePreferences {
         translation_selection: values.get("translationSelection").cloned(),
         active_translation_id: values.get("activeTranslationId").cloned(),
+        follow_detections: values.get("followDetections").and_then(Value::as_bool),
     })
 }
 
@@ -106,6 +109,21 @@ mod tests {
             serde_json::json!({
                 "translationSelection": {"version": 1, "code": "ESV"}, "activeTranslationId": 2,
             })
+        );
+    }
+
+    #[test]
+    fn checked_read_also_restores_the_saved_follow_preference() {
+        let fixture = Fixture::new("follow");
+        fs::write(
+            fixture.path(),
+            r#"{"translationSelection":{"version":1,"code":"BIUO"},"followDetections":true}"#,
+        )
+        .unwrap();
+        let preferences = read_preferences_file(&fixture.path()).unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(preferences).unwrap()["followDetections"],
+            true
         );
     }
 

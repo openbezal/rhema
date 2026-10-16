@@ -4,7 +4,9 @@ const mockInvoke = vi.fn()
 const mockToastError = vi.fn()
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => mockInvoke(...args),
+  // These existing cases focus on start/stop payloads. The dedicated
+  // maintenance suite exercises revision reads, stale responses and dedupe.
+  invoke: (...args: unknown[]) => args[0] === "read_transcription_start_revision" ? Promise.resolve(0) : mockInvoke(...args),
 }))
 
 vi.mock("sonner", () => ({
@@ -50,6 +52,7 @@ describe("use-transcription", () => {
       await transcriptionActions.start()
 
       expect(mockInvoke).toHaveBeenCalledWith("start_transcription", {
+        startRevision: 0,
         apiKey: "", // whisper path never forwards the key
         deviceId: "dev-42",
         gain: 1.5,

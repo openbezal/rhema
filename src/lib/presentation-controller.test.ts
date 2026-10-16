@@ -17,6 +17,7 @@ import {
 } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { beginOperatorMaintenance } from "./operator-maintenance"
 const source: Verse = {
   id: 1,
   translation_id: 1,
@@ -295,4 +296,25 @@ it("traces reserved operator intent before upstream chapter lookup delay", async
   } finally {
     vi.useRealTimers()
   }
+})
+
+it("does not present or clear the committed frame during maintenance", async () => {
+  const lease=beginOperatorMaintenance()
+  try {
+    await presentVerse(source)
+    clearLive("transparent")
+    expect(mocks.invoke).not.toHaveBeenCalled()
+    expect(useBroadcastStore.getState().liveVerse).toEqual(held)
+  } finally {lease.release()}
+})
+
+it("does not commit a lookup from before maintenance after its lease is released", async () => {
+  let resolve!: (row:Verse)=>void
+  mocks.invoke.mockImplementation(()=>new Promise<Verse>(done=>{resolve=done}))
+  const old=presentVerse(source)
+  const lease=beginOperatorMaintenance()
+  lease.release()
+  resolve({...source,translation_id:2,text:"obsolete lookup"})
+  await old
+  expect(useBroadcastStore.getState().liveVerse).toEqual(held)
 })

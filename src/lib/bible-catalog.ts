@@ -2,9 +2,13 @@ import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 import { useBibleStore } from "@/stores/bible-store"
 import type { Book } from "@/types"
+import { connectOutsideMaintenance } from "./operator-maintenance"
 
 /** Catalog/bootstrap ownership belongs to the app, including when Search is hidden. */
 export function connectBibleCatalog(): () => void {
+  return connectOutsideMaintenance(connectActiveBibleCatalog)
+}
+function connectActiveBibleCatalog(): () => void {
   let stopped = false
   let revision = 0
   let key = ""

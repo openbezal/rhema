@@ -3,9 +3,13 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { REMOTE_EVENTS, type RemoteEventName } from "@/lib/remote-events"
 import { operatorActions } from "@/lib/operator-actions"
+import { connectOutsideMaintenance } from "./operator-maintenance"
 
 /** App-owned event subscriptions, independent of panel visibility. */
 export function connectRemoteControl(): () => void {
+  return connectOutsideMaintenance(connectActiveRemoteControl)
+}
+function connectActiveRemoteControl(): () => void {
   let cancelled = false
   const unlisteners: UnlistenFn[] = []
   // A controller sends discrete steps. Finish boundary discovery before the

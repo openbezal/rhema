@@ -4,7 +4,7 @@ import type { Translation } from "@/types"
 const { mockGet, mockSet, mockSave, mockDelete, mockLoad, mockInvoke } = vi.hoisted(() => ({
   mockGet: vi.fn(), mockSet: vi.fn(), mockSave: vi.fn(), mockDelete: vi.fn(), mockLoad: vi.fn(), mockInvoke: vi.fn(),
 }))
-vi.mock("@/lib/profile-persistence", () => ({ openProfileSection: mockLoad }))
+vi.mock("@/lib/profile-persistence", () => ({ openProfileSection: mockLoad, isPublishingRestoredProfile: () => false }))
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mockInvoke }))
 
 function translation(id: number, abbreviation: string): Translation {
@@ -177,10 +177,10 @@ describe("stable Bible translation persistence", () => {
     await vi.advanceTimersByTimeAsync(500)
     useBibleStore.getState().setActiveTranslation(4)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mockSet).toHaveBeenCalledTimes(1)
+    expect(mockSave).not.toHaveBeenCalled()
     finish()
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockSet).toHaveBeenCalledTimes(2)
+    expect(mockSave).toHaveBeenCalledTimes(2)
     expect(mockSet).toHaveBeenLastCalledWith("translationSelection", expect.objectContaining({ code: "NIV" }))
   })
 
@@ -194,12 +194,12 @@ describe("stable Bible translation persistence", () => {
     await vi.advanceTimersByTimeAsync(200)
     useBibleStore.getState().setActiveTranslation(4)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mockSet).toHaveBeenCalledTimes(1)
+    expect(mockSave).toHaveBeenCalledTimes(1)
     expect(mockSet).toHaveBeenLastCalledWith("translationSelection", expect.objectContaining({ code: "NIV" }))
     useBibleStore.getState().setActiveTranslation(7)
     stop?.()
     await vi.advanceTimersByTimeAsync(500)
-    expect(mockSet).toHaveBeenCalledTimes(1)
+    expect(mockSave).toHaveBeenCalledTimes(1)
   })
 
   it("skips a queued choice invalidated while an earlier write is still finishing", async () => {
@@ -216,7 +216,7 @@ describe("stable Bible translation persistence", () => {
     useBibleStore.setState({ translationSelectionStatus: "needs_confirmation" })
     finish()
     await vi.advanceTimersByTimeAsync(0)
-    expect(mockSet).toHaveBeenCalledTimes(1)
+    expect(mockSave).toHaveBeenCalledTimes(1)
     expect(mockSet).toHaveBeenCalledWith("translationSelection", expect.objectContaining({ code: "ESV" }))
   })
 })
@@ -259,12 +259,25 @@ describe("optional language preference integration", () => {
     cleanups.push(await initBiblePersistence())
     useBibleStore.getState().setSecondaryTranslation("OYCB")
     await vi.advanceTimersByTimeAsync(500)
-    expect(mockSet).toHaveBeenCalledTimes(1)
+    expect(mockSave).toHaveBeenCalledTimes(1)
     expect(mockSet).toHaveBeenLastCalledWith("translationSelection", expect.objectContaining({ code: "ESV", secondaryCode: "OYCB" }))
     useBibleStore.getState().setSecondaryTranslation(null)
     await vi.advanceTimersByTimeAsync(500)
-    expect(mockSet).toHaveBeenCalledTimes(2)
-    expect(mockSet.mock.calls[1][1]).not.toHaveProperty("secondaryCode")
-    expect(mockSet.mock.calls[1][1].code).toBe("ESV")
+    expect(mockSave).toHaveBeenCalledTimes(2)
+    const selections = mockSet.mock.calls.filter(([key]) => key === "translationSelection")
+    expect(selections[1][1]).not.toHaveProperty("secondaryCode")
+    expect(selections[1][1].code).toBe("ESV")
   })
+})
+
+it("tracks an in-flight native translation change until success or failure", async () => {
+  const bible=await import("./bible-store")
+  bible.useBibleStore.getState().setTranslations(catalog)
+  let reject!: (error:unknown)=>void
+  mockInvoke.mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail}))
+  const activation=bible.activateTranslation(9)
+  expect(bible.hasPendingTranslationChange()).toBe(true)
+  reject(new Error("Synthetic activation failure"))
+  await expect(activation).rejects.toThrow("activation failure")
+  expect(bible.hasPendingTranslationChange()).toBe(false)
 })

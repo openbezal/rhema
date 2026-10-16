@@ -26,6 +26,7 @@ vi.mock("@tauri-apps/api/window", () => ({
   ),
 }))
 vi.mock("@/lib/profile-persistence", () => ({
+  isPublishingRestoredProfile: () => false,
   openProfileSection: async () => ({
     get: async () => undefined,
     set: vi.fn(),

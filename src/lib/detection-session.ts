@@ -5,6 +5,7 @@ import { pickAutoPresentTarget } from "./auto-present-target"
 import { presentVerse } from "./presentation-controller"
 import { useSettingsStore } from "@/stores/settings-store"
 import { translationCode } from "./translation-selection"
+import { connectOutsideMaintenance } from "./operator-maintenance"
 import {
   useAudioStore,
   useTranscriptStore,
@@ -153,7 +154,11 @@ let leases = 0
 let release: (() => void) | null = null
 /** One app-owned ingestion boundary, regardless of how many panels consume state. */
 export function connectDetectionSession(): () => void {
+  return connectOutsideMaintenance(connectActiveDetectionSession)
+}
+function connectActiveDetectionSession(): () => void {
   if (leases++ === 0) {
+    useDetectionStore.getState().pruneSuggestions()
     let cancelled = false
     const unlisteners: UnlistenFn[] = [
       useSettingsStore.subscribe((settings, previous) => {

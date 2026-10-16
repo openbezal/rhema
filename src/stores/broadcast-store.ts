@@ -1,6 +1,8 @@
 import { create } from "zustand"
+import { useProfileStatusStore } from "@/lib/profile-status"
+import { useOperatorMaintenanceStore } from "@/lib/operator-maintenance"
 import { emitTo } from "@tauri-apps/api/event"
-import { openProfileSection, type ProfileSectionStore } from "@/lib/profile-persistence"
+import { openProfileSection, isPublishingRestoredProfile, type ProfileSectionStore } from "@/lib/profile-persistence"
 import type {
   OutputClearMode,
   BroadcastOutput,
@@ -463,7 +465,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
 // Synchronous session write precedes each action's output fanout, including
 // output configuration/draft changes that have not reached debounced disk save.
 useBroadcastStore.subscribe((state) => {
-  if (state.presentationRecovery === "ready") writeBroadcastSession(state)
+  const phase = useOperatorMaintenanceStore.getState().phase
+  if (phase === "recovery") forgetBroadcastSession()
+  else if (state.presentationRecovery === "ready" && (phase === "idle" || isPublishingRestoredProfile())) writeBroadcastSession(state)
   else if (state.presentationRecovery === "unknown") forgetBroadcastSession()
 })
 
@@ -514,6 +518,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
 
       // Auto-persist on changes (debounced)
       useBroadcastStore.subscribe((state, prevState) => {
+        if (isPublishingRestoredProfile()) return
         const changed =
           state.themes !== prevState.themes ||
           state.activeThemeId !== prevState.activeThemeId ||
@@ -525,7 +530,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
           saveTimer = null
           pendingSave = pendingSave.then(() =>
             persistBroadcastThemes(useBroadcastStore.getState())
-          )
+          ).catch(() => console.warn("[broadcast] Failed to persist themes"))
         }, SAVE_DEBOUNCE_MS)
       })
     } catch {
@@ -540,16 +545,23 @@ let pendingSave: Promise<void> = Promise.resolve()
 const SAVE_DEBOUNCE_MS = 500
 
 async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
-  try {
-    const store = await getThemeStore()
-    const customThemes = state.themes.filter((t) => !t.builtin)
-    await store.set("customThemes", customThemes)
-    await store.set("outputs", state.outputs)
-    // Legacy mirror of the main output's theme; older builds still read it.
-    await store.set("activeThemeId", state.activeThemeId)
-    await store.set("autoLive", state.autoLive)
-    await store.save()
-  } catch {
-    console.warn("[broadcast] Failed to persist themes")
-  }
+  const store = await getThemeStore()
+  const customThemes = state.themes.filter((t) => !t.builtin)
+  await store.set("customThemes", customThemes)
+  await store.set("outputs", state.outputs)
+  // Legacy mirror of the main output's theme; older builds still read it.
+  await store.set("activeThemeId", state.activeThemeId)
+  await store.set("autoLive", state.autoLive)
+  await store.save()
+}
+
+export async function flushBroadcastPersistence(): Promise<void> {
+  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  await hydrateBroadcastThemes()
+  if (useProfileStatusStore.getState().readFailed) throw new Error("Restart Rhema before saving unreadable preferences")
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = null
+  const saved = pendingSave.then(() => persistBroadcastThemes(useBroadcastStore.getState()))
+  pendingSave = saved.catch(() => console.warn("[broadcast] Failed to persist themes"))
+  await saved
 }

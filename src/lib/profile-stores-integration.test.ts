@@ -308,3 +308,98 @@ it("rechecks a Bible choice after waiting behind another section in the shared q
   })
   expect(persisted.revision).toBe(1)
 })
+
+it("flushes pending local keys, output themes and Follow before restore without later timer replays", async () => {
+  const settings = await import("@/stores/settings-store")
+  const bible = await import("@/stores/bible-store")
+  const broadcast = await import("@/stores/broadcast-store")
+  await Promise.all([
+    settings.hydrateSettings(),
+    bible.hydrateBibleStore(),
+    broadcast.hydrateBroadcastThemes(),
+  ])
+  stopBible = await bible.initBiblePersistence()
+  settings.useSettingsStore.getState().setDeepgramApiKey("FAKE-NEW-LOCAL")
+  broadcast.useBroadcastStore
+    .getState()
+    .renameTheme("custom", "Fresh local theme")
+  bible.useBibleStore.getState().setFollowDetections(true)
+  await Promise.all([
+    settings.flushSettingsPersistence(),
+    broadcast.flushBroadcastPersistence(),
+    bible.flushBiblePersistence(),
+  ])
+  expect(persisted.sections.settings.deepgramApiKey).toBe("FAKE-NEW-LOCAL")
+  expect(persisted.sections.broadcast.customThemes).toEqual([
+    expect.objectContaining({ name: "Fresh local theme" }),
+  ])
+  expect(persisted.sections.bible.followDetections).toBe(true)
+  const writes = native.invoke.mock.calls.filter(
+    ([command]) => command === "write_local_profile"
+  ).length
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(
+    native.invoke.mock.calls.filter(
+      ([command]) => command === "write_local_profile"
+    )
+  ).toHaveLength(writes)
+})
+
+it("reports a failed local settings flush and permits a real retry without losing the pending key", async () => {
+  const settings = await import("@/stores/settings-store")
+  await settings.hydrateSettings()
+  settings.useSettingsStore.getState().setDeepgramApiKey("FAKE-NEW-LOCAL")
+  const healthyNative = native.invoke.getMockImplementation()!
+  let fail = true
+  native.invoke.mockImplementation(async (command, args) => {
+    if (command === "write_local_profile" && fail) {
+      fail = false
+      throw new Error("Synthetic disk full")
+    }
+    return healthyNative(command, args)
+  })
+  vi.spyOn(console, "warn").mockImplementation(() => {})
+  await expect(settings.flushSettingsPersistence()).rejects.toThrow("disk full")
+  expect(persisted.sections.settings.deepgramApiKey).toBe("FAKE-LOCAL-KEY")
+  await settings.flushSettingsPersistence()
+  expect(persisted.sections.settings.deepgramApiKey).toBe("FAKE-NEW-LOCAL")
+})
+
+it("hydrates Follow from the canonical Bible section and persists a changed value", async () => {
+  persisted.sections.bible.followDetections = true
+  const bible = await import("@/stores/bible-store")
+  await bible.hydrateBibleStore()
+  expect(bible.useBibleStore.getState().followDetections).toBe(true)
+  stopBible = await bible.initBiblePersistence()
+  bible.useBibleStore.getState().setFollowDetections(false)
+  await vi.advanceTimersByTimeAsync(500)
+  expect(persisted.sections.bible.followDetections).toBe(false)
+})
+
+it.each(["settings", "broadcast"])(
+  "refuses a %s flush whose initial hydration fails instead of retrying with defaults",
+  async (section) => {
+    const healthyNative = native.invoke.getMockImplementation()!
+    let failed = false
+    native.invoke.mockImplementation(async (command, args) => {
+      if (command === "read_local_profile" && !failed) {
+        failed = true
+        throw new Error("Synthetic transient read failure")
+      }
+      return healthyNative(command, args)
+    })
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    const flush =
+      section === "settings"
+        ? (await import("@/stores/settings-store")).flushSettingsPersistence
+        : (await import("@/stores/broadcast-store")).flushBroadcastPersistence
+    await expect(flush()).rejects.toThrow("Restart")
+    expect(
+      native.invoke.mock.calls.filter(
+        ([command]) => command === "write_local_profile"
+      )
+    ).toHaveLength(0)
+    expect(persisted.revision).toBe(0)
+    expect(persisted.sections.settings.deepgramApiKey).toBe("FAKE-LOCAL-KEY")
+  }
+)

@@ -228,3 +228,28 @@ it("closes its modal and restores keyboard focus to the Session trigger", async 
     expect(document.activeElement).toBe(button("Session archive"))
   )
 })
+
+it("opens a separate preference review from a saved reference without applying it", async () => {
+  const live = useBroadcastStore.getState().liveVerse
+  const transcript = useTranscriptStore.getState().segments
+  native.invoke.mockResolvedValue({
+    name: "Saved.json",
+    text: JSON.stringify(saved),
+  })
+  await click("Open saved archive")
+  await click("Review preferences")
+  expect(
+    document.querySelector('[data-slot="dialog-content"]')?.textContent
+  ).toContain("Restore preferences")
+  expect(button("Apply preferences").disabled).toBe(true)
+  expect(useBroadcastStore.getState().liveVerse).toBe(live)
+  expect(useTranscriptStore.getState().segments).toBe(transcript)
+  expect(
+    native.invoke.mock.calls.some(
+      ([command]) => command === "apply_portable_preferences"
+    )
+  ).toBe(false)
+  await click("Cancel")
+  expect(document.querySelector('[data-slot="dialog-content"]')).toBeNull()
+  expect(document.body.textContent).toContain("Saved Sunday")
+})

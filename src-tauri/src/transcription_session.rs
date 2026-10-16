@@ -1,7 +1,7 @@
 //! Serialized boundaries for native transcription work and per-run cancellation.
 
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Mutex, MutexGuard,
 };
 use tokio::sync::Notify;
@@ -39,6 +39,7 @@ impl SessionToken {
 /// Audio capture is independently serialized and is never awaited under the boundary.
 pub(crate) struct SessionController {
     current: Mutex<Option<SessionToken>>,
+    start_revision: AtomicU64,
     capture: Mutex<()>,
     stt_active: Arc<AtomicBool>,
     audio_active: Arc<AtomicBool>,
@@ -47,6 +48,7 @@ impl SessionController {
     pub(crate) fn new(stt_active: Arc<AtomicBool>, audio_active: Arc<AtomicBool>) -> Self {
         Self {
             current: Mutex::new(None),
+            start_revision: AtomicU64::new(0),
             capture: Mutex::new(()),
             stt_active,
             audio_active,
@@ -66,6 +68,40 @@ impl SessionController {
         self.set_status(true);
         Ok(token)
     }
+    /// Capture before provider preparation, including any async audio preemption.
+    pub(crate) fn begin_start(&self) -> Result<u64, String> {
+        let current = self.current.lock().map_err(|error| error.to_string())?;
+        if current.as_ref().is_some_and(SessionToken::is_active) {
+            return Err("Transcription is already running".into());
+        }
+        Ok(self.start_revision.load(Ordering::SeqCst))
+    }
+    pub(crate) fn start_reserved(
+        &self,
+        revision: u64,
+        initialize: impl FnOnce() -> Result<(), String>,
+    ) -> Result<SessionToken, String> {
+        self.start(|| {
+            if self.start_revision.load(Ordering::SeqCst) != revision {
+                return Err("Transcription start was cancelled".into());
+            }
+            initialize()
+        })
+    }
+    /// Serialize a stopped-state action against start and final run work.
+    pub(crate) fn with_stopped<T>(
+        &self,
+        action: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let current = self.current.lock().map_err(|error| error.to_string())?;
+        if current.as_ref().is_some_and(SessionToken::is_active) {
+            return Err("Stop transcription before applying preferences".into());
+        }
+        self.start_revision.fetch_add(1, Ordering::SeqCst);
+        let result = action();
+        drop(current);
+        result
+    }
     pub(crate) fn with_current<R>(
         &self,
         token: &SessionToken,
@@ -84,6 +120,8 @@ impl SessionController {
     }
     pub(crate) fn stop(&self) -> Result<(), String> {
         let mut current = self.current.lock().map_err(|e| e.to_string())?;
+        // Even an early stop with no active token cancels provider preparation.
+        self.start_revision.fetch_add(1, Ordering::SeqCst);
         let token = current
             .take()
             .filter(SessionToken::is_active)
@@ -128,6 +166,81 @@ mod tests {
             Arc::new(AtomicBool::new(false)),
             Arc::new(AtomicBool::new(false)),
         )
+    }
+
+    #[test]
+    fn stopped_actions_refuse_active_transcription_and_propagate_errors() {
+        let sessions = sessions();
+        sessions.start(|| Ok(())).unwrap();
+        assert!(sessions
+            .with_stopped(|| -> Result<(), String> { panic!("must not apply while running") })
+            .is_err());
+        sessions.stop().unwrap();
+        assert_eq!(
+            sessions.with_stopped(|| Err::<(), _>("disk full".to_string())),
+            Err("disk full".to_string())
+        );
+        assert!(!sessions.stt_active.load(Ordering::SeqCst));
+        assert_eq!(sessions.with_stopped(|| Ok(42)), Ok(42));
+    }
+
+    #[test]
+    fn stopped_action_serializes_a_concurrent_start() {
+        let sessions = Arc::new(sessions());
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let maintenance_sessions = sessions.clone();
+        let maintenance = std::thread::spawn(move || {
+            maintenance_sessions.with_stopped(|| {
+                entered_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                Ok(())
+            })
+        });
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (started_tx, started_rx) = mpsc::channel();
+        let start_sessions = sessions.clone();
+        let starter = std::thread::spawn(move || {
+            start_sessions.start(|| {
+                started_tx.send(()).unwrap();
+                Ok(())
+            })
+        });
+        assert!(started_rx.recv_timeout(Duration::from_millis(25)).is_err());
+        release_tx.send(()).unwrap();
+        maintenance.join().unwrap().unwrap();
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(starter.join().unwrap().unwrap().is_active());
+    }
+
+    #[test]
+    fn stopping_before_provider_setup_finishes_cancels_the_reserved_start() {
+        let sessions = sessions();
+        let attempt = sessions.begin_start().unwrap();
+        assert!(sessions.stop().is_err());
+        assert!(sessions
+            .start_reserved(attempt, || panic!(
+                "obsolete provider setup restarted transcription"
+            ))
+            .is_err());
+        assert!(!sessions.stt_active.load(Ordering::SeqCst));
+        let current = sessions.begin_start().unwrap();
+        assert!(sessions
+            .start_reserved(current, || Ok(()))
+            .unwrap()
+            .is_active());
+    }
+
+    #[test]
+    fn stopped_maintenance_invalidates_already_reserved_provider_setup() {
+        let sessions = sessions();
+        let attempt = sessions.begin_start().unwrap();
+        sessions.with_stopped(|| Ok(())).unwrap();
+        assert!(sessions
+            .start_reserved(attempt, || panic!("old parameters survived maintenance"))
+            .is_err());
+        let current = sessions.begin_start().unwrap();
+        assert!(sessions.start_reserved(current, || Ok(())).is_ok());
     }
     #[test]
     fn stopped_workers_cannot_revive_when_a_new_run_starts() {

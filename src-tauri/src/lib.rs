@@ -3,6 +3,7 @@ mod document_files;
 mod events;
 mod memstats;
 mod operator_profile;
+mod profile_restore;
 mod state;
 mod transcription_session;
 
@@ -104,6 +105,7 @@ pub fn run() {
             commands::preferences::read_bible_preferences,
             commands::profile::read_local_profile,
             commands::profile::write_local_profile,
+            commands::profile::apply_portable_preferences,
             commands::documents::save_export_document,
             commands::documents::read_import_document,
             commands::bible::list_translations,
@@ -126,6 +128,7 @@ pub fn run() {
             commands::audio::start_audio_test,
             commands::audio::stop_audio_test,
             commands::stt::start_transcription,
+            commands::stt::read_transcription_start_revision,
             commands::stt::stop_transcription,
             commands::broadcast::list_monitors,
             commands::broadcast::ensure_broadcast_window,

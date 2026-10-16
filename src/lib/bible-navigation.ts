@@ -6,9 +6,19 @@ import {
 } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { mark } from "@/lib/latency-marks"
+import { connectOutsideMaintenance, isOperatorMaintenanceActive } from "./operator-maintenance"
 
 /** Complete pending navigation even when the Bible panel is hidden. */
 export function connectBibleNavigation(): () => void {
+  return connectOutsideMaintenance(() => {
+    const stop = connectActiveBibleNavigation()
+    return () => {
+      stop()
+      if (isOperatorMaintenanceActive()) useBibleStore.getState().setPendingNavigation(null)
+    }
+  })
+}
+function connectActiveBibleNavigation(): () => void {
   let stopped = false
   let revision = 0
   let lastPending: ReturnType<

@@ -2,9 +2,13 @@ import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 import { useBibleStore } from "@/stores/bible-store"
 import type { Verse } from "@/types"
+import { connectOutsideMaintenance } from "./operator-maintenance"
 
 /** Refresh the browsed reference without coupling it to panel visibility or live content. */
 export function connectPreviewSelection(): () => void {
+  return connectOutsideMaintenance(connectActivePreviewSelection)
+}
+function connectActivePreviewSelection(): () => void {
   let stopped = false
   let revision = 0
   let previousVerse: Verse | null | undefined

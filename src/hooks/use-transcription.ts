@@ -3,6 +3,11 @@ import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
+import {
+  isOperatorMaintenanceActive,
+  isOperatorWorkCurrent,
+  operatorRevision,
+} from "@/lib/operator-maintenance"
 
 interface UseTranscriptionOptions {
   /**
@@ -15,47 +20,85 @@ interface UseTranscriptionOptions {
 
 const MISSING_DEEPGRAM_KEY_MARKER = "No Deepgram API key"
 const NOT_RUNNING_ERROR = "Transcription is not running"
+let actionRevision = 0
+let starting: Promise<void> | null = null
+let stopping: Promise<void> | null = null
 
 export const transcriptionActions = {
-  async start(onMissingApiKey?: () => void): Promise<void> {
+  start(onMissingApiKey?: () => void): Promise<void> {
     const transcript = useTranscriptStore.getState()
+    if (isOperatorMaintenanceActive() || stopping || transcript.isTranscribing)
+      return Promise.resolve()
+    if (starting) return starting
+    const revision = ++actionRevision
+    const epoch = operatorRevision()
+    const current = () =>
+      actionRevision === revision && isOperatorWorkCurrent(epoch)
     transcript.setConnectionStatus("connecting")
-
-    const settings = useSettingsStore.getState()
-    try {
-      await invoke("start_transcription", {
-        apiKey:
-          settings.sttProvider === "deepgram"
-            ? (settings.deepgramApiKey ?? "")
-            : "",
-        deviceId: settings.audioDeviceId,
-        gain: settings.gain,
-        provider: settings.sttProvider,
-      })
-      transcript.setTranscribing(true)
-    } catch (e) {
-      const msg = String(e)
-      transcript.setConnectionStatus("error")
-      if (msg.includes(MISSING_DEEPGRAM_KEY_MARKER) && onMissingApiKey) {
-        onMissingApiKey()
-      } else {
-        toast.error("Could not start transcription", { description: msg })
+    const job = (async () => {
+      try {
+        const startRevision = await invoke<number>(
+          "read_transcription_start_revision"
+        )
+        if (!current()) return
+        if (!Number.isSafeInteger(startRevision) || startRevision < 0)
+          throw new Error("Invalid transcription session revision")
+        const settings = useSettingsStore.getState()
+        await invoke("start_transcription", {
+          startRevision,
+          apiKey:
+            settings.sttProvider === "deepgram"
+              ? (settings.deepgramApiKey ?? "")
+              : "",
+          deviceId: settings.audioDeviceId,
+          gain: settings.gain,
+          provider: settings.sttProvider,
+        })
+        if (current()) transcript.setTranscribing(true)
+      } catch (error) {
+        if (!current()) return
+        const message = String(error)
+        transcript.setConnectionStatus("error")
+        if (message.includes(MISSING_DEEPGRAM_KEY_MARKER) && onMissingApiKey)
+          onMissingApiKey()
+        else
+          toast.error("Could not start transcription", { description: message })
       }
-    }
+    })()
+    starting = job
+    void job.then(() => {
+      if (starting === job) starting = null
+    })
+    return job
   },
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    if (stopping) return stopping
+    const revision = ++actionRevision
+    const epoch = operatorRevision()
+    starting = null
     const transcript = useTranscriptStore.getState()
-    try {
-      await invoke("stop_transcription")
-    } catch (e) {
-      if (String(e) !== NOT_RUNNING_ERROR) {
-        toast.error("Could not stop transcription", { description: String(e) })
+    const current = () =>
+      actionRevision === revision && operatorRevision() === epoch
+    const job = (async () => {
+      try {
+        await invoke("stop_transcription")
+      } catch (error) {
+        if (current() && String(error) !== NOT_RUNNING_ERROR)
+          toast.error("Could not stop transcription", {
+            description: String(error),
+          })
       }
-    }
-    transcript.setTranscribing(false)
-    transcript.setPartial("")
-    transcript.setConnectionStatus("disconnected")
+      if (!current()) return
+      transcript.setTranscribing(false)
+      transcript.setPartial("")
+      transcript.setConnectionStatus("disconnected")
+    })()
+    stopping = job
+    void job.then(() => {
+      if (stopping === job) stopping = null
+    })
+    return job
   },
 }
 

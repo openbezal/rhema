@@ -1,6 +1,11 @@
 import { invoke } from "@tauri-apps/api/core"
 import { z } from "zod"
 import { useProfileStatusStore } from "./profile-status"
+import { PortablePreferencesSchema } from "./session-archive-schema"
+import {
+  ResolvedPreferencesRestoreSchema,
+  type ResolvedPreferencesRestore,
+} from "./preference-restore"
 
 const ProfileSchema = z.object({
   version: z.literal(1),
@@ -14,6 +19,28 @@ const ProfileSchema = z.object({
 const ReceiptSchema = ProfileSchema.extend({
   sections: ProfileSchema.shape.sections.partial(),
 })
+const ResolvedPreferencesSchema = ResolvedPreferencesRestoreSchema
+const ApplyReceiptSchema = z.object({
+  profile: ProfileSchema,
+  primary_translation_id: z
+    .number()
+    .int()
+    .positive()
+    .max(Number.MAX_SAFE_INTEGER),
+  primary_translation_code:
+    ResolvedPreferencesSchema.shape.primaryTranslationCode,
+  secondary_translation_code:
+    PortablePreferencesSchema.shape.secondaryTranslationCode,
+})
+const AppliedSchema = z.object({
+  status: z.literal("applied"),
+  receipt: ApplyReceiptSchema,
+})
+const RejectedSchema = z.object({
+  status: z.literal("rejected"),
+  message: z.string().max(2000),
+})
+export type ProfileApplyReceipt = z.infer<typeof ApplyReceiptSchema>
 type ProfileSnapshot = z.infer<typeof ProfileSchema>
 type Section = keyof ProfileSnapshot["sections"]
 export interface ProfileSectionStore {
@@ -26,6 +53,26 @@ export interface ProfileSectionStore {
 let snapshot: ProfileSnapshot | null = null
 let hydration: Promise<ProfileSnapshot> | null = null
 let writes: Promise<void> = Promise.resolve()
+let generation = 0
+let profileFrozen = false
+let publishingRestoredProfile = false
+export const isPublishingRestoredProfile = () => publishingRestoredProfile
+
+function requireWritableProfile() {
+  if (profileFrozen)
+    throw new Error(
+      "Preferences are being restored; wait or reload if recovery is required"
+    )
+}
+
+export class UncertainProfileCommitError extends Error {
+  constructor() {
+    super(
+      "Preferences may already have been saved. Reload Rhema before continuing."
+    )
+    this.name = "UncertainProfileCommitError"
+  }
+}
 
 function loadProfile(): Promise<ProfileSnapshot> {
   if (snapshot) return Promise.resolve(snapshot)
@@ -44,7 +91,9 @@ function loadProfile(): Promise<ProfileSnapshot> {
   return hydration
 }
 
-type Change = { removed: true } | { removed: false; value: unknown }
+type Change = ({ removed: true } | { removed: false; value: unknown }) & {
+  generation: number
+}
 
 /** The existing stores keep their hydration/debounce APIs over one native profile. */
 export async function openProfileSection(
@@ -55,21 +104,35 @@ export async function openProfileSection(
   return {
     async get<T>(key: string): Promise<T | undefined> {
       const change = staged.get(key)
-      if (change)
+      if (change && change.generation === generation)
         return change.removed ? undefined : (structuredClone(change.value) as T)
+      if (change) staged.delete(key)
       const values = (await loadProfile()).sections[section]
       return Object.hasOwn(values, key)
         ? (structuredClone(values[key]) as T)
         : undefined
     },
     async set(key, value) {
-      staged.set(key, { removed: false, value: structuredClone(value) })
+      requireWritableProfile()
+      staged.set(key, {
+        removed: false,
+        value: structuredClone(value),
+        generation,
+      })
     },
     async delete(key) {
-      staged.set(key, { removed: true })
+      requireWritableProfile()
+      staged.set(key, { removed: true, generation })
     },
     save(isCurrent) {
+      if (profileFrozen)
+        return Promise.reject(
+          new Error("Preferences are blocked until restore completes or reload")
+        )
+      for (const [key, change] of staged)
+        if (change.generation !== generation) staged.delete(key)
       if (staged.size === 0) return Promise.resolve()
+      const capturedGeneration = generation
       const changes = new Map(staged)
       const discardCaptured = () => {
         for (const [key, change] of changes)
@@ -79,7 +142,7 @@ export async function openProfileSection(
         const previous = await loadProfile()
         // Earlier sections may have held this save. Recheck the owner at the
         // shared dispatch boundary and discard canceled captured edits.
-        if (isCurrent && !isCurrent()) {
+        if (capturedGeneration !== generation || (isCurrent && !isCurrent())) {
           discardCaptured()
           return
         }
@@ -118,4 +181,64 @@ export async function openProfileSection(
       return saved
     },
   }
+}
+
+/** Registered store flushes run first. Keep native commit and synchronous store
+ * publication within the same exclusive queue item and maintenance lease. */
+export async function restoreProfileAtomically(
+  preferences: ResolvedPreferencesRestore,
+  publish: (receipt: ProfileApplyReceipt) => void
+): Promise<ProfileApplyReceipt> {
+  requireWritableProfile()
+  const request = ResolvedPreferencesSchema.parse(preferences)
+  profileFrozen = true
+  const saved = writes
+    .then(async () => {
+      const previous = await loadProfile()
+      let response: unknown
+      try {
+        response = await invoke("apply_portable_preferences", {
+          expectedRevision: previous.revision,
+          preferences: request,
+        })
+      } catch {
+        throw new UncertainProfileCommitError()
+      }
+      const rejected = RejectedSchema.safeParse(response)
+      if (rejected.success) throw new Error(rejected.data.message)
+      let receipt: ProfileApplyReceipt
+      try {
+        receipt = AppliedSchema.parse(response).receipt
+        if (
+          receipt.profile.revision !== previous.revision + 1 ||
+          receipt.primary_translation_code !== request.primaryTranslationCode ||
+          receipt.secondary_translation_code !==
+            request.secondaryTranslationCode
+        )
+          throw new Error("Invalid profile restore acknowledgement")
+      } catch {
+        throw new UncertainProfileCommitError()
+      }
+      snapshot = receipt.profile
+      generation++
+      publishingRestoredProfile = true
+      try {
+        publish(receipt)
+      } catch {
+        throw new UncertainProfileCommitError()
+      } finally {
+        publishingRestoredProfile = false
+      }
+      profileFrozen = false
+      return receipt
+    })
+    .catch((error: unknown) => {
+      if (!(error instanceof UncertainProfileCommitError)) profileFrozen = false
+      throw error
+    })
+  writes = saved.then(
+    () => {},
+    () => {}
+  )
+  return saved
 }

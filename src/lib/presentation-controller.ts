@@ -7,6 +7,7 @@ import {
   type BroadcastTrace,
 } from "@/lib/broadcast-trace"
 import { translationCode } from "@/lib/translation-selection"
+import { connectOutsideMaintenance, isOperatorMaintenanceActive, isOperatorWorkCurrent, operatorRevision } from "./operator-maintenance"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import type { Verse, VerseRenderData, OutputClearMode } from "@/types"
@@ -29,12 +30,14 @@ interface Intent {
 }
 let reservedTrace: { revision: number; trace: BroadcastTrace } | null = null
 let revision = 0
+let revisionEpoch = operatorRevision()
 let intentOwner: object | null = null
 let pendingIntent: Intent | null = null
 let connections = 0
 let disconnect: (() => void) | null = null
 
 function selection() {
+  if (isOperatorMaintenanceActive()) return null
   const bible = useBibleStore.getState()
   const metadata = bible.translations.find(
     (item) => item.id === bible.activeTranslationId && item.is_downloaded
@@ -158,6 +161,8 @@ export async function presentVerse(
       : null
   reservedTrace = null
   const ticket = ++revision
+  const epoch = operatorRevision()
+  revisionEpoch = epoch
   const trace = inheritedTrace ?? createBroadcastTrace()
   if (!inheritedTrace) markBroadcastTrace(trace, "intent_accepted")
   const startedLive = useBroadcastStore.getState().isLive
@@ -165,6 +170,7 @@ export async function presentVerse(
     const now = selection()
     return (
       ticket === revision &&
+      isOperatorWorkCurrent(epoch) &&
       selectionKey() === selectedKey &&
       useBroadcastStore.getState().presentationRecovery === "ready" &&
       (!intent.automatic || useBroadcastStore.getState().autoLive) &&
@@ -261,11 +267,13 @@ export function presentPrimaryVerse(verse: Verse): Promise<boolean> {
 export function invalidatePresentation(): void {
   reservedTrace = null
   revision++
+  revisionEpoch = operatorRevision()
   pendingIntent = null
   intentOwner = null
 }
 /** Claim operator intent before work that precedes the final verse lookup. */
 export function reservePresentationIntent(owner: object = {}): number {
+  if (isOperatorMaintenanceActive()) return -1
   invalidatePresentation()
   intentOwner = owner
   const trace = createBroadcastTrace()
@@ -275,12 +283,13 @@ export function reservePresentationIntent(owner: object = {}): number {
 }
 /** A serialized input batch cannot acquire fresh intent after it was replaced. */
 export function isPresentationOwnerCurrent(owner: object): boolean {
-  return intentOwner === owner
+  return intentOwner === owner && isOperatorWorkCurrent(revisionEpoch)
 }
 export function isPresentationIntentCurrent(ticket: number): boolean {
-  return ticket === revision
+  return ticket === revision && isOperatorWorkCurrent(revisionEpoch)
 }
 export function clearLive(mode: OutputClearMode): void {
+  if (isOperatorMaintenanceActive()) return
   const trace = createBroadcastTrace()
   markBroadcastTrace(trace, "intent_accepted")
   invalidatePresentation()
@@ -301,6 +310,9 @@ export function refreshLiveVerse(): Promise<void> {
 
 /** App-owned refresh/cancellation; overlapping root leases share one subscription. */
 export function connectPresentationController(): () => void {
+  return connectOutsideMaintenance(connectActivePresentationController)
+}
+function connectActivePresentationController(): () => void {
   if (connections++ === 0) {
     let key = selectionKey()
     const bible = useBibleStore.subscribe(() => {

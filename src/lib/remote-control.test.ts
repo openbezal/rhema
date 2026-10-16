@@ -11,6 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: mockInvoke }))
 
 import { connectBibleNavigation } from "./bible-navigation"
 import { connectRemoteControl } from "./remote-control"
+import { beginOperatorMaintenance } from "./operator-maintenance"
 import { syncStatusSnapshot } from "@/hooks/use-remote-control"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useBibleStore } from "@/stores/bible-store"
@@ -143,4 +144,21 @@ describe("app-owned remote control", () => {
     send("remote:on_air", { active: true })
     expect(useBroadcastStore.getState().isLive).toBe(false)
   })
+})
+
+it("pauses remote commands and does not replay their old callbacks after maintenance", async () => {
+  await connect()
+  useBroadcastStore.setState({autoLive:false})
+  const old=handlers.get("remote:set_auto_broadcast")!
+  const lease=beginOperatorMaintenance()
+  try {
+    old({payload:{active:true}})
+    expect(useBroadcastStore.getState().autoLive).toBe(false)
+    lease.release()
+    await Promise.resolve()
+    old({payload:{active:true}})
+    expect(useBroadcastStore.getState().autoLive).toBe(false)
+    send("remote:set_auto_broadcast",{active:true})
+    expect(useBroadcastStore.getState().autoLive).toBe(true)
+  } finally {lease.release()}
 })

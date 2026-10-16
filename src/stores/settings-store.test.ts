@@ -6,6 +6,7 @@ const mockSave = vi.fn()
 const mockLoad = vi.fn()
 
 vi.mock("@/lib/profile-persistence", () => ({
+  isPublishingRestoredProfile: () => false,
   openProfileSection: (...args: unknown[]) => mockLoad(...args),
 }))
 

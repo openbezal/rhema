@@ -1,0 +1,45 @@
+{
+  "base": "a6620e739c0cf3af5b1a5f15604a76c78ccc4619",
+  "review": { "status": "pending", "passes": 0, "fixPasses": 0 },
+  "local": {
+    "platform": "macOS",
+    "frontendTests": 841,
+    "frontendFiles": 77,
+    "nativeDefaultTests": 476,
+    "nativeNoDefaultTests": 476,
+    "typecheck": true,
+    "seededTypecheckProbe": true,
+    "lintZeroWarnings": true,
+    "productionBuild": true,
+    "strictClippy": true,
+    "fmt": true,
+    "existingViteChunkAdvisory": true
+  },
+  "browser": {
+    "minimumViewport": { "width": 1024, "height": 600 },
+    "initialSuccessViewport": { "width": 1280, "height": 720 },
+    "actualAppAndMainStartup": true,
+    "nativeStorageFilesDatabaseAudioOutputsMocked": true,
+    "reloadBacking": "synthetic sessionStorage",
+    "explicitMissingLanguageMappings": true,
+    "cancelDoesNotApply": true,
+    "successPreservesExistingSessionAndLocalBindings": true,
+    "knownRejectionPreservesNativeEntryRevision": true,
+    "delayedAcknowledgementPreventsEscape": true,
+    "activeTranscriptionRefusesApply": true,
+    "uncertainCommitRequiresRecovery": true,
+    "recoveryExportKeepsTranscriptAndQueue": true,
+    "recoveryExportExcludesLocalKeyAndPartial": true,
+    "reloadHydratesCommittedProfile": true,
+    "reopenedRecoveryExportIsReadOnly": true,
+    "lightAndDark": true,
+    "unexpectedErrorsObserved": false,
+    "temporaryFilesServerTabsViewportCleaned": true
+  },
+  "unverified": [
+    "installed macOS/Windows/Linux restore and restart",
+    "native document dialogs and filesystem permission/power-loss failures",
+    "real provider and microphone traffic",
+    "native output reconciliation after an uncertain commit and reload"
+  ]
+}

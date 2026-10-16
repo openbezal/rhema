@@ -6,6 +6,7 @@ import {
 } from "./presentation-controller"
 import { stepVerse } from "@/hooks/use-bible"
 import { useBibleStore } from "@/stores/bible-store"
+import { isOperatorMaintenanceActive } from "./operator-maintenance"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
 
@@ -28,6 +29,7 @@ function findLiveQueueIndex(): number | null {
 }
 
 async function presentQueueItem(index: number): Promise<boolean> {
+  if (isOperatorMaintenanceActive()) return false
   const item = useQueueStore.getState().items[index]
   if (!item) return false
   useQueueStore.getState().setActive(index)
@@ -46,6 +48,7 @@ async function presentQueueItem(index: number): Promise<boolean> {
 }
 
 function stepQueue(offset: number): void {
+  if (isOperatorMaintenanceActive()) return
   const { items, activeIndex } = useQueueStore.getState()
   if (items.length === 0) return
 
@@ -72,6 +75,7 @@ export const operatorActions = {
   presentQueueItem,
   /** Present the verse showing in Program preview on the live output. */
   sendToLive: () => {
+    if (isOperatorMaintenanceActive()) return
     const { selectedVerse } = useBibleStore.getState()
     if (!selectedVerse) return
     void presentVerse(selectedVerse).catch((e) =>
@@ -81,6 +85,7 @@ export const operatorActions = {
 
   /** Queue the verse showing in Program preview. Duplicates are dropped by the store. */
   addToQueue: () => {
+    if (isOperatorMaintenanceActive()) return
     const { selectedVerse } = useBibleStore.getState()
     if (!selectedVerse) return
     useQueueStore.getState().addItem({
@@ -98,17 +103,20 @@ export const operatorActions = {
 
   /** Present the next/previous Bible verse without moving the queue or going on air. */
   bibleNext: (intentOwner?: object) =>
-    stepVerse("next", { present: true, intentOwner }),
+    isOperatorMaintenanceActive() ? Promise.resolve() : stepVerse("next", { present: true, intentOwner }),
   biblePrev: (intentOwner?: object) =>
-    stepVerse("prev", { present: true, intentOwner }),
+    isOperatorMaintenanceActive() ? Promise.resolve() : stepVerse("prev", { present: true, intentOwner }),
 
   clearLive,
-  setFollowDetections: (enabled: boolean) =>
-    useBibleStore.getState().setFollowDetections(enabled),
+  setFollowDetections: (enabled: boolean) => {
+    if (!isOperatorMaintenanceActive()) useBibleStore.getState().setFollowDetections(enabled)
+  },
 
-  setAutoLive: (enabled: boolean) =>
-    useBroadcastStore.getState().setAutoLive(enabled),
+  setAutoLive: (enabled: boolean) => {
+    if (!isOperatorMaintenanceActive()) useBroadcastStore.getState().setAutoLive(enabled)
+  },
   toggleAutoLive: () => {
+    if (isOperatorMaintenanceActive()) return
     const state = useBroadcastStore.getState()
     state.setAutoLive(!state.autoLive)
   },
