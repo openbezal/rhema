@@ -38,6 +38,11 @@ interface PendingNavigation {
   typedIntent?: { translationId: number; initialSelection: Verse | null }
 }
 
+export interface ContextResultSource {
+  translationId: number
+  translationCode: string | null
+}
+
 interface BibleState {
   followDetections: boolean
   followRevision: number
@@ -52,6 +57,7 @@ interface BibleState {
   books: Book[]
   searchResults: Verse[]
   semanticResults: SemanticSearchResult[]
+  semanticResultSource: ContextResultSource | null
   selectedVerse: Verse | null
   currentChapter: Verse[]
   crossReferences: CrossReference[]
@@ -72,7 +78,10 @@ interface BibleState {
   setActiveTranslation: (id: number) => void
   setBooks: (books: Book[]) => void
   setSearchResults: (results: Verse[]) => void
-  setSemanticResults: (results: SemanticSearchResult[]) => void
+  setSemanticResults: (
+    results: SemanticSearchResult[],
+    source?: ContextResultSource
+  ) => void
   selectVerse: (verse: Verse | null) => void
   setCurrentChapter: (verses: Verse[]) => void
   setCrossReferences: (refs: CrossReference[]) => void
@@ -112,6 +121,7 @@ export const useBibleStore = create<BibleState>((set, get) => ({
   books: [],
   searchResults: [],
   semanticResults: [],
+  semanticResultSource: null,
   selectedVerse: null,
   currentChapter: [],
   crossReferences: [],
@@ -167,7 +177,19 @@ export const useBibleStore = create<BibleState>((set, get) => ({
   },
   setBooks: (books) => set({ books }),
   setSearchResults: (searchResults) => set({ searchResults }),
-  setSemanticResults: (semanticResults) => set({ semanticResults }),
+  setSemanticResults: (semanticResults, source) => {
+    const state = get()
+    const semanticResultSource = source ?? {
+      translationId: state.activeTranslationId,
+      translationCode: state.activeTranslationCode,
+    }
+    if (
+      semanticResultSource.translationId !== state.activeTranslationId ||
+      semanticResultSource.translationCode !== state.activeTranslationCode
+    )
+      return
+    set({ semanticResults, semanticResultSource })
+  },
   selectVerse: (selectedVerse) => set({ selectedVerse }),
   setCurrentChapter: (currentChapter) => set({ currentChapter }),
   setCrossReferences: (crossReferences) => set({ crossReferences }),

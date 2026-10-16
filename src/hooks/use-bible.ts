@@ -107,12 +107,17 @@ async function searchVerses(query: string, limit = 20, translationId?: number) {
 async function semanticSearch(query: string, limit = 10) {
   const epoch = operatorRevision()
   if (!isOperatorWorkCurrent(epoch)) return []
+  const state = useBibleStore.getState()
+  const source = {
+    translationId: state.activeTranslationId,
+    translationCode: state.activeTranslationCode,
+  }
   const results = await invoke<SemanticSearchResult[]>("semantic_search", {
     query,
     limit,
   })
   if (isOperatorWorkCurrent(epoch))
-    useBibleStore.getState().setSemanticResults(results)
+    useBibleStore.getState().setSemanticResults(results, source)
   return results
 }
 

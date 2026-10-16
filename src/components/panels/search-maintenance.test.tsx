@@ -15,6 +15,7 @@ import { connectBibleNavigation } from "@/lib/bible-navigation"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import type { Verse } from "@/types"
 import { useSettingsStore } from "@/stores/settings-store"
+import { useQueueStore } from "@/stores/queue-store"
 
 const oldVerse: Verse = {
   id: 1,
@@ -113,6 +114,158 @@ afterEach(async () => {
   host.remove()
   vi.useRealTimers()
   vi.unstubAllGlobals()
+})
+for (const label of ["John", "Chosen", "John 3", "Love3", "John 3:16"]) {
+  for (const route of ["typing", "IME", "Tab", "ArrowRight"] as const) {
+    it(`preserves canonical Genesis intent with label ${label} through ${route}`, async () => {
+      await act(async () => {
+        useBibleStore.setState({
+          books: [
+            ...useBibleStore.getState().books,
+            {
+              id: 1,
+              translation_id: 1,
+              book_number: 1,
+              name: "Genesis",
+              abbreviation: "Gen",
+              testament: "OT",
+            },
+            {
+              id: 19,
+              translation_id: 1,
+              book_number: 19,
+              name: "Psalms",
+              abbreviation: "Ps",
+              testament: "OT",
+            },
+          ],
+        })
+        useSettingsStore
+          .getState()
+          .setBookDisplayOverrides([
+            { translationCode: "KJV", bookNumber: 1, label },
+            ...(label === "Chosen"
+              ? [{ translationCode: "KJV", bookNumber: 19, label }]
+              : []),
+          ])
+      })
+      const input = host.querySelector<HTMLInputElement>(
+        '[aria-label="Bible reference search"]'
+      )!
+      if (route === "IME") {
+        await act(async () =>
+          input.dispatchEvent(
+            new CompositionEvent("compositionstart", { bubbles: true })
+          )
+        )
+        await type('[aria-label="Bible reference search"]', "Gen 2:4")
+        expect(useBibleStore.getState().pendingNavigation).toBeNull()
+        await act(async () =>
+          input.dispatchEvent(
+            new CompositionEvent("compositionend", { bubbles: true })
+          )
+        )
+      } else if (route === "typing") {
+        await type('[aria-label="Bible reference search"]', "Gen 2:4")
+      } else {
+        await type('[aria-label="Bible reference search"]', "Gen")
+        await act(async () =>
+          input.dispatchEvent(
+            new KeyboardEvent("keydown", { key: route, bubbles: true })
+          )
+        )
+        expect(input.value).toBe("Genesis ")
+        expect(useBibleStore.getState().pendingNavigation).toMatchObject({
+          bookNumber: 1,
+          chapter: 1,
+          verse: 1,
+        })
+        await type('[aria-label="Bible reference search"]', "Gen 2")
+        await act(async () =>
+          input.dispatchEvent(
+            new KeyboardEvent("keydown", { key: route, bubbles: true })
+          )
+        )
+        expect(input.value).toBe("Genesis 2:")
+        expect(useBibleStore.getState().pendingNavigation).toBeNull()
+        await type('[aria-label="Bible reference search"]', "Gen 2:4")
+      }
+      expect(useBibleStore.getState().pendingNavigation).toMatchObject({
+        bookNumber: 1,
+        chapter: 2,
+        verse: 4,
+      })
+      await act(async () =>
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
+        )
+      )
+      expect(useBibleStore.getState().pendingNavigation).toMatchObject({
+        bookNumber: 1,
+        chapter: 2,
+        verse: 4,
+        present: true,
+      })
+    })
+  }
+}
+it("hides an old context row at an edition change and rejects its retained action", async () => {
+  await act(async () => {
+    useQueueStore.getState().clearQueue()
+    useBibleStore.setState({
+      translations: [
+        ...useBibleStore.getState().translations,
+        {
+          id: 2,
+          abbreviation: "ESV",
+          title: "ESV",
+          language: "en",
+          is_downloaded: true,
+          is_copyrighted: false,
+        },
+      ],
+    })
+    useSettingsStore.getState().setBookDisplayOverrides([
+      { translationCode: "KJV", bookNumber: 43, label: "KJV John" },
+      { translationCode: "ESV", bookNumber: 43, label: "ESV John" },
+    ])
+  })
+  await click("Context search")
+  await type('input[placeholder="Search verse text..."]', "love mercy")
+  await act(async () =>
+    useBibleStore.getState().setSemanticResults([oldResult])
+  )
+  const row = host.querySelector<HTMLElement>(
+    '[data-operator-item="context-43:3:16"]'
+  )!
+  expect(row.getAttribute("aria-label")).toBe("KJV John 3:16")
+  const add = row.querySelector<HTMLButtonElement>("button")!
+  // Exercise the retained callbacks before React has removed the old DOM row.
+  await act(async () => {
+    useBibleStore.getState().setActiveTranslation(2)
+    add.click()
+    row.click()
+  })
+  expect(useQueueStore.getState().items).toEqual([])
+  expect(useBibleStore.getState().selectedVerse).toBe(oldVerse)
+  expect(
+    host.querySelector('[data-operator-item="context-43:3:16"]')
+  ).toBeNull()
+  const esvResult = { ...oldResult, verse_text: "Verified ESV context" }
+  await act(async () =>
+    useBibleStore.getState().setSemanticResults([esvResult])
+  )
+  const newRow = host.querySelector<HTMLElement>(
+    '[data-operator-item="context-43:3:16"]'
+  )!
+  expect(newRow.getAttribute("aria-label")).toBe("ESV John 3:16")
+  await act(async () =>
+    newRow.querySelector<HTMLButtonElement>("button")!.click()
+  )
+  expect(useQueueStore.getState().items[0]).toMatchObject({
+    verse: { translation_id: 2, text: "Verified ESV context" },
+    translation_code: "ESV",
+  })
 })
 it("uses a display alias for typed navigation without replaying it after a later label change", async () => {
   await act(async () =>

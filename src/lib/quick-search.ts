@@ -68,14 +68,25 @@ export function findMatchingBook(
     [book.name, book.abbreviation].map((label) =>
       normalizeInput(label).toLowerCase()
     )
-  const canonicalExact = books.filter((book) => labels(book).includes(normalized))
-  const aliasExact = books.filter((book) => book.displayName && normalizeInput(book.displayName).toLowerCase() === normalized)
+  const canonicalExact = books.filter((book) =>
+    labels(book).includes(normalized)
+  )
+  const aliasExact = books.filter(
+    (book) =>
+      book.displayName &&
+      normalizeInput(book.displayName).toLowerCase() === normalized
+  )
   const exact = canonicalExact.length ? canonicalExact : aliasExact
   const prefix = /^(i|ii|iii)$/.test(normalized) ? normalized + " " : normalized
   const matches = exact.length
     ? exact
     : books.filter((book) =>
-        [...labels(book), ...(book.displayName ? [normalizeInput(book.displayName).toLowerCase()] : [])].some((label) => label.startsWith(prefix))
+        [
+          ...labels(book),
+          ...(book.displayName
+            ? [normalizeInput(book.displayName).toLowerCase()]
+            : []),
+        ].some((label) => label.startsWith(prefix))
       )
   return new Set(matches.map((book) => book.book_number)).size === 1
     ? matches[0]
@@ -85,7 +96,7 @@ export function findMatchingBook(
 /**
  * Parse Bible reference input and return autocomplete suggestion
  */
-export function getAutocompleteSuggestion(
+function parseAutocompleteInput(
   input: string,
   books: Book[]
 ): AutocompleteResult {
@@ -121,7 +132,7 @@ export function getAutocompleteSuggestion(
   // Stage 1: Autocomplete book name + suggest 1:1
   if (!chapterNum) {
     return {
-      suggestion: (matchingBook.displayName ?? matchingBook.name) + " 1:1",
+      suggestion: "",
       matchedBook: matchingBook,
       chapter: 1,
       verse: 1,
@@ -136,7 +147,7 @@ export function getAutocompleteSuggestion(
   // Stage 2: Suggest colon after chapter
   if (!delimiter) {
     return {
-      suggestion: `${matchingBook.displayName ?? matchingBook.name} ${chapter}:1`,
+      suggestion: "",
       matchedBook: matchingBook,
       chapter,
       verse: 1,
@@ -171,6 +182,44 @@ export function getAutocompleteSuggestion(
   return { suggestion: "", stage: "none" }
 }
 
+/** Generated input must resolve to the same book at every acceptance stage.
+ * A valid display label may collide with a canonical alias or contain numbers
+ * interpreted as coordinates. Keep that label for presentation, but complete
+ * with canonical spelling when it cannot safely round-trip as input. */
+function completionBookName(book: Book, books: Book[]): string {
+  const label = book.displayName
+  if (label) {
+    const bookOnly = parseAutocompleteInput(label, books)
+    const complete = parseAutocompleteInput(`${label} 1:1`, books)
+    if (
+      bookOnly.stage === "book" &&
+      bookOnly.matchedBook?.book_number === book.book_number &&
+      complete.stage === "complete" &&
+      complete.matchedBook?.book_number === book.book_number &&
+      complete.chapter === 1 &&
+      complete.verse === 1
+    )
+      return label
+  }
+  return book.name
+}
+
+export function getAutocompleteSuggestion(
+  input: string,
+  books: Book[]
+): AutocompleteResult {
+  const parsed = parseAutocompleteInput(input, books)
+  if (
+    parsed.matchedBook &&
+    (parsed.stage === "book" || parsed.stage === "chapter")
+  )
+    return {
+      ...parsed,
+      suggestion: `${completionBookName(parsed.matchedBook, books)} ${parsed.chapter}:1`,
+    }
+  return parsed
+}
+
 export interface TypedReference {
   book: Book
   chapter: number
@@ -185,7 +234,7 @@ export function completeTypedReferenceInput(
 ): string {
   const parsed = getAutocompleteSuggestion(input, books)
   if (!parsed.matchedBook) return input
-  const name = parsed.matchedBook.displayName ?? parsed.matchedBook.name
+  const name = completionBookName(parsed.matchedBook, books)
   if (parsed.stage === "book" && /\s$/.test(input)) return `${name} `
   if (
     (parsed.stage === "chapter" && /\s$/.test(input)) ||

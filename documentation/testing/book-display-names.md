@@ -18,11 +18,31 @@ Archives capture the visible reference label alongside canonical source book nam
 
 ## Automated evidence
 
-- **967 frontend/data tests in 82 files** pass. TypeScript, the intentional type-error detection probe, zero-warning lint and the production build pass. The existing bundle-size advisory remains.
+- **993 frontend/data tests in 82 files** pass after the one review/fix pass. TypeScript, the intentional type-error detection probe, zero-warning lint and the production build pass. The existing bundle-size advisory remains.
 - **479 Rust tests pass in each configuration** on macOS (`cargo test --workspace --locked` and `--no-default-features`); strict workspace/all-target Clippy and format checks pass. No dependency was added.
 - Tests first reproduced missing schema, search, formatting, persistence, archive, editor, live-frame and palette behavior. Native restore tests first rejected the unknown field, then passed real SQLite apply/reopen, bounds/duplicate rejection and injected mid-transaction rollback.
 - Additional regressions cover partial catalogs, punctuation, old JSON/default restoration, future codes, stale edition responses, unreadable profiles, active maintenance, pending primary/optional text, typed navigation ownership, legacy/numbered labels and manual Queue source attribution. All eight language/layout combinations verify actual formatted drawing and measured width after a custom label.
 - The palette assertion was corrected to inspect its actual pending-navigation handoff rather than an immediate preview selection. Initial archive and native failures were retained in temporary test logs. The new editor uses edition/revision-scoped state rather than synchronous effect resets; all lint findings were resolved.
+
+## Independent review and one fix pass
+
+One fresh Astra/high reviewer examined the complete `3769e5a..419066c` branch and retained evidence. There were no Critical findings, two Important findings and one Minor. Both Important findings were independently reproduced before the fixes, then verified in one pass; no second review was dispatched. Exact reviewer token usage and cost are unavailable.
+
+1. Generated input could substitute a display label that reparsed as another canonical book or coordinates. Parsing now stays separate from completion formatting, and generated input falls back to the canonical spelling when a label cannot round-trip through the book-only and complete stages. This does not restrict presentation names. Pure regressions and actual mounted Search tests cover conflicting canonical names, duplicate aliases, `John 3`, `Love3` and `John 3:16`, including typing, IME completion, Tab, ArrowRight and Enter. A colon awaiting its verse correctly has no pending navigation; two initial assertions were corrected to that existing contract.
+2. Context results could retain the previous edition's text while acquiring the new edition's display label and Queue source code. Result batches now capture their source ID/code atomically, asynchronous publication rejects another edition, and the panel hides batches whose source is no longer current. Retained callbacks also check source/batch identity before selection, presentation or Queue mutation. A mounted test reproduces an edition change before React removes the old DOM, rejects both old actions, and verifies a replacement ESV result captures its actual ESV text/ID/code.
+
+The focused run passed 166 tests. The entire final frontend suite passed 993; native source was unchanged by this pass, so the 479/479 Rust and strict Clippy/fmt evidence above still applies to the same native source. Additional post-review paths have automated evidence; retained browser screenshots precede this pass.
+
+Deferred Minor: the Suggestions “already queued” toast still uses its canonical reference while the card and successful Queue toast use the custom display name. Action identity and Queue contents remain canonical and correct.
+
+Review rulings, including costs if wrong:
+
+- Keep legacy string-only held frames verbatim because they lack verified identity. Cost: an old frame keeps its old label until the next verified presentation.
+- Keep speech aliases and Bible metadata canonical. Cost: a custom display name does not become a spoken recognition alias.
+- Keep canonical sample credits and diagnostic references as source identifiers. Cost: those source-credit labels differ from the rendered presentation name.
+- Discard unsaved editor drafts on edition change or dialog closure; Save is explicit. Cost: an unsaved edit must be re-entered.
+- Retain the specified NFC/control-character naming contract, without extra Unicode restrictions. Cost: a visually confusing label remains possible; unsafe generated input falls back to canonical spelling.
+- Keep installed dialogs/restarts, provider audio and physical receivers as separate acceptance work. Cost: this draft remains unverified for those environments; browser mocks cannot establish them.
 
 ## Production browser evidence
 

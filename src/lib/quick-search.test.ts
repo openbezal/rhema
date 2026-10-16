@@ -80,12 +80,68 @@ const mockBooks: Book[] = [
 ]
 
 describe("unambiguous installed-book resolution", () => {
+  it.each(["John", "Chosen", "John 3", "Love3", "John 3:16"])(
+    "preserves book, coordinates and input stage when completing the unsafe label %s",
+    (label) => {
+      const books = mockBooks.map((book) => ({
+        ...book,
+        displayName:
+          book.book_number === 1 ||
+          (label === "Chosen" && book.book_number === 19)
+            ? label
+            : undefined,
+      }))
+      for (const input of ["Gen ", "Gen 2 ", "Gen 2:", "Gen 2:4"]) {
+        const before = getAutocompleteSuggestion(input, books)
+        const completed = completeTypedReferenceInput(input, books)
+        const after = getAutocompleteSuggestion(completed, books)
+        expect(after, completed).toMatchObject({
+          matchedBook: { book_number: 1 },
+          stage: before.stage === "chapter" ? "verse" : before.stage,
+          chapter: before.chapter,
+          ...(before.verse && before.stage !== "chapter"
+            ? { verse: before.verse }
+            : {}),
+        })
+        if (after.stage === "verse") expect(after.verse).toBeUndefined()
+      }
+      for (const input of ["Gen", "Gen 2"]) {
+        const suggestion = getAutocompleteSuggestion(input, books).suggestion
+        const accepted = getTabNavigationResult(input, suggestion)
+        expect(
+          getAutocompleteSuggestion(accepted, books),
+          accepted
+        ).toMatchObject({
+          matchedBook: { book_number: 1 },
+          stage: input === "Gen" ? "book" : "verse",
+          chapter: input === "Gen" ? 1 : 2,
+        })
+      }
+    }
+  )
   it("accepts custom display aliases while retaining canonical names and abbreviations", () => {
-    const books: Book[] = [...mockBooks, { id: 66, translation_id: 1, book_number: 66, name: "Revelation of John", abbreviation: "Rev", testament: "NT", displayName: "Apocalypse" }]
-    expect(parseTypedReference("Apocalypse 1:2", books)?.book.book_number).toBe(66)
-    expect(parseTypedReference("Revelation of John 1:2", books)?.book.book_number).toBe(66)
+    const books: Book[] = [
+      ...mockBooks,
+      {
+        id: 66,
+        translation_id: 1,
+        book_number: 66,
+        name: "Revelation of John",
+        abbreviation: "Rev",
+        testament: "NT",
+        displayName: "Apocalypse",
+      },
+    ]
+    expect(parseTypedReference("Apocalypse 1:2", books)?.book.book_number).toBe(
+      66
+    )
+    expect(
+      parseTypedReference("Revelation of John 1:2", books)?.book.book_number
+    ).toBe(66)
     expect(parseTypedReference("Rev 1:2", books)?.book.book_number).toBe(66)
-    expect(getAutocompleteSuggestion("Apoc", books).suggestion).toBe("Apocalypse 1:1")
+    expect(getAutocompleteSuggestion("Apoc", books).suggestion).toBe(
+      "Apocalypse 1:1"
+    )
     books[books.length - 1].displayName = "John"
     expect(parseTypedReference("John 3:16", books)?.book.book_number).toBe(43)
   })
@@ -95,7 +151,9 @@ describe("unambiguous installed-book resolution", () => {
   })
   it("accepts punctuation and Unicode in a custom typed book label", () => {
     const books = [{ ...mockBooks[0], displayName: "Ọ̀rọ̀ (Beginning)" }]
-    expect(parseTypedReference("Ọ̀rọ̀ (Beginning) 1:2", books)?.book.book_number).toBe(1)
+    expect(
+      parseTypedReference("Ọ̀rọ̀ (Beginning) 1:2", books)?.book.book_number
+    ).toBe(1)
   })
   const james: Book = {
     id: 59,

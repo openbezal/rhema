@@ -231,6 +231,27 @@ export function SearchPanel() {
   const followDetections = useBibleStore((s) => s.followDetections)
   const bookNames = useSettingsStore((s) => s.bookDisplayOverrides)
   const activeCode = useBibleStore((s) => s.activeTranslationCode)
+  const semanticResultSource = useBibleStore((s) => s.semanticResultSource)
+  const contextResults =
+    semanticResultSource &&
+    semanticResultSource.translationId === activeTranslationId &&
+    semanticResultSource.translationCode === activeCode
+      ? semanticResults.map((result) => ({
+          result,
+          source: semanticResultSource,
+        }))
+      : []
+  const contextResultIsCurrent = (source: typeof semanticResultSource) => {
+    const state = useBibleStore.getState()
+    return (
+      !isOperatorMaintenanceActive() &&
+      source !== null &&
+      state.semanticResultSource === source &&
+      state.semanticResults === semanticResults &&
+      state.activeTranslationId === source.translationId &&
+      state.activeTranslationCode === source.translationCode
+    )
+  }
   const displayReference = useDisplayVerseReference()
   const visibleBooks = useMemo(
     () => displayBooks(books, activeCode, bookNames),
@@ -372,10 +393,16 @@ export function SearchPanel() {
       const epoch = operatorRevision()
       if (!isOperatorWorkCurrent(epoch)) return
       const requestId = ++contextSearchRequestIdRef.current
+      const source = {
+        translationId,
+        translationCode: useBibleStore.getState().activeTranslationCode,
+      }
       const isStale = () =>
         requestId !== contextSearchRequestIdRef.current ||
         !isOperatorWorkCurrent(epoch) ||
-        useBibleStore.getState().activeTranslationId !== translationId
+        useBibleStore.getState().activeTranslationId !== translationId ||
+        useBibleStore.getState().activeTranslationCode !==
+          source.translationCode
 
       // A fully-typed reference ("John 3:16", "jn 3 16", "1 cor 13:4") pins
       // the exact verse at the top; hybrid search still runs beneath it.
@@ -428,7 +455,7 @@ export function SearchPanel() {
       if ((hybridResults && hybridResults.length > 0) || referenceResult) {
         useBibleStore
           .getState()
-          .setSemanticResults(pinReference(hybridResults ?? []))
+          .setSemanticResults(pinReference(hybridResults ?? []), source)
         return
       }
 
@@ -439,7 +466,9 @@ export function SearchPanel() {
         15
       ).catch(() => [])
       if (isStale()) return
-      useBibleStore.getState().setSemanticResults(pinReference(fuseResults))
+      useBibleStore
+        .getState()
+        .setSemanticResults(pinReference(fuseResults), source)
     },
     []
   )
@@ -1047,22 +1076,23 @@ export function SearchPanel() {
                 Search by meaning — type a phrase, paraphrase, or topic...
               </p>
             )}
-            {contextQuery.length >= 5 && semanticResults.length === 0 && (
+            {contextQuery.length >= 5 && contextResults.length === 0 && (
               <p className="p-4 text-center text-xs text-muted-foreground">
                 No results found
               </p>
             )}
-            {semanticResults.map((result, idx) => (
+            {contextResults.map(({ result, source }, idx) => (
               <div
                 key={`${result.book_number}-${result.chapter}-${result.verse}-${idx}`}
                 data-operator-item={`context-${result.book_number}:${result.chapter}:${result.verse}`}
                 data-operator-present
                 tabIndex={0}
-                aria-label={displayReference(result, activeCode)}
+                aria-label={displayReference(result, source.translationCode)}
                 onClick={() => {
+                  if (!contextResultIsCurrent(source)) return
                   const verse: Verse = {
                     id: 0,
-                    translation_id: activeTranslationId,
+                    translation_id: source.translationId,
                     book_number: result.book_number,
                     book_name: result.book_name,
                     book_abbreviation: "",
@@ -1077,7 +1107,7 @@ export function SearchPanel() {
               >
                 <div className="flex shrink-0 flex-row items-start gap-2">
                   <span className="text-xs font-semibold">
-                    {displayReference(result, activeCode)}
+                    {displayReference(result, source.translationCode)}
                   </span>
                   <ResultSourceBadges result={result} />
                 </div>
@@ -1097,6 +1127,7 @@ export function SearchPanel() {
                           className="absolute top-1/2 right-2 flex size-6 shrink-0 -translate-y-1/2 cursor-pointer items-center justify-center"
                           onClick={(e) => {
                             e.stopPropagation()
+                            if (!contextResultIsCurrent(source)) return
                             const store = useQueueStore.getState()
                             const idx = store.findDuplicate(
                               result.book_number,
@@ -1134,11 +1165,12 @@ export function SearchPanel() {
                           className="absolute top-1/2 right-2 shrink-0 -translate-y-1/2 bg-primary text-primary-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/80"
                           onClick={(e) => {
                             e.stopPropagation()
+                            if (!contextResultIsCurrent(source)) return
                             useQueueStore.getState().addItem({
                               id: crypto.randomUUID(),
                               verse: {
                                 id: 0,
-                                translation_id: activeTranslationId,
+                                translation_id: source.translationId,
                                 book_number: result.book_number,
                                 book_name: result.book_name,
                                 book_abbreviation: "",
@@ -1147,7 +1179,8 @@ export function SearchPanel() {
                                 text: result.verse_text,
                               },
                               reference: `${result.book_name} ${result.chapter}:${result.verse}`,
-                              translation_code: activeCode ?? undefined,
+                              translation_code:
+                                source.translationCode ?? undefined,
                               confidence: result.similarity,
                               source: "manual",
                               added_at: Date.now(),
