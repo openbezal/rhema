@@ -2,7 +2,7 @@
   "base": "650a340",
   "scope": "Task9A5A native session-reset/event ownership foundation; new-session UI remains Task9A5B",
   "frontend": {
-    "tests": 1003,
+    "tests": 1004,
     "files": 84,
     "typecheck": "pass",
     "typecheckGuard": "pass",
@@ -12,8 +12,8 @@
   "native": {
     "platform": "macOS",
     "tests": {
-      "default": 486,
-      "no-default": 486
+      "default": 487,
+      "no-default": 487
     },
     "strictClippy": "pass",
     "fmt": "pass",
@@ -43,12 +43,40 @@
     ],
     "postBrowserAutomatedOnly": [
       "obsolete manual-detection return value",
-      "actual manual-work/reset serialization"
+      "actual manual-work/reset serialization",
+      "review stale-bootstrap provider admission",
+      "valid-envelope cancellation regressions plus isolated mutant proof"
     ]
   },
   "review": {
-    "status": "awaiting one fresh Astra/high whole-branch review",
-    "fixPasses": 0
+    "status": "one fresh Astra/high whole-branch review; one test-first fix pass; no re-review",
+    "reviewedHead": "d675823d318704435e3c7dee392b8e7ba2eb315c",
+    "reported": {
+      "critical": 0,
+      "important": 1,
+      "minor": 2
+    },
+    "regradedImportant": 2,
+    "minorDeferred": 1,
+    "fixPasses": 1,
+    "focusedFrontendGreen": 38,
+    "fixes": [
+      "acknowledged expectedSessionRevision passed to native start and checked before preparation and within reserved admission",
+      "valid-envelope StrictMode/maintenance cancellation tests; isolated mutant removing cancellation makes both fail"
+    ],
+    "minor": "old audio-test meter/terminal event can acquire successor revision outside STT boundary",
+    "costAndTokenUsage": "unavailable",
+    "rulings": [
+      "UI remains9A5B; user-facing reset incomplete",
+      "native/provider/receiver separate; unverified environments",
+      "mock warnings retained; mocks cannot establish installed cleanup",
+      "raw/tagged compatibility retained; duplicate bounded emissions",
+      "stop/restart same operator revision; explicit reset required",
+      "failed reset invalidates reserved starts; operator must retry after refusal",
+      "typed native inner payloads trusted; malformed unidentified producer could fail handler",
+      "async listener readiness unchanged; immediate first event still installed acceptance",
+      "other roadmap acceptance stays separate; not completed by this draft"
+    ]
   },
   "rulings": [
     {

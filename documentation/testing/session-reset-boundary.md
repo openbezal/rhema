@@ -22,9 +22,9 @@ The revision is process-local and cached only in the current webview. It is not 
 
 ## Automated evidence
 
-The final gate results are retained in `fixtures/session-reset-boundary-results.json`. Tests first failed on the missing reset method/module, native reset primitives, tagged ingestion, provider bootstrap and manual detection guards. Later regressions first reproduced obsolete manual results escaping through the return value and the missing manual-work/reset serialization helper. They pass with the final implementations.
+The final gate results are retained in `fixtures/session-reset-boundary-results.json`. The final frontend suite passes **1,004 tests in 84 files**, plus real type checking, its intentional-error detection probe, zero-warning lint and the production build. Tests first failed on the missing reset method/module, native reset primitives, tagged ingestion, provider bootstrap and manual detection guards. Later regressions first reproduced obsolete manual results escaping through the return value and the missing manual-work/reset serialization helper. They pass with the final implementations.
 
-Native checks cover reset/refusal/repeated reset, canonical context/reading/cooldown cleanup, policy preservation, safe revision bounds, exact envelope serialization, poisoned-lock atomicity, operator-window restrictions and actual two-thread ordering. A drop-counted loaded embedder/index remains alive and searchable after reset; this verifies resource retention without pretending to run a real model/provider. Existing native start/reserved-start cancellation tests remain part of the full workspace suites.
+**487 Rust tests pass in each feature configuration on macOS**, with strict workspace/all-target Clippy and format checks. Native checks cover reset/refusal/repeated reset, canonical context/reading/cooldown cleanup, policy preservation, safe revision bounds, exact envelope serialization, poisoned-lock atomicity, operator-window restrictions and actual two-thread ordering. A drop-counted loaded embedder/index remains alive and searchable after reset; this verifies resource retention without pretending to run a real model/provider. Existing native start/reserved-start cancellation tests remain part of the full workspace suites.
 
 Frontend tests cover shared/invalid/retry bootstrap, exact acknowledged advancement, old/current/raw packets, provider waiting/refusal, manual detection dispatch and completion across maintenance, hidden panels, late subscriptions and duplicate starts. Existing maintenance and keyboard fixtures now acknowledge the additional native bootstrap. Strict Clippy required a documentation fix and a targeted Tauri extractor annotation; no lint was disabled globally.
 
@@ -42,6 +42,27 @@ Four callback-ID warnings came from the installed Tauri JavaScript mock during m
 ![Failed bootstrap refuses provider start](assets/session-boundary-unavailable-minimum.png)
 
 The temporary fixture files, Vite entry, local server, browser tab and viewport override were removed. Actual installed native event delivery, provider audio and physical receivers remain separate acceptance work. No original issue or PR is closed.
+
+## Independent review and one fix pass
+
+One fresh Astra/high reviewer examined the entire `650a340..d675823` branch and evidence. There were no Critical findings, one Important and two Minor findings as reported. The cancellation-test finding was promoted to Important because its false-positive assertions invalidated the branch's stated verification of cancelled handlers. Both Important findings were addressed in one pass; no re-review was dispatched. Exact review token usage and cost are unavailable.
+
+- **Fixed stale-bootstrap provider admission:** start now sends the acknowledged `expectedSessionRevision`, and native start checks it both before preparation and inside the reserved start boundary before resetting detection context or starting capture. A fresh transcription-start counter cannot bypass an obsolete session revision. Stale ownership produces explicit Restart Rhema guidance. Optional legacy native callers remain supported. The frontend bootstrap → native reset → fresh start counter reproduction first started the mock provider incorrectly, then passed with no start; a native regression first lacked the admission helper, then verified refusal before its initializer, successful current ownership and legacy admission.
+- **Repaired cancellation verification:** saved StrictMode and maintenance callbacks now receive valid envelopes with the unchanged current revision. An isolated temporary mutant removed only the cancellation condition and both regressions failed, proving they exercise cancellation. The unchanged production condition passes them. The focused frontend run passed 38 tests; the full suite passed 1,004. The start admission addition has automated evidence after the retained browser screenshots.
+
+Deferred Minor: an old audio-test frame or terminal meter event emitted outside the STT boundary can read the successor revision after Stop/reset. Its current effect is a transient stale/zero meter update, without transcript, Bible or Queue contamination. Capturing the test's originating revision and serializing its tagged admission remains follow-up work.
+
+Review rulings, with costs if wrong:
+
+- Keep the new-session review/export/clear/recovery UI in 9A5B. Cost: this foundation alone does not deliver the user-facing reset.
+- Keep installed native/provider/physical acceptance separate. Cost: those environments remain unverified by these mocks and unit tests.
+- Retain the four documented JavaScript mock warnings without a production workaround. Cost: mocked listener cleanup cannot establish installed behavior.
+- Keep duplicate raw/tagged routes for compatibility while main consumes tagged only. Cost: duplicate bounded serialization/emission.
+- Keep ordinary stop/restart in the same operator revision. Cost: it retains logical session context; the explicit reset is required for a new session.
+- Keep failed-reset invalidation of an already reserved provider start. Cost: the operator must start again after resolving the refusal; no old preparation resumes automatically.
+- Validate packet envelopes and trust event-specific native typed producers. Cost: an unidentified malformed inner payload could still fail a handler; no such native producer was found.
+- Retain pre-existing asynchronous listener-registration behavior; revision bootstrap is now an additional start gate. Cost: immediate first-event readiness still needs installed acceptance, because no new lost-event regression was established.
+- Keep unrelated presentation, language, corpus and focus acceptance in their existing roadmap slices. Cost: this draft does not complete those pending acceptance requirements.
 
 ## Design rulings
 

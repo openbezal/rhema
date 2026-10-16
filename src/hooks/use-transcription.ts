@@ -38,7 +38,7 @@ export const transcriptionActions = {
     transcript.setConnectionStatus("connecting")
     const job = (async () => {
       try {
-        await ensureSessionRevision()
+        const expectedSessionRevision = await ensureSessionRevision()
         if (!current()) return
         const startRevision = await invoke<number>(
           "read_transcription_start_revision"
@@ -49,6 +49,7 @@ export const transcriptionActions = {
         const settings = useSettingsStore.getState()
         await invoke("start_transcription", {
           startRevision,
+          expectedSessionRevision,
           apiKey:
             settings.sttProvider === "deepgram"
               ? (settings.deepgramApiKey ?? "")

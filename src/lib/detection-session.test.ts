@@ -313,7 +313,7 @@ describe("app-owned detection session", () => {
     await Promise.resolve()
     expect(late).toHaveBeenCalledOnce()
     useAudioStore.getState().setLevel({ rms: 0, peak: 0 })
-    old?.({ payload: { rms: 1, peak: 1 } })
+    old?.({ payload: { revision: 0, payload: { rms: 1, peak: 1 } } })
     expect(useAudioStore.getState().level.rms).toBe(0)
   })
   it("keeps other listeners after one subscription fails", async () => {
@@ -376,13 +376,22 @@ it("pauses shared ingestion and keeps queued old callbacks canceled after mainte
   const oldDetections = mocks.callbacks.get("session:verse_detections")![0]
   const lease = beginOperatorMaintenance()
   try {
-    old({ payload: { text: "obsolete", confidence: 1 } })
-    oldDetections({ payload: [{ ...detection, auto_queued: true }] })
+    old({
+      payload: { revision: 0, payload: { text: "obsolete", confidence: 1 } },
+    })
+    oldDetections({
+      payload: { revision: 0, payload: [{ ...detection, auto_queued: true }] },
+    })
     expect(useTranscriptStore.getState().segments).toHaveLength(0)
     expect(useQueueStore.getState().items).toHaveLength(0)
     lease.release()
     await Promise.resolve()
-    old({ payload: { text: "still obsolete", confidence: 1 } })
+    old({
+      payload: {
+        revision: 0,
+        payload: { text: "still obsolete", confidence: 1 },
+      },
+    })
     send("transcript_final", { text: "new generation", confidence: 1 })
     expect(
       useTranscriptStore.getState().segments.map((segment) => segment.text)

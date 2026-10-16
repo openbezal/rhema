@@ -66,6 +66,10 @@ pub fn read_transcription_start_revision(state: State<'_, Mutex<AppState>>) -> R
     reason = "pipeline setup is inherently complex"
 )]
 #[tauri::command]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Tauri provider options and independent start/session admission tokens"
+)]
 pub async fn start_transcription(
     app: AppHandle,
     state: State<'_, Mutex<AppState>>,
@@ -74,6 +78,7 @@ pub async fn start_transcription(
     gain: Option<f32>,
     provider: Option<String>,
     start_revision: Option<u64>,
+    expected_session_revision: Option<u64>,
 ) -> Result<(), String> {
     // ── 1. Guard: already running? ──────────────────────────────────────
     let (sessions, audio_test_active) = {
@@ -91,6 +96,8 @@ pub async fn start_transcription(
         return Err("Transcription start was cancelled".into());
     }
     let start_revision = current_revision;
+    app.state::<crate::session_events::SessionRevision>()
+        .require_start_revision(expected_session_revision)?;
 
     // Transcription preempts a running audio test — both would open the same
     // capture device. Clearing the flag makes the test thread exit within
@@ -175,7 +182,11 @@ pub async fn start_transcription(
         }
     };
 
-    let session = sessions.start_reserved(start_revision, || reset_detection_context(&app))?;
+    let session = app
+        .state::<crate::session_events::SessionRevision>()
+        .start_reserved(&sessions, start_revision, expected_session_revision, || {
+            reset_detection_context(&app)
+        })?;
 
     // ── 3. Prepare channels ─────────────────────────────────────────────
     let (audio_send_tx, audio_send_rx) = crossbeam_channel::bounded::<Vec<i16>>(64);

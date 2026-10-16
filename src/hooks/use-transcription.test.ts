@@ -57,6 +57,7 @@ describe("use-transcription", () => {
 
       expect(mockInvoke).toHaveBeenCalledWith("start_transcription", {
         startRevision: 0,
+        expectedSessionRevision: 0,
         apiKey: "", // whisper path never forwards the key
         deviceId: "dev-42",
         gain: 1.5,

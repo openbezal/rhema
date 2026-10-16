@@ -30,7 +30,44 @@ it("waits for native session ownership before starting a provider", async () => 
   await job
   expect(mocks.invoke).toHaveBeenCalledWith(
     "start_transcription",
-    expect.anything()
+    expect.objectContaining({ expectedSessionRevision: 3 })
+  )
+})
+it("refuses a stale session owner even after reading the fresh post-reset start counter", async () => {
+  let nativeRevision = 0,
+    started = false
+  mocks.invoke.mockImplementation(async (command, args) => {
+    if (command === "read_operator_session_revision") return nativeRevision
+    if (command === "read_transcription_start_revision") {
+      nativeRevision = 1 // An outstanding native reset completed after bootstrap.
+      return 8
+    }
+    if (command === "start_transcription") {
+      // Preserve the optional legacy native contract in this reproduction.
+      if (
+        args.expectedSessionRevision !== undefined &&
+        args.expectedSessionRevision !== nativeRevision
+      )
+        throw new Error(
+          "The operator session changed. Restart Rhema before transcribing."
+        )
+      started = true
+    }
+  })
+  const { transcriptionActions } = await import("./use-transcription")
+  const { useTranscriptStore } = await import("@/stores/transcript-store")
+  await transcriptionActions.start()
+  expect(started).toBe(false)
+  expect(useTranscriptStore.getState().isTranscribing).toBe(false)
+  expect(mocks.error).toHaveBeenCalledWith(
+    "Could not start transcription",
+    expect.objectContaining({
+      description: expect.stringContaining("Restart Rhema"),
+    })
+  )
+  expect(mocks.invoke).toHaveBeenCalledWith(
+    "start_transcription",
+    expect.objectContaining({ startRevision: 8, expectedSessionRevision: 0 })
   )
 })
 it("refuses provider start when the native session revision is unreadable", async () => {

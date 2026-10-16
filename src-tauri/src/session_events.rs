@@ -21,6 +21,24 @@ impl SessionRevision {
     pub(crate) fn commit(&self, next: u64) {
         self.0.store(next, Ordering::SeqCst);
     }
+    pub(crate) fn require_start_revision(&self, expected: Option<u64>) -> Result<(), String> {
+        if expected.is_some_and(|value| value != self.current()) {
+            return Err("The operator session changed. Restart Rhema before transcribing.".into());
+        }
+        Ok(())
+    }
+    pub(crate) fn start_reserved(
+        &self,
+        sessions: &crate::transcription_session::SessionController,
+        start_revision: u64,
+        expected_session_revision: Option<u64>,
+        initialize: impl FnOnce() -> Result<(), String>,
+    ) -> Result<crate::transcription_session::SessionToken, String> {
+        sessions.start_reserved(start_revision, || {
+            self.require_start_revision(expected_session_revision)?;
+            initialize()
+        })
+    }
     pub(crate) fn with_current<T>(
         &self,
         sessions: &crate::transcription_session::SessionController,
@@ -62,6 +80,41 @@ impl SessionEmitter for AppHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_fresh_start_counter_cannot_admit_a_stale_webview_session_owner() {
+        use std::sync::{atomic::AtomicBool, Arc};
+        let revision = SessionRevision::default();
+        let sessions = crate::transcription_session::SessionController::new(
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicBool::new(false)),
+        );
+        sessions
+            .with_stopped(|| {
+                revision.commit(revision.next(0)?);
+                Ok(())
+            })
+            .unwrap();
+        let fresh_counter = sessions.begin_start().unwrap();
+        let result = revision.start_reserved(
+            &sessions,
+            fresh_counter,
+            Some(0),
+            || -> Result<(), String> {
+                panic!("stale session reset detection context or started capture")
+            },
+        );
+        assert!(result.err().unwrap().contains("Restart Rhema"));
+        assert_eq!(sessions.begin_start().unwrap(), fresh_counter);
+        let current = revision
+            .start_reserved(&sessions, fresh_counter, Some(1), || Ok(()))
+            .unwrap();
+        assert!(current.is_active());
+        sessions.stop().unwrap();
+        let legacy_counter = sessions.begin_start().unwrap();
+        assert!(revision
+            .start_reserved(&sessions, legacy_counter, None, || Ok(()))
+            .is_ok());
+    }
     #[test]
     fn manual_work_finishes_before_reset_and_a_queued_old_revision_cannot_mutate() {
         use std::{
