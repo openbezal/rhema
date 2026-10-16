@@ -52,6 +52,7 @@ export async function fetchChapter(
   })
 }
 
+let chapterRequestRevision = 0
 async function loadChapter(
   bookNumber: number,
   chapter: number,
@@ -59,8 +60,17 @@ async function loadChapter(
 ) {
   const epoch = operatorRevision()
   if (!isOperatorWorkCurrent(epoch)) return []
-  const verses = await fetchChapter(bookNumber, chapter, translationId)
-  if (isOperatorWorkCurrent(epoch))
+  const ticket = ++chapterRequestRevision
+  const initial = useBibleStore.getState()
+  const id = translationId ?? initial.activeTranslationId
+  const verses = await fetchChapter(bookNumber, chapter, id)
+  if (
+    isOperatorWorkCurrent(epoch) &&
+    ticket === chapterRequestRevision &&
+    useBibleStore.getState().activeTranslationId === id &&
+    useBibleStore.getState().currentChapter === initial.currentChapter &&
+    useBibleStore.getState().selectedVerse === initial.selectedVerse
+  )
     useBibleStore.getState().setCurrentChapter(verses)
   return verses
 }
@@ -243,15 +253,11 @@ export async function stepVerse(
     if (!current()) return
 
     if (cursorChapter.some((v) => v.verse === target.verse)) {
-      useBibleStore
-        .getState()
-        .setPendingNavigation({
-          ...target,
-          present: options?.present,
-          ...(presentationRevision === undefined
-            ? {}
-            : { presentationRevision }),
-        })
+      useBibleStore.getState().setPendingNavigation({
+        ...target,
+        present: options?.present,
+        ...(presentationRevision === undefined ? {} : { presentationRevision }),
+      })
       return
     }
 

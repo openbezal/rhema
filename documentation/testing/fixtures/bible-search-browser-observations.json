@@ -1,0 +1,422 @@
+{
+  "james": {
+    "phase": "idle",
+    "uiCode": "BIUO",
+    "selected": {
+      "book": 59,
+      "chapter": 2,
+      "verse": 2,
+      "translation": 10
+    },
+    "pending": null,
+    "chapterRows": [
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      }
+    ],
+    "uiGain": 1.6,
+    "frame": "Held John 3:16 (BIUO)",
+    "onAir": false,
+    "queue": [
+      {
+        "id": "retained-queue",
+        "text": "Retained Queue verse — Chineke Ọlọ́run",
+        "code": "BIUO"
+      }
+    ],
+    "active": 0,
+    "transcriptCount": 5,
+    "detectionCount": 1,
+    "uiAutoLive": false,
+    "uiFollow": false,
+    "uiThemeCount": 1,
+    "mode": "apply",
+    "revision": 1,
+    "savedCode": "BIUO",
+    "savedGain": 1.6,
+    "nativeActive": 10,
+    "localKeyRetained": true,
+    "unknownRetained": true,
+    "themeCount": 1,
+    "monitor": 2,
+    "writes": 1,
+    "reads": 1,
+    "legacyCalls": 0,
+    "lastApplyBeforeRevision": null,
+    "lastApplyHasLocalKey": null,
+    "lastExport": null,
+    "nativeTranscribing": false
+  },
+  "languageChange": {
+    "phase": "idle",
+    "uiCode": "ESV",
+    "selected": {
+      "book": 43,
+      "chapter": 3,
+      "verse": 18,
+      "translation": 2
+    },
+    "pending": null,
+    "chapterRows": [
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      }
+    ],
+    "uiGain": 1.6,
+    "frame": "John 3:18 (ESV)",
+    "onAir": false,
+    "queue": [
+      {
+        "id": "retained-queue",
+        "text": "Retained Queue verse — Chineke Ọlọ́run",
+        "code": "BIUO"
+      }
+    ],
+    "active": 0,
+    "transcriptCount": 5,
+    "detectionCount": 1,
+    "uiAutoLive": false,
+    "uiFollow": false,
+    "uiThemeCount": 1,
+    "mode": "apply",
+    "revision": 1,
+    "savedCode": "BIUO",
+    "savedGain": 1.6,
+    "nativeActive": 2,
+    "localKeyRetained": true,
+    "unknownRetained": true,
+    "themeCount": 1,
+    "monitor": 2,
+    "writes": 1,
+    "reads": 1,
+    "legacyCalls": 0,
+    "lastApplyBeforeRevision": null,
+    "lastApplyHasLocalKey": null,
+    "lastExport": null,
+    "nativeTranscribing": false
+  },
+  "keyboard": {
+    "phase": "idle",
+    "uiCode": "ESV",
+    "selected": {
+      "book": 59,
+      "chapter": 2,
+      "verse": 2,
+      "translation": 2
+    },
+    "pending": null,
+    "chapterRows": [
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 2
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 2
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 2
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 2
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 2
+      }
+    ],
+    "uiGain": 1.6,
+    "frame": "James 2:2 (ESV)",
+    "onAir": false,
+    "queue": [
+      {
+        "id": "retained-queue",
+        "text": "Retained Queue verse — Chineke Ọlọ́run",
+        "code": "BIUO"
+      }
+    ],
+    "active": 0,
+    "transcriptCount": 5,
+    "detectionCount": 1,
+    "uiAutoLive": false,
+    "uiFollow": false,
+    "uiThemeCount": 1,
+    "mode": "apply",
+    "revision": 2,
+    "savedCode": "ESV",
+    "savedGain": 1.6,
+    "nativeActive": 2,
+    "localKeyRetained": true,
+    "unknownRetained": true,
+    "themeCount": 1,
+    "monitor": 2,
+    "writes": 2,
+    "reads": 1,
+    "legacyCalls": 0,
+    "lastApplyBeforeRevision": null,
+    "lastApplyHasLocalKey": null,
+    "lastExport": null,
+    "nativeTranscribing": false
+  },
+  "ambiguous": {
+    "phase": "idle",
+    "uiCode": "BIUO",
+    "selected": {
+      "book": 43,
+      "chapter": 1,
+      "verse": 1,
+      "translation": 10
+    },
+    "pending": null,
+    "chapterRows": [
+      {
+        "book": 43,
+        "chapter": 1,
+        "translation": 10
+      },
+      {
+        "book": 43,
+        "chapter": 1,
+        "translation": 10
+      },
+      {
+        "book": 43,
+        "chapter": 1,
+        "translation": 10
+      },
+      {
+        "book": 43,
+        "chapter": 1,
+        "translation": 10
+      },
+      {
+        "book": 43,
+        "chapter": 1,
+        "translation": 10
+      }
+    ],
+    "uiGain": 1.6,
+    "frame": "Held John 3:16 (BIUO)",
+    "onAir": false,
+    "queue": [
+      {
+        "id": "retained-queue",
+        "text": "Retained Queue verse — Chineke Ọlọ́run",
+        "code": "BIUO"
+      }
+    ],
+    "active": 0,
+    "transcriptCount": 5,
+    "detectionCount": 1,
+    "uiAutoLive": false,
+    "uiFollow": false,
+    "uiThemeCount": 1,
+    "mode": "apply",
+    "revision": 1,
+    "savedCode": "BIUO",
+    "savedGain": 1.6,
+    "nativeActive": 10,
+    "localKeyRetained": true,
+    "unknownRetained": true,
+    "themeCount": 1,
+    "monitor": 2,
+    "writes": 1,
+    "reads": 1,
+    "legacyCalls": 0,
+    "lastApplyBeforeRevision": null,
+    "lastApplyHasLocalKey": null,
+    "lastExport": null,
+    "nativeTranscribing": false
+  },
+  "finalJames": {
+    "phase": "idle",
+    "uiCode": "BIUO",
+    "selected": {
+      "book": 59,
+      "chapter": 2,
+      "verse": 2,
+      "translation": 10
+    },
+    "pending": null,
+    "chapterRows": [
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      },
+      {
+        "book": 59,
+        "chapter": 2,
+        "translation": 10
+      }
+    ],
+    "uiGain": 1.6,
+    "frame": "Held John 3:16 (BIUO)",
+    "onAir": false,
+    "queue": [
+      {
+        "id": "retained-queue",
+        "text": "Retained Queue verse — Chineke Ọlọ́run",
+        "code": "BIUO"
+      }
+    ],
+    "active": 0,
+    "transcriptCount": 5,
+    "detectionCount": 1,
+    "uiAutoLive": false,
+    "uiFollow": false,
+    "uiThemeCount": 1,
+    "mode": "apply",
+    "revision": 1,
+    "savedCode": "BIUO",
+    "savedGain": 1.6,
+    "nativeActive": 10,
+    "localKeyRetained": true,
+    "unknownRetained": true,
+    "themeCount": 1,
+    "monitor": 2,
+    "writes": 1,
+    "reads": 1,
+    "legacyCalls": 0,
+    "lastApplyBeforeRevision": null,
+    "lastApplyHasLocalKey": null,
+    "lastExport": null,
+    "nativeTranscribing": false
+  },
+  "finalLanguageChange": {
+    "phase": "idle",
+    "uiCode": "ESV",
+    "selected": {
+      "book": 43,
+      "chapter": 3,
+      "verse": 18,
+      "translation": 2
+    },
+    "pending": null,
+    "chapterRows": [
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      },
+      {
+        "book": 43,
+        "chapter": 3,
+        "translation": 2
+      }
+    ],
+    "uiGain": 1.6,
+    "frame": "John 3:18 (ESV)",
+    "onAir": false,
+    "queue": [
+      {
+        "id": "retained-queue",
+        "text": "Retained Queue verse — Chineke Ọlọ́run",
+        "code": "BIUO"
+      }
+    ],
+    "active": 0,
+    "transcriptCount": 5,
+    "detectionCount": 1,
+    "uiAutoLive": false,
+    "uiFollow": false,
+    "uiThemeCount": 1,
+    "mode": "apply",
+    "revision": 2,
+    "savedCode": "ESV",
+    "savedGain": 1.6,
+    "nativeActive": 2,
+    "localKeyRetained": true,
+    "unknownRetained": true,
+    "themeCount": 1,
+    "monitor": 2,
+    "writes": 2,
+    "reads": 1,
+    "legacyCalls": 0,
+    "lastApplyBeforeRevision": null,
+    "lastApplyHasLocalKey": null,
+    "lastExport": null,
+    "nativeTranscribing": false
+  }
+}

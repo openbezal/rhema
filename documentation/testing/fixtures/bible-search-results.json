@@ -1,0 +1,41 @@
+{
+  "base": "3f55f0af0da62a6b2b1a249c0f18bbd1cfb09b3d",
+  "review": { "status": "pending", "passes": 0, "fixPasses": 0 },
+  "local": {
+    "platform": "macOS",
+    "frontendTests": 892,
+    "frontendFiles": 78,
+    "typecheck": true,
+    "seededTypecheckProbe": true,
+    "lintZeroWarnings": true,
+    "productionBuild": true,
+    "existingViteChunkAdvisory": true,
+    "nativeSourceAndDependenciesUnchanged": true,
+    "nativeTestsRerunForThisSlice": false,
+    "inheritedNativeDefaultTests": 476,
+    "inheritedNativeNoDefaultTests": 476
+  },
+  "browser": {
+    "viewport": { "width": 1024, "height": 600 },
+    "actualAppAndMainStartup": true,
+    "nativeStorageFilesDatabaseAudioOutputsMocked": true,
+    "ambiguousPrefixDoesNotNavigate": true,
+    "jaSpace2Space2CanonicalizesAndBrowsesJames": true,
+    "browseDoesNotChangeProgramFrameOrQueue": true,
+    "tabSpaceAndEnterExplicitlyPresentJames": true,
+    "retainedJohn316DoesNotReclaimManualJohn318OnLanguageChange": true,
+    "previewAndProgramUseNewTranslationForRetainedManualVerse": true,
+    "lightAndDark": true,
+    "unexpectedErrorsObserved": false,
+    "temporaryFilesServerTabsViewportCleaned": true,
+    "differencesAfterCaptureCoveredByRegressions": [
+      "chapter loads also retain newer app-owned chapter and manual selection identities",
+      "maintenance clears IME composition state",
+      "Tab retains an abbreviated book's typed chapter"
+    ]
+  },
+  "remaining": [
+    "book display overrides and structured reference/verse-number options",
+    "installed packages and real native database/provider/receiver acceptance"
+  ]
+}

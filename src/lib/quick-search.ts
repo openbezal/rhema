@@ -35,10 +35,12 @@ export function numberToRoman(num: number): string {
  * Stored display names remain unchanged.
  */
 export function normalizeInput(input: string): string {
-  const trimmed = input.trim().replace(/\s+/g, " ")
+  const trimmed = input.normalize("NFC").trim().replace(/\s+/g, " ")
   const ordinal = trimmed.match(/^(first|second|third)\b\s*(.*)$/i)
   if (ordinal) {
-    const number = { first: 1, second: 2, third: 3 }[ordinal[1].toLowerCase() as "first" | "second" | "third"]
+    const number = { first: 1, second: 2, third: 3 }[
+      ordinal[1].toLowerCase() as "first" | "second" | "third"
+    ]
     return numberToRoman(number) + (ordinal[2] ? " " + ordinal[2] : "")
   }
   const leadingNumberMatch = trimmed.match(/^(\d+)\s*(.*)$/)
@@ -55,13 +57,26 @@ export function normalizeInput(input: string): string {
 /**
  * Find matching book by name or abbreviation (case insensitive)
  */
-export function findMatchingBook(bookInput: string, books: Book[]): Book | undefined {
-  const normalized = normalizeInput(bookInput).toLowerCase()
-  return books.find(
-    b =>
-      normalizeInput(b.name).toLowerCase().startsWith(normalized) ||
-      normalizeInput(b.abbreviation).toLowerCase().startsWith(normalized)
-  )
+export function findMatchingBook(
+  bookInput: string,
+  books: Book[]
+): Book | undefined {
+  const normalized = normalizeInput(bookInput).replace(/\.$/, "").toLowerCase()
+  if (!normalized) return undefined
+  const labels = (book: Book) =>
+    [book.name, book.abbreviation].map((label) =>
+      normalizeInput(label).toLowerCase()
+    )
+  const exact = books.filter((book) => labels(book).includes(normalized))
+  const prefix = /^(i|ii|iii)$/.test(normalized) ? normalized + " " : normalized
+  const matches = exact.length
+    ? exact
+    : books.filter((book) =>
+        labels(book).some((label) => label.startsWith(prefix))
+      )
+  return new Set(matches.map((book) => book.book_number)).size === 1
+    ? matches[0]
+    : undefined
 }
 
 /**
@@ -79,24 +94,11 @@ export function getAutocompleteSuggestion(
 
   const normalizedInput = normalizeInput(trimmed)
 
-  // An ordinal alone suggests the first installed book with that ordinal.
-  if (/^(I|II|III)$/i.test(normalizedInput)) {
-    const matchingBook = books.find(b => normalizeInput(b.name).toLowerCase().startsWith(normalizedInput.toLowerCase() + " "))
-
-    if (matchingBook) {
-      return {
-        suggestion: matchingBook.name + " 1:1",
-        matchedBook: matchingBook,
-        chapter: 1,
-        verse: 1,
-        stage: "book"
-      }
-    }
-  }
-
-  // Parse: "NumberedBook Chapter:Verse" or "BookName Chapter:Verse"
-  // Match patterns like: "I J", "I John", "John", "John 3", "John 3:16"
-  const match = normalizedInput.match(/^([IVX]+\s+[a-zA-Z]+|[IVX]+\s+[a-zA-Z\s]+|[a-zA-Z\s]+?)\s*(\d+)?:?(\d+)?$/)
+  // Installed Unicode labels, then optional chapter and a colon, dot or space
+  // before the verse. Numbered-book aliases were normalized above.
+  const match = normalizedInput.match(
+    /^([\p{L}\p{M}][\p{L}\p{M}\s.'’-]*?)\s*(?:(\d+)(?:(\s*[:.]\s*|\s+)(\d*))?)?$/u
+  )
 
   if (!match) {
     return { suggestion: "", stage: "none" }
@@ -104,7 +106,8 @@ export function getAutocompleteSuggestion(
 
   const bookInput = match[1].trim()
   const chapterNum = match[2]
-  const verseNum = match[3]
+  const delimiter = match[3]
+  const verseNum = match[4]
 
   const matchingBook = findMatchingBook(bookInput, books)
 
@@ -119,42 +122,46 @@ export function getAutocompleteSuggestion(
       matchedBook: matchingBook,
       chapter: 1,
       verse: 1,
-      stage: "book"
+      stage: "book",
     }
   }
 
   const chapter = parseInt(chapterNum)
+  if (!Number.isSafeInteger(chapter) || chapter < 1)
+    return { suggestion: "", stage: "none" }
 
   // Stage 2: Suggest colon after chapter
-  if (!verseNum && !trimmed.includes(':')) {
+  if (!delimiter) {
     return {
-      suggestion: trimmed + ":1",
+      suggestion: `${matchingBook.name} ${chapter}:1`,
       matchedBook: matchingBook,
       chapter,
       verse: 1,
-      stage: "chapter"
+      stage: "chapter",
     }
   }
 
   // Stage 3: Has colon but no verse number yet
-  if (!verseNum && trimmed.includes(':')) {
+  if (!verseNum) {
     return {
       suggestion: "",
       matchedBook: matchingBook,
       chapter,
-      stage: "verse"
+      stage: "verse",
     }
   }
 
   // Stage 4: Complete reference
   if (verseNum) {
     const verse = parseInt(verseNum)
+    if (!Number.isSafeInteger(verse) || verse < 1)
+      return { suggestion: "", stage: "none" }
     return {
       suggestion: "",
       matchedBook: matchingBook,
       chapter,
       verse,
-      stage: "complete"
+      stage: "complete",
     }
   }
 
@@ -165,6 +172,26 @@ export interface TypedReference {
   book: Book
   chapter: number
   verse: number
+}
+
+/** Complete only an explicit delimiter or a complete reference. Callers keep
+ * deletion, mid-input editing and IME composition as the operator typed them. */
+export function completeTypedReferenceInput(
+  input: string,
+  books: Book[]
+): string {
+  const parsed = getAutocompleteSuggestion(input, books)
+  if (!parsed.matchedBook) return input
+  const name = parsed.matchedBook.name
+  if (parsed.stage === "book" && /\s$/.test(input)) return `${name} `
+  if (
+    (parsed.stage === "chapter" && /\s$/.test(input)) ||
+    parsed.stage === "verse"
+  )
+    return `${name} ${parsed.chapter}:`
+  if (parsed.stage === "complete")
+    return `${name} ${parsed.chapter}:${parsed.verse}`
+  return input
 }
 
 /**
@@ -180,24 +207,13 @@ export function parseTypedReference(
   input: string,
   books: Book[]
 ): TypedReference | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-
-  const normalized = normalizeInput(trimmed)
-  // Book words, then chapter and verse separated by ":", ".", or whitespace.
-  const match = normalized.match(
-    /^([IVX]+\s+[a-zA-Z.]+|[a-zA-Z][a-zA-Z.\s]*?)\s*(\d{1,3})\s*[:.\s]\s*(\d{1,3})$/
-  )
-  if (!match) return null
-
-  const book = findMatchingBook(match[1].trim().replace(/\.$/, ""), books)
-  if (!book) return null
-
-  const chapter = parseInt(match[2])
-  const verse = parseInt(match[3])
-  if (chapter < 1 || verse < 1) return null
-
-  return { book, chapter, verse }
+  const parsed = getAutocompleteSuggestion(input, books)
+  return parsed.stage === "complete" &&
+    parsed.matchedBook &&
+    parsed.chapter &&
+    parsed.verse
+    ? { book: parsed.matchedBook, chapter: parsed.chapter, verse: parsed.verse }
+    : null
 }
 
 /**
@@ -226,9 +242,7 @@ export function getTabNavigationResult(
     const currentIsCompleteBookName = normalizedCurrent === normalizedBook
 
     // Check if current input has a chapter number
-    const hasChapter =
-      new RegExp(`^${normalizedBook.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+\\d+`, 'i').test(normalizedCurrent) &&
-      !trimmed.includes(':')
+    const hasChapter = /\d+$/.test(normalizedCurrent) && !/[.:]/.test(trimmed)
 
     // Stage 1: Still typing book name -> advance to complete book name
     if (!currentIsCompleteBookName && !hasChapter) {
@@ -249,7 +263,10 @@ export function getTabNavigationResult(
 }
 
 /** Text drawn after the typed alias in the autocomplete overlay. */
-export function getAutocompleteSuffix(input: string, suggestion: string): string | null {
+export function getAutocompleteSuffix(
+  input: string,
+  suggestion: string
+): string | null {
   const normalized = normalizeInput(input).toLowerCase()
   if (!normalized) return null
   // Find the equivalent prefix in the stored spelling; its length can differ

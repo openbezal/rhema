@@ -7,20 +7,154 @@ import {
   getAutocompleteSuggestion,
   getTabNavigationResult,
   parseTypedReference,
+  completeTypedReferenceInput,
   type Book,
 } from "./quick-search"
 
 // Mock book data
 const mockBooks: Book[] = [
-  { id: 1, translation_id: 1, book_number: 1, name: "Genesis", abbreviation: "Gen", testament: "OT" },
-  { id: 43, translation_id: 1, book_number: 43, name: "John", abbreviation: "John", testament: "NT" },
-  { id: 62, translation_id: 1, book_number: 62, name: "I John", abbreviation: "1John", testament: "NT" },
-  { id: 63, translation_id: 1, book_number: 63, name: "II John", abbreviation: "2John", testament: "NT" },
-  { id: 64, translation_id: 1, book_number: 64, name: "III John", abbreviation: "3John", testament: "NT" },
-  { id: 45, translation_id: 1, book_number: 45, name: "Romans", abbreviation: "Rom", testament: "NT" },
-  { id: 19, translation_id: 1, book_number: 19, name: "Psalms", abbreviation: "Ps", testament: "OT" },
-  { id: 46, translation_id: 1, book_number: 46, name: "I Corinthians", abbreviation: "1Cor", testament: "NT" },
+  {
+    id: 1,
+    translation_id: 1,
+    book_number: 1,
+    name: "Genesis",
+    abbreviation: "Gen",
+    testament: "OT",
+  },
+  {
+    id: 43,
+    translation_id: 1,
+    book_number: 43,
+    name: "John",
+    abbreviation: "John",
+    testament: "NT",
+  },
+  {
+    id: 62,
+    translation_id: 1,
+    book_number: 62,
+    name: "I John",
+    abbreviation: "1John",
+    testament: "NT",
+  },
+  {
+    id: 63,
+    translation_id: 1,
+    book_number: 63,
+    name: "II John",
+    abbreviation: "2John",
+    testament: "NT",
+  },
+  {
+    id: 64,
+    translation_id: 1,
+    book_number: 64,
+    name: "III John",
+    abbreviation: "3John",
+    testament: "NT",
+  },
+  {
+    id: 45,
+    translation_id: 1,
+    book_number: 45,
+    name: "Romans",
+    abbreviation: "Rom",
+    testament: "NT",
+  },
+  {
+    id: 19,
+    translation_id: 1,
+    book_number: 19,
+    name: "Psalms",
+    abbreviation: "Ps",
+    testament: "OT",
+  },
+  {
+    id: 46,
+    translation_id: 1,
+    book_number: 46,
+    name: "I Corinthians",
+    abbreviation: "1Cor",
+    testament: "NT",
+  },
 ]
+
+describe("unambiguous installed-book resolution", () => {
+  const james: Book = {
+    id: 59,
+    translation_id: 1,
+    book_number: 59,
+    name: "James",
+    abbreviation: "Jas",
+    testament: "NT",
+  }
+  const jude: Book = {
+    ...james,
+    id: 65,
+    book_number: 65,
+    name: "Jude",
+    abbreviation: "Jud",
+  }
+  const books = [...mockBooks, james, jude]
+  it("keeps an abbreviated book's typed chapter when Tab accepts completion", () => {
+    const suggestion = getAutocompleteSuggestion("JA 2", books).suggestion
+    expect(getTabNavigationResult("JA 2", suggestion)).toBe("James 2:")
+  })
+  it.each([
+    ["JA ", "James "],
+    ["JA 2 ", "James 2:"],
+    ["JA 2 2", "James 2:2"],
+    ["JA 2.", "James 2:"],
+    ["J ", "J "],
+    ["JA", "JA"],
+  ])("completes an explicit delimiter %s", (input, expected) => {
+    expect(completeTypedReferenceInput(input, books)).toBe(expected)
+  })
+  it("never chooses the first ambiguous prefix or ordinal by catalog order", () => {
+    for (const input of ["J", "1", "I", "First"]) {
+      expect(
+        getAutocompleteSuggestion(input, books).matchedBook
+      ).toBeUndefined()
+      expect(
+        getAutocompleteSuggestion(input, [...books].reverse()).matchedBook
+      ).toBeUndefined()
+    }
+    expect(parseTypedReference("J 2 2", books)).toBeNull()
+  })
+  it("keeps exact names and abbreviations ahead of prefix ambiguity", () => {
+    expect(findMatchingBook("John", books)?.book_number).toBe(43)
+    expect(findMatchingBook("Jas", books)?.book_number).toBe(59)
+  })
+  it.each(["JA 2 2", "ja 2:2", "Ja 2.2"])(
+    "resolves %s to James 2:2",
+    (input) => {
+      expect(getAutocompleteSuggestion(input, books)).toMatchObject({
+        matchedBook: james,
+        chapter: 2,
+        verse: 2,
+        stage: "complete",
+      })
+      expect(parseTypedReference(input, books)).toEqual({
+        book: james,
+        chapter: 2,
+        verse: 2,
+      })
+    }
+  )
+  it("uses Unicode book names with canonically equivalent spelling", () => {
+    const yoruba = { ...james, name: "Jákọ́bù", abbreviation: "Ják" }
+    expect(
+      parseTypedReference("JÁKỌ́BÙ 2 2".normalize("NFD"), [yoruba])
+    ).toEqual({ book: yoruba, chapter: 2, verse: 2 })
+  })
+  it.each(["John 0:1", "John 1:0", "John 3::16", "John 3..16"])(
+    "rejects %s",
+    (input) => {
+      expect(getAutocompleteSuggestion(input, books).stage).toBe("none")
+      expect(parseTypedReference(input, books)).toBeNull()
+    }
+  )
+})
 
 describe("numberToRoman", () => {
   it("converts 1 to I", () => {
@@ -109,13 +243,9 @@ describe("getAutocompleteSuggestion", () => {
   })
 
   // Test 2: Just number "1" suggests "I John 1:1"
-  it("suggests 'I John 1:1' when input is '1'", () => {
+  it("does not guess between I John and I Corinthians when input is '1'", () => {
     const result = getAutocompleteSuggestion("1", mockBooks)
-    expect(result.suggestion).toBe("I John 1:1")
-    expect(result.matchedBook?.name).toBe("I John")
-    expect(result.chapter).toBe(1)
-    expect(result.verse).toBe(1)
-    expect(result.stage).toBe("book")
+    expect(result).toEqual({ suggestion: "", stage: "none" })
   })
 
   // Test 3: Just number "2" suggests "II John 1:1"
@@ -182,7 +312,7 @@ describe("getAutocompleteSuggestion", () => {
   // Test 10: Numbered book with chapter "1 john 3" suggests "1 john 3:1"
   it("suggests '1 john 3:1' when input is '1 john 3'", () => {
     const result = getAutocompleteSuggestion("1 john 3", mockBooks)
-    expect(result.suggestion).toBe("1 john 3:1")
+    expect(result.suggestion).toBe("I John 3:1")
     expect(result.matchedBook?.name).toBe("I John")
     expect(result.chapter).toBe(3)
     expect(result.stage).toBe("chapter")
@@ -330,7 +460,9 @@ describe("parseTypedReference", () => {
 
   it("does not parse free text", () => {
     expect(parseTypedReference("johnny walked home", mockBooks)).toBeNull()
-    expect(parseTypedReference("for god so loved the world", mockBooks)).toBeNull()
+    expect(
+      parseTypedReference("for god so loved the world", mockBooks)
+    ).toBeNull()
     expect(parseTypedReference("love never fails", mockBooks)).toBeNull()
   })
 
@@ -349,49 +481,98 @@ describe("parseTypedReference", () => {
 })
 
 const numberedBooks = [
-  [9, 1, "Samuel"], [10, 2, "Samuel"], [11, 1, "Kings"], [12, 2, "Kings"],
-  [13, 1, "Chronicles"], [14, 2, "Chronicles"], [46, 1, "Corinthians"], [47, 2, "Corinthians"],
-  [52, 1, "Thessalonians"], [53, 2, "Thessalonians"], [54, 1, "Timothy"], [55, 2, "Timothy"],
-  [60, 1, "Peter"], [61, 2, "Peter"], [62, 1, "John"], [63, 2, "John"], [64, 3, "John"],
+  [9, 1, "Samuel"],
+  [10, 2, "Samuel"],
+  [11, 1, "Kings"],
+  [12, 2, "Kings"],
+  [13, 1, "Chronicles"],
+  [14, 2, "Chronicles"],
+  [46, 1, "Corinthians"],
+  [47, 2, "Corinthians"],
+  [52, 1, "Thessalonians"],
+  [53, 2, "Thessalonians"],
+  [54, 1, "Timothy"],
+  [55, 2, "Timothy"],
+  [60, 1, "Peter"],
+  [61, 2, "Peter"],
+  [62, 1, "John"],
+  [63, 2, "John"],
+  [64, 3, "John"],
 ] as const
 const ordinals = ["", "First", "Second", "Third"]
 
 function numberedCatalog(style: "arabic" | "roman"): Book[] {
   return numberedBooks.map(([book_number, number, name]) => ({
-    id: book_number, translation_id: 1, book_number,
+    id: book_number,
+    translation_id: 1,
+    book_number,
     name: `${style === "roman" ? numberToRoman(number) : number} ${name}`,
-    abbreviation: `${number}${name.slice(0, 3)}`, testament: book_number < 40 ? "OT" : "NT",
+    abbreviation: `${number}${name.slice(0, 3)}`,
+    testament: book_number < 40 ? "OT" : "NT",
   }))
 }
 
-describe.each(["roman", "arabic"] as const)("numbered books with %s stored names", (style) => {
-  const books = numberedCatalog(style)
-  it.each(numberedBooks)("matches canonical book %i from all ordinal forms", (bookNumber, number, name) => {
-    for (const prefix of [String(number), numberToRoman(number), ordinals[number]]) {
-      const input = `${prefix} ${name}`
-      const expected = books.find(book => book.book_number === bookNumber)!
-      expect(findMatchingBook(input.toLowerCase(), books)).toEqual(expected)
-      expect(getAutocompleteSuggestion(input, books)).toMatchObject({
-        matchedBook: expected, suggestion: `${expected.name} 1:1`, stage: "book",
-      })
-      expect(getAutocompleteSuggestion(`${input} 1:2`, books)).toMatchObject({
-        matchedBook: expected, chapter: 1, verse: 2, stage: "complete",
-      })
-      expect(parseTypedReference(`${input} 1 2`, books)).toEqual({ book: expected, chapter: 1, verse: 2 })
-      expect(getTabNavigationResult(input, `${expected.name} 1:1`)).toBe(`${expected.name} 1:1`)
-      expect(getTabNavigationResult(`${input} 1`, `${expected.name} 1:1`)).toBe(`${expected.name} 1:`)
-    }
-  })
+describe.each(["roman", "arabic"] as const)(
+  "numbered books with %s stored names",
+  (style) => {
+    const books = numberedCatalog(style)
+    it.each(numberedBooks)(
+      "matches canonical book %i from all ordinal forms",
+      (bookNumber, number, name) => {
+        for (const prefix of [
+          String(number),
+          numberToRoman(number),
+          ordinals[number],
+        ]) {
+          const input = `${prefix} ${name}`
+          const expected = books.find(
+            (book) => book.book_number === bookNumber
+          )!
+          expect(findMatchingBook(input.toLowerCase(), books)).toEqual(expected)
+          expect(getAutocompleteSuggestion(input, books)).toMatchObject({
+            matchedBook: expected,
+            suggestion: `${expected.name} 1:1`,
+            stage: "book",
+          })
+          expect(
+            getAutocompleteSuggestion(`${input} 1:2`, books)
+          ).toMatchObject({
+            matchedBook: expected,
+            chapter: 1,
+            verse: 2,
+            stage: "complete",
+          })
+          expect(parseTypedReference(`${input} 1 2`, books)).toEqual({
+            book: expected,
+            chapter: 1,
+            verse: 2,
+          })
+          expect(getTabNavigationResult(input, `${expected.name} 1:1`)).toBe(
+            `${expected.name} 1:1`
+          )
+          expect(
+            getTabNavigationResult(`${input} 1`, `${expected.name} 1:1`)
+          ).toBe(`${expected.name} 1:`)
+        }
+      }
+    )
 
-  it("completes an ordinal prefix and advances Tab through book and chapter", () => {
-    const first = books[0]
-    expect(getAutocompleteSuggestion("first sam", books).suggestion).toBe(`${first.name} 1:1`)
-    expect(getTabNavigationResult("first sam", `${first.name} 1:1`)).toBe(`${first.name} `)
-    expect(getAutocompleteSuggestion("FIRST", books).matchedBook).toEqual(first)
-    expect(getAutocompleteSuggestion("2", books).matchedBook?.book_number).toBe(10)
-    expect(parseTypedReference("1Cor 1:2", books)?.book.book_number).toBe(46)
-  })
-})
+    it("completes an ordinal prefix and advances Tab through book and chapter", () => {
+      const first = books[0]
+      expect(getAutocompleteSuggestion("first sam", books).suggestion).toBe(
+        `${first.name} 1:1`
+      )
+      expect(getTabNavigationResult("first sam", `${first.name} 1:1`)).toBe(
+        `${first.name} `
+      )
+      expect(
+        getAutocompleteSuggestion("FIRST", books).matchedBook
+      ).toBeUndefined()
+      expect(getAutocompleteSuggestion("2", books).matchedBook).toBeUndefined()
+      expect(parseTypedReference("1Cor 1:2", books)?.book.book_number).toBe(46)
+    })
+  }
+)
 
 describe("ordinal boundaries", () => {
   it("normalizes case and whitespace without rewriting ordinary book words", () => {
@@ -401,12 +582,17 @@ describe("ordinal boundaries", () => {
   })
   it("rejects unsupported ordinals and incomplete references", () => {
     const books = numberedCatalog("arabic")
-    for (const input of ["Fourth John 1:2", "Firstborn John 1:2", "First John", "First John 1", "First John 0:2"]) {
+    for (const input of [
+      "Fourth John 1:2",
+      "Firstborn John 1:2",
+      "First John",
+      "First John 1",
+      "First John 0:2",
+    ]) {
       expect(parseTypedReference(input, books)).toBeNull()
     }
   })
 })
-
 
 describe("visible alias completion", () => {
   it.each([

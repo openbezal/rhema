@@ -40,14 +40,14 @@ async function click(text: string) {
       .click()
   })
 }
-async function type(selector: string, value: string) {
+async function type(selector: string, value: string, inputType = "insertText") {
   await act(async () => {
     const input = host.querySelector<HTMLInputElement>(selector)!
     Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
       "value"
     )!.set!.call(input, value)
-    input.dispatchEvent(new Event("input", { bubbles: true }))
+    input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType }))
   })
 }
 beforeEach(async () => {
@@ -208,4 +208,223 @@ it("cancels the old typed navigation intent before the restored catalog arrives"
     )?.value
   ).toBe("")
   expect(useBibleStore.getState().pendingNavigation).toBeNull()
+})
+
+it("does not replay retained typed input after a manual selection and language/catalog change", async () => {
+  await type('[aria-label="Bible reference search"]', "John 3:16")
+  const selected = {
+    ...oldVerse,
+    id: 18,
+    verse: 18,
+    text: "New manual preview",
+    translation_id: 2,
+  }
+  await act(async () => {
+    useBibleStore.setState({
+      activeTranslationId: 2,
+      activeTranslationCode: "ESV",
+      books: useBibleStore
+        .getState()
+        .books.map((book) => ({ ...book, translation_id: 2 })),
+      selectedVerse: selected,
+      currentChapter: [selected],
+      pendingNavigation: null,
+    })
+  })
+  expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  expect(useBibleStore.getState().selectedVerse).toBe(selected)
+  expect(
+    host.querySelector<HTMLInputElement>(
+      '[aria-label="Bible reference search"]'
+    )?.value
+  ).toBe("John 3:16")
+})
+async function addJamesAndJude() {
+  await act(async () => {
+    useBibleStore.setState({
+      books: [
+        ...useBibleStore.getState().books,
+        {
+          id: 59,
+          translation_id: 1,
+          book_number: 59,
+          name: "James",
+          abbreviation: "Jas",
+          testament: "NT",
+        },
+        {
+          id: 65,
+          translation_id: 1,
+          book_number: 65,
+          name: "Jude",
+          abbreviation: "Jud",
+          testament: "NT",
+        },
+      ],
+    })
+  })
+}
+it("leaves ambiguous J alone and completes JA on a delimiter and JA 2 2 on paste", async () => {
+  await addJamesAndJude()
+  await type('[aria-label="Bible reference search"]', "J")
+  expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  await type('[aria-label="Bible reference search"]', "JA ")
+  expect(
+    host.querySelector<HTMLInputElement>(
+      '[aria-label="Bible reference search"]'
+    )?.value
+  ).toBe("James ")
+  await type(
+    '[aria-label="Bible reference search"]',
+    "JA 2 2",
+    "insertFromPaste"
+  )
+  expect(
+    host.querySelector<HTMLInputElement>(
+      '[aria-label="Bible reference search"]'
+    )?.value
+  ).toBe("James 2:2")
+  expect(useBibleStore.getState().pendingNavigation).toMatchObject({
+    bookNumber: 59,
+    chapter: 2,
+    verse: 2,
+  })
+})
+it("does not rewrite a deletion or intermediate composition", async () => {
+  await addJamesAndJude()
+  await type(
+    '[aria-label="Bible reference search"]',
+    "JA ",
+    "deleteContentBackward"
+  )
+  const input = host.querySelector<HTMLInputElement>(
+    '[aria-label="Bible reference search"]'
+  )!
+  expect(input.value).toBe("JA ")
+  await act(async () => {
+    useBibleStore.getState().setPendingNavigation(null)
+    input.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true })
+    )
+  })
+  await type('[aria-label="Bible reference search"]', "JA 2 2")
+  expect(input.value).toBe("JA 2 2")
+  expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  await act(async () =>
+    input.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true })
+    )
+  )
+  expect(input.value).toBe("James 2:2")
+  expect(useBibleStore.getState().pendingNavigation).toMatchObject({
+    bookNumber: 59,
+    chapter: 2,
+    verse: 2,
+  })
+})
+it("retains the newest quick dropdown when an old chapter finishes last", async () => {
+  let oldFinish!: (rows: Verse[]) => void, newFinish!: (rows: Verse[]) => void
+  mocks.invoke
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          oldFinish = resolve
+        })
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          newFinish = resolve
+        })
+    )
+  await type('[aria-label="Bible reference search"]', "John 3:")
+  await type('[aria-label="Bible reference search"]', "John 4:")
+  await act(async () => {
+    newFinish([{ ...oldVerse, chapter: 4, text: "Newest dropdown" }])
+    oldFinish([oldVerse])
+  })
+  expect(
+    [...host.querySelectorAll("button")].some((button) =>
+      button.textContent?.includes("Newest dropdown")
+    )
+  ).toBe(true)
+  expect(
+    [...host.querySelectorAll("button")].some((button) =>
+      button.textContent?.includes("Old pending verse")
+    )
+  ).toBe(false)
+})
+it("hides the previous dropdown while a new chapter request is pending", async () => {
+  mocks.invoke.mockResolvedValueOnce([oldVerse])
+  await type('[aria-label="Bible reference search"]', "John 3:")
+  expect(
+    [...host.querySelectorAll("button")].some((button) =>
+      button.textContent?.includes("Old pending verse")
+    )
+  ).toBe(true)
+  mocks.invoke.mockImplementationOnce(() => new Promise(() => {}))
+  await type('[aria-label="Bible reference search"]', "John 4:")
+  expect(
+    [...host.querySelectorAll("button")].some((button) =>
+      button.textContent?.includes("Old pending verse")
+    )
+  ).toBe(false)
+})
+it("keeps mid-input editing at the operator's caret", async () => {
+  await addJamesAndJude()
+  const input = host.querySelector<HTMLInputElement>(
+    '[aria-label="Bible reference search"]'
+  )!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value"
+    )!.set!.call(input, "JA 2 2")
+    input.setSelectionRange(1, 1)
+    input.dispatchEvent(
+      new InputEvent("input", { bubbles: true, inputType: "insertText" })
+    )
+  })
+  expect(input.value).toBe("JA 2 2")
+  expect(input.selectionStart).toBe(1)
+})
+it("drops an old context result immediately when the language changes", async () => {
+  let finish!: (rows: unknown[]) => void
+  mocks.invoke.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+  )
+  await click("Context search")
+  await type('input[placeholder="Search verse text..."]', "pending words")
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(300)
+  })
+  const retained = [{ ...oldResult, verse_text: "Current language result" }]
+  await act(async () => {
+    useBibleStore.setState({
+      activeTranslationId: 2,
+      semanticResults: retained,
+    })
+    finish([oldResult])
+  })
+  expect(useBibleStore.getState().semanticResults).toBe(retained)
+})
+it("does not show an old context result while a newer query waits for its debounce", async () => {
+  let finish!: (rows: unknown[]) => void
+  mocks.invoke.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+  )
+  await click("Context search")
+  await type('input[placeholder="Search verse text..."]', "pending words")
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(300)
+  })
+  await type('input[placeholder="Search verse text..."]', "newer query")
+  await act(async () => finish([oldResult]))
+  expect(useBibleStore.getState().semanticResults).toEqual([])
 })

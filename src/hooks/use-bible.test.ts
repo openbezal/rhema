@@ -129,6 +129,70 @@ describe("Bible action completions across maintenance", () => {
   })
 })
 
+describe("chapter request ownership", () => {
+  it("cannot replace a chapter installed by app-owned navigation after the request began", async () => {
+    let finish!: (rows: Verse[]) => void
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const old = bibleActions.loadChapter(43, 4)
+    const navigated = [verse(43, 5, 1)]
+    useBibleStore.getState().setCurrentChapter(navigated)
+    finish([verse(43, 4, 1)])
+    await old
+    expect(useBibleStore.getState().currentChapter).toBe(navigated)
+  })
+  it("cannot move away from a newer manually selected verse", async () => {
+    let finish!: (rows: Verse[]) => void
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const old = bibleActions.loadChapter(43, 4)
+    useBibleStore.getState().selectVerse(johnThree[7])
+    finish([verse(43, 4, 1)])
+    await old
+    expect(useBibleStore.getState().currentChapter).toBe(johnThree)
+    expect(useBibleStore.getState().selectedVerse).toBe(johnThree[7])
+  })
+  it("retains the newest requested chapter when an older load finishes last", async () => {
+    let finish!: (rows: Verse[]) => void
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const old = bibleActions.loadChapter(43, 3)
+    const newest = [verse(43, 4, 1)]
+    mockInvoke.mockResolvedValueOnce(newest)
+    await bibleActions.loadChapter(43, 4)
+    finish(johnThree)
+    await old
+    expect(useBibleStore.getState().currentChapter).toBe(newest)
+  })
+  it("retains the current language after an old translation's chapter load finishes", async () => {
+    let finish!: (rows: Verse[]) => void
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const old = bibleActions.loadChapter(43, 3)
+    const newest = [{ ...verse(43, 4, 1), translation_id: 2 }]
+    useBibleStore.setState({ activeTranslationId: 2, currentChapter: newest })
+    finish(johnThree)
+    await old
+    expect(useBibleStore.getState().currentChapter).toBe(newest)
+  })
+})
+
 describe("findLoadedVerse", () => {
   it("matches on book, chapter and verse together", () => {
     expect(

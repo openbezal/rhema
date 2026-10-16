@@ -16,6 +16,7 @@ import {
   getAutocompleteSuffix,
   getTabNavigationResult,
   parseTypedReference,
+  completeTypedReferenceInput,
 } from "@/lib/quick-search"
 import {
   Select,
@@ -145,8 +146,21 @@ export function SearchPanel() {
 
   // EasyWorship-style autocomplete
   const [quickInput, setQuickInput] = useState("")
+  const [quickEditRevision, setQuickEditRevision] = useState(0)
+  const [quickComposing, setQuickComposing] = useState(false)
+  const quickOriginTranslationRef = useRef(
+    useBibleStore.getState().activeTranslationId
+  )
+  const handledQuickEditRef = useRef(-1)
+  const editQuickInput = useCallback((input: string) => {
+    quickOriginTranslationRef.current =
+      useBibleStore.getState().activeTranslationId
+    setQuickInput(input)
+    setQuickEditRevision((revision) => revision + 1)
+  }, [])
   const [showQuickVerses, setShowQuickVerses] = useState(false)
   const [quickVersesList, setQuickVersesList] = useState<Verse[]>([])
+  const [quickVerseRequest, setQuickVerseRequest] = useState("")
 
   const quickInputRef = useRef<HTMLInputElement>(null)
   const searchFocusRevision = useOperatorUiStore(
@@ -305,6 +319,7 @@ export function SearchPanel() {
         // Do not replay an old typed intent when the restored catalog arrives.
         setContextQuery("")
         setQuickInput("")
+        setQuickComposing(false)
         setShowQuickVerses(false)
         setQuickVersesList([])
       }),
@@ -318,7 +333,8 @@ export function SearchPanel() {
       const requestId = ++contextSearchRequestIdRef.current
       const isStale = () =>
         requestId !== contextSearchRequestIdRef.current ||
-        !isOperatorWorkCurrent(epoch)
+        !isOperatorWorkCurrent(epoch) ||
+        useBibleStore.getState().activeTranslationId !== translationId
 
       // A fully-typed reference ("John 3:16", "jn 3 16", "1 cor 13:4") pins
       // the exact verse at the top; hybrid search still runs beneath it.
@@ -394,6 +410,7 @@ export function SearchPanel() {
     (query: string) => {
       if (isOperatorMaintenanceActive()) return
       setContextQuery(query)
+      contextSearchRequestIdRef.current += 1
       if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
       if (query.length >= 5) {
         const translationId = useBibleStore.getState().activeTranslationId
@@ -450,20 +467,38 @@ export function SearchPanel() {
     quickSuggestionSuffix !== null
   )
 
-  // Side effects only: navigation + verse loading
+  // Only an edit or explicit acceptance owns a typed navigation intent.
+  // Catalog/translation refreshes may update suggestions but never replay it.
   useEffect(() => {
-    const epoch = operatorRevision()
-    if (!isOperatorWorkCurrent(epoch)) return
-    let cancelled = false
-    const result = autocompleteResult
-
+    if (
+      quickComposing ||
+      isOperatorMaintenanceActive() ||
+      handledQuickEditRef.current === quickEditRevision
+    )
+      return
+    handledQuickEditRef.current = quickEditRevision
+    const state = useBibleStore.getState()
+    if (
+      state.translationSelectionStatus !== "ready" ||
+      state.activeTranslationId !== quickOriginTranslationRef.current
+    )
+      return
+    const result = getAutocompleteSuggestion(quickInput, state.books)
     if (result.matchedBook && result.chapter && result.verse) {
-      useBibleStore.getState().setPendingNavigation({
+      state.setPendingNavigation({
         bookNumber: result.matchedBook.book_number,
         chapter: result.chapter,
         verse: result.verse,
       })
     }
+  }, [quickInput, quickEditRevision, quickComposing])
+
+  // Dropdown loading is read-only and has its own cancellable request.
+  useEffect(() => {
+    const epoch = operatorRevision()
+    if (!isOperatorWorkCurrent(epoch) || quickComposing) return
+    let cancelled = false
+    const result = autocompleteResult
 
     if (
       (result.stage === "chapter" || result.stage === "verse") &&
@@ -476,8 +511,14 @@ export function SearchPanel() {
         chapter: result.chapter,
       })
         .then((verses) => {
-          if (cancelled || !isOperatorWorkCurrent(epoch)) return
+          if (
+            cancelled ||
+            !isOperatorWorkCurrent(epoch) ||
+            useBibleStore.getState().activeTranslationId !== activeTranslationId
+          )
+            return
           setQuickVersesList(verses)
+          setQuickVerseRequest(`${activeTranslationId}|${quickInput}`)
           setShowQuickVerses(true)
         })
         .catch((error: unknown) => {
@@ -487,17 +528,26 @@ export function SearchPanel() {
     return () => {
       cancelled = true
     }
-  }, [autocompleteResult, activeTranslationId, maintenancePhase])
+  }, [
+    autocompleteResult,
+    activeTranslationId,
+    maintenancePhase,
+    quickInput,
+    quickComposing,
+  ])
 
   // Derive dropdown visibility: only show when autocomplete stage is chapter/verse
   const shouldShowVerseDropdown =
     showQuickVerses &&
+    !quickComposing &&
+    quickVerseRequest === `${activeTranslationId}|${quickInput}` &&
     (autocompleteResult.stage === "chapter" ||
       autocompleteResult.stage === "verse")
 
   const handleQuickKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.defaultPrevented || e.nativeEvent.isComposing) return
+      if (e.defaultPrevented || e.nativeEvent.isComposing || quickComposing)
+        return
       // Tab or → accepts suggestion and advances to NEXT STAGE
       if (
         (e.key === "Tab" || e.key === "ArrowRight") &&
@@ -506,7 +556,7 @@ export function SearchPanel() {
       ) {
         e.preventDefault()
         const nextInput = getTabNavigationResult(quickInput, quickSuggestion)
-        setQuickInput(nextInput)
+        editQuickInput(nextInput)
         return
       }
 
@@ -522,7 +572,7 @@ export function SearchPanel() {
             present: true,
           })
         }
-        setQuickInput("")
+        editQuickInput("")
         setShowQuickVerses(false)
         return
       }
@@ -530,24 +580,34 @@ export function SearchPanel() {
       // First Escape clears completion; an empty input lets the app unfocus it.
       if (e.key === "Escape" && (quickInput || shouldShowVerseDropdown)) {
         e.preventDefault()
-        setQuickInput("")
+        editQuickInput("")
         setShowQuickVerses(false)
         return
       }
     },
-    [quickInput, quickSuggestion, autocompleteResult, shouldShowVerseDropdown]
+    [
+      quickInput,
+      quickSuggestion,
+      autocompleteResult,
+      shouldShowVerseDropdown,
+      editQuickInput,
+      quickComposing,
+    ]
   )
 
-  const handleQuickVerseClick = useCallback((verse: Verse) => {
-    useBibleStore.getState().setPendingNavigation({
-      bookNumber: verse.book_number,
-      chapter: verse.chapter,
-      verse: verse.verse,
-      present: true,
-    })
-    setQuickInput("")
-    setShowQuickVerses(false)
-  }, [])
+  const handleQuickVerseClick = useCallback(
+    (verse: Verse) => {
+      useBibleStore.getState().setPendingNavigation({
+        bookNumber: verse.book_number,
+        chapter: verse.chapter,
+        verse: verse.verse,
+        present: true,
+      })
+      editQuickInput("")
+      setShowQuickVerses(false)
+    },
+    [editQuickInput]
+  )
 
   return (
     <div
@@ -637,9 +697,36 @@ export function SearchPanel() {
                 data-tour="quick-nav"
                 aria-label="Bible reference search"
                 value={quickInput}
-                onChange={(e) => setQuickInput(e.target.value)}
+                onChange={(event) => {
+                  const input = event.target
+                  const native = event.nativeEvent as InputEvent
+                  const canComplete =
+                    !quickComposing &&
+                    !native.isComposing &&
+                    !native.inputType?.startsWith("delete") &&
+                    input.selectionStart === input.value.length &&
+                    input.selectionEnd === input.value.length
+                  editQuickInput(
+                    canComplete
+                      ? completeTypedReferenceInput(
+                          input.value,
+                          useBibleStore.getState().books
+                        )
+                      : input.value
+                  )
+                }}
+                onCompositionStart={() => setQuickComposing(true)}
+                onCompositionEnd={(event) => {
+                  setQuickComposing(false)
+                  editQuickInput(
+                    completeTypedReferenceInput(
+                      event.currentTarget.value,
+                      useBibleStore.getState().books
+                    )
+                  )
+                }}
                 onKeyDown={handleQuickKeyDown}
-                placeholder="Type: J → John 3:16"
+                placeholder="Book chapter:verse"
                 className={cn(
                   "relative h-7 bg-background text-xs",
                   hasQuickSuggestion ? "text-transparent" : ""
