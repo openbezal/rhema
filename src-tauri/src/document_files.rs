@@ -62,8 +62,19 @@ fn write_atomic_with(
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
+    let permissions = match fs::symlink_metadata(destination) {
+        Ok(metadata) if metadata.is_file() => Some(metadata.permissions()),
+        Ok(_) => None,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
     let mut staging = tempfile::NamedTempFile::new_in(parent)?;
     write(staging.as_file_mut())?;
+    // Replacement creates a new inode; keep a shared destination's permission
+    // bits instead of silently replacing them with tempfile's private defaults.
+    if let Some(permissions) = permissions {
+        staging.as_file().set_permissions(permissions)?;
+    }
     staging.as_file_mut().flush()?;
     staging.as_file().sync_all()?;
     staging.persist(destination).map_err(|error| error.error)?;
@@ -129,6 +140,10 @@ pub fn suggested_file_name(raw: &str, format: DocumentFormat) -> String {
         })
         .collect();
     name = name.trim_matches(['.', ' ']).into();
+    while name.len() > 180 {
+        name.pop();
+    }
+    name = name.trim_end_matches(['.', ' ']).into();
     let device = name
         .split('.')
         .next()
@@ -153,7 +168,10 @@ pub fn suggested_file_name(raw: &str, format: DocumentFormat) -> String {
 }
 
 fn is_device_digit(suffix: &str) -> bool {
-    matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
+    matches!(
+        suffix,
+        "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+    )
 }
 
 #[cfg(test)]
@@ -170,6 +188,37 @@ mod tests {
         save_document_at(&destination, content, DocumentFormat::Json).unwrap();
         assert_eq!(fs::read(&destination).unwrap(), content.as_bytes());
         assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replacing_a_shared_export_keeps_its_unix_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("shared.json");
+        fs::write(&destination, "{}").unwrap();
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o640)).unwrap();
+        save_document_at(&destination, "{\"updated\":true}", DocumentFormat::Json).unwrap();
+        assert_eq!(
+            fs::read_to_string(&destination).unwrap(),
+            "{\"updated\":true}"
+        );
+        assert_eq!(
+            fs::metadata(&destination).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+    }
+
+    #[test]
+    fn finalized_default_names_avoid_all_windows_reserved_device_forms() {
+        for (input, expected) in [
+            ("COM¹".to_string(), "_COM¹.json"),
+            ("LPT²".to_string(), "_LPT².json"),
+            ("com³.extra".to_string(), "_com³.extra.json"),
+            (format!("CON{}x", " ".repeat(180)), "_CON.json"),
+        ] {
+            assert_eq!(suggested_file_name(&input, DocumentFormat::Json), expected);
+        }
     }
 
     #[test]
