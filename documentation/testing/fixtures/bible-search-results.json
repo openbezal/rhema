@@ -1,9 +1,50 @@
 {
   "base": "3f55f0af0da62a6b2b1a249c0f18bbd1cfb09b3d",
-  "review": { "status": "pending", "passes": 0, "fixPasses": 0 },
+  "review": {
+    "status": "complete",
+    "passes": 1,
+    "fixPasses": 1,
+    "critical": 0,
+    "important": 1,
+    "minor": 2,
+    "authorImportantAfterRegrading": 3,
+    "allFindingsFixed": true,
+    "rulings": [
+      {
+        "behavior": "Book display overrides and structured reference/verse-number settings",
+        "decision": "Separate approved next slice; #138 remains open.",
+        "costIfWrong": "This PR does not satisfy those display requests."
+      },
+      {
+        "behavior": "Speech parsing and database labels",
+        "decision": "Unchanged by this frontend slice; canonical book-number lookup remains authoritative.",
+        "costIfWrong": "Speech aliases and official stored names do not gain new behavior."
+      },
+      {
+        "behavior": "Real native database/providers/receivers and installed acceptance",
+        "decision": "Still pending; synthetic browser evidence is not physical acceptance.",
+        "costIfWrong": "Installed/native behavior can expose additional defects."
+      },
+      {
+        "behavior": "Fresh native tests",
+        "decision": "Native source/dependencies unchanged; 476-test counts are inherited #204 evidence, not a new run.",
+        "costIfWrong": "An indirect integration regression may require installed testing despite unchanged Rust."
+      },
+      {
+        "behavior": "Reviewer's full-suite/lint/type/build/browser certification",
+        "decision": "Reviewer did not repeat author gates; final author verification and source-specific evidence are recorded separately.",
+        "costIfWrong": "Fresh independent review is not a duplicate full-suite certification."
+      },
+      {
+        "behavior": "OS-specific IME ordering",
+        "decision": "DOM regressions verify the reproduced caret defect; actual native IME acceptance remains pending.",
+        "costIfWrong": "Platform IMEs may order events differently."
+      }
+    ]
+  },
   "local": {
     "platform": "macOS",
-    "frontendTests": 892,
+    "frontendTests": 899,
     "frontendFiles": 78,
     "typecheck": true,
     "seededTypecheckProbe": true,
@@ -16,7 +57,10 @@
     "inheritedNativeNoDefaultTests": 476
   },
   "browser": {
-    "viewport": { "width": 1024, "height": 600 },
+    "viewport": {
+      "width": 1024,
+      "height": 600
+    },
     "actualAppAndMainStartup": true,
     "nativeStorageFilesDatabaseAudioOutputsMocked": true,
     "ambiguousPrefixDoesNotNavigate": true,
@@ -37,5 +81,16 @@
   "remaining": [
     "book display overrides and structured reference/verse-number options",
     "installed packages and real native database/provider/receiver acceptance"
+  ],
+  "reviewedSource": "c014684a15bdf9de1ea2690bafb3ed2d124c5ee9",
+  "fixedSource": "e4b71034b24914c9dbc1d6f241a522ee034a2174",
+  "postReviewRegressionEvidence": [
+    "Clearing pending typed reference cannot later change chapter or selection",
+    "A newer manual row cancels the typed chapter handoff",
+    "Translation change does not restart the old typed coordinates; normal new-language chapter loading remains allowed",
+    "Clearing quick input preserves unrelated app-owned navigation",
+    "Explicit Enter still commits the program verse after clearing input",
+    "Dotted installed abbreviation Tab retains its chapter",
+    "Composition commit in the middle preserves text and caret"
   ]
 }
