@@ -13,6 +13,7 @@
     "data/ci-build.ts",
     "data/prepare-embeddings.ts",
     "data/download-model.ts",
+    "data/compute-embeddings.ts",
     "data/lib/*.ts"
   ]
 }

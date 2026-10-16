@@ -1,0 +1,78 @@
+$ vitest --run data/embedding-toolchain.test.ts
+
+ RUN  v4.1.10 /Users/faithful/.codex/worktrees/bible-data-upgrades/rhema
+
+ ❯ data/embedding-toolchain.test.ts (18 tests | 5 failed) 766ms
+     × does not receipt empty binaries for a nonempty source 7ms
+     × exports the chosen directory using repository code and the stable KJV identity 409ms
+     × keeps the destination lock through export, precompute and index receipt 1ms
+     × preserves the previous index/receipt on command generation failure 1ms
+     × preserves the previous index/receipt on incomplete generation failure 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  data/embedding-toolchain.test.ts > reviewed index lifecycle > does not receipt empty binaries for a nonempty source
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ data/embedding-toolchain.test.ts:312:58
+    310|     await writeFile(join(root, "embeddings/kjv-qwen3-0.6b.bin"), "")
+    311|     await writeFile(join(root, "embeddings/kjv-qwen3-0.6b-ids.bin"), "…
+    312|     await expect(recordEmbeddingIndex(root, "same-model")).rejects.toT…
+       |                                                          ^
+    313|     expect(await isEmbeddingIndexCurrent(root, "same-model")).toBe(fal…
+    314|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  data/embedding-toolchain.test.ts > reviewed index lifecycle > exports the chosen directory using repository code and the stable KJV identity
+Error: ENOENT: no such file or directory, open '/var/folders/95/y0yf3fw557sdmvmmk106g5wh0000gn/T/rhema-model-tooling-WDXszH/chosen data/verses-for-embedding.json'
+ ❯ data/embedding-toolchain.test.ts:328:23
+    326|     }
+    327|     execFileSync("bun", [script, "--data-dir", selected], { stdio: "pi…
+    328|     expect(JSON.parse(await readFile(join(selected, "verses-for-embedd…
+       |                       ^
+    329|     expect(existsSync(join(scripts, "verses-for-embedding.json"))).toB…
+    330|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  data/embedding-toolchain.test.ts > reviewed index lifecycle > keeps the destination lock through export, precompute and index receipt
+TypeError: prepareEmbeddingAssets is not a function
+ ❯ data/embedding-toolchain.test.ts:365:19
+    363|     const entered = new Promise<void>((resolve) => { enter = resolve })
+    364|     const released = new Promise<void>((resolve) => { release = resolv…
+    365|     const first = prepareEmbeddingAssets({ root, dataDir }, async (com…
+       |                   ^
+    366|       if (command.includes("precompute")) { enter(); await released }
+    367|       return runner(command, capture)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  data/embedding-toolchain.test.ts > reviewed index lifecycle > preserves the previous index/receipt on command generation failure
+ FAIL  data/embedding-toolchain.test.ts > reviewed index lifecycle > preserves the previous index/receipt on incomplete generation failure
+TypeError: prepareEmbeddingAssets is not a function
+ ❯ data/embedding-toolchain.test.ts:380:11
+    378|   it.each(["command", "incomplete"])("preserves the previous index/rec…
+    379|     const { root, dataDir, runner, setIndexFailure } = await bundleFix…
+    380|     await prepareEmbeddingAssets({ root, dataDir }, runner)
+       |           ^
+    381|     const paths = ["kjv-qwen3-0.6b.bin", "kjv-qwen3-0.6b-ids.bin", "kj…
+    382|     const before = await Promise.all(paths.map((path) => readFile(path…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 13 passed (18)
+   Start at  14:22:34
+   Duration  896ms (transform 39ms, setup 0ms, import 49ms, tests 766ms, environment 0ms)
+
+error: script "test" exited with code 1

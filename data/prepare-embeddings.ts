@@ -16,7 +16,7 @@
  *      bun run setup:all --force
  */
 
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { ensureBibleAssets } from "./lib/bible-assets"
 import { existsSync } from "node:fs"
 import { ensurePythonEnv, PROJECT_ROOT } from "./lib/python-env"
@@ -24,20 +24,19 @@ import {
   EMBEDDING_REQUIREMENTS,
   EMBEDDING_MINIMUM_PYTHON,
   createEmbeddingPlan,
-  prepareEmbeddingModels,
-  isEmbeddingIndexCurrent,
-  recordEmbeddingIndex,
+  prepareEmbeddingAssets,
 } from "./lib/embedding-toolchain"
 
 // ── Paths ────────────────────────────────────────────────────────────
 const directoryIndex = process.argv.indexOf("--data-dir")
-const DATA_DIR =
+const requestedDirectory =
   directoryIndex >= 0
     ? process.argv[directoryIndex + 1]
     : join(PROJECT_ROOT, "data")
-if (!DATA_DIR) throw new Error("--data-dir requires a directory")
+if (!requestedDirectory || requestedDirectory.startsWith("--"))
+  throw new Error("--data-dir requires a directory")
+const DATA_DIR = resolve(requestedDirectory)
 
-const DB_PATH = join(DATA_DIR, "rhema.db")
 const WHISPER_MODEL = join(
   PROJECT_ROOT,
   "models",
@@ -90,6 +89,11 @@ async function main() {
     await ensureBibleAssets(DATA_DIR, { force })
     return
   }
+  if (process.argv.includes("--embedding-only")) {
+    await ensurePythonEnv(EMBEDDING_REQUIREMENTS, EMBEDDING_MINIMUM_PYTHON)
+    await prepareEmbeddingAssets({ dataDir: DATA_DIR, force })
+    return
+  }
   console.log("\n╔══════════════════════════════════════════════╗")
   console.log("║   Rhema – Full Setup Pipeline                ║")
   console.log("╚══════════════════════════════════════════════╝")
@@ -115,56 +119,30 @@ async function main() {
 
   // Always verify required sources, then compare the DB's content manifest.
   console.log("\n━━━ Bible sources and database freshness ━━━")
-  await ensureBibleAssets(DATA_DIR, { force })
+  if (!withEmbedding) await ensureBibleAssets(DATA_DIR, { force })
 
-  // ── Phase 4: ONNX model download + quantize ────────────────────
-  console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")
-  let modelFingerprint = ""
+  // One lease owns models, selected source, staged native index and receipt.
+  console.log("\n━━━ Phases 4–6/7: Embedding models and matching index ━━━")
   if (!withEmbedding) {
     console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
   } else {
-    modelFingerprint = (await prepareEmbeddingModels({ force })).fingerprint
-  }
-
-  // ── Phase 5: Export verses to JSON ─────────────────────────────
-  console.log("\n━━━ Phase 5/7: Export verses to JSON ━━━")
-  if (!withEmbedding) {
-    console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
-  } else {
-    if (!existsSync(DB_PATH)) {
-      console.error(
-        "  ❌ rhema.db not found. Run phases 2-3 first (or remove --force skip)."
-      )
-      process.exit(1)
-    }
-    await run(["bun", "run", join(DATA_DIR, "compute-embeddings.ts")])
-  }
-
-  // ── Phase 6: Pre-compute embeddings ────────────────────────────
-  console.log("\n━━━ Phase 6/7: Pre-compute verse embeddings ━━━")
-  if (!withEmbedding) {
-    console.log("  ⏭ Skip: embedding assets are opt-in (--with-embedding)")
-  } else if (
-    force ||
-    !(await isEmbeddingIndexCurrent(PROJECT_ROOT, modelFingerprint))
-  ) {
-    // Use the Rust precompute binary — it embeds with the SAME ONNX model
-    // and pooling the app uses at runtime and writes the provenance sidecar.
-    // (The old sentence-transformers path produced vectors that did not
-    // match the runtime embedder — that mismatch crippled vector search
-    // until the 2026-08 regeneration.)
-    await run(["bun", "run", "precompute:embeddings"])
-    await recordEmbeddingIndex(PROJECT_ROOT, modelFingerprint)
-  } else {
-    console.log(
-      "  Verified index model/source/binary hashes; skipping pre-computation."
+    await prepareEmbeddingAssets(
+      { dataDir: DATA_DIR, force },
+      undefined,
+      async () => {
+        await ensureBibleAssets(DATA_DIR, { force })
+      }
     )
   }
 
   // ── Phase 7: Whisper model ────────────────────────────────────
   console.log("\n━━━ Phase 7/7: Download Whisper model ━━━")
   if (!shouldSkip("Whisper model", WHISPER_MODEL)) {
-    await run(["bun", "run", join(DATA_DIR, "download-whisper-model.ts")])
+    await run([
+      "bun",
+      "run",
+      join(PROJECT_ROOT, "data/download-whisper-model.ts"),
+    ])
   }
 
   // ── Done ───────────────────────────────────────────────────────

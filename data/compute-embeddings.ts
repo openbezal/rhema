@@ -1,41 +1,31 @@
 /// <reference types="bun-types" />
 /**
- * Pre-computes verse embeddings using the ONNX model.
- * This script exports verses to a JSON file, then a Rust binary does the actual embedding.
- *
- * Usage:
- * 1. Run: bun run data/download-model.ts  (download the ONNX model first)
- * 2. Run: bun run data/compute-embeddings.ts  (export verses to JSON)
- * 3. Run: cargo run -p rhema-detection --features onnx,vector-search --bin precompute -- \
- *         --model models/qwen3-embedding-0.6b/model.onnx \
- *         --tokenizer models/qwen3-embedding-0.6b/tokenizer.json \
- *         --verses data/verses-for-embedding.json \
- *         --output-embeddings embeddings/kjv-qwen3-0.6b.bin \
- *         --output-ids embeddings/kjv-qwen3-0.6b-ids.bin
- *
- * For now, this script just exports the verses to JSON.
- * The actual embedding computation will be done via Rust.
+ * Export KJV verse rows from the selected SQLite database for native precompute.
+ * Run: bun run export:verses --data-dir /path/to/data
+ * Use bun run precompute:embeddings for the guarded model/export/index pipeline.
  */
 
 import { Database } from "bun:sqlite"
-import { join } from "node:path"
-import { mkdir } from "node:fs/promises"
+import { join, resolve } from "node:path"
 
-const DATA_DIR = import.meta.dir
+const directoryIndex = process.argv.indexOf("--data-dir")
+const directoryArgument =
+  directoryIndex >= 0 ? process.argv[directoryIndex + 1] : import.meta.dir
+if (!directoryArgument || directoryArgument.startsWith("--"))
+  throw new Error("--data-dir requires a directory")
+const DATA_DIR = resolve(directoryArgument)
 const DB_PATH = join(DATA_DIR, "rhema.db")
 const OUTPUT_PATH = join(DATA_DIR, "verses-for-embedding.json")
 
 async function main() {
-  await mkdir(join(DATA_DIR, "..", "embeddings"), { recursive: true })
-
   console.log("\n📖 Exporting KJV verses for embedding...\n")
 
   const db = new Database(DB_PATH, { readonly: true })
 
-  // Get all KJV verses (translation_id = 1)
+  // Local row IDs vary across prepared databases; select the stable edition.
   const verses = db
     .query(
-      "SELECT id, book_name, chapter, verse, text FROM verses WHERE translation_id = 1 ORDER BY id"
+      "SELECT v.id, v.book_name, v.chapter, v.verse, v.text FROM verses v JOIN translations t ON t.id = v.translation_id WHERE t.abbreviation = 'KJV' ORDER BY v.id"
     )
     .all() as Array<{
     id: number
@@ -46,6 +36,10 @@ async function main() {
   }>
 
   console.log(`  Found ${verses.length} KJV verses`)
+  if (verses.length === 0) {
+    db.close()
+    throw new Error("The selected database has no KJV verses")
+  }
 
   // Write to JSON for the Rust precompute binary
   const output = verses.map((v) => ({

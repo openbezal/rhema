@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -54,9 +55,18 @@ def inspect_assets(directory: Path, filename: str) -> dict[str, Any]:
             if not location or relative.is_absolute() or not target.is_relative_to(directory):
                 raise ValueError("External tensor must stay inside the model directory")
             offset = int(external.get("offset", "0"))
-            length = int(external.get("length", "0"))
+            if tensor.data_type == TensorProto.STRING or any(dimension < 0 for dimension in tensor.dims):
+                raise ValueError("Unsupported external tensor storage type/dimensions")
+            elements = math.prod(tensor.dims)
+            packed = tensor.data_type in {TensorProto.INT4, TensorProto.UINT4, TensorProto.FLOAT4E2M1}
+            required = (
+                (elements + 1) // 2
+                if packed
+                else elements * onnx.helper.tensor_dtype_to_np_dtype(tensor.data_type).itemsize
+            )
+            length = int(external["length"]) if "length" in external else required
             size = target.stat().st_size
-            if offset < 0 or length < 0 or size <= offset or (length and size < offset + length):
+            if offset < 0 or length != required or size < offset + required:
                 raise ValueError(f"Incomplete external weights: {location}")
             if location not in files:
                 files[location] = file_digest(target)

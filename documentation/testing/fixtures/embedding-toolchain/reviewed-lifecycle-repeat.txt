@@ -1,0 +1,11 @@
+  Verified embedding models and pinned toolchain receipt; skipping export.
+
+📖 Exporting KJV verses for embedding...
+
+  Found 65 KJV verses
+  ✓ Exported to /tmp/rhema-embedding-toolchain-validation/workflow-project/chosen data/verses-for-embedding.json
+
+  Next: Run the Rust precompute binary to generate embeddings.
+  This requires the ONNX model to be downloaded first (bun run data/download-model.ts)
+
+{"changed":false,"fingerprint":"588ff5fe2c9c95ddf6efd03345873d58bfb8ce093d14f60f62edb23701032c72","indexChanged":false,"chosenIndexCurrent":true,"defaultIndexCurrent":false}

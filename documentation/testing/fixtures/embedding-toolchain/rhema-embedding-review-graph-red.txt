@@ -1,0 +1,32 @@
+.....F.FF...
+======================================================================
+FAIL: test_omitted_external_length_still_requires_the_tensor_storage (__main__.InspectAssetsTests.test_omitted_external_length_still_requires_the_tensor_storage)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/faithful/.codex/worktrees/bible-data-upgrades/rhema/data/test_embedding_assets.py", line 80, in test_omitted_external_length_still_requires_the_tensor_storage
+    self.assertFalse(self.inspect()["valid"])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_short_or_zero_declared_length_cannot_hide_missing_storage (__main__.InspectAssetsTests.test_short_or_zero_declared_length_cannot_hide_missing_storage) (length='0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/faithful/.codex/worktrees/bible-data-upgrades/rhema/data/test_embedding_assets.py", line 91, in test_short_or_zero_declared_length_cannot_hide_missing_storage
+    self.assertFalse(self.inspect()["valid"])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_short_or_zero_declared_length_cannot_hide_missing_storage (__main__.InspectAssetsTests.test_short_or_zero_declared_length_cannot_hide_missing_storage) (length='4')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/faithful/.codex/worktrees/bible-data-upgrades/rhema/data/test_embedding_assets.py", line 91, in test_short_or_zero_declared_length_cannot_hide_missing_storage
+    self.assertFalse(self.inspect()["valid"])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.022s
+
+FAILED (failures=3)

@@ -8,7 +8,11 @@
     "matchingReceiptRepeat": 0,
     "numericalAcceptance": 1,
     "rustCombinedAcceptance": 1,
-    "rustRetrievalOnly": true
+    "rustRetrievalOnly": true,
+    "reviewedLifecycle": 0,
+    "reviewedLifecycleRepeat": 0,
+    "reviewedNumericalAcceptance": 1,
+    "reviewedRetrievalOnly": true
   },
   "index": {
     "verses": 65,
@@ -30,7 +34,34 @@
     "quantize-transformers.txt": "e1ed3a1ea3dc874a11df93c88a36b1dec81afa9c75a8470376021785b6deed18",
     "quantize-weight-only8-block16.txt": "f43973193513a2d44a2e03d88caa86f8692836284462be8874832701c94f1447",
     "quantize-weight-only8.txt": "ee09bc3f09ad6e75b48a0f242d2c0fe037cc7ff1bb55f1a5d53066f4689ab76d",
+    "reviewed-lifecycle-repeat.txt": "695935c5febbcc72f1451b8772b13b269ee84797ad21eafe678e9feff09c255d",
+    "reviewed-lifecycle-result.json": "d1b3fabb0d2b3bce73e61b7029e12dc98b32a2d9de8f56806ea823935662621c",
+    "reviewed-lifecycle.txt": "c0432529160cdcda8cbc172858d5ac3b4e9d3fa4cfecb8dc580526e3f28e1b89",
+    "rhema-embedding-review-focused-final.txt": "cf3e4833bfb317d60314b46cf6eaeb21b0f1010cc2d9c1653f9e98bab7c0766f",
+    "rhema-embedding-review-graph-green.txt": "1716b47a03188bc918a0e69af2d063dbf3f51ded577934827cd953a60bd6070d",
+    "rhema-embedding-review-graph-red.txt": "23a3ba4fd7bc02b9e8027e2c14990c3a23805d01e23ad4be68b1d889be5739b8",
+    "rhema-embedding-review-lifecycle-red.txt": "9cc8943b217245ab255bd3bc7f60b50492596387c09a62ca64ddaf78657f0a54",
     "rust-probe.json": "13503cefefd07c9c5f31fafc61b642b5e527212d2289be479e506cc0ba7fdf03",
+    "rust-reviewed-probe.json": "c2a2f350c1909a2879dacdc810d510eed55183571402614433cd1fb548fed57f",
     "unsupported-quantize-red.txt": "f8958dcb3177eb42c78dca786549f211b01e19da489c6975e9327b8a5cfe21bc"
+  },
+  "reviewedIndex": {
+    "vectorsIdentical": true,
+    "idsIdentical": true,
+    "actualIndexReceipt": {
+      "modelFingerprint": "588ff5fe2c9c95ddf6efd03345873d58bfb8ce093d14f60f62edb23701032c72",
+      "verses": "c22eb809e61a45ad521f17267009bb3cd2e8f95cdd2c6e599ea43059800bf1a3",
+      "verseCount": 65,
+      "dimension": 1024,
+      "embeddings": "644a178c7331f30e394b702b835ca95913c77316c484b143fa0dc9b70b7d9eb3",
+      "ids": "377553d34e15c916d306923928081d73c061a4d83f88c5fbf416bb4d1c647f8b"
+    },
+    "nativeProbe": {
+      "comparisonPassed": false,
+      "dimension": 1024,
+      "indexVerses": 65,
+      "passed": false,
+      "retrievalPassed": true
+    }
   }
 }

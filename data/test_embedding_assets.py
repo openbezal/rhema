@@ -68,6 +68,38 @@ class InspectAssetsTests(unittest.TestCase):
         (self.directory / "model.onnx_data").write_bytes(b"truncated")
         self.assertFalse(self.inspect()["valid"])
 
+    def test_omitted_external_length_still_requires_the_tensor_storage(self) -> None:
+        self.graph()
+        model = onnx.load(self.directory / "model.onnx", load_external_data=False)
+        tensor = model.graph.initializer[0]
+        entries = [entry for entry in tensor.external_data if entry.key != "length"]
+        tensor.ClearField("external_data")
+        tensor.external_data.extend(entries)
+        onnx.save_model(model, self.directory / "model.onnx")
+        (self.directory / "model.onnx_data").write_bytes(np.ones(1, dtype=np.float32).tobytes())
+        self.assertFalse(self.inspect()["valid"])
+
+    def test_short_or_zero_declared_length_cannot_hide_missing_storage(self) -> None:
+        for length in ["0", "4"]:
+            with self.subTest(length=length):
+                self.graph()
+                model = onnx.load(self.directory / "model.onnx", load_external_data=False)
+                for entry in model.graph.initializer[0].external_data:
+                    if entry.key == "length":
+                        entry.value = length
+                onnx.save_model(model, self.directory / "model.onnx")
+                self.assertFalse(self.inspect()["valid"])
+
+    def test_complete_storage_with_omitted_length_is_supported(self) -> None:
+        self.graph()
+        model = onnx.load(self.directory / "model.onnx", load_external_data=False)
+        tensor = model.graph.initializer[0]
+        entries = [entry for entry in tensor.external_data if entry.key != "length"]
+        tensor.ClearField("external_data")
+        tensor.external_data.extend(entries)
+        onnx.save_model(model, self.directory / "model.onnx")
+        self.assertTrue(self.inspect()["valid"])
+
     def test_external_path_escape_is_rejected_before_reading_it(self) -> None:
         self.graph()
         model = onnx.load(self.directory / "model.onnx", load_external_data=False)

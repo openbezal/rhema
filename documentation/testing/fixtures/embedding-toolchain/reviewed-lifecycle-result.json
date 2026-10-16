@@ -1,0 +1,19 @@
+{
+  "vectorsIdentical": true,
+  "idsIdentical": true,
+  "actualIndexReceipt": {
+    "modelFingerprint": "588ff5fe2c9c95ddf6efd03345873d58bfb8ce093d14f60f62edb23701032c72",
+    "verses": "c22eb809e61a45ad521f17267009bb3cd2e8f95cdd2c6e599ea43059800bf1a3",
+    "verseCount": 65,
+    "dimension": 1024,
+    "embeddings": "644a178c7331f30e394b702b835ca95913c77316c484b143fa0dc9b70b7d9eb3",
+    "ids": "377553d34e15c916d306923928081d73c061a4d83f88c5fbf416bb4d1c647f8b"
+  },
+  "nativeProbe": {
+    "comparisonPassed": false,
+    "dimension": 1024,
+    "indexVerses": 65,
+    "passed": false,
+    "retrievalPassed": true
+  }
+}

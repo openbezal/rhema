@@ -1,0 +1,502 @@
+{
+  "comparisonPassed": false,
+  "comparisons": [
+    {
+      "characters": 63,
+      "cosine": 0.9999999999995854,
+      "model": "fp32",
+      "norm": 1.000000046197376,
+      "passed": true
+    },
+    {
+      "characters": 42,
+      "cosine": 0.9999999999996402,
+      "model": "fp32",
+      "norm": 0.9999999190473295,
+      "passed": true
+    },
+    {
+      "characters": 67,
+      "cosine": 0.9999999999995202,
+      "model": "fp32",
+      "norm": 1.0000003497917247,
+      "passed": true
+    },
+    {
+      "characters": 4320,
+      "cosine": 0.9999999999998079,
+      "model": "fp32",
+      "norm": 1.0000000521527597,
+      "passed": true
+    },
+    {
+      "characters": 63,
+      "cosine": 0.9795603035684024,
+      "model": "int8",
+      "norm": 0.9999993588118439,
+      "passed": false
+    },
+    {
+      "characters": 42,
+      "cosine": 0.9650987369575751,
+      "model": "int8",
+      "norm": 1.000000036480058,
+      "passed": false
+    },
+    {
+      "characters": 67,
+      "cosine": 0.9808413229959424,
+      "model": "int8",
+      "norm": 0.9999998218078676,
+      "passed": false
+    },
+    {
+      "characters": 4320,
+      "cosine": 0.9981811823073165,
+      "model": "int8",
+      "norm": 0.9999999433929585,
+      "passed": false
+    }
+  ],
+  "dimension": 1024,
+  "indexVerses": 65,
+  "passed": false,
+  "queries": [
+    {
+      "category": "exact",
+      "elapsedMs": 117.37,
+      "passed": true,
+      "query": "In the beginning God created the heaven and the earth.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 62207,
+          "score": 0.9999996423721313
+        },
+        {
+          "id": 93261,
+          "score": 0.7858788371086121
+        },
+        {
+          "id": 62208,
+          "score": 0.7591627836227417
+        },
+        {
+          "id": 62214,
+          "score": 0.7389847636222839
+        },
+        {
+          "id": 62213,
+          "score": 0.7315155863761902
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 121.58800000000001,
+      "passed": true,
+      "query": "The Lord is my shepherd; I shall not want.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 76443,
+          "score": 1.000001072883606
+        },
+        {
+          "id": 91654,
+          "score": 0.7547010779380798
+        },
+        {
+          "id": 76446,
+          "score": 0.7476149201393127
+        },
+        {
+          "id": 76448,
+          "score": 0.7377612590789795
+        },
+        {
+          "id": 90356,
+          "score": 0.7203837633132935
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 118.085333,
+      "passed": true,
+      "query": "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 88343,
+          "score": 1.000000238418579
+        },
+        {
+          "id": 88344,
+          "score": 0.8434374332427979
+        },
+        {
+          "id": 90355,
+          "score": 0.786278247833252
+        },
+        {
+          "id": 93263,
+          "score": 0.7826347947120667
+        },
+        {
+          "id": 90352,
+          "score": 0.7757817506790161
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 117.469791,
+      "passed": true,
+      "query": "For God sent not his Son into the world to condemn the world; but that the world through him might be saved.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 88344,
+          "score": 0.9999994039535522
+        },
+        {
+          "id": 88343,
+          "score": 0.8434374332427979
+        },
+        {
+          "id": 88346,
+          "score": 0.8126726746559143
+        },
+        {
+          "id": 88340,
+          "score": 0.8011237978935242
+        },
+        {
+          "id": 90357,
+          "score": 0.7935883402824402
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 119.11225,
+      "passed": true,
+      "query": "And we know that all things work together for good to them that love God, to them who are the called according to his purpose.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 90351,
+          "score": 1.000000238418579
+        },
+        {
+          "id": 90360,
+          "score": 0.8364186882972717
+        },
+        {
+          "id": 90356,
+          "score": 0.8239753842353821
+        },
+        {
+          "id": 76448,
+          "score": 0.8199542164802551
+        },
+        {
+          "id": 90354,
+          "score": 0.8142794370651245
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 121.136625,
+      "passed": true,
+      "query": "I can do all things through Christ which strengtheneth me.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 91662,
+          "score": 0.9999988675117493
+        },
+        {
+          "id": 91656,
+          "score": 0.7958856821060181
+        },
+        {
+          "id": 90351,
+          "score": 0.7869775295257568
+        },
+        {
+          "id": 90360,
+          "score": 0.7710688710212708
+        },
+        {
+          "id": 91658,
+          "score": 0.761989414691925
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 120.239625,
+      "passed": true,
+      "query": "And now abideth faith, hope, charity, these three; but the greatest of these is charity. ",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 90885,
+          "score": 1.0000005960464478
+        },
+        {
+          "id": 90876,
+          "score": 0.8008614778518677
+        },
+        {
+          "id": 90351,
+          "score": 0.7768839001655579
+        },
+        {
+          "id": 90361,
+          "score": 0.7712042331695557
+        },
+        {
+          "id": 76448,
+          "score": 0.7703489661216736
+        }
+      ]
+    },
+    {
+      "category": "exact",
+      "elapsedMs": 117.838584,
+      "passed": true,
+      "query": "And God shall wipe away all tears from their eyes; and there shall be no more death, neither sorrow, nor crying, neither shall there be any more pain: for the former things are passed away.",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 93264,
+          "score": 0.999998927116394
+        },
+        {
+          "id": 90358,
+          "score": 0.7654104828834534
+        },
+        {
+          "id": 76446,
+          "score": 0.7642577886581421
+        },
+        {
+          "id": 90880,
+          "score": 0.734494686126709
+        },
+        {
+          "id": 90361,
+          "score": 0.7336132526397705
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 118.839375,
+      "passed": true,
+      "query": "God loved the world so much that he gave his only Son",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 88343,
+          "score": 0.8112747073173523
+        },
+        {
+          "id": 90355,
+          "score": 0.7574778199195862
+        },
+        {
+          "id": 90351,
+          "score": 0.7269455790519714
+        },
+        {
+          "id": 88344,
+          "score": 0.723926305770874
+        },
+        {
+          "id": 90352,
+          "score": 0.7073109745979309
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 118.236125,
+      "passed": true,
+      "query": "God sent his Son to save the world rather than condemn it",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 88344,
+          "score": 0.8329280614852905
+        },
+        {
+          "id": 90355,
+          "score": 0.8092543482780457
+        },
+        {
+          "id": 90357,
+          "score": 0.7817270755767822
+        },
+        {
+          "id": 88343,
+          "score": 0.7654924392700195
+        },
+        {
+          "id": 90356,
+          "score": 0.7609940767288208
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 119.265833,
+      "passed": true,
+      "query": "The Lord is my shepherd and provides everything I need",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 76443,
+          "score": 0.8776126503944397
+        },
+        {
+          "id": 91654,
+          "score": 0.7551213502883911
+        },
+        {
+          "id": 90356,
+          "score": 0.7433717250823975
+        },
+        {
+          "id": 90351,
+          "score": 0.7410961389541626
+        },
+        {
+          "id": 76448,
+          "score": 0.7312865853309631
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 119.260667,
+      "passed": true,
+      "query": "I can do anything through Christ who gives me strength",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 91662,
+          "score": 0.913840651512146
+        },
+        {
+          "id": 90351,
+          "score": 0.7669660449028015
+        },
+        {
+          "id": 90874,
+          "score": 0.7639617919921875
+        },
+        {
+          "id": 90360,
+          "score": 0.7599319219589233
+        },
+        {
+          "id": 91656,
+          "score": 0.7566301822662354
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 121.052375,
+      "passed": true,
+      "query": "Nothing can separate us from the love of God in Christ",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 90362,
+          "score": 0.8491045236587524
+        },
+        {
+          "id": 90351,
+          "score": 0.7808873057365417
+        },
+        {
+          "id": 91656,
+          "score": 0.7789518237113953
+        },
+        {
+          "id": 91662,
+          "score": 0.7757188081741333
+        },
+        {
+          "id": 90356,
+          "score": 0.7457543015480042
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 121.279083,
+      "passed": true,
+      "query": "Faith hope and love remain, and love is the greatest",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 90885,
+          "score": 0.8153758645057678
+        },
+        {
+          "id": 90351,
+          "score": 0.7520903944969177
+        },
+        {
+          "id": 76448,
+          "score": 0.74937903881073
+        },
+        {
+          "id": 91656,
+          "score": 0.7453732490539551
+        },
+        {
+          "id": 90360,
+          "score": 0.7294871807098389
+        }
+      ]
+    },
+    {
+      "category": "paraphrase",
+      "elapsedMs": 120.543333,
+      "passed": true,
+      "query": "I saw a new heaven and a new earth",
+      "rank": 1,
+      "top5": [
+        {
+          "id": 93261,
+          "score": 0.8347914218902588
+        },
+        {
+          "id": 62207,
+          "score": 0.6700791120529175
+        },
+        {
+          "id": 93262,
+          "score": 0.6561682820320129
+        },
+        {
+          "id": 62208,
+          "score": 0.6278742551803589
+        },
+        {
+          "id": 90884,
+          "score": 0.615024745464325
+        }
+      ]
+    }
+  ],
+  "retrievalPassed": true
+}
