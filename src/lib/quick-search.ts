@@ -242,7 +242,8 @@ export function getTabNavigationResult(
     const currentIsCompleteBookName = normalizedCurrent === normalizedBook
 
     // Check if current input has a chapter number
-    const hasChapter = /\d+$/.test(normalizedCurrent) && !/[.:]/.test(trimmed)
+    const hasChapter =
+      /\d+$/.test(normalizedCurrent) && !/\d\s*[:.]/.test(trimmed)
 
     // Stage 1: Still typing book name -> advance to complete book name
     if (!currentIsCompleteBookName && !hasChapter) {

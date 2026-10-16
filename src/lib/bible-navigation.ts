@@ -6,7 +6,10 @@ import {
 } from "./presentation-controller"
 import { useBibleStore } from "@/stores/bible-store"
 import { mark } from "@/lib/latency-marks"
-import { connectOutsideMaintenance, isOperatorMaintenanceActive } from "./operator-maintenance"
+import {
+  connectOutsideMaintenance,
+  isOperatorMaintenanceActive,
+} from "./operator-maintenance"
 
 /** Complete pending navigation even when the Bible panel is hidden. */
 export function connectBibleNavigation(): () => void {
@@ -14,7 +17,8 @@ export function connectBibleNavigation(): () => void {
     const stop = connectActiveBibleNavigation()
     return () => {
       stop()
-      if (isOperatorMaintenanceActive()) useBibleStore.getState().setPendingNavigation(null)
+      if (isOperatorMaintenanceActive())
+        useBibleStore.getState().setPendingNavigation(null)
     }
   })
 }
@@ -28,6 +32,14 @@ function connectActiveBibleNavigation(): () => void {
   const handle = () => {
     const state = useBibleStore.getState()
     const pending = state.pendingNavigation
+    if (
+      pending?.typedIntent &&
+      (pending.typedIntent.translationId !== state.activeTranslationId ||
+        pending.typedIntent.initialSelection !== state.selectedVerse)
+    ) {
+      state.setPendingNavigation(null)
+      return
+    }
     if (
       pending === lastPending &&
       state.activeTranslationId === lastTranslation

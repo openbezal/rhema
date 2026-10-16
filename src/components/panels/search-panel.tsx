@@ -152,12 +152,39 @@ export function SearchPanel() {
     useBibleStore.getState().activeTranslationId
   )
   const handledQuickEditRef = useRef(-1)
+  const quickNavigationRef =
+    useRef<ReturnType<typeof useBibleStore.getState>["pendingNavigation"]>(null)
   const editQuickInput = useCallback((input: string) => {
-    quickOriginTranslationRef.current =
-      useBibleStore.getState().activeTranslationId
+    const state = useBibleStore.getState()
+    if (
+      quickNavigationRef.current &&
+      state.pendingNavigation === quickNavigationRef.current
+    )
+      state.setPendingNavigation(null)
+    quickNavigationRef.current = null
+    quickOriginTranslationRef.current = state.activeTranslationId
     setQuickInput(input)
     setQuickEditRevision((revision) => revision + 1)
   }, [])
+  const queueQuickNavigation = useCallback(
+    (
+      reference: { bookNumber: number; chapter: number; verse: number },
+      present = false
+    ) => {
+      const state = useBibleStore.getState()
+      const pending = {
+        ...reference,
+        ...(present ? { present: true } : {}),
+        typedIntent: {
+          translationId: state.activeTranslationId,
+          initialSelection: state.selectedVerse,
+        },
+      }
+      quickNavigationRef.current = pending
+      state.setPendingNavigation(pending)
+    },
+    []
+  )
   const [showQuickVerses, setShowQuickVerses] = useState(false)
   const [quickVersesList, setQuickVersesList] = useState<Verse[]>([])
   const [quickVerseRequest, setQuickVerseRequest] = useState("")
@@ -485,13 +512,13 @@ export function SearchPanel() {
       return
     const result = getAutocompleteSuggestion(quickInput, state.books)
     if (result.matchedBook && result.chapter && result.verse) {
-      state.setPendingNavigation({
+      queueQuickNavigation({
         bookNumber: result.matchedBook.book_number,
         chapter: result.chapter,
         verse: result.verse,
       })
     }
-  }, [quickInput, quickEditRevision, quickComposing])
+  }, [quickInput, quickEditRevision, quickComposing, queueQuickNavigation])
 
   // Dropdown loading is read-only and has its own cancellable request.
   useEffect(() => {
@@ -564,15 +591,17 @@ export function SearchPanel() {
       if (e.key === "Enter") {
         e.preventDefault()
         const result = autocompleteResult
-        if (result.matchedBook && result.chapter && result.verse) {
-          useBibleStore.getState().setPendingNavigation({
-            bookNumber: result.matchedBook.book_number,
-            chapter: result.chapter,
-            verse: result.verse,
-            present: true,
-          })
-        }
         editQuickInput("")
+        if (result.matchedBook && result.chapter && result.verse) {
+          queueQuickNavigation(
+            {
+              bookNumber: result.matchedBook.book_number,
+              chapter: result.chapter,
+              verse: result.verse,
+            },
+            true
+          )
+        }
         setShowQuickVerses(false)
         return
       }
@@ -592,21 +621,24 @@ export function SearchPanel() {
       shouldShowVerseDropdown,
       editQuickInput,
       quickComposing,
+      queueQuickNavigation,
     ]
   )
 
   const handleQuickVerseClick = useCallback(
     (verse: Verse) => {
-      useBibleStore.getState().setPendingNavigation({
-        bookNumber: verse.book_number,
-        chapter: verse.chapter,
-        verse: verse.verse,
-        present: true,
-      })
       editQuickInput("")
+      queueQuickNavigation(
+        {
+          bookNumber: verse.book_number,
+          chapter: verse.chapter,
+          verse: verse.verse,
+        },
+        true
+      )
       setShowQuickVerses(false)
     },
-    [editQuickInput]
+    [editQuickInput, queueQuickNavigation]
   )
 
   return (
@@ -718,11 +750,15 @@ export function SearchPanel() {
                 onCompositionStart={() => setQuickComposing(true)}
                 onCompositionEnd={(event) => {
                   setQuickComposing(false)
+                  const input = event.currentTarget
                   editQuickInput(
-                    completeTypedReferenceInput(
-                      event.currentTarget.value,
-                      useBibleStore.getState().books
-                    )
+                    input.selectionStart === input.value.length &&
+                      input.selectionEnd === input.value.length
+                      ? completeTypedReferenceInput(
+                          input.value,
+                          useBibleStore.getState().books
+                        )
+                      : input.value
                   )
                 }}
                 onKeyDown={handleQuickKeyDown}

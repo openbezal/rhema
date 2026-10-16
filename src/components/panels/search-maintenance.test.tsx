@@ -11,6 +11,8 @@ vi.mock("@/lib/context-search", () => ({ searchContextWithFuse: mocks.fuse }))
 import { SearchPanel } from "./search-panel"
 import { useBibleStore } from "@/stores/bible-store"
 import { beginOperatorMaintenance } from "@/lib/operator-maintenance"
+import { connectBibleNavigation } from "@/lib/bible-navigation"
+import { useBroadcastStore } from "@/stores/broadcast-store"
 import type { Verse } from "@/types"
 
 const oldVerse: Verse = {
@@ -63,6 +65,13 @@ beforeEach(async () => {
   )
   mocks.invoke.mockReset().mockResolvedValue([])
   mocks.fuse.mockReset().mockResolvedValue([])
+  useBroadcastStore.setState({
+    isLive: false,
+    autoLive: false,
+    liveVerse: null,
+    liveSourceVerse: null,
+    presentationRecovery: "ready",
+  })
   useBibleStore.setState({
     activeTranslationId: 1,
     activeTranslationCode: "KJV",
@@ -427,4 +436,134 @@ it("does not show an old context result while a newer query waits for its deboun
   await type('input[placeholder="Search verse text..."]', "newer query")
   await act(async () => finish([oldResult]))
   expect(useBibleStore.getState().semanticResults).toEqual([])
+})
+
+it("cancels handed-off quick navigation when the input is cleared before loading finishes", async () => {
+  let finish!: (rows: Verse[]) => void
+  mocks.invoke.mockImplementation((command) =>
+    command === "get_chapter"
+      ? new Promise((resolve) => {
+          finish = resolve
+        })
+      : Promise.resolve(undefined)
+  )
+  const stop = connectBibleNavigation()
+  try {
+    await type('[aria-label="Bible reference search"]', "John 4:16")
+    await type('[aria-label="Bible reference search"]', "")
+    await act(async () => finish([{ ...oldVerse, chapter: 4 }]))
+    expect(useBibleStore.getState().selectedVerse).toBe(oldVerse)
+    expect(useBibleStore.getState().currentChapter).toEqual([oldVerse])
+    expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  } finally {
+    stop()
+  }
+})
+it("cancels handed-off quick navigation when a newer manual row is selected", async () => {
+  let finish!: (rows: Verse[]) => void
+  mocks.invoke.mockImplementation((command) =>
+    command === "get_chapter"
+      ? new Promise((resolve) => {
+          finish = resolve
+        })
+      : Promise.resolve(null)
+  )
+  const manual = { ...oldVerse, id: 18, verse: 18 }
+  await act(async () =>
+    useBibleStore.getState().setCurrentChapter([oldVerse, manual])
+  )
+  const stop = connectBibleNavigation()
+  try {
+    await type('[aria-label="Bible reference search"]', "John 3:16")
+    await act(async () =>
+      host.querySelector<HTMLElement>('[aria-label="John 3:18"]')!.click()
+    )
+    await act(async () => finish([oldVerse]))
+    expect(useBibleStore.getState().selectedVerse).toBe(manual)
+    expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  } finally {
+    stop()
+  }
+})
+it("does not restart handed-off typed navigation under a different translation", async () => {
+  mocks.invoke.mockImplementation(() => new Promise(() => {}))
+  const stop = connectBibleNavigation()
+  try {
+    await type('[aria-label="Bible reference search"]', "John 4:16")
+    await act(async () => useBibleStore.setState({ activeTranslationId: 2 }))
+    expect(mocks.invoke).toHaveBeenCalledWith("get_chapter", {
+      translationId: 1,
+      bookNumber: 43,
+      chapter: 4,
+    })
+    expect(mocks.invoke).not.toHaveBeenCalledWith("get_chapter", {
+      translationId: 2,
+      bookNumber: 43,
+      chapter: 4,
+    })
+    expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  } finally {
+    stop()
+  }
+})
+it("retains an unrelated app-owned navigation when quick input is cleared", async () => {
+  await type('[aria-label="Bible reference search"]', "John 3:16")
+  const other = { bookNumber: 43, chapter: 5, verse: 1, follow: true }
+  await act(async () => useBibleStore.getState().setPendingNavigation(other))
+  await type('[aria-label="Bible reference search"]', "")
+  expect(useBibleStore.getState().pendingNavigation).toBe(other)
+})
+it("preserves explicit Enter navigation after it clears the input", async () => {
+  mocks.invoke.mockImplementation(async (command) =>
+    command === "get_chapter" ? [oldVerse] : oldVerse
+  )
+  await type('[aria-label="Bible reference search"]', "John 3:16")
+  const stop = connectBibleNavigation()
+  try {
+    await act(async () =>
+      host
+        .querySelector<HTMLInputElement>(
+          '[aria-label="Bible reference search"]'
+        )!
+        .dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Enter",
+            bubbles: true,
+            cancelable: true,
+          })
+        )
+    )
+    expect(
+      host.querySelector<HTMLInputElement>(
+        '[aria-label="Bible reference search"]'
+      )?.value
+    ).toBe("")
+    expect(useBibleStore.getState().selectedVerse?.verse).toBe(16)
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
+      "John 3:16 (KJV)"
+    )
+    expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  } finally {
+    stop()
+  }
+})
+it("keeps the text and caret when composition commits in the middle", async () => {
+  await addJamesAndJude()
+  const input = host.querySelector<HTMLInputElement>(
+    '[aria-label="Bible reference search"]'
+  )!
+  await act(async () =>
+    input.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true })
+    )
+  )
+  await type('[aria-label="Bible reference search"]', "JA 2 2")
+  await act(async () => {
+    input.setSelectionRange(1, 1)
+    input.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true })
+    )
+  })
+  expect(input.value).toBe("JA 2 2")
+  expect(input.selectionStart).toBe(1)
 })

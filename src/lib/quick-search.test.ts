@@ -100,6 +100,15 @@ describe("unambiguous installed-book resolution", () => {
     const suggestion = getAutocompleteSuggestion("JA 2", books).suggestion
     expect(getTabNavigationResult("JA 2", suggestion)).toBe("James 2:")
   })
+  it("keeps the chapter when Tab accepts a dotted abbreviation", () => {
+    const suggestion = getAutocompleteSuggestion(
+      "Jn. 3",
+      books.map((book) =>
+        book.book_number === 43 ? { ...book, abbreviation: "Jn" } : book
+      )
+    ).suggestion
+    expect(getTabNavigationResult("Jn. 3", suggestion)).toBe("John 3:")
+  })
   it.each([
     ["JA ", "James "],
     ["JA 2 ", "James 2:"],
