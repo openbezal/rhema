@@ -1,0 +1,26 @@
+{
+  "kind": "headless production module HTTPS probe, not installed GUI acceptance",
+  "current_version_unchanged": "0.3.2",
+  "runs": [
+    {
+      "synthetic_current": false,
+      "queried_current": "0.3.2",
+      "elapsed_ms": 1264,
+      "notice": {
+        "status": "current",
+        "current_version": "0.3.2"
+      }
+    },
+    {
+      "synthetic_current": true,
+      "queried_current": "0.0.0",
+      "elapsed_ms": 970,
+      "notice": {
+        "status": "available",
+        "current_version": "0.0.0",
+        "latest_version": "0.3.2",
+        "url": "https://github.com/openbezal/rhema/releases/tag/v0.3.2"
+      }
+    }
+  ]
+}

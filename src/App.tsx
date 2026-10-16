@@ -9,8 +9,10 @@ import { useRemoteControl } from "@/hooks/use-remote-control"
 import { TutorialOverlay } from "@/components/tutorial/tutorial-overlay"
 import { TranslationSelectionDialog } from "@/components/translation-selection-dialog"
 import { Toaster } from "sonner"
+import { useReleaseNotice } from "@/hooks/use-release-notice"
 
 export function App() {
+  useReleaseNotice()
   useKeyboardShortcuts()
   useDetectionSession()
   usePresentationController()

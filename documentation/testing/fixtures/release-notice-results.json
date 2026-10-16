@@ -1,0 +1,63 @@
+{
+  "base": "8cc6f40878a73a24b7c11796bd1e62f3278ac594",
+  "stage": "before-independent-review",
+  "frontend": {
+    "tests": 1053,
+    "files": 92,
+    "focused": 13,
+    "typecheck": "pass",
+    "type_error_probe": "pass",
+    "lint": "pass, zero warnings",
+    "production_build": "pass"
+  },
+  "native": {
+    "default": 496,
+    "no_default": 496,
+    "new_tests": 7,
+    "strict_workspace_all_targets_clippy": "pass",
+    "fmt": "pass",
+    "platform": "macOS"
+  },
+  "real_https_probe": {
+    "published_tag": "v0.3.2",
+    "response_bytes": 20905,
+    "assets": 10,
+    "current": {
+      "input": "0.3.2",
+      "result": "current",
+      "elapsed_ms": 1264
+    },
+    "synthetic_older": {
+      "input": "0.0.0",
+      "result": "available",
+      "latest": "0.3.2",
+      "elapsed_ms": 970
+    },
+    "app_version_changed": false,
+    "release_published": false,
+    "temporary_probe_warnings": "unused cache type/methods only"
+  },
+  "browser": {
+    "size": [
+      1024,
+      600
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "release_and_native_boundaries": "mocked",
+    "warnings": 0,
+    "errors": 0,
+    "observations": "release-notice-browser-observations.json",
+    "first_immediate_toast": "expired during initial cold tab observation; delayed response fixture captured without changing production duration"
+  },
+  "dependencies": {
+    "opener": "2.5.3",
+    "added_lock_packages": 45,
+    "removed_or_upgraded_baseline_packages": 0
+  },
+  "installed_native_acceptance": "pending",
+  "review": "pending",
+  "original_issues_prs": "unchanged"
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "release-notice",
+  "description": "Open verified Rhema release pages from the operator window",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{"url": "https://github.com/openbezal/rhema/releases/tag/*"}]
+    }
+  ]
+}

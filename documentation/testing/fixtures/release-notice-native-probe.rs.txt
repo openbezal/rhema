@@ -1,0 +1,10 @@
+#[path = "../src/release_notice.rs"]
+mod release_notice;
+#[tokio::main]
+async fn main() {
+    for current in [env!("CARGO_PKG_VERSION"), "0.0.0"] {
+        let started = std::time::Instant::now();
+        let result = release_notice::fetch_latest(current).await;
+        println!("{}", serde_json::json!({"synthetic_current":current=="0.0.0","queried_current":current,"elapsed_ms":started.elapsed().as_millis(),"notice":result}));
+    }
+}

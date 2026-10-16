@@ -1,0 +1,603 @@
+{
+  "startup": {
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": null,
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "delay",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": true,
+      "noticeChecks": 1,
+      "noticeClaimed": true,
+      "noticeClaims": 1,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 1,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 1
+    },
+    "toasts": [
+      "Rhema 0.3.3 is availableYou are running 0.3.2.Download"
+    ]
+  },
+  "available": {
+    "dialog": "SettingsConfigure audio, display mode, and API keys.SettingsAudioSpeech RecognitionBibleDetectionsDisplay ModeRemote ControlAPI KeysDiagnosticsHelpDiagnosticsSave a copy of the app's logs to send with a bug report.Time rangeLast hourSave logs…The file records what the app did, including short fragments of speech picked up by transcription. It never contains your API keys.Version0.3.2Log folder/synthetic-qa/logsRhema 0.3.3 is availableDownloadCheck againDownload opens the release page in your browser.Close",
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": null,
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "delay",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": true,
+      "noticeChecks": 1,
+      "noticeClaimed": true,
+      "noticeClaims": 1,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 1
+    },
+    "theme": "dark"
+  },
+  "download": "{\"phase\":\"idle\",\"uiCode\":\"BIUO\",\"selected\":{\"book\":1,\"chapter\":1,\"verse\":1,\"translation\":10},\"pending\":null,\"chapterRows\":[{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10},{\"book\":1,\"chapter\":1,\"translation\":10}],\"uiBookNames\":[],\"uiGain\":1.6,\"frame\":\"Held John 3:16 (BIUO)\",\"onAir\":false,\"queue\":[{\"id\":\"retained-queue\",\"text\":\"Retained Queue verse — Chineke Ọlọ́run\",\"code\":\"BIUO\"}],\"active\":0,\"transcriptCount\":5,\"detectionCount\":2,\"suggestionCount\":0,\"partial\":\"UNFINISHED-QA-PARTIAL\",\"uiAutoLive\":false,\"uiFollow\":false,\"uiThemeCount\":1,\"noticeChecks\":1,\"noticeClaims\":1,\"noticeAvailable\":true,\"noticeClaimed\":true,\"lastOpened\":\"https://github.com/openbezal/rhema/releases/tag/v0.3.3\",\"sessionRevision\":7,\"resetCalls\":0,\"bootstrapReads\":1,\"currentSends\":0,\"mode\":\"delay\",\"revision\":1,\"savedBookNames\":[],\"savedCode\":\"BIUO\",\"savedGain\":1.6,\"nativeActive\":10,\"localKeyRetained\":true,\"unknownRetained\":true,\"themeCount\":1,\"monitor\":2,\"writes\":1,\"reads\":1,\"legacyCalls\":0,\"lastApplyBeforeRevision\":null,\"lastApplyHasLocalKey\":null,\"lastExport\":null,\"nativeTranscribing\":false}",
+  "current": {
+    "dialog": "SettingsConfigure audio, display mode, and API keys.SettingsAudioSpeech RecognitionBibleDetectionsDisplay ModeRemote ControlAPI KeysDiagnosticsHelpDiagnosticsSave a copy of the app's logs to send with a bug report.Time rangeLast hourSave logs…The file records what the app did, including short fragments of speech picked up by transcription. It never contains your API keys.Version0.3.2Log folder/synthetic-qa/logsUp to dateCheck againClose",
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": "https://github.com/openbezal/rhema/releases/tag/v0.3.3",
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "current",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": false,
+      "noticeChecks": 2,
+      "noticeClaimed": true,
+      "noticeClaims": 1,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 1
+    },
+    "toasts": []
+  },
+  "offline": {
+    "dialog": "SettingsConfigure audio, display mode, and API keys.SettingsAudioSpeech RecognitionBibleDetectionsDisplay ModeRemote ControlAPI KeysDiagnosticsHelpDiagnosticsSave a copy of the app's logs to send with a bug report.Time rangeLast hourSave logs…The file records what the app did, including short fragments of speech picked up by transcription. It never contains your API keys.Version0.3.2Log folder/synthetic-qa/logsUpdate check unavailableCheck againClose",
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": "https://github.com/openbezal/rhema/releases/tag/v0.3.3",
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "offline",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": false,
+      "noticeChecks": 3,
+      "noticeClaimed": true,
+      "noticeClaims": 1,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 1
+    },
+    "toasts": []
+  },
+  "openerFailure": {
+    "state": {
+      "active": 0,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 2,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": "https://github.com/openbezal/rhema/releases/tag/v0.3.3",
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "opener-fail",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": true,
+      "noticeChecks": 4,
+      "noticeClaimed": true,
+      "noticeClaims": 1,
+      "onAir": false,
+      "partial": "UNFINISHED-QA-PARTIAL",
+      "pending": null,
+      "phase": "idle",
+      "queue": [
+        {
+          "code": "BIUO",
+          "id": "retained-queue",
+          "text": "Retained Queue verse — Chineke Ọlọ́run"
+        }
+      ],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 5,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 1
+    },
+    "theme": "light",
+    "toasts": [
+      "Could not open the release pageTry Download again from Settings → Diagnostics."
+    ]
+  },
+  "reload": {
+    "state": {
+      "active": null,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 0,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": null,
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "newer",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": true,
+      "noticeChecks": 1,
+      "noticeClaimed": true,
+      "noticeClaims": 1,
+      "onAir": false,
+      "partial": "",
+      "pending": null,
+      "phase": "idle",
+      "queue": [],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 1,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 0,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 0
+    },
+    "toasts": []
+  },
+  "offlineStartup": {
+    "state": {
+      "active": null,
+      "bootstrapReads": 1,
+      "chapterRows": [
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        },
+        {
+          "book": 1,
+          "chapter": 1,
+          "translation": 10
+        }
+      ],
+      "currentSends": 0,
+      "detectionCount": 0,
+      "frame": "Held John 3:16 (BIUO)",
+      "lastApplyBeforeRevision": null,
+      "lastApplyHasLocalKey": null,
+      "lastExport": null,
+      "lastOpened": null,
+      "legacyCalls": 0,
+      "localKeyRetained": true,
+      "mode": "offline",
+      "monitor": 2,
+      "nativeActive": 10,
+      "nativeTranscribing": false,
+      "noticeAvailable": false,
+      "noticeChecks": 1,
+      "noticeClaimed": true,
+      "noticeClaims": 0,
+      "onAir": false,
+      "partial": "",
+      "pending": null,
+      "phase": "idle",
+      "queue": [],
+      "reads": 1,
+      "resetCalls": 0,
+      "revision": 2,
+      "savedBookNames": [],
+      "savedCode": "BIUO",
+      "savedGain": 1.6,
+      "selected": {
+        "book": 1,
+        "chapter": 1,
+        "translation": 10,
+        "verse": 1
+      },
+      "sessionRevision": 7,
+      "suggestionCount": 0,
+      "themeCount": 1,
+      "transcriptCount": 0,
+      "uiAutoLive": false,
+      "uiBookNames": [],
+      "uiCode": "BIUO",
+      "uiFollow": false,
+      "uiGain": 1.6,
+      "uiThemeCount": 1,
+      "unknownRetained": true,
+      "writes": 0
+    },
+    "toasts": []
+  },
+  "consoleMain": [],
+  "consoleDelayed": []
+}

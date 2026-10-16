@@ -4,6 +4,7 @@ mod events;
 mod memstats;
 mod operator_profile;
 mod profile_restore;
+mod release_notice;
 mod session_events;
 mod state;
 mod transcription_session;
@@ -93,6 +94,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
+        .manage(release_notice::ReleaseNoticeRuntime::default())
         .manage(Mutex::new(state::AppState::new()))
         .manage(operator_profile::ProfileRuntime::default())
         .manage(Mutex::new(rhema_detection::DetectionPipeline::new()))
@@ -104,6 +107,8 @@ pub fn run() {
         .manage(Mutex::new(commands::remote::OscRuntime::new()))
         .manage(Mutex::new(commands::remote::HttpRuntime::new()))
         .invoke_handler(tauri::generate_handler![
+            commands::releases::check_release_notice,
+            commands::releases::claim_release_notice,
             commands::preferences::read_bible_preferences,
             commands::profile::read_local_profile,
             commands::profile::write_local_profile,

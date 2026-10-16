@@ -7,6 +7,7 @@ import { appLogDir } from "@tauri-apps/api/path"
 import { save } from "@tauri-apps/plugin-dialog"
 import { writeTextFile } from "@tauri-apps/plugin-fs"
 import { Button } from "@/components/ui/button"
+import { ReleaseNoticeRow } from "./release-notice-row"
 import {
   Select,
   SelectContent,
@@ -25,7 +26,10 @@ const RANGES: { value: string; label: string; minutes: number | null }[] = [
 
 /** `2026-08-19T14-05-33Z` — safe in a filename, sorts chronologically. */
 function fileStamp(): string {
-  return new Date().toISOString().replace(/:/g, "-").replace(/\.\d+Z$/, "Z")
+  return new Date()
+    .toISOString()
+    .replace(/:/g, "-")
+    .replace(/\.\d+Z$/, "Z")
 }
 
 export function DiagnosticsSection() {
@@ -35,8 +39,12 @@ export function DiagnosticsSection() {
   const [logDir, setLogDir] = useState("")
 
   useEffect(() => {
-    void getVersion().then(setVersion).catch(() => {})
-    void appLogDir().then(setLogDir).catch(() => {})
+    void getVersion()
+      .then(setVersion)
+      .catch(() => {})
+    void appLogDir()
+      .then(setLogDir)
+      .catch(() => {})
   }, [])
 
   const handleSave = async () => {
@@ -79,7 +87,10 @@ export function DiagnosticsSection() {
               Time range
             </label>
             <Select value={range} onValueChange={setRange}>
-              <SelectTrigger aria-labelledby="log-range-label" className="w-full">
+              <SelectTrigger
+                aria-labelledby="log-range-label"
+                className="w-full"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -119,11 +130,17 @@ export function DiagnosticsSection() {
             <span className="font-mono text-xs">{version || "—"}</span>
           </div>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="shrink-0 text-xs text-muted-foreground">Log folder</span>
-            <span className="truncate font-mono text-[0.6875rem]" title={logDir}>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              Log folder
+            </span>
+            <span
+              className="truncate font-mono text-[0.6875rem]"
+              title={logDir}
+            >
               {logDir || "—"}
             </span>
           </div>
+          <ReleaseNoticeRow />
         </div>
       </div>
     </div>
