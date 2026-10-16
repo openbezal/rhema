@@ -1,23 +1,35 @@
 import { invoke } from "@tauri-apps/api/core"
 import { useBibleStore } from "@/stores"
 import { presentVerse } from "@/hooks/use-broadcast"
-import { reservePresentationIntent, isPresentationIntentCurrent } from "@/lib/presentation-controller"
+import {
+  reservePresentationIntent,
+  isPresentationIntentCurrent,
+} from "@/lib/presentation-controller"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
+import {
+  isOperatorWorkCurrent,
+  operatorRevision,
+} from "@/lib/operator-maintenance"
 
 // Stable action functions that use getState() instead of closing over the store.
 // This prevents the infinite re-render loop caused by useCallback deps changing every render.
 
 async function loadTranslations() {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
   const translations = await invoke<Translation[]>("list_translations")
-  useBibleStore.getState().setTranslations(translations)
+  if (isOperatorWorkCurrent(epoch))
+    useBibleStore.getState().setTranslations(translations)
   return translations
 }
 
 async function loadBooks(translationId?: number) {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
   const id = translationId ?? useBibleStore.getState().activeTranslationId
   const books = await invoke<Book[]>("list_books", { translationId: id })
-  useBibleStore.getState().setBooks(books)
+  if (isOperatorWorkCurrent(epoch)) useBibleStore.getState().setBooks(books)
   return books
 }
 
@@ -45,8 +57,11 @@ async function loadChapter(
   chapter: number,
   translationId?: number
 ) {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
   const verses = await fetchChapter(bookNumber, chapter, translationId)
-  useBibleStore.getState().setCurrentChapter(verses)
+  if (isOperatorWorkCurrent(epoch))
+    useBibleStore.getState().setCurrentChapter(verses)
   return verses
 }
 
@@ -65,27 +80,29 @@ async function fetchVerse(
   })
 }
 
-async function searchVerses(
-  query: string,
-  limit = 20,
-  translationId?: number
-) {
+async function searchVerses(query: string, limit = 20, translationId?: number) {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
   const id = translationId ?? useBibleStore.getState().activeTranslationId
   const results = await invoke<Verse[]>("search_verses", {
     query,
     translationId: id,
     limit,
   })
-  useBibleStore.getState().setSearchResults(results)
+  if (isOperatorWorkCurrent(epoch))
+    useBibleStore.getState().setSearchResults(results)
   return results
 }
 
 async function semanticSearch(query: string, limit = 10) {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
   const results = await invoke<SemanticSearchResult[]>("semantic_search", {
     query,
     limit,
   })
-  useBibleStore.getState().setSemanticResults(results)
+  if (isOperatorWorkCurrent(epoch))
+    useBibleStore.getState().setSemanticResults(results)
   return results
 }
 
@@ -94,12 +111,15 @@ async function loadCrossReferences(
   chapter: number,
   verse: number
 ) {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return []
   const refs = await invoke<CrossReference[]>("get_cross_references", {
     bookNumber,
     chapter,
     verse,
   })
-  useBibleStore.getState().setCrossReferences(refs)
+  if (isOperatorWorkCurrent(epoch))
+    useBibleStore.getState().setCrossReferences(refs)
   return refs
 }
 
@@ -167,13 +187,21 @@ export async function stepVerse(
   direction: "next" | "prev",
   options?: { present?: boolean; intentOwner?: object }
 ): Promise<void> {
+  const epoch = operatorRevision()
+  if (!isOperatorWorkCurrent(epoch)) return
   // Claim the ticket before anything else. A step that resolves synchronously
   // still has to invalidate a crossing already in flight, or the operator's
   // correction lands and the crossing it replaced arrives afterwards.
   stepSeq += 1
   const ticket = stepSeq
-  const presentationRevision = options?.present ? reservePresentationIntent(options.intentOwner) : undefined
-  const current = () => ticket === stepSeq && (presentationRevision === undefined || isPresentationIntentCurrent(presentationRevision))
+  const presentationRevision = options?.present
+    ? reservePresentationIntent(options.intentOwner)
+    : undefined
+  const current = () =>
+    isOperatorWorkCurrent(epoch) &&
+    ticket === stepSeq &&
+    (presentationRevision === undefined ||
+      isPresentationIntentCurrent(presentationRevision))
 
   const state = useBibleStore.getState()
   const offset = direction === "next" ? 1 : -1
@@ -191,7 +219,8 @@ export async function stepVerse(
         : state.currentChapter[state.currentChapter.length - 1]
     if (!entry) return
     state.selectVerse(entry)
-    if (options?.present) void presentVerse(entry, { intentRevision: presentationRevision })
+    if (options?.present)
+      void presentVerse(entry, { intentRevision: presentationRevision })
     state.requestVerseReveal("nearest")
     return
   }
@@ -202,7 +231,8 @@ export async function stepVerse(
     const loaded = findLoadedVerse(state.currentChapter, target)
     if (loaded) {
       state.selectVerse(loaded)
-      if (options?.present) void presentVerse(loaded, { intentRevision: presentationRevision })
+      if (options?.present)
+        void presentVerse(loaded, { intentRevision: presentationRevision })
       state.requestVerseReveal("nearest")
       return
     }
@@ -213,7 +243,15 @@ export async function stepVerse(
     if (!current()) return
 
     if (cursorChapter.some((v) => v.verse === target.verse)) {
-      useBibleStore.getState().setPendingNavigation({ ...target, present: options?.present, ...(presentationRevision === undefined ? {} : { presentationRevision }) })
+      useBibleStore
+        .getState()
+        .setPendingNavigation({
+          ...target,
+          present: options?.present,
+          ...(presentationRevision === undefined
+            ? {}
+            : { presentationRevision }),
+        })
       return
     }
 
@@ -224,7 +262,8 @@ export async function stepVerse(
     if (!current()) return
     if (crossing.length === 0) return
 
-    const landing = direction === "next" ? crossing[0] : crossing[crossing.length - 1]
+    const landing =
+      direction === "next" ? crossing[0] : crossing[crossing.length - 1]
     useBibleStore.getState().setPendingNavigation({
       bookNumber: cursor.bookNumber,
       chapter: crossingChapter,

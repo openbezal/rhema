@@ -7,8 +7,9 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }))
 
-import { findLoadedVerse, stepVerse } from "./use-bible"
+import { bibleActions, findLoadedVerse, stepVerse } from "./use-bible"
 import { useBibleStore } from "@/stores/bible-store"
+import { beginOperatorMaintenance } from "@/lib/operator-maintenance"
 
 function verse(
   bookNumber: number,
@@ -43,10 +44,96 @@ beforeEach(() => {
   })
 })
 
+describe("Bible action completions across maintenance", () => {
+  const cases = [
+    {
+      field: "currentChapter",
+      run: () => bibleActions.loadChapter(43, 3),
+      response: johnThree,
+    },
+    {
+      field: "books",
+      run: () => bibleActions.loadBooks(),
+      response: [{ book_number: 43, translation_id: 1, name: "Old John" }],
+    },
+    {
+      field: "translations",
+      run: () => bibleActions.loadTranslations(),
+      response: [{ id: 1, abbreviation: "OLD" }],
+    },
+    {
+      field: "searchResults",
+      run: () => bibleActions.searchVerses("old words"),
+      response: johnThree,
+    },
+    {
+      field: "semanticResults",
+      run: () => bibleActions.semanticSearch("old words"),
+      response: [{ verse_ref: "Old John 3:1" }],
+    },
+    {
+      field: "crossReferences",
+      run: () => bibleActions.loadCrossReferences(43, 3, 1),
+      response: [{ book_number: 43, chapter: 3, verse: 1 }],
+    },
+  ] as const
+  for (const phase of ["during", "after"] as const) {
+    for (const item of cases) {
+      it(`retains ${item.field} when old work completes ${phase} maintenance`, async () => {
+        let finish!: (response: unknown) => void
+        mockInvoke.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finish = resolve
+            })
+        )
+        const pending = item.run()
+        const lease = beginOperatorMaintenance()
+        useBibleStore.setState({
+          activeTranslationId: 2,
+          currentChapter: [],
+          books: [],
+          translations: [],
+          searchResults: [],
+          semanticResults: [],
+          crossReferences: [],
+        })
+        const retained = useBibleStore.getState()[item.field]
+        if (phase === "after") lease.release()
+        try {
+          finish(item.response)
+          await pending
+          expect(useBibleStore.getState()[item.field]).toBe(retained)
+        } finally {
+          lease.release()
+        }
+      })
+    }
+  }
+  it("does not navigate when a non-presenting chapter step finishes after maintenance", async () => {
+    useBibleStore.setState({ selectedVerse: johnThree[9] })
+    let finish!: (rows: Verse[]) => void
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    const pending = stepVerse("next")
+    await Promise.resolve()
+    const lease = beginOperatorMaintenance()
+    lease.release()
+    finish([verse(43, 4, 1)])
+    await pending
+    expect(useBibleStore.getState().pendingNavigation).toBeNull()
+  })
+})
+
 describe("findLoadedVerse", () => {
   it("matches on book, chapter and verse together", () => {
     expect(
-      findLoadedVerse(johnThree, { bookNumber: 43, chapter: 3, verse: 7 })?.verse
+      findLoadedVerse(johnThree, { bookNumber: 43, chapter: 3, verse: 7 })
+        ?.verse
     ).toBe(7)
   })
 
@@ -151,7 +238,9 @@ describe("stepVerse across a chapter boundary", () => {
   })
 
   it("does nothing at the end of a book — stepping never crosses into the next book", async () => {
-    const malachiFour = Array.from({ length: 6 }, (_, i) => verse(39, 4, i + 1, "Malachi"))
+    const malachiFour = Array.from({ length: 6 }, (_, i) =>
+      verse(39, 4, i + 1, "Malachi")
+    )
     useBibleStore.setState({
       currentChapter: malachiFour,
       selectedVerse: malachiFour[5], // Malachi 4:6

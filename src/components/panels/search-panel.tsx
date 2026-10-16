@@ -48,6 +48,12 @@ import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
+import {
+  isOperatorMaintenanceActive,
+  isOperatorWorkCurrent,
+  operatorRevision,
+  useOperatorMaintenanceStore,
+} from "@/lib/operator-maintenance"
 
 type SearchTab = "book" | "context"
 
@@ -125,6 +131,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 }
 
 export function SearchPanel() {
+  const maintenancePhase = useOperatorMaintenanceStore((state) => state.phase)
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
   const [selectedBook, setSelectedBook] = useState<Book | null>(() => {
     const state = useBibleStore.getState()
@@ -188,6 +195,7 @@ export function SearchPanel() {
 
   // Load chapter when book + chapter are set
   useEffect(() => {
+    if (isOperatorMaintenanceActive()) return
     if (selectedBookNumber && chapter >= 1) {
       const state = useBibleStore.getState()
       const loaded = state.currentChapter[0]
@@ -200,7 +208,7 @@ export function SearchPanel() {
         return
       bibleActions.loadChapter(selectedBookNumber, chapter).catch(console.error)
     }
-  }, [selectedBookNumber, chapter, activeTranslationId])
+  }, [selectedBookNumber, chapter, activeTranslationId, maintenancePhase])
 
   // The highlight follows the store, not component state, so a remote command
   // or a keyboard shortcut moves it just as a click does. Matching on
@@ -287,10 +295,30 @@ export function SearchPanel() {
   const contextDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contextSearchRequestIdRef = useRef(0)
 
+  useEffect(
+    () =>
+      useOperatorMaintenanceStore.subscribe((state) => {
+        if (state.phase === "idle") return
+        contextSearchRequestIdRef.current += 1
+        if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
+        contextDebounceRef.current = null
+        // Do not replay an old typed intent when the restored catalog arrives.
+        setContextQuery("")
+        setQuickInput("")
+        setShowQuickVerses(false)
+        setQuickVersesList([])
+      }),
+    []
+  )
+
   const runContextSearch = useCallback(
     async (query: string, translationId: number) => {
+      const epoch = operatorRevision()
+      if (!isOperatorWorkCurrent(epoch)) return
       const requestId = ++contextSearchRequestIdRef.current
-      const isStale = () => requestId !== contextSearchRequestIdRef.current
+      const isStale = () =>
+        requestId !== contextSearchRequestIdRef.current ||
+        !isOperatorWorkCurrent(epoch)
 
       // A fully-typed reference ("John 3:16", "jn 3 16", "1 cor 13:4") pins
       // the exact verse at the top; hybrid search still runs beneath it.
@@ -364,12 +392,15 @@ export function SearchPanel() {
 
   const handleContextSearch = useCallback(
     (query: string) => {
+      if (isOperatorMaintenanceActive()) return
       setContextQuery(query)
       if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
       if (query.length >= 5) {
         const translationId = useBibleStore.getState().activeTranslationId
+        const epoch = operatorRevision()
         contextDebounceRef.current = setTimeout(() => {
-          runContextSearch(query, translationId).catch(console.error)
+          if (isOperatorWorkCurrent(epoch))
+            runContextSearch(query, translationId).catch(console.error)
         }, 280)
       } else {
         contextSearchRequestIdRef.current += 1
@@ -380,15 +411,25 @@ export function SearchPanel() {
   )
 
   useEffect(() => {
+    if (isOperatorMaintenanceActive()) return
     if (activeTab !== "context" || contextQuery.length < 5) return
     if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
+    const epoch = operatorRevision()
     contextDebounceRef.current = setTimeout(() => {
-      runContextSearch(contextQuery, activeTranslationId).catch(console.error)
+      if (isOperatorWorkCurrent(epoch))
+        runContextSearch(contextQuery, activeTranslationId).catch(console.error)
     }, 120)
-  }, [activeTranslationId, activeTab, contextQuery, runContextSearch])
+  }, [
+    activeTranslationId,
+    activeTab,
+    contextQuery,
+    runContextSearch,
+    maintenancePhase,
+  ])
 
   useEffect(() => {
     return () => {
+      contextSearchRequestIdRef.current += 1
       if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
     }
   }, [])
@@ -399,11 +440,21 @@ export function SearchPanel() {
     [quickInput, books]
   )
   const quickSuggestion = autocompleteResult.suggestion
-  const quickSuggestionSuffix = getAutocompleteSuffix(quickInput, quickSuggestion)
-  const hasQuickSuggestion = Boolean(quickSuggestion && quickSuggestion !== quickInput && quickSuggestionSuffix !== null)
+  const quickSuggestionSuffix = getAutocompleteSuffix(
+    quickInput,
+    quickSuggestion
+  )
+  const hasQuickSuggestion = Boolean(
+    quickSuggestion &&
+    quickSuggestion !== quickInput &&
+    quickSuggestionSuffix !== null
+  )
 
   // Side effects only: navigation + verse loading
   useEffect(() => {
+    const epoch = operatorRevision()
+    if (!isOperatorWorkCurrent(epoch)) return
+    let cancelled = false
     const result = autocompleteResult
 
     if (result.matchedBook && result.chapter && result.verse) {
@@ -425,12 +476,18 @@ export function SearchPanel() {
         chapter: result.chapter,
       })
         .then((verses) => {
+          if (cancelled || !isOperatorWorkCurrent(epoch)) return
           setQuickVersesList(verses)
           setShowQuickVerses(true)
         })
-        .catch(console.error)
+        .catch((error: unknown) => {
+          if (!cancelled && isOperatorWorkCurrent(epoch)) console.error(error)
+        })
     }
-  }, [autocompleteResult, activeTranslationId])
+    return () => {
+      cancelled = true
+    }
+  }, [autocompleteResult, activeTranslationId, maintenancePhase])
 
   // Derive dropdown visibility: only show when autocomplete stage is chapter/verse
   const shouldShowVerseDropdown =
