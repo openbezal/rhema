@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
   info: vi.fn(),
 }))
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }))
-vi.mock("./presentation-controller", () => ({ presentVerse: mocks.present }))
+vi.mock("./presentation-controller", () => ({
+  presentPrimaryVerse: mocks.present,
+}))
 vi.mock("sonner", () => ({ toast: { info: mocks.info } }))
 const candidate: SuggestionCandidate = {
   book_number: 43,

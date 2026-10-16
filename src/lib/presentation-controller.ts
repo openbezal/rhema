@@ -247,6 +247,16 @@ export async function presentVerse(
   }
 }
 
+/** Normal bilingual presentation; interactive controls finish at primary commit. */
+export function presentPrimaryVerse(verse: Verse): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    void presentVerse(verse, { onCommitted: () => resolve(true) }).then(
+      () => resolve(false),
+      reject
+    )
+  })
+}
+
 /** Cancel unfinished work while retaining the last valid content. */
 export function invalidatePresentation(): void {
   reservedTrace = null

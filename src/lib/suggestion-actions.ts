@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
-import { presentVerse } from "./presentation-controller"
+import { presentPrimaryVerse } from "./presentation-controller"
 import { translationCode } from "./translation-selection"
 import type { SuggestionCandidate } from "./suggestion-history"
 import type { Verse } from "@/types"
@@ -25,7 +25,7 @@ export async function presentSuggestion(
   candidate: SuggestionCandidate
 ): Promise<void> {
   const metadata = sourceTranslation(candidate)
-  await presentVerse({
+  await presentPrimaryVerse({
     id: 0,
     translation_id: metadata.id,
     book_number: candidate.book_number,

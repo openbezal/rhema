@@ -1,5 +1,9 @@
 import { requestOnAir } from "./output-safety"
-import { presentVerse, clearLive } from "./presentation-controller"
+import {
+  presentVerse,
+  presentPrimaryVerse,
+  clearLive,
+} from "./presentation-controller"
 import { stepVerse } from "@/hooks/use-bible"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -35,14 +39,9 @@ async function presentQueueItem(index: number): Promise<boolean> {
   })
   // The primary commit completes this operator action. Optional language text
   // can arrive later without holding Queue selection or other keyboard work.
-  return new Promise<boolean>((resolve) => {
-    void presentVerse(item.verse, { onCommitted: () => resolve(true) }).then(
-      () => resolve(false),
-      (error: unknown) => {
-        console.warn("[remote-actions] presentQueueItem failed:", error)
-        resolve(false)
-      }
-    )
+  return presentPrimaryVerse(item.verse).catch((error: unknown) => {
+    console.warn("[remote-actions] presentQueueItem failed:", error)
+    return false
   })
 }
 
@@ -127,7 +126,7 @@ export const operatorActions = {
     ) {
       const selected = useBibleStore.getState().selectedVerse
       if (selected)
-        await presentVerse(selected).catch((error) =>
+        await presentPrimaryVerse(selected).catch((error) =>
           console.warn("[remote-actions] on-air preview failed:", error)
         )
     }
