@@ -5,6 +5,7 @@
  * Run: bun run data/download-sources.ts
  */
 
+import { ensureLocalBibleSource, LOCAL_BIBLE_SOURCES } from "./lib/local-bible-source"
 import { mkdir, rm } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
@@ -137,6 +138,10 @@ async function main() {
   await downloadSourcesZip()
   console.log("\n📖 Verifying the pinned Yoruba source...\n")
   await ensureYorubaSource(SOURCES_DIR)
+  for (const spec of LOCAL_BIBLE_SOURCES) {
+    console.log(`  Verifying ${spec.code}: ${spec.title}`)
+    await ensureLocalBibleSource(SOURCES_DIR, spec)
+  }
 
   console.log("\n🔗 Downloading cross-references...\n")
   await downloadCrossRefs()

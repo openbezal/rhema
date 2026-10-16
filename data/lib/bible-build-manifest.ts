@@ -13,9 +13,10 @@ function optionalHash(path: string): string | null {
 }
 export function createBibleBuildManifest(directory: string, translations: TranslationInput[]) {
   return {
-    version: 2,
+    version: 3,
     schemaSha256: hash(readFileSync(new URL("../schema.sql", import.meta.url))),
     sourceSpecificationSha256: hash(readFileSync(new URL("../yoruba-source.json", import.meta.url))),
+    localSourceSpecificationSha256: hash(readFileSync(new URL("../local-bible-sources.json", import.meta.url))),
     translations: translations.flatMap((translation) => {
       const sha256 = optionalHash(join(directory, "sources", translation.file))
       return sha256 ? [{ ...translation, sha256 }] : []

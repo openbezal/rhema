@@ -4,6 +4,8 @@
  * Prereq: bun run data/download-sources.ts
  */
 
+import { LOCAL_BIBLE_SOURCES, sha256 } from "./lib/local-bible-source"
+import { validateBibleCorpus, type BibleSource } from "./convert-bible-vpl"
 import { Database } from "bun:sqlite"
 import { readFileSync, renameSync, rmSync } from "node:fs"
 import { join } from "node:path"
@@ -523,6 +525,7 @@ export const TRANSLATIONS_META: Array<{
     file: "OYCB.json", abbreviation: "OYCB", title: "Biblica® Open Yoruba Contemporary Bible™",
     language: "yo", license: "CC-BY-SA-4.0; Copyright © 2009, 2017 Biblica, Inc.",
   },
+  ...LOCAL_BIBLE_SOURCES.map((spec) => ({ file: `${spec.code}.json`, abbreviation: spec.code, title: spec.title, language: spec.language, license: spec.license })),
 
 ]
 
@@ -568,6 +571,11 @@ function populateDatabase(db: Database) {
     }
 
     const data: ScrollmapperJSON = JSON.parse(raw)
+    const pinned = LOCAL_BIBLE_SOURCES.find((spec) => spec.code === meta.abbreviation)
+    if (pinned) {
+      if (sha256(raw) !== pinned.jsonSha256) throw new Error(`${pinned.code} JSON differs from the reviewed source; rerun download:bible-data`)
+      validateBibleCorpus(data as BibleSource, pinned.bookVerseCounts)
+    }
 
     db.exec("BEGIN TRANSACTION")
 
@@ -607,7 +615,7 @@ function populateDatabase(db: Database) {
         for (const verse of chapter.verses) {
           if (!Number.isInteger(chapter.chapter) || chapter.chapter < 1 ||
               !Number.isInteger(verse.verse) || verse.verse < 1 || typeof verse.text !== "string" ||
-              (meta.abbreviation === "OYCB" && !verse.text.trim())) {
+              ((meta.abbreviation === "OYCB" || pinned) && !verse.text.trim())) {
             throw new Error(`Invalid verse coordinates or empty text in ${meta.file}`)
           }
           insertVerse.run(

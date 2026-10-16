@@ -22,6 +22,16 @@ function query(directory: string, sql: string) {
 const source = { translation: { abbreviation: "KJV" }, books: [{ book_number: 43, name: "John", chapters: [{ chapter: 3, verses: [{ verse: 16, text: "Synthetic fixture text" }] }] }] }
 
 describe("Bible database upgrades", () => {
+  it.each(["BSRK", "BIUO"])("rejects unreviewed %s corpus without replacing a working database", async (code) => {
+    const directory = await fixture()
+    await writeFile(join(directory, "sources", "KJV.json"), JSON.stringify(source))
+    build(directory)
+    const before = await readFile(join(directory, "rhema.db"))
+    await writeFile(join(directory, "sources", `${code}.json`), JSON.stringify(source))
+    expect(() => build(directory)).toThrow()
+    expect(await readFile(join(directory, "rhema.db"))).toEqual(before)
+  })
+
   it("uses canonical source book numbers instead of a partial array position", async () => {
     const directory = await fixture()
     await writeFile(join(directory, "sources", "KJV.json"), JSON.stringify(source))
