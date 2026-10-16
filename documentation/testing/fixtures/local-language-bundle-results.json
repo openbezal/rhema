@@ -1,0 +1,70 @@
+{
+  "scope": "macOS Apple Silicon ad-hoc debug app bundle resource verification; app was not launched; no native UI or Windows/Linux package acceptance claimed.",
+  "identifier": "org.openbezal.rhema.qa.local-languages",
+  "binarySha256": "b8c39325bdce8649f74c8900c2f5c7be6eec54c661796e8d3bd4e7dc646cc0e9",
+  "resources": [
+    {
+      "path": "rhema.db",
+      "bytes": 93462528,
+      "sha256": "13591cb4107deaf98043fe36cfceccd384eff761705fe7ee76ea08efd4d120ea"
+    },
+    {
+      "path": "licenses/OYCB-NOTICE.txt",
+      "bytes": 5805,
+      "sha256": "4532028cb00a399f94d16bdead076021abd5e10f5b90b4f880a814b1436740dd"
+    },
+    {
+      "path": "licenses/OYCB-about.html",
+      "bytes": 6724,
+      "sha256": "734878c78418c57309c9d88f2751bae051a4f8a0a0adc043415697c5ad874c9a"
+    },
+    {
+      "path": "licenses/OYCB-source.json",
+      "bytes": 770,
+      "sha256": "b59eeb5653572dc8b098321186e8a303cc1daf9da59a9e1a3b791b356ad062ec"
+    },
+    {
+      "path": "licenses/BSRK-NOTICE.txt",
+      "bytes": 5673,
+      "sha256": "f3aacf1af69ab38728fb6dd68cca5abc402076ce0a16470c474b5d238449bfec"
+    },
+    {
+      "path": "licenses/BSRK-about.html",
+      "bytes": 6287,
+      "sha256": "86396fb3432a9d0820a6da0a11ab7d866f4bed4b72c210dd0c5a182cbb7bf78f"
+    },
+    {
+      "path": "licenses/BIUO-NOTICE.txt",
+      "bytes": 4111,
+      "sha256": "81bf615a21a53fabe5912f2bf54581587adf3bf1730e1e6b03728440980ca18d"
+    },
+    {
+      "path": "licenses/BIUO-about.html",
+      "bytes": 4565,
+      "sha256": "08d7a18c6d6af7906ae62f83fc5224a28eca2e9ac7c6b3007907187444fe6dfb"
+    },
+    {
+      "path": "licenses/local-bible-sources.json",
+      "bytes": 3485,
+      "sha256": "d9896208e1a30ff5ef20e19490cd5b0519d655afbcbf416c822fd830e986ac74"
+    }
+  ],
+  "installedDatabaseEditions": [
+    [
+      "OYCB",
+      66,
+      31087
+    ],
+    [
+      "BSRK",
+      66,
+      31087
+    ],
+    [
+      "BIUO",
+      66,
+      31103
+    ]
+  ],
+  "qaFixtureAbsent": true
+}

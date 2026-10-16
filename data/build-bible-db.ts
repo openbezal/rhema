@@ -4,13 +4,30 @@
  * Prereq: bun run data/download-sources.ts
  */
 
+import { LOCAL_BIBLE_SOURCES, sha256 } from "./lib/local-bible-source"
+import { validateBibleCorpus, type BibleSource } from "./convert-bible-vpl"
 import { Database } from "bun:sqlite"
-import { readFileSync, rmSync } from "node:fs"
+import { readFileSync, renameSync, rmSync } from "node:fs"
 import { join } from "node:path"
+import { randomUUID } from "node:crypto"
+import { createBibleBuildManifest } from "./lib/bible-build-manifest"
+import { BIBLE_CANON } from "./lib/bible-canon"
 
-const DATA_DIR = import.meta.dir
+const CANONICAL_BOOK_NUMBERS = new Map<string, number>(
+  BIBLE_CANON.map(([, name], index) => [name.toLowerCase(), index + 1]),
+)
+
+function canonicalBookNumber(name: string): number | undefined {
+  const normalized = name.trim().toLowerCase().replace(/\s+/g, " ")
+    .replace(/^(iii|ii|i) /, (_, roman: string) => `${({ i: 1, ii: 2, iii: 3 } as Record<string, number>)[roman]} `)
+  return CANONICAL_BOOK_NUMBERS.get(normalized === "revelation of john" ? "revelation" : normalized)
+}
+
+const directoryIndex = process.argv.indexOf("--data-dir")
+const DATA_DIR = directoryIndex >= 0 ? process.argv[directoryIndex + 1] : import.meta.dir
+if (!DATA_DIR) throw new Error("--data-dir requires a directory")
 const DB_PATH = join(DATA_DIR, "rhema.db")
-const SCHEMA_PATH = join(DATA_DIR, "schema.sql")
+const SCHEMA_PATH = join(import.meta.dir, "schema.sql")
 const SOURCES_DIR = join(DATA_DIR, "sources")
 const CROSS_REFS_PATH = join(DATA_DIR, "cross-refs", "cross_references.txt")
 
@@ -158,6 +175,7 @@ interface ScrollmapperJSON {
   translation: { name?: string; abbreviation?: string }
   books: Array<{
     name: string
+    book_number?: number
     chapters: Array<{
       chapter: number
       verses: Array<{ verse: number; text: string }>
@@ -165,7 +183,7 @@ interface ScrollmapperJSON {
   }>
 }
 
-const TRANSLATIONS_META: Array<{
+export const TRANSLATIONS_META: Array<{
   file: string
   abbreviation: string
   title: string
@@ -503,16 +521,15 @@ const TRANSLATIONS_META: Array<{
   //   language: "af",
   //   license: "Unknown",
   // },
+  {
+    file: "OYCB.json", abbreviation: "OYCB", title: "Biblica® Open Yoruba Contemporary Bible™",
+    language: "yo", license: "CC-BY-SA-4.0; Copyright © 2009, 2017 Biblica, Inc.",
+  },
+  ...LOCAL_BIBLE_SOURCES.map((spec) => ({ file: `${spec.code}.json`, abbreviation: spec.code, title: spec.title, language: spec.language, license: spec.license })),
+
 ]
 
-function main() {
-  console.log("\n🔨 Building rhema.db...\n")
-
-  // Remove existing DB
-  rmSync(DB_PATH, { force: true })
-
-  const db = new Database(DB_PATH, { create: true })
-
+function populateDatabase(db: Database) {
   // Create schema — execute each statement individually for FTS5 compatibility
   const schema = readFileSync(SCHEMA_PATH, "utf-8")
   const statements = schema
@@ -530,7 +547,7 @@ function main() {
 
   // Prepare insert statements
   const insertTranslation = db.prepare(
-    "INSERT INTO translations (abbreviation, title, language, license) VALUES (?, ?, ?, ?)"
+    "INSERT INTO translations (abbreviation, title, language, license, is_copyrighted) VALUES (?, ?, ?, ?, ?)"
   )
   const insertBook = db.prepare(
     "INSERT INTO books (translation_id, book_number, name, abbreviation, testament) VALUES (?, ?, ?, ?, ?)"
@@ -547,12 +564,18 @@ function main() {
     let raw: string
     try {
       raw = readFileSync(filePath, "utf-8")
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
       console.log(`  ⏭ ${meta.file} not found, skipping`)
       continue
     }
 
     const data: ScrollmapperJSON = JSON.parse(raw)
+    const pinned = LOCAL_BIBLE_SOURCES.find((spec) => spec.code === meta.abbreviation)
+    if (pinned) {
+      if (sha256(raw) !== pinned.jsonSha256) throw new Error(`${pinned.code} JSON differs from the reviewed source; rerun download:bible-data`)
+      validateBibleCorpus(data as BibleSource, pinned.bookVerseCounts)
+    }
 
     db.exec("BEGIN TRANSACTION")
 
@@ -561,7 +584,8 @@ function main() {
       meta.abbreviation,
       meta.title,
       meta.language,
-      meta.license
+      meta.license,
+      meta.license.toLowerCase() === "public domain" ? 0 : 1
     )
     const translationId = db
       .query("SELECT last_insert_rowid() as id")
@@ -571,9 +595,13 @@ function main() {
     let verseCount = 0
 
     // Insert books and verses
-    for (let bookIdx = 0; bookIdx < data.books.length; bookIdx++) {
-      const book = data.books[bookIdx]
-      const bookNumber = bookIdx + 1
+    const bookNumbers = new Set<number>()
+    for (const book of data.books) {
+      const bookNumber = book.book_number ?? canonicalBookNumber(book.name)
+      if (bookNumber === undefined || !Number.isInteger(bookNumber) || bookNumber < 1 || bookNumber > 66 || bookNumbers.has(bookNumber)) {
+        throw new Error(`Invalid or duplicate canonical book number in ${meta.file}`)
+      }
+      bookNumbers.add(bookNumber)
       const abbrev = BOOK_ABBREVS[book.name] || book.name.substring(0, 4)
       const testament = bookNumber <= 39 ? "OT" : "NT"
 
@@ -585,6 +613,11 @@ function main() {
 
       for (const chapter of book.chapters) {
         for (const verse of chapter.verses) {
+          if (!Number.isInteger(chapter.chapter) || chapter.chapter < 1 ||
+              !Number.isInteger(verse.verse) || verse.verse < 1 || typeof verse.text !== "string" ||
+              ((meta.abbreviation === "OYCB" || pinned) && !verse.text.trim())) {
+            throw new Error(`Invalid verse coordinates or empty text in ${meta.file}`)
+          }
           insertVerse.run(
             tId,
             bookId,
@@ -691,13 +724,43 @@ function main() {
     .query("SELECT COUNT(*) as c FROM cross_references")
     .get() as { c: number }
 
-  console.log(`\n✅ rhema.db built successfully!`)
+  console.log(`\nReplacement Bible database prepared:`)
   console.log(`   ${transTotal.c} translations`)
   console.log(`   ${verseTotal.c.toLocaleString()} verses`)
   console.log(`   ${crossTotal.c.toLocaleString()} cross-references`)
   console.log(`   📁 ${DB_PATH}\n`)
 
-  db.close()
 }
 
-main()
+export function currentBibleManifest(directory = DATA_DIR) {
+  return createBibleBuildManifest(directory, TRANSLATIONS_META)
+}
+
+export function buildBibleDatabase(): void {
+  console.log("\n🔨 Building replacement rhema.db...\n")
+  const stagingPath = join(DATA_DIR, `.rhema-build-${randomUUID()}.db`)
+  const db = new Database(stagingPath, { create: true })
+  let closed = false
+  try {
+    const manifest = currentBibleManifest()
+    populateDatabase(db)
+    const count = db.query("SELECT COUNT(*) AS count FROM verses").get() as { count: number }
+    if (count.count === 0) throw new Error("No Bible verses were imported")
+    const integrity = db.query("PRAGMA integrity_check").get() as Record<string, unknown>
+    if (Object.values(integrity)[0] !== "ok" || db.query("PRAGMA foreign_key_check").all().length) {
+      throw new Error("Replacement Bible database failed validation")
+    }
+    db.exec("CREATE TABLE rhema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    db.query("INSERT INTO rhema_metadata (key, value) VALUES (?, ?)").run("source_manifest", JSON.stringify(manifest))
+    // Release every prepared statement before Windows can rename the file.
+    db.close(true)
+    closed = true
+    renameSync(stagingPath, DB_PATH)
+    console.log(`✅ Bible database installed at ${DB_PATH}`)
+  } finally {
+    if (!closed) db.close(true)
+    rmSync(stagingPath, { force: true })
+  }
+}
+
+if (import.meta.main) buildBibleDatabase()

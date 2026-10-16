@@ -27,7 +27,17 @@
     }
   },
   "bundle": {
-    "resources": { "../data/rhema.db": "rhema.db" },
+    "resources": {
+      "../data/rhema.db": "rhema.db",
+      "../data/licenses/OYCB-NOTICE.txt": "licenses/OYCB-NOTICE.txt",
+      "../data/licenses/OYCB-about.html": "licenses/OYCB-about.html",
+      "../data/yoruba-source.json": "licenses/OYCB-source.json",
+      "../data/licenses/BSRK-NOTICE.txt": "licenses/BSRK-NOTICE.txt",
+      "../data/licenses/BSRK-about.html": "licenses/BSRK-about.html",
+      "../data/licenses/BIUO-NOTICE.txt": "licenses/BIUO-NOTICE.txt",
+      "../data/licenses/BIUO-about.html": "licenses/BIUO-about.html",
+      "../data/local-bible-sources.json": "licenses/local-bible-sources.json"
+    },
     "active": true,
     "targets": "all",
     "macOS": {

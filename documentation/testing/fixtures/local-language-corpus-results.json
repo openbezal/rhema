@@ -1,0 +1,133 @@
+{
+  "testedAt": "2026-10-16T00:05:43.417Z",
+  "scope": "Isolated real database built from pinned official Hausa/Igbo/Yoruba archives and existing legacy source inputs; no cross-reference file provisioned. Not a native/package acceptance result.",
+  "schemaIntegrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "foreignKeys": [],
+  "databaseSha256": "13591cb4107deaf98043fe36cfceccd384eff761705fe7ee76ea08efd4d120ea",
+  "catalog": [
+    {
+      "id": 1,
+      "abbreviation": "AMP",
+      "language": "en"
+    },
+    {
+      "id": 2,
+      "abbreviation": "ESV",
+      "language": "en"
+    },
+    {
+      "id": 3,
+      "abbreviation": "KJV",
+      "language": "en"
+    },
+    {
+      "id": 4,
+      "abbreviation": "NASB",
+      "language": "en"
+    },
+    {
+      "id": 5,
+      "abbreviation": "NIV",
+      "language": "en"
+    },
+    {
+      "id": 6,
+      "abbreviation": "NKJV",
+      "language": "en"
+    },
+    {
+      "id": 7,
+      "abbreviation": "NLT",
+      "language": "en"
+    },
+    {
+      "id": 8,
+      "abbreviation": "OYCB",
+      "language": "yo"
+    },
+    {
+      "id": 9,
+      "abbreviation": "BSRK",
+      "language": "ha"
+    },
+    {
+      "id": 10,
+      "abbreviation": "BIUO",
+      "language": "ig"
+    }
+  ],
+  "editions": [
+    {
+      "code": "BSRK",
+      "id": 9,
+      "title": "Biblica® Open Hausa Contemporary Bible™",
+      "language": "ha",
+      "license": "CC-BY-SA-4.0",
+      "books": 66,
+      "verses": 31087,
+      "chapters": {
+        "count": 1189
+      },
+      "firstVerse": {
+        "text": "A farko-farko, Allah ya halicci sama da ƙasa."
+      },
+      "omittedMatthew1721": {
+        "count": 0
+      },
+      "empty": {
+        "count": 0
+      }
+    },
+    {
+      "code": "BIUO",
+      "id": 10,
+      "title": "Biblica® Open Igbo Contemporary Bible™",
+      "language": "ig",
+      "license": "CC-BY-SA-4.0",
+      "books": 66,
+      "verses": 31103,
+      "chapters": {
+        "count": 1189
+      },
+      "firstVerse": {
+        "text": "Na mmalite Chineke kere eluigwe na ụwa."
+      },
+      "omittedMatthew1721": {
+        "count": 1
+      },
+      "empty": {
+        "count": 0
+      }
+    }
+  ],
+  "igboLead": {
+    "apiUrl": "https://bible.helloao.org/api/ibo_bib/complete.json",
+    "apiSha256": "74c3cff8a6e7d11b184e169f09fd48298cc1a84af715ad95dfbb9ef7ad191361",
+    "apiVerses": 31103,
+    "officialVerses": 31103,
+    "missingCoordinates": 0,
+    "extraCoordinates": 0,
+    "usfmToVplBookCodes": {
+      "SNG": "SOL",
+      "EZK": "EZE",
+      "JOL": "JOE",
+      "NAM": "NAH",
+      "MRK": "MAR",
+      "JHN": "JOH",
+      "PHP": "PHI",
+      "JAS": "JAM",
+      "1JN": "1JO",
+      "2JN": "2JO",
+      "3JN": "3JO"
+    },
+    "plainVerses": 19963,
+    "plainExact": 19320,
+    "plainWhitespaceNormalizedEqual": 19940,
+    "structuredVerses": 11140,
+    "interpretation": "The supplied lead identifies the same official edition with matching canonical coordinates. Markup/whitespace are not byte-identical. Production ingests only the pinned official VPL without normalizing Scripture wording."
+  }
+}

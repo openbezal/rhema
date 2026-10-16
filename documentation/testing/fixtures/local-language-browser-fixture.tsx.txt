@@ -1,0 +1,4 @@
+import { createRoot } from "react-dom/client"
+import { BibleDataNotices } from "./src/components/bible-data-notices"
+import "./src/index.css"
+createRoot(document.getElementById("root")!).render(<main className="dark min-h-screen bg-background p-6 text-foreground"><p className="mb-4 text-xs text-amber-300">QA · actual production BibleDataNotices · no native app or database calls</p><h1 className="mb-2 text-xl font-semibold">Local Bible data notices</h1><p className="mb-6 max-w-xl text-sm text-muted-foreground">Yoruba · OYCB / Hausa · BSRK / Igbo · BIUO</p><BibleDataNotices /></main>)

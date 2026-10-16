@@ -26,6 +26,7 @@ dist-ssr
 *.sw?
 
 # Build artifacts
+src-tauri/target
 build
 data/rhema.db
 data/sources/*.json
