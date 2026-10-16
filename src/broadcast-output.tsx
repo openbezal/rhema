@@ -1,243 +1,207 @@
 import { createRoot } from "react-dom/client"
-import { useRef, useEffect, useCallback } from "react"
+import { useRef, useEffect } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { onThemeFontsLoaded } from "@/lib/verse-renderer"
 import { renderPresentationFrame } from "@/lib/presentation-frame"
+import { LatestFrameDelivery, type CapturedFrame } from "@/lib/frame-delivery"
 import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
+import { markBroadcastTrace, type BroadcastTrace } from "@/lib/broadcast-trace"
 import { normalizeTheme } from "@/lib/theme-migrations"
 import "./broadcast-fonts.css"
-import type { BroadcastTheme, VerseRenderData, OutputClearMode } from "@/types/broadcast"
-import type { NdiConfigEventPayload, NdiFrameRequest } from "@/types"
+import type {
+  BroadcastTheme,
+  VerseRenderData,
+  OutputClearMode,
+} from "@/types/broadcast"
+import type {
+  NdiConfigEventPayload,
+  NdiStatus,
+  NdiRendererLease,
+} from "@/types/ndi"
 
-/** Convert Uint8Array/Uint8ClampedArray to base64 using Function.apply (avoids spread stack overflow) */
-function uint8ToBase64(bytes: Uint8Array | Uint8ClampedArray): string {
-  const CHUNK = 0x8000 // 32KB — safe for Function.apply
-  const parts: string[] = []
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    parts.push(
-      String.fromCharCode.apply(
-        null,
-        bytes.subarray(i, i + CHUNK) as unknown as number[],
-      ),
-    )
-  }
-  return btoa(parts.join(""))
-}
-
-/** Read output ID from URL query param (?output=main or ?output=alt). Defaults to "main". */
-const OUTPUT_ID = new URLSearchParams(window.location.search).get("output") ?? "main"
-
+const OUTPUT_ID =
+  new URLSearchParams(window.location.search).get("output") ?? "main"
 interface BroadcastPayload {
   theme: BroadcastTheme
   verse: VerseRenderData | null
   clearMode?: OutputClearMode
+  trace?: BroadcastTrace
 }
 
 export function BroadcastCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const latestData = useRef<BroadcastPayload | null>(null)
-  const ndiConfigRef = useRef<NdiConfigEventPayload>({
-    active: false,
-    fps: 24,
-    width: 1920,
-    height: 1080,
-  })
-  const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
-  const lastPushRef = useRef(0)
-  const pushingRef = useRef(false)
-  const pushNdiBurstRef = useRef<(() => void) | null>(null)
-
-  const logDebug = useCallback((message: string, meta?: unknown) => {
-    if (!import.meta.env.DEV) return
-    if (meta === undefined) {
-      console.debug(`[broadcast-output] ${message}`)
-      return
+  useEffect(() => {
+    let disposed = false
+    let negotiation = 0
+    let renderRevision = 0
+    let latest: BroadcastPayload | null = null
+    let config: NdiRendererLease | null = null
+    let scaled: HTMLCanvasElement | null = null
+    let renderedTrace:
+      (BroadcastTrace & { renderedEpochMs: number }) | undefined
+    const canvas = canvasRef.current!
+    canvas.width = 1920
+    canvas.height = 1080
+    const delivery = new LatestFrameDelivery(
+      async (frame) => {
+        await invoke("push_ndi_frame", frame.pixels, {
+          headers: {
+            "x-rhema-output": OUTPUT_ID,
+            "x-rhema-lease": frame.lease,
+            "x-rhema-revision": String(frame.revision),
+            "x-rhema-width": String(frame.width),
+            "x-rhema-height": String(frame.height),
+            ...(frame.trace
+              ? {
+                  "x-rhema-trace": frame.trace.id,
+                  "x-rhema-accepted-ms": String(frame.trace.acceptedEpochMs),
+                  "x-rhema-rendered-ms": String(frame.trace.renderedEpochMs),
+                }
+              : {}),
+          },
+        })
+      },
+      (error) =>
+        console.warn("[broadcast-output] frame submission failed", error)
+    )
+    function capture(): CapturedFrame {
+      if (!config || disposed) throw new Error("output renderer is inactive")
+      let source = canvas
+      if (canvas.width !== config.width || canvas.height !== config.height) {
+        scaled ??= document.createElement("canvas")
+        // Reset the bitmap before drawing, including a transparent terminal frame.
+        scaled.width = config.width
+        scaled.height = config.height
+        const ctx = scaled.getContext("2d")
+        if (!ctx) throw new Error("could not create scaled output context")
+        ctx.drawImage(canvas, 0, 0, config.width, config.height)
+        source = scaled
+      }
+      const ctx = source.getContext("2d")
+      if (!ctx) throw new Error("could not read output context")
+      const pixels = ctx.getImageData(0, 0, source.width, source.height).data
+      return {
+        trace: renderedTrace,
+        width: source.width,
+        height: source.height,
+        pixels: new Uint8Array(
+          pixels.buffer,
+          pixels.byteOffset,
+          pixels.byteLength
+        ),
+      }
     }
-    console.debug(`[broadcast-output] ${message}`, meta)
-  }, [])
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    const data = latestData.current
-    if (!data) {
-      // Black screen when no data
-      ctx.fillStyle = "#000"
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      return
-    }
-
-    const { theme, verse } = data
-    canvas.width = theme.resolution.width
-    canvas.height = theme.resolution.height
-    renderPresentationFrame(ctx, theme, verse, data.clearMode ?? "background", {
-      scale: 1,
-      imageCache: themeImageCache(),
-    })
-  }, [])
-
-  // Redraw once a theme's images land. The burst matters: without it NDI
-  // receivers keep the flat fallback frame until the 2s keepalive fires.
-  const preloadThemeAssets = useCallback((theme: BroadcastTheme) => {
-    preloadThemeImages(theme, () => {
-      logDebug("Theme images loaded")
-      draw()
-      pushNdiBurstRef.current?.()
-    })
-  }, [draw, logDebug])
-
-  const pushNdiFrame = useCallback(async () => {
-    if (!ndiConfigRef.current.active) return
-    if (pushingRef.current) return // back-pressure: skip if already pushing
-    pushingRef.current = true
-
-    try {
-      const canvas = canvasRef.current
-      if (!canvas) return
+    function draw() {
+      if (disposed) return
       const ctx = canvas.getContext("2d")
       if (!ctx) return
-
-      const targetWidth = ndiConfigRef.current.width
-      const targetHeight = ndiConfigRef.current.height
-
-      let sourceCtx = ctx
-      let sourceWidth = canvas.width
-      let sourceHeight = canvas.height
-
-      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-        const ndiCanvas = ndiCanvasRef.current ?? document.createElement("canvas")
-        ndiCanvas.width = targetWidth
-        ndiCanvas.height = targetHeight
-        const ndiCtx = ndiCanvas.getContext("2d")
-        if (!ndiCtx) return
-        ndiCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight)
-        ndiCanvasRef.current = ndiCanvas
-        sourceCtx = ndiCtx
-        sourceWidth = targetWidth
-        sourceHeight = targetHeight
+      if (!latest) {
+        ctx.fillStyle = "#000000"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      } else {
+        canvas.width = latest.theme.resolution.width
+        canvas.height = latest.theme.resolution.height
+        renderPresentationFrame(
+          ctx,
+          latest.theme,
+          latest.verse,
+          latest.clearMode ?? "background",
+          { scale: 1, imageCache: themeImageCache() }
+        )
       }
-
-      const imageData = sourceCtx.getImageData(0, 0, sourceWidth, sourceHeight)
-      const rgbaBase64 = uint8ToBase64(imageData.data)
-
-      const request: NdiFrameRequest = {
-        outputId: OUTPUT_ID,
-        width: sourceWidth,
-        height: sourceHeight,
-        rgbaBase64,
+      renderedTrace = latest?.trace
+        ? { ...latest.trace, renderedEpochMs: Date.now() }
+        : undefined
+      if (renderedTrace)
+        markBroadcastTrace(renderedTrace, "canvas_rendered", OUTPUT_ID)
+      if (latest) delivery.request(++renderRevision, capture)
+    }
+    async function connect() {
+      const ticket = ++negotiation
+      config = null
+      delivery.stop()
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const status = await invoke<NdiStatus | null>("get_ndi_status", {
+            outputId: OUTPUT_ID,
+          })
+          if (disposed || ticket !== negotiation) return
+          if (!status?.active) return
+          if (status.frameProtocol !== 1)
+            throw new Error("unsupported native frame protocol")
+          const lease = await invoke<NdiRendererLease>("begin_ndi_renderer", {
+            outputId: OUTPUT_ID,
+            generation: status.generation,
+            expectedEpoch: status.stats.epoch,
+          })
+          if (disposed || ticket !== negotiation) return
+          config = lease
+          renderRevision = 0
+          delivery.activate(lease.lease)
+          draw()
+          return
+        } catch (error) {
+          if (disposed || ticket !== negotiation) return
+          if (attempt === 2)
+            console.warn(
+              "[broadcast-output] could not negotiate native frame delivery",
+              error
+            )
+        }
       }
-
-      await invoke("push_ndi_frame", { request })
-      lastPushRef.current = Date.now()
-    } catch (error) {
-      console.warn("[broadcast-output] push_ndi_frame failed", error)
-    } finally {
-      pushingRef.current = false
+    }
+    const currentWindow = getCurrentWebviewWindow()
+    const subscriptions = [
+      currentWindow.listen<BroadcastPayload>(
+        "broadcast:verse-update",
+        (event) => {
+          if (disposed) return
+          latest = {
+            ...event.payload,
+            theme: normalizeTheme(event.payload.theme),
+          }
+          preloadThemeImages(latest.theme, () => draw())
+          draw()
+        }
+      ),
+      currentWindow.listen<NdiConfigEventPayload>(
+        "broadcast:ndi-config",
+        (event) => {
+          if (disposed) return
+          if (event.payload.active) void connect()
+          else {
+            negotiation++
+            config = null
+            delivery.stop()
+          }
+        }
+      ),
+    ]
+    void Promise.all(subscriptions)
+      .then(() => {
+        if (disposed) return
+        return currentWindow.emitTo("main", "broadcast:output-ready", {
+          outputId: OUTPUT_ID,
+        })
+      })
+      .catch((error: unknown) =>
+        console.warn("[broadcast-output] listener setup failed", error)
+      )
+    const unsubscribeFonts = onThemeFontsLoaded(draw)
+    draw()
+    void connect()
+    return () => {
+      disposed = true
+      negotiation++
+      config = null
+      delivery.stop()
+      unsubscribeFonts()
+      subscriptions.forEach((subscription) => {
+        void subscription.then((stop) => stop()).catch(() => {})
+      })
     }
   }, [])
-
-  /** Push a burst of 3 frames after content changes (NDI receivers need a few frames to sync) */
-  const pushNdiBurst = useCallback(() => {
-    void pushNdiFrame()
-    setTimeout(() => void pushNdiFrame(), 150)
-    setTimeout(() => void pushNdiFrame(), 300)
-  }, [pushNdiFrame])
-
-  // Image loads finish after the burst that followed their theme update, and
-  // the preload callback is defined above this — go through a ref so it can
-  // re-burst without a definition cycle.
-  useEffect(() => {
-    pushNdiBurstRef.current = pushNdiBurst
-  }, [pushNdiBurst])
-
-  useEffect(() => {
-    // Set initial canvas size
-    const canvas = canvasRef.current
-    if (canvas) {
-      canvas.width = 1920
-      canvas.height = 1080
-      const ctx = canvas.getContext("2d")
-      if (ctx) {
-        ctx.fillStyle = "#000"
-        ctx.fillRect(0, 0, 1920, 1080)
-      }
-    }
-
-    const currentWindow = getCurrentWebviewWindow()
-    logDebug("Listener registration started", { label: currentWindow.label })
-    const unlisten = currentWindow.listen<BroadcastPayload>("broadcast:verse-update", (event) => {
-      latestData.current = {
-        ...event.payload,
-        theme: normalizeTheme(event.payload.theme),
-      }
-      preloadThemeAssets(event.payload.theme)
-      logDebug("Received broadcast:verse-update", {
-        hasVerse: Boolean(event.payload.verse),
-        themeId: event.payload.theme.id,
-      })
-      draw()
-      pushNdiBurst()
-    })
-
-    const unlistenNdiConfig = currentWindow.listen<NdiConfigEventPayload>("broadcast:ndi-config", (event) => {
-      ndiConfigRef.current = event.payload
-      logDebug("Received broadcast:ndi-config", event.payload)
-      // Push burst when NDI becomes active
-      if (event.payload.active) pushNdiBurst()
-    })
-
-    // Request current NDI status on mount (fixes race condition
-    // where NDI is started before this window opens)
-    void invoke<{ active: boolean; width: number; height: number; fps: number } | null>("get_ndi_status", { outputId: OUTPUT_ID })
-      .then((status) => {
-        if (status && status.active) {
-          ndiConfigRef.current = {
-            active: true,
-            fps: status.fps,
-            width: status.width,
-            height: status.height,
-          }
-          logDebug("Fetched NDI status on mount", status)
-        }
-      })
-      .catch(() => {
-        // Command may not exist yet
-      })
-
-    // Redraw whenever a theme webfont finishes loading (the renderer requests
-    // them on demand) so frames drawn against fallback metrics are replaced.
-    const unsubscribeFonts = onThemeFontsLoaded(() => {
-      draw()
-      pushNdiBurst()
-    })
-
-    void currentWindow.emitTo("main", "broadcast:output-ready", { outputId: OUTPUT_ID }).then(() => {
-      logDebug("Sent broadcast:output-ready")
-    }).catch(() => {
-      console.warn("[broadcast-output] failed to send output-ready event")
-    })
-
-    return () => {
-      unsubscribeFonts()
-      unlisten.then((fn) => fn())
-      unlistenNdiConfig.then((fn) => fn())
-    }
-  }, [draw, logDebug, preloadThemeAssets, pushNdiFrame, pushNdiBurst])
-
-  // Slow keepalive: push one frame every 2s if idle (prevents NDI receivers from dropping the source)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (!ndiConfigRef.current.active) return
-      const elapsed = Date.now() - lastPushRef.current
-      if (elapsed > 2000) void pushNdiFrame()
-    }, 2000)
-    return () => clearInterval(timer)
-  }, [pushNdiFrame])
-
   return (
     <canvas
       ref={canvasRef}

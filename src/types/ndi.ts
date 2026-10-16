@@ -10,6 +10,8 @@ export interface NdiStartRequest {
 }
 
 export interface NdiSessionInfo {
+  generation: string
+  frameProtocol: number
   sourceName: string
   resolution: NdiResolution
   frameRate: NdiFrameRate
@@ -19,11 +21,36 @@ export interface NdiSessionInfo {
   fps: number
 }
 
-export interface NdiFrameRequest {
-  outputId: string
+export interface NdiFrameStats {
+  active: boolean
+  epoch: number
+  submitted: number
+  coalesced: number
+  duplicates: number
+  rejected: number
+  sent: number
+  repeated: number
+  lastSentEpoch: number
+  lastSentRevision: number
+  lastSendDurationUs: number
+  lastReceivedMs: number
+  lastSentMs: number
+  lastError: string | null
+}
+export interface NdiStatus {
+  active: boolean
   width: number
   height: number
-  rgbaBase64: string
+  fps: number
+  generation: string
+  frameProtocol: number
+  stats: NdiFrameStats
+}
+export interface NdiRendererLease {
+  lease: string
+  width: number
+  height: number
+  fps: number
 }
 
 export interface NdiConfigEventPayload {

@@ -9,10 +9,12 @@ import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { TooltipProvider } from "@/components/ui/tooltip.tsx"
 import { hydrateSettings } from "@/stores/settings-store"
 import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
-import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
+import { initializeBroadcastRecovery } from "@/lib/broadcast-recovery"
+import { useBroadcastStore, hydrateBroadcastThemes } from "@/stores/broadcast-store"
 
 // Frontend warnings, errors and uncaught rejections only exist in devtools
 // otherwise, so the logs a user sends us would say nothing about them.
+useBroadcastStore.setState({ presentationRecovery: "restoring" })
 forwardConsoleToLog()
 
 // Webview reloads do NOT restart the Rust backend, so any STT pipeline
@@ -25,6 +27,7 @@ invoke("stop_transcription")
   .catch(() => {})
   .then(() => Promise.all([hydrateSettings(), hydrateBibleStore(), hydrateBroadcastThemes()]))
   .then(() => initBiblePersistence())
+  .then(() => initializeBroadcastRecovery())
   .finally(() => {
     createRoot(document.getElementById("root")!).render(
       <StrictMode>

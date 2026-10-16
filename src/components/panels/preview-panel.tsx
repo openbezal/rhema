@@ -1,22 +1,14 @@
+import { useActiveBroadcastTheme } from "@/hooks/use-broadcast"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
-import { useBibleStore, useBroadcastStore } from "@/stores"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { useBibleStore } from "@/stores"
+import { useBilingualPreview } from "@/hooks/use-bilingual-preview"
 
 export function PreviewPanel() {
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
-  const translations = useBibleStore((s) => s.translations)
-  const themes = useBroadcastStore((s) => s.themes)
-  const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
 
-  const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
-  const translation =
-    translations.find((t) => t.id === selectedVerse?.translation_id)
-      ?.abbreviation ?? "Unknown translation"
-
-  const verseData = selectedVerse
-    ? toVerseRenderData(selectedVerse, translation)
-    : null
+  const activeTheme = useActiveBroadcastTheme()
+  const verseData = useBilingualPreview(selectedVerse)
 
   return (
     <div

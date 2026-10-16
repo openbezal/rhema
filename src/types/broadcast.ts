@@ -8,6 +8,8 @@ export interface VerseSegment {
 export interface VerseRenderData {
   reference: string
   segments: VerseSegment[]
+  /** Same canonical address, independently verified optional translation. */
+  secondary?: { translationCode: string; segments: VerseSegment[] }
 }
 
 export interface RenderOptions {
@@ -94,6 +96,7 @@ export interface BroadcastTheme {
     /** Optional plate behind the verse text alone. Absent means none. */
     surface?: SurfaceFill
   }
+  secondaryVerseText?: Partial<BroadcastTheme["verseText"]>
   verseNumbers: {
     visible: boolean
     fontSize: number
@@ -132,6 +135,10 @@ export interface BroadcastTheme {
     backgroundHeight: number
     textAreaWidth: number
     textAreaHeight: number
+    /** Split of stacked language regions; percentage reserved for primary. */
+    primaryShare?: number
+    languageGap?: number
+    secondaryBox?: ElementBox
     referenceGap?: number
     /** "stacked" (default): reference + verse flow as one block. "free": each is positioned by its box. */
     mode?: "stacked" | "free"

@@ -1,0 +1,104 @@
+import { mockIPC, mockWindows } from "@tauri-apps/api/mocks"
+import { createRoot } from "react-dom/client"
+import { useSyncExternalStore } from "react"
+import "./src/index.css"
+const corpus = {"KJV": {"1": "In the beginning God created the heaven and the earth.", "2": "And the earth was without form and void; and darkness was upon the face of the deep. And the Spirit of God moved upon the face of the waters."}, "OYCB": {"1": "Ní ìbẹ̀rẹ̀ ohun gbogbo Ọlọ́run dá àwọn ọ̀run àti ayé.", "2": "Ayé sì wà ní rúdurùdu, ó sì ṣófo, òkùnkùn sì wà lójú ibú omi, Ẹ̀mí Ọlọ́run sì ń rábàbà lójú omi."}}
+const prefix = "rhema.bilingual.qa."
+const nativeWindows = new Set<string>(JSON.parse(localStorage.getItem(prefix + "windows") ?? '["broadcast-main"]'))
+let payloads: Record<string, any> = JSON.parse(localStorage.getItem(prefix + "payloads") ?? "{}")
+const subscribers = new Set<() => void>()
+const paths = new Map<number, string>(); let rid = 0
+const stores = new Map<string, Record<string, any>>()
+let delay = 0, fail = false
+const catalogue = () => [
+  { id: 1, abbreviation: "KJV", title: "King James Version", language: "en", is_downloaded: true, is_copyrighted: false },
+  { id: 2, abbreviation: "OYCB", title: "Open Yoruba Contemporary Bible", language: "yo", is_downloaded: true, is_copyrighted: true },
+]
+const row = (translationId: number, verse: number) => ({ id: translationId * 100 + verse, translation_id: translationId, book_number: 1, book_name: "Genesis", book_abbreviation: "Gen", chapter: 1, verse,
+  text: corpus[translationId === 1 ? "KJV" : "OYCB"][String(verse)] })
+const values = (path: string) => { if (!stores.has(path)) stores.set(path, JSON.parse(localStorage.getItem(prefix + path) ?? "{}")); return stores.get(path)! }
+mockWindows("main")
+mockIPC(async (command, raw) => {
+  const args = raw as any
+  if (command === "list_translations") return catalogue()
+  if (command === "read_bible_preferences") return values("bible.json")
+  if (command === "set_active_translation" || command === "ui_mark") return undefined
+  if (command === "get_verse") {
+    if (args.translationId === 2) { if (delay) await new Promise(resolve => setTimeout(resolve, delay)); if (fail) throw new Error("Fixture optional lookup unavailable") }
+    return args.bookNumber === 1 && args.chapter === 1 && [1,2].includes(args.verse) ? row(args.translationId, args.verse) : null
+  }
+  if (command === "list_system_fonts") return ["Georgia", "Arial"]
+  if (command === "get_broadcast_process_identity") return "fixture-native-process-1"
+  if (command === "get_ndi_output_ids") return []
+  if (command === "get_ndi_status") return null
+  if (command === "plugin:window|get_all_windows") return [...nativeWindows]
+  if (command === "plugin:window|is_visible") return nativeWindows.has(args.label)
+  if (command === "plugin:store|load") { const id = ++rid; paths.set(id,args.path); return id }
+  if (command === "plugin:store|get") { const data = values(paths.get(args.rid)!); return [data[args.key], args.key in data] }
+  if (command === "plugin:store|set") { values(paths.get(args.rid)!)[args.key] = args.value; return }
+  if (command === "plugin:store|delete") { delete values(paths.get(args.rid)!)[args.key]; return true }
+  if (command === "plugin:store|save") { const path = paths.get(args.rid)!; localStorage.setItem(prefix + path, JSON.stringify(values(path))); return }
+  if (command === "plugin:dialog|open") return "/fixture-secondary.svg"
+  if (command === "plugin:fs|read_file") return [...new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="128"><defs><linearGradient id="a"><stop stop-color="#374d9d"/><stop offset="1" stop-color="#af277e"/></linearGradient></defs><rect width="256" height="128" fill="url(#a)"/><circle cx="160" cy="64" r="40" fill="#ffffff" opacity=".2"/></svg>')]
+  return undefined
+}, { shouldMockEvents: true })
+const bridge = (window as any).__TAURI_INTERNALS__
+const invoke = bridge.invoke
+bridge.invoke = async (command: string, args: any, options: any) => {
+  if (command === "plugin:event|emit_to") {
+    if (args.event === "broadcast:verse-update" && nativeWindows.has(args.target.label)) {
+      payloads = { ...payloads, [args.target.label]: args.payload }
+      localStorage.setItem(prefix + "payloads", JSON.stringify(payloads))
+      subscribers.forEach(callback => callback())
+    }
+    return
+  }
+  return invoke(command,args,options)
+}
+async function boot() {
+  const [{ LiveOutputPanel }, { PreviewPanel }, { ThemeDesigner }, { CanvasVerse }, { ThemeProvider }, { TooltipProvider }, { Toaster }, bible, broadcast, controller, output, preview, themes, types, event] = await Promise.all([
+    import("./src/components/panels/live-output-panel"), import("./src/components/panels/preview-panel"), import("./src/components/broadcast/theme-designer"), import("./src/components/ui/canvas-verse"),
+    import("./src/components/theme-provider"), import("./src/components/ui/tooltip"), import("sonner"), import("./src/stores/bible-store"), import("./src/stores/broadcast-store"),
+    import("./src/lib/presentation-controller"), import("./src/lib/broadcast-output-session"), import("./src/lib/preview-selection"), import("./src/lib/builtin-themes"), import("./src/types"), import("@tauri-apps/api/event"),
+  ])
+  broadcast.useBroadcastStore.setState({ presentationRecovery: "restoring" })
+  await Promise.all([bible.hydrateBibleStore(), broadcast.hydrateBroadcastThemes()])
+  const store = broadcast.useBroadcastStore.getState()
+  for (const [id, width, height] of [["qa-dual-a",1920,1080],["qa-dual-b",1280,720]] as const) {
+    if (!store.themes.some(theme => theme.id === id)) store.saveTheme({ ...themes.BUILTIN_THEMES[0], id, name: id === "qa-dual-a" ? "QA Dual 1080p" : "QA Dual 720p", builtin: false, resolution: { width,height } })
+  }
+  if (!localStorage.getItem(prefix + "initialized")) {
+    store.updateOutput("main", { themeId: "qa-dual-a" }); store.addOutput({ id: "secondary-qa", name: "QA Late 720p", type: "display", themeId: "qa-dual-b", monitorIndex: 0, ndi: types.defaultNdiSettings() })
+    broadcast.useBroadcastStore.setState({ autoLive: false }); localStorage.setItem(prefix + "initialized", "1")
+  }
+  const { initializeBroadcastRecovery } = await import("./src/lib/broadcast-recovery")
+  await initializeBroadcastRecovery()
+  if (broadcast.useBroadcastStore.getState().presentationRecovery !== "ready") broadcast.useBroadcastStore.getState().setLiveVerse(null,null,"background")
+  await bible.initBiblePersistence()
+  controller.connectPresentationController(); preview.connectPreviewSelection(); output.connectBroadcastOutputs()
+  bible.useBibleStore.getState().selectVerse(row(bible.useBibleStore.getState().activeTranslationId,1))
+  function Harness() {
+    const frames = useSyncExternalStore(callback => { subscribers.add(callback); return () => subscribers.delete(callback) }, () => payloads)
+    const live = broadcast.useBroadcastStore(state => state.liveVerse), on = broadcast.useBroadcastStore(state => state.isLive)
+    const selected = broadcast.useBroadcastStore(state => state.selectedElement), draft = broadcast.useBroadcastStore(state => state.draftTheme)
+    const secondary = bible.useBibleStore(state => state.secondaryTranslationCode)
+    const controls = "rounded border border-input bg-secondary px-2 py-1 text-xs"
+    return <ThemeProvider defaultTheme="dark"><TooltipProvider><main className="min-h-screen bg-background p-4 text-foreground">
+      <p className="mb-2 text-xs text-amber-400">Bilingual QA fixture · mocked Tauri/database/windows · actual production UI, fonts and Canvas/Fabric</p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <button className={controls} onClick={() => void controller.presentVerse(row(1,1))}>Present Genesis 1:1</button>
+        <button className={controls} onClick={() => void controller.presentVerse(row(1,2))}>Present Genesis 1:2</button>
+        <button className={controls} onClick={() => { broadcast.useBroadcastStore.getState().startEditing("qa-dual-a"); broadcast.useBroadcastStore.getState().setDesignerOpen(true) }}>Open Theme Designer</button>
+        <button className={controls} onClick={() => { delay = delay ? 0 : 1200; document.getElementById("delay")!.textContent = String(delay) }}>Toggle optional delay</button>
+        <button className={controls} onClick={() => { fail = !fail; document.getElementById("failure")!.textContent = String(fail) }}>Toggle optional failure</button>
+        <button className={controls} onClick={() => { nativeWindows.add("broadcast-secondary-qa"); localStorage.setItem(prefix + "windows", JSON.stringify([...nativeWindows])); void event.emit("broadcast:output-ready",{outputId:"secondary-qa"}) }}>Open late 720p output</button>
+      </div>
+      <pre className="mb-3 overflow-auto rounded bg-muted p-2 text-[10px]" data-testid="fixture-state">{JSON.stringify({ onAir: on, secondary, liveReference: live?.reference, secondaryText: live?.secondary?.segments[0].text, selected, draftSecondary: draft?.secondaryVerseText, layout: draft ? { mode:draft.layout.mode, primaryShare:draft.layout.primaryShare, secondaryBox:draft.layout.secondaryBox } : undefined })}</pre>
+      <p className="mb-2 text-[10px]">Optional delay: <span id="delay">0</span> ms · Failure: <span id="failure">false</span></p>
+      <div className="grid grid-cols-2 gap-3"><PreviewPanel/><LiveOutputPanel/></div>
+      <div className="mt-3 grid grid-cols-2 gap-3">{Object.entries(frames).map(([label,payload]) => <section key={label} className="rounded border p-2"><h2 className="text-xs">Simulated receiver view · {label} · {payload.theme.resolution.width}×{payload.theme.resolution.height}</h2><CanvasVerse theme={payload.theme} verse={payload.verse} clearMode={payload.clearMode}/><pre className="mt-1 text-[10px]" data-testid={label}>{JSON.stringify({ reference:payload.verse?.reference, secondary:payload.verse?.secondary?.translationCode, clearMode:payload.clearMode, primaryFont:payload.theme.verseText.fontSize, secondaryFont:payload.theme.secondaryVerseText?.fontSize ?? null, secondaryPlate:payload.theme.secondaryVerseText?.surface?.enabled ?? false })}</pre></section>)}</div>
+    </main><ThemeDesigner/><Toaster/></TooltipProvider></ThemeProvider>
+  }
+  createRoot(document.getElementById("root")!).render(<Harness />)
+}
+void boot().catch(error => { document.body.innerHTML = `<pre>Fixture boot error: ${String(error)}</pre>` })

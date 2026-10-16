@@ -11,6 +11,7 @@ const currentOutput = (id: string) => useBroadcastStore.getState().outputs.find(
 
 /** All control surfaces share the same latest operator intent and no-output warning. */
 export function requestOnAir(active: boolean): Promise<boolean> {
+  if (useBroadcastStore.getState().presentationRecovery !== "ready") return Promise.resolve(false)
   if (!active) {
     liveRevision++
     pendingLive = null

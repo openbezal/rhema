@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { ChevronsUpDownIcon, CheckIcon } from "lucide-react"
+import { secondaryVerseStyle } from "@/lib/bilingual-theme"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { SurfaceControls } from "@/components/broadcast/surface-properties"
 import { Slider } from "@/components/ui/slider"
@@ -29,9 +30,11 @@ import {
 } from "@/components/ui/popover"
 
 function FontFamilyPicker({
+  label,
   value,
   onChange,
 }: {
+  label: string
   value: string
   onChange: (font: string) => void
 }) {
@@ -76,6 +79,7 @@ function FontFamilyPicker({
         <Button
           variant="outline"
           role="combobox"
+          aria-label={label}
           aria-expanded={open}
           className="w-full justify-between font-normal"
         >
@@ -143,7 +147,13 @@ const TEXT_DECORATION_OPTIONS = [
   { value: "line-through", label: "Line Through" },
 ] as const
 
-function SectionHeader({ title, description }: { title: string; description: string }) {
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
   return (
     <div className="flex flex-col gap-0.5 pb-1">
       <h4 className="text-xs font-semibold">{title}</h4>
@@ -152,13 +162,27 @@ function SectionHeader({ title, description }: { title: string; description: str
   )
 }
 
-function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
+function FontControls({
+  prefix,
+}: {
+  prefix: "verseText" | "secondaryVerseText" | "reference"
+}) {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const update = useBroadcastStore((s) => s.updateDraftNested)
 
   if (!draftTheme) return null
 
-  const data = prefix === "verseText" ? draftTheme.verseText : draftTheme.reference
+  const verseStyle =
+    prefix === "secondaryVerseText"
+      ? secondaryVerseStyle(draftTheme)
+      : draftTheme.verseText
+  const data = prefix === "reference" ? draftTheme.reference : verseStyle
+  const languageLabel =
+    prefix === "secondaryVerseText"
+      ? "Secondary"
+      : prefix === "verseText"
+        ? "Primary"
+        : "Reference"
   const { hex: colorHex, opacity: colorOpacity } = parseColorOpacity(data.color)
   const horizontalAlign = data.horizontalAlign ?? draftTheme.layout.textAlign
   const verticalAlign = data.verticalAlign ?? "top"
@@ -169,8 +193,11 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
     <div className="flex flex-col gap-3">
       {/* Font Family */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Font Family</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Font Family
+        </label>
         <FontFamilyPicker
+          label={`${languageLabel} font family`}
           value={data.fontFamily}
           onChange={(v) => update(`${prefix}.fontFamily`, v)}
         />
@@ -178,12 +205,17 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
 
       {/* Font Weight */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Font Weight</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Font Weight
+        </label>
         <Select
           value={String(data.fontWeight)}
           onValueChange={(v) => update(`${prefix}.fontWeight`, Number(v))}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger
+            aria-label={`${languageLabel} font weight`}
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -199,11 +231,16 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
       {/* Font Size */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Font Size</label>
-          <span className="text-xs tabular-nums text-muted-foreground">{data.fontSize}px</span>
+          <label className="text-xs font-medium text-muted-foreground">
+            Font Size
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {data.fontSize}px
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Slider
+            aria-label={`${languageLabel} font size`}
             min={8}
             max={200}
             step={1}
@@ -212,6 +249,7 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
             className="flex-1"
           />
           <Input
+            aria-label={`${languageLabel} font size`}
             type="number"
             min={8}
             max={200}
@@ -226,18 +264,23 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
       </div>
 
       {/* Line Height — only for verse text, reference type doesn't have lineHeight */}
-      {prefix === "verseText" && (
+      {prefix !== "reference" && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Line Height</label>
-            <span className="text-xs tabular-nums text-muted-foreground">{(draftTheme.verseText.lineHeight).toFixed(2)}</span>
+            <label className="text-xs font-medium text-muted-foreground">
+              Line Height
+            </label>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {verseStyle.lineHeight.toFixed(2)}
+            </span>
           </div>
           <Slider
+            aria-label={`${languageLabel} line height`}
             min={0.5}
             max={3.0}
             step={0.05}
-            value={[draftTheme.verseText.lineHeight]}
-            onValueChange={([v]) => update("verseText.lineHeight", v)}
+            value={[verseStyle.lineHeight]}
+            onValueChange={([v]) => update(`${prefix}.lineHeight`, v)}
           />
         </div>
       )}
@@ -245,10 +288,15 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
       {/* Letter Spacing */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Letter Spacing</label>
-          <span className="text-xs tabular-nums text-muted-foreground">{data.letterSpacing}px</span>
+          <label className="text-xs font-medium text-muted-foreground">
+            Letter Spacing
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {data.letterSpacing}px
+          </span>
         </div>
         <Slider
+          aria-label={`${languageLabel} letter spacing`}
           min={-5}
           max={50}
           step={0.5}
@@ -259,34 +307,44 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
 
       {/* Horizontal Alignment */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Horizontal Alignment</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Horizontal Alignment
+        </label>
         <Select
           value={horizontalAlign}
           onValueChange={(v) => update(`${prefix}.horizontalAlign`, v)}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger
+            aria-label={`${languageLabel} horizontal alignment`}
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {HORIZONTAL_ALIGN_OPTIONS
-              .filter((option) => prefix === "verseText" || option.value !== "justify")
-              .map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+            {HORIZONTAL_ALIGN_OPTIONS.filter(
+              (option) => prefix !== "reference" || option.value !== "justify"
+            ).map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
       {/* Vertical Alignment */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Vertical Alignment</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Vertical Alignment
+        </label>
         <Select
           value={verticalAlign}
           onValueChange={(v) => update(`${prefix}.verticalAlign`, v)}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger
+            aria-label={`${languageLabel} vertical alignment`}
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -301,12 +359,17 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
 
       {/* Text Transform */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Text Transform</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Text Transform
+        </label>
         <Select
           value={textTransform}
           onValueChange={(v) => update(`${prefix}.textTransform`, v)}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger
+            aria-label={`${languageLabel} text transform`}
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -321,12 +384,17 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
 
       {/* Text Decoration */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Text Decoration</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Text Decoration
+        </label>
         <Select
           value={textDecoration}
           onValueChange={(v) => update(`${prefix}.textDecoration`, v)}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger
+            aria-label={`${languageLabel} text decoration`}
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -341,32 +409,47 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
 
       {/* Text Color */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Text Color</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Text Color
+        </label>
         <div className="flex items-center gap-2">
           <input
+            aria-label={`${languageLabel} text color`}
             type="color"
             value={colorHex}
             onChange={(e) =>
-              update(`${prefix}.color`, buildColorWithOpacity(e.target.value, colorOpacity))
+              update(
+                `${prefix}.color`,
+                buildColorWithOpacity(e.target.value, colorOpacity)
+              )
             }
             className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
           />
           <Input
+            aria-label={`${languageLabel} text color hex`}
             value={colorHex}
             onChange={(e) => {
               const v = e.target.value
               if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                update(`${prefix}.color`, buildColorWithOpacity(v, colorOpacity))
+                update(
+                  `${prefix}.color`,
+                  buildColorWithOpacity(v, colorOpacity)
+                )
               }
             }}
             className="w-20 font-mono"
           />
         </div>
         <div className="flex items-center justify-between">
-          <label className="text-xs font-medium text-muted-foreground">Opacity</label>
-          <span className="text-xs tabular-nums text-muted-foreground">{colorOpacity}%</span>
+          <label className="text-xs font-medium text-muted-foreground">
+            Opacity
+          </label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {colorOpacity}%
+          </span>
         </div>
         <Slider
+          aria-label={`${languageLabel} text opacity`}
           min={0}
           max={100}
           step={1}
@@ -388,12 +471,17 @@ function ReferenceProperties() {
 
   return (
     <div className="flex flex-col gap-3">
-      <SectionHeader title="Reference Text" description="Customize how reference text appears" />
+      <SectionHeader
+        title="Reference Text"
+        description="Customize how reference text appears"
+      />
       <FontControls prefix="reference" />
 
       {/* Uppercase */}
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-muted-foreground">Uppercase</label>
+        <label className="text-xs font-medium text-muted-foreground">
+          Uppercase
+        </label>
         <input
           type="checkbox"
           checked={draftTheme.reference.uppercase}
@@ -411,7 +499,9 @@ function ReferenceProperties() {
       {/* Reference Position (stacked mode only — free mode positions by box) */}
       {draftTheme.layout.mode !== "free" && (
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Reference Position</label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Reference Position
+          </label>
           <Select
             value={draftTheme.reference.position}
             onValueChange={(v) => update("reference.position", v)}
@@ -431,120 +521,185 @@ function ReferenceProperties() {
   )
 }
 
-function VerseProperties() {
+function VerseProperties({
+  prefix = "verseText",
+}: {
+  prefix?: "verseText" | "secondaryVerseText"
+}) {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const update = useBroadcastStore((s) => s.updateDraftNested)
 
   if (!draftTheme) return null
 
-  const shadow = draftTheme.verseText.shadow
-  const outline = draftTheme.verseText.outline
+  const style =
+    prefix === "secondaryVerseText"
+      ? secondaryVerseStyle(draftTheme)
+      : draftTheme.verseText
+  const shadow = style.shadow
+  const outline = style.outline
 
-  const shadowColor = shadow ? parseColorOpacity(shadow.color) : { hex: "#000000", opacity: 100 }
-  const outlineColor = outline ? parseColorOpacity(outline.color) : { hex: "#000000", opacity: 100 }
+  const shadowColor = shadow
+    ? parseColorOpacity(shadow.color)
+    : { hex: "#000000", opacity: 100 }
+  const outlineColor = outline
+    ? parseColorOpacity(outline.color)
+    : { hex: "#000000", opacity: 100 }
 
   const verseNumbers = draftTheme.verseNumbers
   const verseNumberColor = parseColorOpacity(verseNumbers.color)
   const superscriptSizePct = Math.round(
-    (verseNumbers.fontSize / draftTheme.verseText.fontSize) * 100
+    (verseNumbers.fontSize / style.fontSize) * 100
   )
 
   return (
     <div className="flex flex-col gap-3">
-      <SectionHeader title="Verse Text" description="Customize how verse text appears" />
-      <FontControls prefix="verseText" />
+      <SectionHeader
+        title={
+          prefix === "secondaryVerseText"
+            ? "Secondary Verse Text"
+            : "Primary Verse Text"
+        }
+        description={
+          prefix === "secondaryVerseText"
+            ? "Unedited secondary text inherits Primary. Edits create independent styling."
+            : "Customize primary verse text"
+        }
+      />
+      {prefix === "secondaryVerseText" && (
+        <Button
+          size="sm"
+          variant="outline"
+          aria-label="Reset secondary style"
+          onClick={() =>
+            useBroadcastStore
+              .getState()
+              .updateDraft({ secondaryVerseText: undefined })
+          }
+        >
+          Use primary style
+        </Button>
+      )}
+      <FontControls prefix={prefix} />
 
-      {/* Verse Numbers */}
-      <div className="flex flex-col gap-3 border-t pt-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold">Verse Numbers</label>
-          <input
-            type="checkbox"
-            checked={verseNumbers.visible}
-            onChange={(e) => update("verseNumbers.visible", e.target.checked)}
-            className="h-4 w-4 rounded border-input accent-primary"
-          />
-        </div>
-
-        {verseNumbers.visible && (
-          <div className="flex flex-col gap-3">
-            {/* Superscript */}
+      {prefix === "verseText" && (
+        <>
+          {/* Verse Numbers */}
+          <div className="flex flex-col gap-3 border-t pt-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Superscript</label>
+              <label className="text-xs font-semibold">Verse Numbers</label>
               <input
                 type="checkbox"
-                checked={verseNumbers.superscript}
-                onChange={(e) => update("verseNumbers.superscript", e.target.checked)}
+                checked={verseNumbers.visible}
+                onChange={(e) =>
+                  update("verseNumbers.visible", e.target.checked)
+                }
                 className="h-4 w-4 rounded border-input accent-primary"
               />
             </div>
 
-            {/* Superscript Size */}
-            {verseNumbers.superscript && (
-              <div className="flex flex-col gap-1.5">
+            {verseNumbers.visible && (
+              <div className="flex flex-col gap-3">
+                {/* Superscript */}
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">Size</label>
-                  <span className="text-xs tabular-nums text-muted-foreground">{superscriptSizePct}%</span>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Superscript
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={verseNumbers.superscript}
+                    onChange={(e) =>
+                      update("verseNumbers.superscript", e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-input accent-primary"
+                  />
                 </div>
-                <Slider
-                  min={20}
-                  max={100}
-                  step={1}
-                  value={[superscriptSizePct]}
-                  onValueChange={([v]) => {
-                    const newFontSize = Math.round((v / 100) * draftTheme.verseText.fontSize)
-                    update("verseNumbers.fontSize", newFontSize)
-                  }}
-                />
-              </div>
-            )}
 
-            {/* Number Color */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Number Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={verseNumberColor.hex}
-                  onChange={(e) =>
-                    update(
-                      "verseNumbers.color",
-                      buildColorWithOpacity(e.target.value, verseNumberColor.opacity)
-                    )
-                  }
-                  className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
-                />
-                <Input
-                  value={verseNumberColor.hex}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                {/* Superscript Size */}
+                {verseNumbers.superscript && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Size
+                      </label>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {superscriptSizePct}%
+                      </span>
+                    </div>
+                    <Slider
+                      min={20}
+                      max={100}
+                      step={1}
+                      value={[superscriptSizePct]}
+                      onValueChange={([v]) => {
+                        const newFontSize = Math.round(
+                          (v / 100) * style.fontSize
+                        )
+                        update("verseNumbers.fontSize", newFontSize)
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Number Color */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Number Color
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={verseNumberColor.hex}
+                      onChange={(e) =>
+                        update(
+                          "verseNumbers.color",
+                          buildColorWithOpacity(
+                            e.target.value,
+                            verseNumberColor.opacity
+                          )
+                        )
+                      }
+                      className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
+                    />
+                    <Input
+                      value={verseNumberColor.hex}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                          update(
+                            "verseNumbers.color",
+                            buildColorWithOpacity(v, verseNumberColor.opacity)
+                          )
+                        }
+                      }}
+                      className="w-20 font-mono"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Opacity
+                    </label>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {verseNumberColor.opacity}%
+                    </span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[verseNumberColor.opacity]}
+                    onValueChange={([v]) =>
                       update(
                         "verseNumbers.color",
-                        buildColorWithOpacity(v, verseNumberColor.opacity)
+                        buildColorWithOpacity(verseNumberColor.hex, v)
                       )
                     }
-                  }}
-                  className="w-20 font-mono"
-                />
+                  />
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Opacity</label>
-                <span className="text-xs tabular-nums text-muted-foreground">{verseNumberColor.opacity}%</span>
-              </div>
-              <Slider
-                min={0}
-                max={100}
-                step={1}
-                value={[verseNumberColor.opacity]}
-                onValueChange={([v]) =>
-                  update("verseNumbers.color", buildColorWithOpacity(verseNumberColor.hex, v))
-                }
-              />
-            </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Text Shadow */}
       <div className="flex flex-col gap-3 border-t pt-3">
@@ -555,9 +710,14 @@ function VerseProperties() {
             checked={shadow !== null}
             onChange={(e) => {
               if (e.target.checked) {
-                update("verseText.shadow", { color: "#00000080", blur: 4, x: 2, y: 2 })
+                update(`${prefix}.shadow`, {
+                  color: "#00000080",
+                  blur: 4,
+                  x: 2,
+                  y: 2,
+                })
               } else {
-                update("verseText.shadow", null)
+                update(`${prefix}.shadow`, null)
               }
             }}
             className="h-4 w-4 rounded border-input accent-primary"
@@ -569,58 +729,72 @@ function VerseProperties() {
             {/* Offset X */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Offset X</label>
-                <span className="text-xs tabular-nums text-muted-foreground">{shadow.x}px</span>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Offset X
+                </label>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {shadow.x}px
+                </span>
               </div>
               <Slider
                 min={-20}
                 max={50}
                 step={1}
                 value={[shadow.x]}
-                onValueChange={([v]) => update("verseText.shadow.x", v)}
+                onValueChange={([v]) => update(`${prefix}.shadow.x`, v)}
               />
             </div>
 
             {/* Offset Y */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Offset Y</label>
-                <span className="text-xs tabular-nums text-muted-foreground">{shadow.y}px</span>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Offset Y
+                </label>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {shadow.y}px
+                </span>
               </div>
               <Slider
                 min={-20}
                 max={50}
                 step={1}
                 value={[shadow.y]}
-                onValueChange={([v]) => update("verseText.shadow.y", v)}
+                onValueChange={([v]) => update(`${prefix}.shadow.y`, v)}
               />
             </div>
 
             {/* Blur */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Blur</label>
-                <span className="text-xs tabular-nums text-muted-foreground">{shadow.blur}px</span>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Blur
+                </label>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {shadow.blur}px
+                </span>
               </div>
               <Slider
                 min={0}
                 max={50}
                 step={1}
                 value={[shadow.blur]}
-                onValueChange={([v]) => update("verseText.shadow.blur", v)}
+                onValueChange={([v]) => update(`${prefix}.shadow.blur`, v)}
               />
             </div>
 
             {/* Shadow Color */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Shadow Color</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Shadow Color
+              </label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   value={shadowColor.hex}
                   onChange={(e) =>
                     update(
-                      "verseText.shadow.color",
+                      `${prefix}.shadow.color`,
                       buildColorWithOpacity(e.target.value, shadowColor.opacity)
                     )
                   }
@@ -632,7 +806,7 @@ function VerseProperties() {
                     const v = e.target.value
                     if (/^#[0-9a-fA-F]{6}$/.test(v)) {
                       update(
-                        "verseText.shadow.color",
+                        `${prefix}.shadow.color`,
                         buildColorWithOpacity(v, shadowColor.opacity)
                       )
                     }
@@ -641,8 +815,12 @@ function VerseProperties() {
                 />
               </div>
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Opacity</label>
-                <span className="text-xs tabular-nums text-muted-foreground">{shadowColor.opacity}%</span>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Opacity
+                </label>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {shadowColor.opacity}%
+                </span>
               </div>
               <Slider
                 min={0}
@@ -651,7 +829,7 @@ function VerseProperties() {
                 value={[shadowColor.opacity]}
                 onValueChange={([v]) =>
                   update(
-                    "verseText.shadow.color",
+                    `${prefix}.shadow.color`,
                     buildColorWithOpacity(shadowColor.hex, v)
                   )
                 }
@@ -670,9 +848,9 @@ function VerseProperties() {
             checked={outline !== null}
             onChange={(e) => {
               if (e.target.checked) {
-                update("verseText.outline", { color: "#000000", width: 1 })
+                update(`${prefix}.outline`, { color: "#000000", width: 1 })
               } else {
-                update("verseText.outline", null)
+                update(`${prefix}.outline`, null)
               }
             }}
             className="h-4 w-4 rounded border-input accent-primary"
@@ -684,26 +862,34 @@ function VerseProperties() {
             {/* Width */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Width</label>
-                <span className="text-xs tabular-nums text-muted-foreground">{outline.width}px</span>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Width
+                </label>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {outline.width}px
+                </span>
               </div>
               <Slider
                 min={0}
                 max={20}
                 step={0.5}
                 value={[outline.width]}
-                onValueChange={([v]) => update("verseText.outline.width", v)}
+                onValueChange={([v]) => update(`${prefix}.outline.width`, v)}
               />
             </div>
 
             {/* Outline Color */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Outline Color</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Outline Color
+              </label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   value={outlineColor.hex}
-                  onChange={(e) => update("verseText.outline.color", e.target.value)}
+                  onChange={(e) =>
+                    update(`${prefix}.outline.color`, e.target.value)
+                  }
                   className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
                 />
                 <Input
@@ -711,7 +897,7 @@ function VerseProperties() {
                   onChange={(e) => {
                     const v = e.target.value
                     if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                      update("verseText.outline.color", v)
+                      update(`${prefix}.outline.color`, v)
                     }
                   }}
                   className="w-20 font-mono"
@@ -723,8 +909,12 @@ function VerseProperties() {
       </div>
 
       <SurfaceControls
-        prefix="verseText.surface"
-        title="Verse Plate"
+        prefix={`${prefix}.surface`}
+        title={
+          prefix === "secondaryVerseText"
+            ? "Secondary Verse Plate"
+            : "Primary Verse Plate"
+        }
         description="A plate behind the verse text alone"
       />
     </div>
@@ -732,22 +922,51 @@ function VerseProperties() {
 }
 
 export function TextProperties() {
-  const selectedElement = useBroadcastStore((s) => s.selectedElement)
-
-  if (selectedElement === "reference") {
-    return <ReferenceProperties />
-  }
-
-  if (selectedElement === "verse") {
-    return <VerseProperties />
-  }
-
+  const selectedElement = useBroadcastStore((state) => state.selectedElement)
+  const select = useBroadcastStore((state) => state.setSelectedElement)
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-      <p className="text-sm font-medium text-muted-foreground">No element selected</p>
-      <p className="text-xs text-muted-foreground">
-        Click on verse, reference, or translation text in the canvas to edit its properties
-      </p>
+    <div className="flex flex-col gap-4">
+      <div
+        role="group"
+        aria-label="Text element"
+        className="flex flex-wrap gap-1"
+      >
+        <Button
+          size="sm"
+          variant={selectedElement === "verse" ? "secondary" : "ghost"}
+          onClick={() => select("verse")}
+          aria-pressed={selectedElement === "verse"}
+        >
+          Primary
+        </Button>
+        <Button
+          size="sm"
+          variant={selectedElement === "secondary" ? "secondary" : "ghost"}
+          onClick={() => select("secondary")}
+          aria-pressed={selectedElement === "secondary"}
+        >
+          Secondary
+        </Button>
+        <Button
+          size="sm"
+          variant={selectedElement === "reference" ? "secondary" : "ghost"}
+          onClick={() => select("reference")}
+          aria-pressed={selectedElement === "reference"}
+        >
+          Reference
+        </Button>
+      </div>
+      {selectedElement === "reference" ? (
+        <ReferenceProperties />
+      ) : selectedElement === "secondary" ? (
+        <VerseProperties prefix="secondaryVerseText" />
+      ) : selectedElement === "verse" ? (
+        <VerseProperties />
+      ) : (
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          Choose Primary, Secondary or Reference to edit its style.
+        </p>
+      )}
     </div>
   )
 }

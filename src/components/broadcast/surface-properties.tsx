@@ -1,3 +1,4 @@
+import { secondaryVerseStyle } from "@/lib/bilingual-theme"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { pickThemeBackgroundImage } from "@/lib/theme-designer-files"
 import { buildColorWithOpacity, parseColorOpacity } from "@/lib/color-utils"
@@ -11,10 +12,18 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import type { BroadcastTheme, SurfaceFill, ThemeImageFill } from "@/types/broadcast"
+import type {
+  BroadcastTheme,
+  SurfaceFill,
+  ThemeImageFill,
+} from "@/types/broadcast"
 
 /** Dotted path to a SurfaceFill within a theme. */
-export type SurfacePrefix = "textBox" | "reference.surface" | "verseText.surface"
+export type SurfacePrefix =
+  | "textBox"
+  | "reference.surface"
+  | "verseText.surface"
+  | "secondaryVerseText.surface"
 
 const DEFAULT_IMAGE: ThemeImageFill = {
   url: "",
@@ -44,6 +53,8 @@ function surfaceAt(
       return theme.reference.surface
     case "verseText.surface":
       return theme.verseText.surface
+    case "secondaryVerseText.surface":
+      return secondaryVerseStyle(theme).surface
   }
 }
 
@@ -90,7 +101,9 @@ export function SurfaceControls({
         <div className="flex flex-col">
           <h4 className="text-xs font-semibold">{title}</h4>
           {description && (
-            <p className="text-[0.625rem] text-muted-foreground">{description}</p>
+            <p className="text-[0.625rem] text-muted-foreground">
+              {description}
+            </p>
           )}
         </div>
         <input
@@ -106,14 +119,19 @@ export function SurfaceControls({
         <div className="flex flex-col gap-3">
           {/* Fill type */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Fill</label>
+            <label className="text-xs font-medium text-muted-foreground">
+              Fill
+            </label>
             <Select
               value={image ? "image" : "color"}
               onValueChange={(v) =>
-                update(`${prefix}.image`, v === "image" ? { ...DEFAULT_IMAGE } : null)
+                update(
+                  `${prefix}.image`,
+                  v === "image" ? { ...DEFAULT_IMAGE } : null
+                )
               }
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger aria-label={`${title} fill`} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -140,12 +158,17 @@ export function SurfaceControls({
               </Button>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Fit</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Fit
+                </label>
                 <Select
                   value={image.fit}
                   onValueChange={(v) => update(`${prefix}.image.fit`, v)}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    aria-label={`${title} image fit`}
+                    className="w-full"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -181,7 +204,9 @@ export function SurfaceControls({
                   onChange={(e) =>
                     update(
                       `${prefix}.image.tint`,
-                      e.target.checked ? buildColorWithOpacity("#000000", 50) : null
+                      e.target.checked
+                        ? buildColorWithOpacity("#000000", 50)
+                        : null
                     )
                   }
                   className="h-4 w-4 rounded border-input accent-primary"
@@ -192,14 +217,19 @@ export function SurfaceControls({
                   hex={tint.hex}
                   opacity={tint.opacity}
                   onChange={(hex, opacity) =>
-                    update(`${prefix}.image.tint`, buildColorWithOpacity(hex, opacity))
+                    update(
+                      `${prefix}.image.tint`,
+                      buildColorWithOpacity(hex, opacity)
+                    )
                   }
                 />
               )}
             </>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Color</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Color
+              </label>
               <ColorRow
                 hex={colorHex}
                 opacity={Math.round(surface.opacity * 100)}
@@ -247,8 +277,10 @@ function SliderRow({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-muted-foreground">{label}</label>
-        <span className="text-xs tabular-nums text-muted-foreground">
+        <label className="text-xs font-medium text-muted-foreground">
+          {label}
+        </label>
+        <span className="text-xs text-muted-foreground tabular-nums">
           {value}
           {suffix}
         </span>
@@ -292,8 +324,12 @@ function ColorRow({
         />
       </div>
       <div className="flex items-center justify-between">
-        <label className="text-xs font-medium text-muted-foreground">Opacity</label>
-        <span className="text-xs tabular-nums text-muted-foreground">{opacity}%</span>
+        <label className="text-xs font-medium text-muted-foreground">
+          Opacity
+        </label>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {opacity}%
+        </span>
       </div>
       <Slider
         min={0}

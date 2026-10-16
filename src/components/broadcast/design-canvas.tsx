@@ -6,8 +6,10 @@ import {
   renderVerse,
   type VerseLayoutMetrics,
 } from "@/lib/verse-renderer"
-import { seedFreeBoxesFromMetrics, SAMPLE_VERSE } from "@/lib/theme-migrations"
-import { preloadThemeImages, themeImageCache } from "@/lib/theme-image-cache"
+import { DesignerSampleCredits } from "./designer-sample-credits"
+import { DESIGN_WORKSPACE, renderDesignerSample } from "@/lib/designer-sample"
+import { seedFreeBoxesFromMetrics } from "@/lib/theme-migrations"
+import { preloadThemeImages } from "@/lib/theme-image-cache"
 import { Button } from "@/components/ui/button"
 import {
   SearchIcon,
@@ -19,8 +21,8 @@ import {
 } from "lucide-react"
 import type { BroadcastTheme } from "@/types"
 
-const WS_WIDTH = 1920
-const WS_HEIGHT = 1080
+const WS_WIDTH = DESIGN_WORKSPACE.width
+const WS_HEIGHT = DESIGN_WORKSPACE.height
 
 export function DesignCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -32,14 +34,31 @@ export function DesignCanvas() {
     workspace: fabric.Rect | null
     referenceRegion: fabric.Rect | null
     verseRegion: fabric.Rect | null
-  }>({ workspace: null, referenceRegion: null, verseRegion: null })
-  const draggingRef = useRef<"reference" | "verse" | null>(null)
+    secondaryRegion: fabric.Rect | null
+  }>({
+    workspace: null,
+    referenceRegion: null,
+    verseRegion: null,
+    secondaryRegion: null,
+  })
+  const draggingRef = useRef<"reference" | "verse" | "secondary" | null>(null)
   const latestMetricsRef = useRef<VerseLayoutMetrics | null>(null)
 
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
   const selectedElement = useBroadcastStore((s) => s.selectedElement)
   const [zoomLevel, setZoomLevel] = useState(0)
+  const [fitWarning, setFitWarning] = useState("")
+  const updateFitWarning = useCallback((metrics: VerseLayoutMetrics) => {
+    const labels = [
+      metrics.primaryNoFit ? "Primary" : "",
+      metrics.secondaryNoFit ? "Secondary" : "",
+      metrics.referenceNoFit ? "Reference" : "",
+    ]
+      .filter(Boolean)
+      .join(", ")
+    setFitWarning((previous) => (previous === labels ? previous : labels))
+  }, [])
 
   const resyncLatestTheme = useCallback(() => {
     const latestTheme = latestThemeRef.current
@@ -51,9 +70,10 @@ export function DesignCanvas() {
       canvas,
       undefined,
       latestMetricsRef,
-      draggingRef.current
+      draggingRef.current,
+      updateFitWarning
     )
-  }, [])
+  }, [updateFitWarning])
 
   // Auto-zoom: fit workspace into container
   const autoZoom = useCallback(() => {
@@ -71,7 +91,8 @@ export function DesignCanvas() {
     canvas.setViewportTransform(identity)
 
     // Calculate zoom to fit workspace with padding
-    const scale = fabric.util.findScaleToFit(workspace, { width: cw, height: ch }) * 0.85
+    const scale =
+      fabric.util.findScaleToFit(workspace, { width: cw, height: ch }) * 0.85
     canvas.setZoom(scale)
 
     // Center the workspace
@@ -159,6 +180,26 @@ export function DesignCanvas() {
     })
     canvas.add(verseRegion)
     objectsRef.current.verseRegion = verseRegion
+    const secondaryRegion = new fabric.Rect({
+      left: 0,
+      top: 0,
+      originX: "left",
+      originY: "top",
+      width: 100,
+      height: 200,
+      fill: "rgba(0,0,0,0.001)",
+      selectable: true,
+      hasControls: false,
+      hasBorders: true,
+      borderColor: "#60a5fa",
+      borderDashArray: [6, 3],
+      lockMovementX: false,
+      lockMovementY: false,
+      evented: true,
+      objectCaching: false,
+    })
+    canvas.add(secondaryRegion)
+    objectsRef.current.secondaryRegion = secondaryRegion
 
     // Selection events
     canvas.on("selection:created", (e) => {
@@ -167,6 +208,8 @@ export function DesignCanvas() {
         useBroadcastStore.getState().setSelectedElement("reference")
       } else if (obj === objectsRef.current.verseRegion) {
         useBroadcastStore.getState().setSelectedElement("verse")
+      } else if (obj === objectsRef.current.secondaryRegion) {
+        useBroadcastStore.getState().setSelectedElement("secondary")
       }
     })
     canvas.on("selection:updated", (e) => {
@@ -175,6 +218,8 @@ export function DesignCanvas() {
         useBroadcastStore.getState().setSelectedElement("reference")
       } else if (obj === objectsRef.current.verseRegion) {
         useBroadcastStore.getState().setSelectedElement("verse")
+      } else if (obj === objectsRef.current.secondaryRegion) {
+        useBroadcastStore.getState().setSelectedElement("secondary")
       }
     })
     canvas.on("selection:cleared", () => {
@@ -189,7 +234,9 @@ export function DesignCanvas() {
         ? ("reference" as const)
         : obj === objectsRef.current.verseRegion
           ? ("verse" as const)
-          : null
+          : obj === objectsRef.current.secondaryRegion
+            ? ("secondary" as const)
+            : null
 
     canvas.on("object:moving", (e) => {
       const region = regionForObject(e.target)
@@ -202,14 +249,17 @@ export function DesignCanvas() {
       if (
         theme.layout.mode !== "free" ||
         !theme.layout.referenceBox ||
-        !theme.layout.verseBox
+        !theme.layout.verseBox ||
+        !theme.layout.secondaryBox
       ) {
         const metrics = latestMetricsRef.current
         const seeded = metrics
-          ? seedFreeBoxesFromMetrics(metrics, theme.resolution)
+          ? seedFreeBoxesFromMetrics(metrics, metrics.scaledTheme.resolution)
           : null
         if (!seeded) return
-        store.updateDraft({ layout: { ...theme.layout, mode: "free", ...seeded } })
+        store.updateDraft({
+          layout: { ...theme.layout, mode: "free", ...seeded },
+        })
         theme = useBroadcastStore.getState().draftTheme
         if (!theme) return
       }
@@ -218,13 +268,26 @@ export function DesignCanvas() {
       const obj = e.target
       if (!ws || !obj) return
       const wsTopLeft = ws.getPointByOrigin("left", "top")
-      const key = region === "reference" ? "referenceBox" : "verseBox"
+      const key =
+        region === "reference"
+          ? "referenceBox"
+          : region === "secondary"
+            ? "secondaryBox"
+            : "verseBox"
       const box = theme.layout[key]
       if (!box) return
       const widthPx = (box.width / 100) * WS_WIDTH
       const heightPx = (box.height / 100) * WS_HEIGHT
-      const localX = clamp(obj.left - wsTopLeft.x, 0, Math.max(0, WS_WIDTH - widthPx))
-      const localY = clamp(obj.top - wsTopLeft.y, 0, Math.max(0, WS_HEIGHT - heightPx))
+      const localX = clamp(
+        obj.left - wsTopLeft.x,
+        0,
+        Math.max(0, WS_WIDTH - widthPx)
+      )
+      const localY = clamp(
+        obj.top - wsTopLeft.y,
+        0,
+        Math.max(0, WS_HEIGHT - heightPx)
+      )
       store.updateDraftNested(`layout.${key}`, {
         ...box,
         x: Math.round((localX / WS_WIDTH) * 10000) / 100,
@@ -262,7 +325,12 @@ export function DesignCanvas() {
       rafIdRef.current = null
       void canvas.dispose()
       fabricRef.current = null
-      objectsRef.current = { workspace: null, referenceRegion: null, verseRegion: null }
+      objectsRef.current = {
+        workspace: null,
+        referenceRegion: null,
+        verseRegion: null,
+        secondaryRegion: null,
+      }
     }
   }, [editingThemeId, autoZoom, resyncLatestTheme])
 
@@ -292,21 +360,27 @@ export function DesignCanvas() {
             currentCanvas,
             undefined,
             latestMetricsRef,
-            draggingRef.current
+            draggingRef.current,
+            updateFitWarning
           )
         },
         latestMetricsRef,
-        draggingRef.current
+        draggingRef.current,
+        updateFitWarning
       )
     })
-  }, [draftTheme])
+  }, [draftTheme, updateFitWarning])
 
   useEffect(() => {
     const refRegion = objectsRef.current.referenceRegion
     const verseRegion = objectsRef.current.verseRegion
-    if (!refRegion || !verseRegion) return
+    const secondaryRegion = objectsRef.current.secondaryRegion
+    if (!refRegion || !verseRegion || !secondaryRegion) return
     refRegion.set({ strokeWidth: selectedElement === "reference" ? 1 : 0 })
     verseRegion.set({ strokeWidth: selectedElement === "verse" ? 1 : 0 })
+    secondaryRegion.set({
+      strokeWidth: selectedElement === "secondary" ? 1 : 0,
+    })
     fabricRef.current?.requestRenderAll()
   }, [selectedElement])
 
@@ -331,15 +405,26 @@ export function DesignCanvas() {
   }, [resyncLatestTheme])
 
   const elementLabel =
-    selectedElement === "verse" ? "verse"
-      : selectedElement === "reference" ? "reference"
-        : "none"
+    selectedElement === "verse"
+      ? "verse"
+      : selectedElement === "secondary"
+        ? "secondary verse"
+        : selectedElement === "reference"
+          ? "reference"
+          : "none"
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/40 px-3" style={{ background: "#18181b" }}>
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground">
+      <div
+        className="flex h-14 shrink-0 items-center gap-2 border-b border-border/40 px-3"
+        style={{ background: "#18181b" }}
+      >
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground"
+        >
           <MousePointer2Icon className="size-3.5" />
         </Button>
         <div className="flex items-center gap-1.5 text-[0.625rem] text-muted-foreground">
@@ -347,36 +432,79 @@ export function DesignCanvas() {
           <span>Grid</span>
         </div>
         <div className="flex-1" />
-        <Button variant="ghost" size="icon-xs" className="text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground"
+        >
           <SearchIcon className="size-3.5" />
         </Button>
-        <span className="min-w-12 text-center text-[0.625rem] font-medium tabular-nums text-muted-foreground">
+        <span className="min-w-12 text-center text-[0.625rem] font-medium text-muted-foreground tabular-nums">
           {zoomLevel}%
         </span>
-        <Button variant="ghost" size="icon-xs" onClick={zoomOut} className="text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={zoomOut}
+          className="text-muted-foreground"
+        >
           <MinusIcon className="size-3" />
         </Button>
-        <Button variant="ghost" size="icon-xs" onClick={zoomIn} className="text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={zoomIn}
+          className="text-muted-foreground"
+        >
           <PlusIcon className="size-3" />
         </Button>
-        <Button variant="ghost" size="icon-xs" onClick={autoZoom} className="text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={autoZoom}
+          className="text-muted-foreground"
+        >
           <MaximizeIcon className="size-3.5" />
         </Button>
       </div>
 
+      <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-1 text-[0.625rem] text-muted-foreground">
+        <span>Design sample · Genesis 1:1 · KJV / OYCB</span>
+        <DesignerSampleCredits />
+      </div>
+      {fitWarning && (
+        <p
+          role="status"
+          className="border-b border-border/40 px-3 py-1 text-xs text-amber-400"
+        >
+          Text exceeds its region: {fitWarning}. Increase the region or reduce
+          padding/font size.
+        </p>
+      )}
       {/* Canvas container */}
       <div ref={containerRef} className="relative min-h-0 flex-1">
         <canvas ref={canvasElRef} />
         {!draftTheme && (
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#18181b" }}>
-            <p className="text-xs text-muted-foreground">Select a theme to begin editing</p>
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ background: "#18181b" }}
+          >
+            <p className="text-xs text-muted-foreground">
+              Select a theme to begin editing
+            </p>
           </div>
         )}
       </div>
 
       {/* Status bar */}
-      <div className="flex h-8 shrink-0 items-center border-t border-border/40 px-3 text-[0.5625rem] text-muted-foreground/70" style={{ background: "#18181b" }}>
-        <span>Output: {WS_WIDTH} × {WS_HEIGHT}px</span>
+      <div
+        className="flex min-h-8 shrink-0 flex-wrap items-center gap-y-1 border-t border-border/40 px-3 py-1 text-[0.5625rem] text-muted-foreground/70"
+        style={{ background: "#18181b" }}
+      >
+        <span>
+          Theme: {draftTheme?.resolution.width ?? WS_WIDTH} ×{" "}
+          {draftTheme?.resolution.height ?? WS_HEIGHT}px
+        </span>
         <span className="mx-2">·</span>
         <span>Zoom: {zoomLevel}%</span>
         <span className="mx-2">·</span>
@@ -384,7 +512,10 @@ export function DesignCanvas() {
         <span className="mx-2">·</span>
         <span>
           {selectedElement ? (
-            <>Editing: <span className="font-medium text-primary">{elementLabel}</span></>
+            <>
+              Editing:{" "}
+              <span className="font-medium text-primary">{elementLabel}</span>
+            </>
           ) : (
             "Click frame to select"
           )}
@@ -401,16 +532,19 @@ async function syncThemeToCanvas(
     workspace: fabric.Rect | null
     referenceRegion: fabric.Rect | null
     verseRegion: fabric.Rect | null
+    secondaryRegion: fabric.Rect | null
   }>,
   canvas: fabric.Canvas,
   onImageReady?: () => void,
   metricsRef?: React.MutableRefObject<VerseLayoutMetrics | null>,
-  dragging?: "reference" | "verse" | null
+  dragging?: "reference" | "verse" | "secondary" | null,
+  onMetrics?: (metrics: VerseLayoutMetrics) => void
 ) {
   const ws = objectsRef.current.workspace
   const refRegion = objectsRef.current.referenceRegion
   const verseRegion = objectsRef.current.verseRegion
-  if (!ws || !refRegion || !verseRegion) return
+  const secondaryRegion = objectsRef.current.secondaryRegion
+  if (!ws || !refRegion || !verseRegion || !secondaryRegion) return
 
   // Covers the frame background and every surface fill.
   preloadThemeImages(theme, onImageReady)
@@ -425,9 +559,11 @@ async function syncThemeToCanvas(
 
   if (!metrics) return
   if (metricsRef) metricsRef.current = metrics
+  onMetrics?.(metrics)
   const referenceRect = metrics.referenceRect
   const verseRect = metrics.verseRect
-  if (!referenceRect || !verseRect) return
+  const secondaryRect = metrics.secondaryVerseRect
+  if (!referenceRect || !verseRect || !secondaryRect) return
 
   ws.setCoords()
   const wsTopLeft = ws.getPointByOrigin("left", "top")
@@ -438,14 +574,26 @@ async function syncThemeToCanvas(
     theme.layout.mode === "free" &&
     metrics.referenceBoxRect &&
     metrics.verseBoxRect
-  const hitRects = freeMode
-    ? {
-        referenceRect: metrics.referenceBoxRect!,
-        verseRect: metrics.verseBoxRect!,
-      }
-    : { referenceRect, verseRect }
-  const mappedReferenceRect = mapLocalRectToWorkspaceRect(hitRects.referenceRect, wsTopLeft)
-  const mappedVerseRect = mapLocalRectToWorkspaceRect(hitRects.verseRect, wsTopLeft)
+  const hitRects =
+    freeMode || metrics.secondaryBoxRect
+      ? {
+          referenceRect: metrics.referenceBoxRect!,
+          verseRect: metrics.verseBoxRect!,
+          secondaryRect: metrics.secondaryBoxRect ?? secondaryRect,
+        }
+      : { referenceRect, verseRect, secondaryRect }
+  const mappedReferenceRect = mapLocalRectToWorkspaceRect(
+    hitRects.referenceRect,
+    wsTopLeft
+  )
+  const mappedVerseRect = mapLocalRectToWorkspaceRect(
+    hitRects.verseRect,
+    wsTopLeft
+  )
+  const mappedSecondaryRect = mapLocalRectToWorkspaceRect(
+    hitRects.secondaryRect,
+    wsTopLeft
+  )
 
   if (dragging !== "reference") {
     refRegion.set({
@@ -473,14 +621,30 @@ async function syncThemeToCanvas(
       "top"
     )
   }
+  if (dragging !== "secondary") {
+    secondaryRegion.set({
+      originX: "left",
+      originY: "top",
+      width: Math.max(24, mappedSecondaryRect.width),
+      height: Math.max(24, mappedSecondaryRect.height),
+    })
+    secondaryRegion.setPositionByOrigin(
+      new fabric.Point(mappedSecondaryRect.x, mappedSecondaryRect.y),
+      "left",
+      "top"
+    )
+  }
   canvas.bringObjectToFront(verseRegion)
+  canvas.bringObjectToFront(secondaryRegion)
   canvas.bringObjectToFront(refRegion)
 
   const selected = useBroadcastStore.getState().selectedElement
   refRegion.set({ strokeWidth: selected === "reference" ? 1 : 0 })
   verseRegion.set({ strokeWidth: selected === "verse" ? 1 : 0 })
+  secondaryRegion.set({ strokeWidth: selected === "secondary" ? 1 : 0 })
   refRegion.setCoords()
   verseRegion.setCoords()
+  secondaryRegion.setCoords()
 
   canvas.requestRenderAll()
 }
@@ -524,18 +688,17 @@ function drawTransparencyCheckerboard(ctx: CanvasRenderingContext2D): void {
   ctx.restore()
 }
 
-function renderThemeBitmap(
-  theme: BroadcastTheme,
-): { bitmap: HTMLCanvasElement; metrics: ReturnType<typeof renderVerse> } {
+function renderThemeBitmap(theme: BroadcastTheme): {
+  bitmap: HTMLCanvasElement
+  metrics: ReturnType<typeof renderVerse>
+} {
   const offscreen = document.createElement("canvas")
   offscreen.width = WS_WIDTH
   offscreen.height = WS_HEIGHT
   const ctx = offscreen.getContext("2d")
   if (!ctx) return { bitmap: offscreen, metrics: null }
 
-  const metrics = renderVerse(ctx, theme, SAMPLE_VERSE, {
-    imageCache: themeImageCache(),
-  })
+  const metrics = renderDesignerSample(ctx, theme)
   if (theme.background.type === "transparent") {
     drawTransparencyCheckerboard(ctx)
   }

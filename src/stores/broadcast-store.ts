@@ -9,11 +9,20 @@ import type {
   Verse,
   VerseRenderData,
 } from "@/types"
-import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel } from "@/types"
+import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel, MISSING_OUTPUT_RENDERER_ERROR } from "@/types"
 import { BUILTIN_THEMES, LOWER_THIRDS, CLASSIC_DARK } from "@/lib/builtin-themes"
+import { effectiveBroadcastTheme } from "@/lib/effective-broadcast-theme"
+import { secondaryVerseStyle } from "@/lib/bilingual-theme"
 import { normalizeTheme } from "@/lib/theme-migrations"
 
-type SelectedElement = "verse" | "reference" | null
+import { createBroadcastTrace, markBroadcastTrace, type BroadcastTrace } from "@/lib/broadcast-trace"
+
+import { readBroadcastSession, writeBroadcastSession, forgetBroadcastSession } from "@/lib/broadcast-session-snapshot"
+
+const restoredSession = readBroadcastSession()
+export const hasBroadcastSessionSnapshot = restoredSession !== null
+
+type SelectedElement = "verse" | "secondary" | "reference" | null
 
 export type NewThemeLayoutKind = "fullscreen" | "lower-thirds"
 
@@ -25,8 +34,10 @@ interface BroadcastState {
   outputs: BroadcastOutput[]
   /** Runtime on-air state per output id. Not persisted. */
   outputStatus: Record<string, BroadcastOutputStatus>
+  presentationRecovery: "restoring" | "ready" | "unknown"
   isLive: boolean
   liveVerse: VerseRenderData | null
+  liveTrace: BroadcastTrace | null
   clearMode: OutputClearMode
   /** Explicit clears must survive off/on without seeding the browsed preview. */
   hasExplicitClear: boolean
@@ -55,7 +66,7 @@ interface BroadcastState {
   togglePinTheme: (id: string) => void
   setActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
-  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null, clearMode?: OutputClearMode) => void
+  setLiveVerse: (verse: VerseRenderData | null, source?: Verse | null, clearMode?: OutputClearMode, trace?: BroadcastTrace) => void
   setAutoLive: (auto: boolean) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
@@ -111,8 +122,13 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
   return result
 }
 
+function resyncThemeOutputs(state: BroadcastState, themeId: string | null): void {
+  if (!themeId) return
+  for (const output of state.outputs) if (output.themeId === themeId) state.syncBroadcastOutputFor(output.id)
+}
+
 function emitDraftToBroadcast(state: BroadcastState): void {
-  if (!state.draftTheme) return
+  if (!state.draftTheme || state.presentationRecovery !== "ready") return
   const verse = state.isLive ? state.liveVerse : null
   for (const output of state.outputs) {
     if (output.themeId !== state.editingThemeId) continue
@@ -120,6 +136,7 @@ function emitDraftToBroadcast(state: BroadcastState): void {
       theme: state.draftTheme,
       verse,
       clearMode: state.clearMode,
+      trace: state.liveTrace ?? undefined,
     }).catch(() => {})
   }
 }
@@ -163,12 +180,14 @@ export function migrateLegacyOutputs(
 }
 
 export const useBroadcastStore = create<BroadcastState>((set, get) => ({
+  presentationRecovery: "ready",
   themes: [...BUILTIN_THEMES],
   activeThemeId: BUILTIN_THEMES[0].id,
   outputs: [defaultMainOutput()],
   outputStatus: {},
   isLive: false,
   liveVerse: null,
+  liveTrace: null,
   clearMode: "background",
   hasExplicitClear: false,
   liveSourceVerse: null,
@@ -178,6 +197,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   renamingThemeId: null,
   draftTheme: null,
   selectedElement: null,
+  ...restoredSession,
 
   loadThemes: () => {
     set({ themes: [...BUILTIN_THEMES] })
@@ -247,12 +267,16 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     })),
   syncBroadcastOutputFor: (outputId: string) => {
     const s = get()
+    if (s.presentationRecovery !== "ready") return
     const output = s.outputs.find((o) => o.id === outputId)
     if (!output) return
-    const theme = s.themes.find((t) => t.id === output.themeId) ?? s.themes[0]
+    const theme = effectiveBroadcastTheme(s, output.themeId)
     if (!theme) return
 
+    const trace = s.liveTrace ?? createBroadcastTrace()
+    markBroadcastTrace(trace, "output_event", outputId)
     void emitTo(outputWindowLabel(outputId), "broadcast:verse-update", {
+      trace,
       theme,
       verse: s.isLive ? s.liveVerse : null,
       clearMode: s.clearMode,
@@ -334,24 +358,34 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       return { outputStatus: { ...s.outputStatus, [id]: status } }
     }),
   setLive: (isLive) => {
-    set({ isLive })
+    if (get().presentationRecovery !== "ready") return
+    const trace = createBroadcastTrace()
+    markBroadcastTrace(trace, "intent_accepted")
+    set({ isLive, liveTrace: trace })
     get().syncBroadcastOutput()
   },
-  setLiveVerse: (liveVerse, source = null, clearMode = "background") => {
-    set({ liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null })
+  setLiveVerse: (liveVerse, source = null, clearMode = "background", trace = createBroadcastTrace()) => {
+    if (liveVerse !== null && get().presentationRecovery !== "ready") return
+    if (Object.values(get().outputStatus).some((status) => status.error === MISSING_OUTPUT_RENDERER_ERROR)) return
+    const recovering = get().presentationRecovery !== "ready"
+    set({ liveTrace: trace, liveVerse, liveSourceVerse: source, clearMode, hasExplicitClear: liveVerse === null,
+      presentationRecovery: "ready", ...(recovering ? { isLive: false } : {}) })
     get().syncBroadcastOutput()
   },
-  setAutoLive: (autoLive) => set({ autoLive }),
+  setAutoLive: (autoLive) => { if (get().presentationRecovery === "ready") set({ autoLive }) },
 
   // Designer
   setDesignerOpen: (isDesignerOpen) => {
     if (!isDesignerOpen) {
+      const previous = get().editingThemeId
       set({ isDesignerOpen, editingThemeId: null, draftTheme: null, selectedElement: null })
+      resyncThemeOutputs(get(), previous)
     } else {
       set({ isDesignerOpen })
     }
   },
   startEditing: (themeId) => {
+    const previous = get().editingThemeId
     const theme = get().themes.find((t) => t.id === themeId)
     if (!theme) return
     set({
@@ -359,13 +393,17 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       draftTheme: { ...theme, updatedAt: Date.now() },
       selectedElement: null,
     })
+    if (previous !== themeId) resyncThemeOutputs(get(), previous)
+    emitDraftToBroadcast(get())
   },
   stopEditing: () => {
+    const previous = get().editingThemeId
     set({
       editingThemeId: null,
       draftTheme: null,
       selectedElement: null,
     })
+    resyncThemeOutputs(get(), previous)
   },
   updateDraft: (updates) => {
     set((s) => ({
@@ -376,7 +414,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   updateDraftNested: (path, value) => {
     set((s) => ({
       draftTheme: s.draftTheme
-        ? (setNestedValue(s.draftTheme as unknown as Record<string, unknown>, path, value) as unknown as BroadcastTheme)
+        ? (setNestedValue((path.startsWith("secondaryVerseText.")
+          ? { ...s.draftTheme, secondaryVerseText: secondaryVerseStyle(s.draftTheme) }
+          : s.draftTheme) as unknown as Record<string, unknown>, path, value) as unknown as BroadcastTheme)
         : null,
     }))
     emitDraftToBroadcast(get())
@@ -420,6 +460,13 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   setRenamingTheme: (id) => set({ renamingThemeId: id }),
 }))
 
+// Synchronous session write precedes each action's output fanout, including
+// output configuration/draft changes that have not reached debounced disk save.
+useBroadcastStore.subscribe((state) => {
+  if (state.presentationRecovery === "ready") writeBroadcastSession(state)
+  else if (state.presentationRecovery === "unknown") forgetBroadcastSession()
+})
+
 // ── Theme persistence via tauri-plugin-store ──
 
 let tauriStore: Store | null = null
@@ -455,6 +502,14 @@ export function hydrateBroadcastThemes(): Promise<void> {
       if (main) patch.activeThemeId = main.themeId
       if (typeof autoLive === "boolean") patch.autoLive = autoLive
 
+      if (restoredSession) {
+        patch.outputs = restoredSession.outputs
+        patch.activeThemeId = restoredSession.activeThemeId
+        patch.autoLive = restoredSession.autoLive
+        const themes = new Map((patch.themes ?? BUILTIN_THEMES).map((theme) => [theme.id, theme]))
+        restoredSession.themes.forEach((theme) => themes.set(theme.id, theme))
+        patch.themes = [...themes.values()]
+      }
       useBroadcastStore.setState(patch)
 
       // Auto-persist on changes (debounced)

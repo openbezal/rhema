@@ -1,7 +1,8 @@
 use std::ffi::{c_void, CString};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex};
 
+use crate::frame_pump::{FramePump, FrameSender, FrameStats, VideoFrame};
 use libloading::{Library, Symbol};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -73,6 +74,9 @@ pub enum NdiFrameRate {
 }
 
 impl NdiFrameRate {
+    pub fn ratio(&self) -> (i32, i32) {
+        (i32::try_from(self.fps()).expect("supported NDI rate"), 1)
+    }
     pub fn fps(&self) -> u32 {
         match self {
             Self::Fps24 => 24,
@@ -93,6 +97,8 @@ pub enum NdiAlphaMode {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NdiSessionInfo {
+    pub generation: String,
+    pub frame_protocol: u32,
     pub source_name: String,
     pub resolution: NdiResolution,
     pub frame_rate: NdiFrameRate,
@@ -105,6 +111,10 @@ pub struct NdiSessionInfo {
 #[non_exhaustive]
 #[derive(Debug, Clone, Error)]
 pub enum NdiError {
+    #[error("frame delivery failed: {0}")]
+    FrameDelivery(String),
+    #[error("obsolete NDI session or renderer lease")]
+    StaleRenderer,
     #[error("NDI source name must not be empty")]
     EmptySourceName,
     #[error("unable to locate NDI library at {0}")]
@@ -135,10 +145,9 @@ pub enum NdiError {
 
 /// The loaded NDI runtime library plus the function pointers resolved from it.
 ///
-/// Exactly one `NdiLibrary` exists while any NDI session is alive: sessions
-/// hold an `Arc<NdiLibrary>` and `NdiRuntime` keeps only a `Weak`, so
-/// `NDIlib_initialize`/`NDIlib_destroy` run once per load — not once per
-/// session — and the library unloads when the last session drops.
+/// One lazily initialized library is retained for the runtime lifetime. This
+/// prevents a last-sender destroy racing a new output initialize while SDK
+/// teardown runs outside the output registry. Each sender also owns an Arc.
 struct NdiLibrary {
     _library: Library,
     send_create: NdiSendCreateFn,
@@ -195,7 +204,7 @@ impl NdiLibrary {
 
 impl Drop for NdiLibrary {
     fn drop(&mut self) {
-        log::info!("NDI: last session closed — destroying NDI runtime");
+        log::info!("NDI: runtime released — destroying NDI runtime");
         // SAFETY: NDIlib_initialize succeeded in load(); this is the sole
         // NDIlib_destroy call site and runs once, when the last Arc drops.
         unsafe { (self.ndi_destroy)() };
@@ -205,20 +214,27 @@ impl Drop for NdiLibrary {
 #[derive(Default)]
 pub struct NdiRuntime {
     sessions: std::collections::HashMap<String, ActiveNdiSession>,
-    /// Weak handle to the shared library so concurrent sessions reuse one
-    /// load/initialize, while an idle runtime holds nothing alive.
-    library: Weak<NdiLibrary>,
+    library: LibraryCache,
+    lifecycles: std::collections::HashMap<String, Arc<OutputLifecycle>>,
+    pending_starts: std::collections::HashMap<String, u64>,
     /// Directories searched (in order) for the NDI runtime library before the
     /// compile-time dev fallback. In production this is the Tauri resource dir.
     library_search_dirs: Vec<PathBuf>,
+    next_generation: u64,
 }
 
 impl std::fmt::Debug for NdiRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NdiRuntime")
             .field("active_sessions", &self.sessions.len())
-            .field("library_loaded", &(self.library.strong_count() > 0))
+            .field(
+                "library_loaded",
+                &self.library.lock().is_ok_and(|library| library.is_some()),
+            )
             .field("library_search_dirs", &self.library_search_dirs)
+            .field("next_generation", &self.next_generation)
+            .field("lifecycle_count", &self.lifecycles.len())
+            .field("pending_starts", &self.pending_starts)
             .finish()
     }
 }
@@ -230,27 +246,22 @@ impl NdiRuntime {
         self.library_search_dirs = dirs;
     }
 
-    /// Reuse the already-loaded NDI library, or load and initialize it fresh
-    /// when no session currently holds it.
-    fn shared_library(&mut self) -> Result<Arc<NdiLibrary>, NdiError> {
-        if let Some(library) = self.library.upgrade() {
-            return Ok(library);
-        }
-        let mut search_dirs = self.library_search_dirs.clone();
-        search_dirs.push(dev_fallback_dir());
-        let library = Arc::new(NdiLibrary::load(&search_dirs)?);
-        self.library = Arc::downgrade(&library);
-        Ok(library)
+    fn shared_library(&self) -> Result<Arc<NdiLibrary>, NdiError> {
+        load_cached_library(&self.library, &self.library_search_dirs)
     }
 
     /// Check if a specific session is active.
     pub fn is_active(&self, session_id: &str) -> bool {
-        self.sessions.contains_key(session_id)
+        self.sessions
+            .get(session_id)
+            .is_some_and(|session| session.pump.stats().active)
     }
 
     /// Check if any session is active.
     pub fn any_active(&self) -> bool {
-        !self.sessions.is_empty()
+        self.sessions
+            .values()
+            .any(|session| session.pump.stats().active)
     }
 
     pub fn start(
@@ -258,88 +269,138 @@ impl NdiRuntime {
         session_id: String,
         request: NdiStartRequest,
     ) -> Result<NdiSessionInfo, NdiError> {
-        log::info!(
-            "NDI[{session_id}]: starting session '{}'",
-            request.source_name
-        );
-        // Hold the library before dropping the old session, so restarting the
-        // only active session doesn't unload and immediately reload the runtime.
+        let next = self
+            .next_generation
+            .checked_add(1)
+            .ok_or_else(|| NdiError::FrameDelivery("session generation exhausted".into()))?;
         let library = self.shared_library()?;
-
-        // Stop existing session with this ID if running
-        if let Some(existing) = self.sessions.remove(&session_id) {
-            log::info!("NDI[{session_id}]: shutting down existing session before restart");
-            drop(existing);
+        if request.source_name.trim().is_empty() || request.source_name.contains('\0') {
+            return Err(NdiError::EmptySourceName);
         }
-
-        let session = ActiveNdiSession::create(request, library)?;
-        let info = session.info.clone();
-        log::info!(
-            "NDI[{session_id}]: session active — {}x{} @ {}fps",
-            info.width,
-            info.height,
-            info.fps
+        // Destroy the previous sender before reusing its discovery name. Two
+        // simultaneous SDK senders can cause automatic source-name suffixes.
+        self.stop(&session_id);
+        let sender = NdiSender::create(request, library, next.to_string())?;
+        let info = sender.info.clone();
+        let pump = FramePump::start(info.width, info.height, info.fps, sender)
+            .map_err(NdiError::FrameDelivery)?;
+        self.next_generation = next;
+        self.sessions.insert(
+            session_id,
+            ActiveNdiSession {
+                info: info.clone(),
+                pump,
+            },
         );
-        self.sessions.insert(session_id, session);
         Ok(info)
     }
 
     pub fn stop(&mut self, session_id: &str) {
-        if let Some(existing) = self.sessions.remove(session_id) {
+        if let Some(mut existing) = self.sessions.remove(session_id) {
             log::info!("NDI[{session_id}]: stopping session");
+            existing.pump.stop();
+            log::info!(
+                "[BCAST] output={session_id} stage=stopped stats={}",
+                serde_json::to_string(&existing.pump.stats()).unwrap_or_default()
+            );
             drop(existing);
         }
     }
 
     pub fn stop_all(&mut self) {
+        self.pending_starts.clear();
+        for lifecycle in self.lifecycles.values() {
+            drain_retired(lifecycle);
+        }
+        for session in self.sessions.values() {
+            session.pump.request_stop();
+        }
         for (id, _session) in self.sessions.drain() {
             log::info!("NDI[{id}]: stopping session");
         }
+    }
+
+    pub fn output_ids(&self) -> Vec<String> {
+        self.sessions.keys().cloned().collect()
     }
 
     pub fn current_info(&self, session_id: &str) -> Option<NdiSessionInfo> {
         self.sessions.get(session_id).map(|s| s.info.clone())
     }
 
-    pub fn send_frame_rgba(
-        &mut self,
+    pub fn begin_renderer(
+        &self,
         session_id: &str,
-        width: u32,
-        height: u32,
-        rgba_data: &[u8],
+        generation: &str,
+        expected_epoch: u64,
+    ) -> Result<String, NdiError> {
+        let session = self
+            .sessions
+            .get(session_id)
+            .ok_or(NdiError::SessionNotActive)?;
+        if session.info.generation != generation {
+            return Err(NdiError::StaleRenderer);
+        }
+        let epoch = session
+            .pump
+            .begin_epoch_if(expected_epoch)
+            .map_err(NdiError::FrameDelivery)?;
+        Ok(format!("{generation}:{epoch}"))
+    }
+    pub fn frame_stats(&self, session_id: &str) -> Option<FrameStats> {
+        self.sessions
+            .get(session_id)
+            .map(|session| session.pump.stats())
+    }
+    pub fn submit_frame(
+        &self,
+        session_id: &str,
+        lease: &str,
+        mut frame: VideoFrame,
     ) -> Result<(), NdiError> {
         let session = self
             .sessions
-            .get_mut(session_id)
+            .get(session_id)
             .ok_or(NdiError::SessionNotActive)?;
-        session.send_frame_rgba(width, height, rgba_data)
+        let (generation, epoch) = lease.split_once(':').ok_or(NdiError::StaleRenderer)?;
+        if generation != session.info.generation {
+            return Err(NdiError::StaleRenderer);
+        }
+        frame.epoch = epoch.parse().map_err(|_| NdiError::StaleRenderer)?;
+        session.pump.submit(frame).map_err(NdiError::FrameDelivery)
     }
 }
 
 struct ActiveNdiSession {
+    info: NdiSessionInfo,
+    pump: FramePump,
+}
+
+struct NdiSender {
     library: Arc<NdiLibrary>,
     _sender_name: CString,
     sender: NdiSendInstance,
     info: NdiSessionInfo,
     frame_count: u64,
     frame_buffer: Vec<u8>,
+    last_frame: Option<(u64, u64)>,
+    frame_metadata: Option<CString>,
 }
 
-// SAFETY: ActiveNdiSession is only accessed behind a Mutex in app state.
-// It contains opaque NDI pointers/function pointers and owned buffers.
-unsafe impl Send for ActiveNdiSession {}
-unsafe impl Sync for ActiveNdiSession {}
+// SAFETY: The sender and all owned buffers move to exactly one frame-worker
+// thread. SDK send and destroy run only there; no other thread accesses it.
+unsafe impl Send for NdiSender {}
 
-// SAFETY: NdiRuntime is stored behind Mutex and only mutated under lock.
-unsafe impl Send for NdiRuntime {}
-unsafe impl Sync for NdiRuntime {}
-
-impl ActiveNdiSession {
+impl NdiSender {
     #[expect(
         clippy::needless_pass_by_value,
         reason = "request fields are destructured and moved into the session"
     )]
-    fn create(request: NdiStartRequest, library: Arc<NdiLibrary>) -> Result<Self, NdiError> {
+    fn create(
+        request: NdiStartRequest,
+        library: Arc<NdiLibrary>,
+        generation: String,
+    ) -> Result<Self, NdiError> {
         let source_name = request.source_name.trim().to_string();
         if source_name.is_empty() {
             return Err(NdiError::EmptySourceName);
@@ -363,7 +424,7 @@ impl ActiveNdiSession {
             log::error!(
                 "NDI: NDIlib_send_create returned null for '{source_name}' (last OS error: {os_err})"
             );
-            // NDIlib_destroy fires via the Arc<NdiLibrary> drop if this was the only holder.
+            // Runtime cache retains the initialized library; no sender was created.
             return Err(NdiError::SenderCreateFailed);
         }
 
@@ -375,6 +436,8 @@ impl ActiveNdiSession {
             _sender_name: name,
             sender,
             info: NdiSessionInfo {
+                generation,
+                frame_protocol: 1,
                 source_name,
                 resolution: request.resolution,
                 frame_rate: request.frame_rate,
@@ -385,6 +448,8 @@ impl ActiveNdiSession {
             },
             frame_buffer: vec![0; (width * height * 4) as usize],
             frame_count: 0,
+            last_frame: None,
+            frame_metadata: None,
         })
     }
 
@@ -393,6 +458,7 @@ impl ActiveNdiSession {
         width: u32,
         height: u32,
         rgba_data: &[u8],
+        changed: bool,
     ) -> Result<(), NdiError> {
         if width != self.info.width || height != self.info.height {
             return Err(NdiError::FrameDimensionsMismatch {
@@ -410,16 +476,18 @@ impl ActiveNdiSession {
             self.frame_buffer.resize(expected, 0);
         }
 
-        // Convert RGBA -> BGRA for NDIlib_FourCC_type_BGRA.
-        for (idx, px) in rgba_data.chunks_exact(4).enumerate() {
-            let offset = idx * 4;
-            self.frame_buffer[offset] = px[2];
-            self.frame_buffer[offset + 1] = px[1];
-            self.frame_buffer[offset + 2] = px[0];
-            self.frame_buffer[offset + 3] = match self.info.alpha_mode {
-                NdiAlphaMode::NoneOpaque => 255,
-                NdiAlphaMode::StraightAlpha | NdiAlphaMode::PremultipliedAlpha => px[3],
-            };
+        if changed {
+            // Convert RGBA -> BGRA for NDIlib_FourCC_type_BGRA.
+            for (idx, px) in rgba_data.chunks_exact(4).enumerate() {
+                let offset = idx * 4;
+                self.frame_buffer[offset] = px[2];
+                self.frame_buffer[offset + 1] = px[1];
+                self.frame_buffer[offset + 2] = px[0];
+                self.frame_buffer[offset + 3] = match self.info.alpha_mode {
+                    NdiAlphaMode::NoneOpaque => 255,
+                    NdiAlphaMode::StraightAlpha | NdiAlphaMode::PremultipliedAlpha => px[3],
+                };
+            }
         }
 
         #[expect(
@@ -434,14 +502,17 @@ impl ActiveNdiSession {
             xres: width as i32,
             yres: height as i32,
             fourcc: u32::from_le_bytes(*b"BGRA"),
-            frame_rate_n: (self.info.fps * 1000) as i32,
-            frame_rate_d: 1001,
+            frame_rate_n: self.info.frame_rate.ratio().0,
+            frame_rate_d: self.info.frame_rate.ratio().1,
             picture_aspect_ratio: (width as f32) / (height as f32),
             frame_format_type: 1, // NDIlib_frame_format_type_progressive
             timecode: i64::MAX,   // NDIlib_send_timecode_synthesize
             p_data: self.frame_buffer.as_mut_ptr(),
             line_stride_in_bytes: (width * 4) as i32,
-            p_metadata: std::ptr::null(),
+            p_metadata: self
+                .frame_metadata
+                .as_ref()
+                .map_or(std::ptr::null(), |value| value.as_ptr()),
             timestamp: 0,
         };
 
@@ -465,11 +536,35 @@ impl ActiveNdiSession {
     }
 }
 
-impl Drop for ActiveNdiSession {
+impl FrameSender for NdiSender {
+    fn send(&mut self, frame: &VideoFrame) -> Result<(), String> {
+        let key = (frame.epoch, frame.revision);
+        if self.last_frame != Some(key) {
+            self.frame_metadata = Some(
+                CString::new(format!(
+                    "<rhema-frame generation=\"{}\" renderer=\"{}\" revision=\"{}\"/>",
+                    self.info.generation, frame.epoch, frame.revision
+                ))
+                .map_err(|error| error.to_string())?,
+            );
+        }
+        self.send_frame_rgba(
+            frame.width,
+            frame.height,
+            &frame.pixels,
+            self.last_frame != Some(key),
+        )
+        .map_err(|error| error.to_string())?;
+        self.last_frame = Some(key);
+        Ok(())
+    }
+}
+
+impl Drop for NdiSender {
     fn drop(&mut self) {
         // SAFETY: sender was created by NDIlib_send_create and is non-null (validated in create()).
         // send_destroy is a valid function pointer kept alive by the Arc<NdiLibrary>, which drops
-        // after this struct's fields — running NDIlib_destroy only once the last session is gone.
+        // after the runtime cache and all sender references release it.
         let sender = self.sender;
         unsafe {
             (self.library.send_destroy)(sender);
@@ -557,6 +652,17 @@ mod tests {
     }
 
     #[test]
+    fn selected_integer_rates_are_advertised_exactly() {
+        for (mode, expected) in [
+            (NdiFrameRate::Fps24, 24),
+            (NdiFrameRate::Fps30, 30),
+            (NdiFrameRate::Fps60, 60),
+        ] {
+            assert_eq!(mode.ratio(), (expected, 1));
+        }
+    }
+
+    #[test]
     fn resolves_library_from_search_dir() {
         let dir = TempDir::new("resolve");
         let planted = plant_library(&dir.0);
@@ -589,3 +695,11 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "ndi_lifecycle_tests.rs"]
+mod lifecycle_tests;
+
+#[path = "ndi_lifecycle.rs"]
+mod lifecycle;
+use lifecycle::{drain_retired, load_cached_library, LibraryCache, OutputLifecycle};

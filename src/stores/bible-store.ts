@@ -1,4 +1,4 @@
-import { resolveTranslationSelection, saveTranslationSelection, translationCode, type TranslationSelectionStatus } from "@/lib/translation-selection"
+import { resolveSecondaryTranslation, resolveTranslationSelection, saveTranslationSelection, translationCode, type TranslationSelectionStatus } from "@/lib/translation-selection"
 import { create } from "zustand"
 import { load } from "@tauri-apps/plugin-store"
 import { invoke } from "@tauri-apps/api/core"
@@ -27,6 +27,8 @@ interface BibleState {
   setFollowDetections: (enabled: boolean) => void
   translations: Translation[]
   activeTranslationId: number
+  secondaryTranslationCode: string | null
+  setSecondaryTranslation: (code: string | null) => void
   activeTranslationCode: string | null
   translationSelectionStatus: TranslationSelectionStatus
   books: Book[]
@@ -67,6 +69,9 @@ export const useBibleStore = create<BibleState>((set, get) => ({
   translations: [],
   activeTranslationId: 1, // Resolved against installed metadata during hydration.
   activeTranslationCode: "KJV",
+  secondaryTranslationCode: null,
+  setSecondaryTranslation: (code) => set((state) => ({ secondaryTranslationCode:
+    resolveSecondaryTranslation(state.translations, { version: 1, secondaryCode: code }, state.activeTranslationCode) })),
   translationSelectionStatus: "ready",
   books: [],
   searchResults: [],
@@ -81,18 +86,20 @@ export const useBibleStore = create<BibleState>((set, get) => ({
   setTranslations: (translations) => {
     const state = get()
     if (!translations.some((item) => item.is_downloaded)) {
-      set({ translations, translationSelectionStatus: "unavailable" })
+      set({ translations, translationSelectionStatus: "unavailable", secondaryTranslationCode: null })
       return
     }
+    const secondaryTranslationCode = resolveSecondaryTranslation(translations, { version: 1, secondaryCode: state.secondaryTranslationCode }, state.activeTranslationCode)
     const selected = translations.find((item) => item.is_downloaded && translationCode(item) === state.activeTranslationCode)
     if (state.translationSelectionStatus === "ready") {
-      set({ translations, ...(selected ? { activeTranslationId: selected.id } : { translationSelectionStatus: "needs_confirmation" }) })
-    } else set({ translations })
+      set({ translations, secondaryTranslationCode, ...(selected ? { activeTranslationId: selected.id } : { translationSelectionStatus: "needs_confirmation" }) })
+    } else set({ translations, secondaryTranslationCode })
   },
   setActiveTranslation: (activeTranslationId) => {
     const selected = get().translations.find((item) => item.id === activeTranslationId && item.is_downloaded)
     if (!selected) return
-    set({ activeTranslationId, activeTranslationCode: translationCode(selected), translationSelectionStatus: "ready" })
+    set({ activeTranslationId, activeTranslationCode: translationCode(selected), translationSelectionStatus: "ready",
+      secondaryTranslationCode: resolveSecondaryTranslation(get().translations, { version: 1, secondaryCode: get().secondaryTranslationCode }, translationCode(selected)) })
   },
   setBooks: (books) => set({ books }),
   setSearchResults: (searchResults) => set({ searchResults }),
@@ -107,7 +114,7 @@ export const useBibleStore = create<BibleState>((set, get) => ({
 
 /** Resolve a saved stable code against the current database, never an unverified old ID. */
 export async function hydrateBibleStore(): Promise<void> {
-  useBibleStore.setState({ translationSelectionStatus: "loading" })
+  useBibleStore.setState({ translationSelectionStatus: "loading", secondaryTranslationCode: null })
   let translations: Translation[]
   try {
     translations = await invoke<Translation[]>("list_translations")
@@ -135,6 +142,7 @@ export async function hydrateBibleStore(): Promise<void> {
     ...(selection.translation ? { activeTranslationId: selection.translation.id } : {}),
     activeTranslationCode: selection.status === "ready" && selection.translation ? translationCode(selection.translation) : null,
     translationSelectionStatus: selection.status === "ready" ? "loading" : selection.status,
+    secondaryTranslationCode: selection.status === "ready" ? resolveSecondaryTranslation(translations, saved, selection.translation ? translationCode(selection.translation) : null) : null,
   })
   if (selection.status !== "ready" || !selection.translation) return
   try {
@@ -173,10 +181,11 @@ export async function initBiblePersistence(): Promise<() => void> {
         previousCode = null
         return
       }
-      if (state.activeTranslationCode === previousCode) return
-      previousCode = state.activeTranslationCode
+      const key = `${state.activeTranslationCode}|${state.secondaryTranslationCode ?? ""}`
+      if (key === previousCode) return
+      previousCode = key
       if (timer) clearTimeout(timer)
-      const selection = saveTranslationSelection(state.activeTranslationCode, state.translations)
+      const selection = saveTranslationSelection(state.activeTranslationCode, state.translations, state.secondaryTranslationCode)
       timer = setTimeout(() => {
         timer = null
         writes = writes.then(async () => {

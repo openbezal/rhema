@@ -66,6 +66,7 @@ function isValidBox(box: ElementBox | undefined): box is ElementBox {
  */
 export function normalizeTheme(theme: BroadcastTheme): BroadcastTheme {
   const layout = { ...theme.layout }
+  if (layout.secondaryBox && !isValidBox(layout.secondaryBox)) delete layout.secondaryBox
   layout.mode = layout.mode === "free" ? "free" : "stacked"
   if (
     layout.mode === "free" &&
@@ -76,6 +77,9 @@ export function normalizeTheme(theme: BroadcastTheme): BroadcastTheme {
   return {
     ...theme,
     verseNumbers: { ...DEFAULT_VERSE_NUMBERS, ...theme.verseNumbers },
+    ...(theme.secondaryVerseText ? { secondaryVerseText: {
+      ...theme.secondaryVerseText, surface: normalizeSurface(theme.secondaryVerseText.surface),
+    } } : {}),
     textBox: { ...DEFAULT_SURFACE, ...theme.textBox },
     verseText: {
       ...theme.verseText,
@@ -112,14 +116,14 @@ const rectToBox = (
 export function seedFreeBoxesForTheme(
   theme: BroadcastTheme,
   verse: VerseRenderData = SAMPLE_VERSE
-): { referenceBox: ElementBox; verseBox: ElementBox } | null {
+): { referenceBox: ElementBox; verseBox: ElementBox; secondaryBox?: ElementBox } | null {
   const ctx = document.createElement("canvas").getContext("2d")
   if (!ctx) return null
   const stackedTheme: BroadcastTheme = {
     ...theme,
     layout: { ...theme.layout, mode: "stacked" },
   }
-  const metrics = computeVerseLayoutMetrics(ctx, stackedTheme, verse)
+  const metrics = computeVerseLayoutMetrics(ctx, verse.secondary && theme.layout.mode === "free" ? theme : stackedTheme, verse)
   return seedFreeBoxesFromMetrics(metrics, theme.resolution)
 }
 
@@ -132,12 +136,14 @@ export function seedFreeBoxesForTheme(
 export function seedFreeBoxesFromMetrics(
   metrics: VerseLayoutMetrics,
   resolution: BroadcastTheme["resolution"]
-): { referenceBox: ElementBox; verseBox: ElementBox } | null {
-  const { referenceRect, verseRect } = metrics
+): { referenceBox: ElementBox; verseBox: ElementBox; secondaryBox?: ElementBox } | null {
+  const referenceRect = metrics.secondaryBoxRect ? metrics.referenceBoxRect ?? metrics.referenceRect : metrics.referenceRect
+  const verseRect = metrics.secondaryBoxRect ? metrics.verseBoxRect ?? metrics.verseRect : metrics.verseRect
   if (!referenceRect || !verseRect) return null
   const { width: canvasW, height: canvasH } = resolution
   return {
     referenceBox: rectToBox(referenceRect, canvasW, canvasH),
     verseBox: rectToBox(verseRect, canvasW, canvasH),
+    ...(metrics.secondaryBoxRect ? { secondaryBox: rectToBox(metrics.secondaryBoxRect, canvasW, canvasH) } : {}),
   }
 }

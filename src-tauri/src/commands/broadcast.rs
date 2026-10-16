@@ -4,12 +4,12 @@
 )]
 
 use std::sync::Mutex;
+mod frame_protocol;
 
-use base64::Engine;
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::State;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Map `output_id` to its Tauri window label (`broadcast-{id}`).
 ///
@@ -37,15 +37,6 @@ pub struct MonitorInfo {
     pub name: String,
     pub width: u32,
     pub height: u32,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NdiFrameRequest {
-    pub output_id: String,
-    pub width: u32,
-    pub height: u32,
-    pub rgba_base64: String,
 }
 
 #[tauri::command]
@@ -228,67 +219,165 @@ pub async fn close_broadcast_window(
 }
 
 #[tauri::command]
-pub fn start_ndi(
+pub async fn start_ndi(
+    app: tauri::AppHandle,
     output_id: String,
-    runtime: State<'_, Mutex<NdiRuntime>>,
     request: NdiStartRequest,
 ) -> Result<NdiSessionInfo, String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime.start(output_id, request).map_err(|e| {
-        log::error!("start_ndi failed: {e}");
-        e.to_string()
+    let worker_app = app.clone();
+    let worker_id = output_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let runtime = worker_app.state::<Mutex<NdiRuntime>>();
+        NdiRuntime::start_shared(&runtime, &worker_id, request).map_err(|error| error.to_string())
     })
+    .await
+    .map_err(|error| error.to_string())
+    .and_then(std::convert::identity);
+    let _ = app.emit_to(
+        "main",
+        "broadcast:native-output-status",
+        serde_json::json!({ "outputId": output_id }),
+    );
+    result
 }
 
 #[tauri::command]
-pub fn stop_ndi(output_id: String, runtime: State<'_, Mutex<NdiRuntime>>) -> Result<(), String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime.stop(&output_id);
-    Ok(())
+pub async fn stop_ndi(app: tauri::AppHandle, output_id: String) -> Result<(), String> {
+    let worker_app = app.clone();
+    let worker_id = output_id.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let runtime = worker_app.state::<Mutex<NdiRuntime>>();
+        NdiRuntime::stop_shared(&runtime, &worker_id).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())
+    .and_then(std::convert::identity);
+    let _ = app.emit_to(
+        "main",
+        "broadcast:native-output-status",
+        serde_json::json!({ "outputId": output_id }),
+    );
+    result
+}
+
+/// A boot discriminator, not an authentication token. A restored `WebKit` session
+/// must not restore on-air content across native process restarts.
+#[tauri::command]
+pub fn get_broadcast_process_identity() -> String {
+    static IDENTITY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    IDENTITY
+        .get_or_init(|| {
+            format!(
+                "{}:{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos()
+            )
+        })
+        .clone()
+}
+
+#[tauri::command]
+pub fn get_ndi_output_ids(runtime: State<'_, Mutex<NdiRuntime>>) -> Result<Vec<String>, String> {
+    Ok(runtime
+        .lock()
+        .map_err(|error| error.to_string())?
+        .output_ids())
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NdiStatusResponse {
     pub active: bool,
     pub width: u32,
     pub height: u32,
     pub fps: u32,
+    pub generation: String,
+    pub frame_protocol: u32,
+    pub stats: rhema_broadcast::frame_pump::FrameStats,
 }
-
 #[tauri::command]
 pub fn get_ndi_status(
     output_id: String,
     runtime: State<'_, Mutex<NdiRuntime>>,
 ) -> Result<Option<NdiStatusResponse>, String> {
-    let runtime = runtime.lock().map_err(|e| e.to_string())?;
-    match runtime.current_info(&output_id) {
-        Some(info) => Ok(Some(NdiStatusResponse {
-            active: true,
+    let runtime = runtime.lock().map_err(|error| error.to_string())?;
+    Ok(runtime
+        .current_info(&output_id)
+        .zip(runtime.frame_stats(&output_id))
+        .map(|(info, stats)| NdiStatusResponse {
+            active: stats.active,
             width: info.width,
             height: info.height,
             fps: info.fps,
-        })),
-        None => Ok(None),
+            generation: info.generation,
+            frame_protocol: info.frame_protocol,
+            stats,
+        }))
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NdiRendererLease {
+    pub lease: String,
+    pub width: u32,
+    pub height: u32,
+    pub fps: u32,
+}
+#[tauri::command]
+pub fn begin_ndi_renderer(
+    output_id: String,
+    generation: String,
+    expected_epoch: u64,
+    window: tauri::WebviewWindow,
+    runtime: State<'_, Mutex<NdiRuntime>>,
+) -> Result<NdiRendererLease, String> {
+    if window.label() != window_label(&output_id)? {
+        return Err("frame renderer must own its output window".into());
     }
+    let runtime = runtime.lock().map_err(|error| error.to_string())?;
+    let lease = runtime
+        .begin_renderer(&output_id, &generation, expected_epoch)
+        .map_err(|error| error.to_string())?;
+    let info = runtime
+        .current_info(&output_id)
+        .ok_or("NDI session ended")?;
+    Ok(NdiRendererLease {
+        lease,
+        width: info.width,
+        height: info.height,
+        fps: info.fps,
+    })
 }
 
+// Binary RGBA body; headers carry only bounded protocol metadata. The command
+// enqueues owned bytes and returns without waiting for an SDK/receiver send.
 #[tauri::command]
 pub fn push_ndi_frame(
+    request: tauri::ipc::Request<'_>,
+    window: tauri::WebviewWindow,
     runtime: State<'_, Mutex<NdiRuntime>>,
-    request: NdiFrameRequest,
 ) -> Result<(), String> {
-    let rgba_data = base64::engine::general_purpose::STANDARD
-        .decode(&request.rgba_base64)
-        .map_err(|e| format!("base64 decode error: {e}"))?;
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("frame body must be binary RGBA".into());
+    };
+    let header = |name: &str| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+    };
+    let output_id = header("x-rhema-output").ok_or("missing output id")?;
+    if window.label() != window_label(output_id)? {
+        return Err("frame renderer must own its output window".into());
+    }
+    let packet = frame_protocol::parse_packet(header, bytes)?;
     runtime
-        .send_frame_rgba(
-            &request.output_id,
-            request.width,
-            request.height,
-            &rgba_data,
-        )
-        .map_err(|e| e.to_string())
+        .lock()
+        .map_err(|error| error.to_string())?
+        .submit_frame(&packet.output_id, &packet.lease, packet.frame)
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
