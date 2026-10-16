@@ -1,0 +1,67 @@
+import {mockIPC,mockWindows} from '@tauri-apps/api/mocks'
+import {createRoot} from 'react-dom/client'
+import {useSyncExternalStore} from 'react'
+import './src/index.css'
+const catalogue=[{id:8,abbreviation:'OYCB',title:'Open Yoruba Contemporary Bible',language:'yo',is_downloaded:true,is_copyrighted:true},{id:9,abbreviation:'BSRK',title:'Open Hausa Contemporary Bible',language:'ha',is_downloaded:true,is_copyrighted:true},{id:10,abbreviation:'BIUO',title:'Open Igbo Contemporary Bible',language:'ig',is_downloaded:true,is_copyrighted:true},{id:1,abbreviation:'KJV',title:'King James Version',language:'en',is_downloaded:true,is_copyrighted:false},{id:2,abbreviation:'ESV',title:'English Standard Version',language:'en',is_downloaded:true,is_copyrighted:true}]
+const book=(id:number,b=43)=>({id:id*100+b,translation_id:id,book_number:b,name:b===62?'I John':'John',abbreviation:b===62?'1Jn':'Jn',testament:'NT'})
+const row=(id:number,chapter:number,verse:number,b=43)=>({id:id*1000+chapter*100+verse,translation_id:id,book_number:b,book_name:b===62?'I John':'John',book_abbreviation:b===62?'1Jn':'Jn',chapter,verse,text:`Synthetic ${catalogue.find(t=>t.id===id)?.abbreviation} fixture for ${b===62?'I John':'John'} ${chapter}:${verse}. Archive workflow only.`})
+let fileMode='saved';let documentMode='valid';let referenceArchive:any=null;let fileReceipt:any=null;
+const records=new Map<number,string>();const stores=new Map<string,Record<string,unknown>>([['settings.json',{onboardingComplete:true,sttProvider:'whisper'}]])
+let rid=0;const calls:string[]=[];const native={activeTranslationId:1,secondaryDelay:false,transcribing:false,readingStops:0,osc:{running:false,port:null as number|null},http:{running:false,port:null as number|null}}
+const subscribers=new Set<()=>void>();let nativeSnapshot=JSON.stringify(native)
+function changed(){nativeSnapshot=JSON.stringify({...native,fileMode,documentMode,fileReceipt,calls:calls.slice(-8)});subscribers.forEach(fn=>fn())}
+mockWindows('main')
+mockIPC(async(command,args:any)=>{
+ if(!command.includes('log')&&command!=='update_remote_status'&&command!=='ui_mark'){calls.push(command);if(calls.length>50)calls.shift()}
+ if(command==='save_export_document'){
+  if(fileMode==='error')throw new Error('Synthetic disk-full failure');
+  if(fileMode==='cancel')return false;
+  fileReceipt={format:args.format,bytes:new TextEncoder().encode(args.content).length,hasSecret:args.content.includes('FAKE-SECRET'),hasPartial:args.content.includes('UNFINISHED-PARTIAL'),hasUnicode:args.content.includes('Ọlọ́run'),kind:args.format==='json'?JSON.parse(args.content).kind:'text'};changed();return true;
+ }
+ if(command==='read_import_document'){
+  if(fileMode==='cancel')return null;
+  if(fileMode==='error')throw new Error('Synthetic unreadable file');
+  return {name:'saved-Sunday.json',text:documentMode==='malformed'?'{broken':JSON.stringify({...referenceArchive,...(documentMode==='future'?{version:99}:{})})};
+ }
+ if(command==='list_translations')return catalogue
+ if(command==='list_books')return [book(args.translationId),book(args.translationId,62)]
+ if(command==='get_chapter')return [43,62].includes(args.bookNumber)&&[1,3,4].includes(args.chapter)?(args.bookNumber===62?[1,2]:[1,2,16,17,18]).map(v=>row(args.translationId,args.chapter,v,args.bookNumber)):[]
+ if(command==='get_verse'){if(args.translationId===9&&native.secondaryDelay)await new Promise(resolve=>setTimeout(resolve,8000));return [43,62].includes(args.bookNumber)&&[1,3,4].includes(args.chapter)&&(args.bookNumber===62?[1,2]:[1,2,16,17,18]).includes(args.verse)?row(args.translationId,args.chapter,args.verse,args.bookNumber):null}
+ if(command==='set_active_translation'){native.activeTranslationId=args.translationId;changed();return}
+ if(command==='get_active_translation')return native.activeTranslationId
+ if(command==='get_osc_status')return native.osc
+ if(command==='get_http_status')return native.http
+ if(command==='start_osc'||command==='start_http'){const kind=command==='start_osc'?'osc':'http';native[kind]={running:true,port:args.port};changed();return args.port}
+ if(command==='stop_osc'||command==='stop_http'){const kind=command==='stop_osc'?'osc':'http';native[kind]={running:false,port:null};changed();return}
+ if(command==='start_transcription'){native.transcribing=true;changed();return}
+ if(command==='stop_transcription'){native.transcribing=false;changed();return}
+ if(command==='stop_reading_mode'){native.readingStops++;changed();return}
+ if(command==='get_audio_devices')return [{id:'fixture',name:'Mock microphone — no capture',is_default:true}]
+ if(command==='get_ndi_status')return null
+ if(command==='get_ndi_output_ids')return []
+ if(command==='get_broadcast_process_identity')return 'integration-fixture-process'
+ if(command==='plugin:window|get_all_windows')return ['main','broadcast-main']
+ if(command==='plugin:window|is_visible')return args.label==='broadcast-main'
+ if(command==='plugin:store|load'){const id=++rid;records.set(id,args.path);if(!stores.has(args.path))stores.set(args.path,{});return id}
+ if(command==='plugin:store|get'){const data=stores.get(records.get(args.rid)!)!;return [data[args.key],args.key in data]}
+ if(command==='plugin:store|set'){stores.get(records.get(args.rid)!)![args.key]=args.value;return}
+ if(command==='plugin:store|save')return
+ if(command==='get_embedding_status')return {available:false,model_loaded:false,embeddings_loaded:false}
+ if(command==='list_system_fonts')return ['Georgia','Arial']
+ if(command==='get_recent_detections'||command==='search_context'||command==='search_verses'||command==='semantic_search'||command==='get_cross_references')return []
+ return undefined
+},{shouldMockEvents:true})
+async function boot(){
+ const [{App},{ThemeProvider},{TooltipProvider},{useBibleStore},{useQueueStore},{useSettingsStore},{useBroadcastStore},{useTranscriptStore},{useDetectionStore}]=await Promise.all([import('./src/App'),import('./src/components/theme-provider'),import('./src/components/ui/tooltip'),import('./src/stores/bible-store'),import('./src/stores/queue-store'),import('./src/stores/settings-store'),import('./src/stores/broadcast-store'),import('./src/stores/transcript-store'),import('./src/stores/detection-store')])
+ useSettingsStore.setState({onboardingComplete:true,sttProvider:'whisper',deepgramApiKey:'FAKE-SECRET',audioDeviceId:'qa-machine-only'})
+ useBibleStore.setState({translations:catalogue,activeTranslationId:1,activeTranslationCode:'KJV',translationSelectionStatus:'ready',books:[book(1),book(1,62)],secondaryTranslationCode:'BSRK',currentChapter:[16,17,18].map(v=>row(1,3,v)),selectedVerse:row(1,3,16),followDetections:false})
+ useQueueStore.setState({items:[16,17,18].map(v=>({id:`qa-q-${v}`,verse:row(1,3,v),reference:`John 3:${v}`,translation_code:'KJV',confidence:1,source:'manual' as const,added_at:Date.now()})),activeIndex:null})
+ useBroadcastStore.setState({autoLive:false,isLive:true,liveVerse:{reference:'John 3:16 (KJV)',segments:[{text:row(1,3,16).text}]},liveSourceVerse:row(1,3,16),liveTrace:null,hasExplicitClear:false,clearMode:"background",presentationRecovery:"ready"})
+ useDetectionStore.setState({detections:[16,17].map(v=>({book_number:43,book_name:'John',chapter:3,verse:v,verse_ref:`John 3:${v}`,verse_text:row(1,3,v).text,translation_id:1,translation_code:'KJV',confidence:.95,source:'direct' as const,auto_queued:false,transcript_snippet:'QA spoken reference',is_chapter_only:false,score_kind:'reference' as const,timestamp:Date.now()}))})
+ useTranscriptStore.setState({segments:Array.from({length:205},(_,i)=>({id:`segment-${i}`,text:i===0?'Ọlọ́run — Chineke — Allah. Synthetic saved transcript.':`Synthetic completed segment ${i+1}`,is_final:true,confidence:.95,words:[],timestamp:Date.UTC(2026,9,16,9,0,i)})),currentPartial:'UNFINISHED-PARTIAL'})
+ const {captureSessionArchive}=await import('./src/lib/session-archive');referenceArchive=captureSessionArchive('Saved Sunday Ọlọ́run');referenceArchive.transcript[0].text='Opened archive Ọlọ́run — historical reference only.';
+ function Debug(){const bible=useBibleStore(),queue=useQueueStore(),live=useBroadcastStore(),transcript=useTranscriptStore();const runtime=useSyncExternalStore(fn=>{subscribers.add(fn);return()=>subscribers.delete(fn)},()=>nativeSnapshot)
+ return <><div style={{position:'fixed',left:125,top:29,zIndex:200,fontSize:10,color:'#fbbf24'}}><label>QA file receipt <select aria-label="QA file receipt" value={fileMode} onChange={e=>{fileMode=e.target.value;changed()}}><option value="saved">Saved</option><option value="cancel">Cancel</option><option value="error">Error</option></select></label><label> QA document <select aria-label="QA document" value={documentMode} onChange={e=>{documentMode=e.target.value;changed()}}><option value="valid">Valid</option><option value="future">Future</option><option value="malformed">Malformed</option></select></label></div><button data-testid="delay-secondary" style={{position:'fixed',left:400,top:30,zIndex:200,fontSize:10,color:'#fbbf24'}} onClick={()=>{native.secondaryDelay=!native.secondaryDelay;changed()}}>QA secondary delay: {JSON.parse(runtime).secondaryDelay?'8s':'off'}</button><div style={{position:'fixed',top:10,left:125,zIndex:100,pointerEvents:'none',fontSize:10,color:'#fbbf24'}}>QA · archive workflow · native file I/O/DB/audio/outputs mocked</div><pre data-testid="integration-fixture-state" style={{position:'fixed',bottom:0,left:0,zIndex:100,fontSize:9,maxWidth:'100%',maxHeight:36,overflow:'auto',background:'#101010',color:'#fff',padding:3}}>{JSON.stringify({onAir:live.isLive,live:live.liveVerse?.reference,preview:bible.selectedVerse?.verse,primary:bible.activeTranslationCode,secondary:bible.secondaryTranslationCode,secondaryText:live.liveVerse?.secondary?.text,recovery:live.presentationRecovery,queue:queue.items.map(i=>i.id),active:queue.activeIndex,transcribing:transcript.isTranscribing,fileReceipt,fileMode,documentMode,transcriptCount:transcript.segments.length,runtime:JSON.parse(runtime)})}</pre></>}
+ createRoot(document.getElementById('root')!).render(<ThemeProvider defaultTheme="dark"><TooltipProvider><App/><Debug/></TooltipProvider></ThemeProvider>)
+}
+void boot().catch(error=>{document.body.innerHTML=`<pre>Fixture error: ${String(error)}</pre>`})

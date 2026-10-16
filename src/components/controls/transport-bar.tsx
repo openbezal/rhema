@@ -18,6 +18,7 @@ import { ThemeDesigner } from "@/components/broadcast/theme-designer"
 import { BroadcastOutputsDialog } from "@/components/broadcast/broadcast-outputs-dialog"
 import { useAudioStore, useTranscriptStore, useBroadcastStore } from "@/stores"
 import { useTheme } from "@/components/theme-provider"
+import { SessionArchivePanel } from "@/components/panels/session-archive-panel"
 
 export function TransportBar() {
   const { theme, setTheme } = useTheme()
@@ -86,6 +87,7 @@ export function TransportBar() {
           <PaletteIcon className="size-3.5" />
         </Button>
         <ThemeDesigner />
+        <SessionArchivePanel />
         <Button
           variant="ghost"
           size="icon-sm"
