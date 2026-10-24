@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { Verse } from "@/types"
-import { presentVerse } from "./use-broadcast"
+import { presentVerse, toDualVerseRenderData } from "./use-broadcast"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 
@@ -42,6 +42,7 @@ describe("presentVerse", () => {
     useBibleStore.setState({
       selectedVerse: null,
       activeTranslationId: 2,
+      secondaryTranslationId: null,
       translations: [
         {
           id: 2,
@@ -69,7 +70,7 @@ describe("presentVerse", () => {
     await presentVerse(staleVerse)
 
     expect(useBibleStore.getState().selectedVerse?.text).toBe(
-      "For God so loved the world",
+      "For God so loved the world"
     )
     const liveVerse = useBroadcastStore.getState().liveVerse
     expect(liveVerse?.reference).toBe("John 3:16 (NKJV)")
@@ -96,7 +97,7 @@ describe("presentVerse", () => {
 
     expect(useBibleStore.getState().selectedVerse).toEqual(sampleVerse)
     expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
-      sampleVerse.text,
+      sampleVerse.text
     )
   })
 
@@ -107,17 +108,75 @@ describe("presentVerse", () => {
 
     expect(useBibleStore.getState().selectedVerse).toEqual(sampleVerse)
     expect(useBroadcastStore.getState().liveVerse?.segments[0].text).toBe(
-      sampleVerse.text,
+      sampleVerse.text
     )
   })
 
   it("records the presented verse as the live source verse", async () => {
-    const fullVerse: Verse = { ...staleVerse, id: 26137, translation_id: 2, text: "For God so loved the world" }
+    const fullVerse: Verse = {
+      ...staleVerse,
+      id: 26137,
+      translation_id: 2,
+      text: "For God so loved the world",
+    }
     mockInvoke.mockResolvedValue(fullVerse)
 
     await presentVerse(staleVerse)
 
     expect(useBroadcastStore.getState().liveSourceVerse).toEqual(fullVerse)
+  })
+
+  it("presents the active and secondary translations together", async () => {
+    const english: Verse = {
+      ...staleVerse,
+      id: 26137,
+      translation_id: 2,
+      text: "For God so loved the world",
+    }
+    const yoruba: Verse = {
+      ...staleVerse,
+      id: 76137,
+      translation_id: 3,
+      text: "Nitori Ọlọrun fẹ́ràn ayé",
+    }
+    useBibleStore.setState({
+      secondaryTranslationId: 3,
+      translations: [
+        {
+          id: 2,
+          abbreviation: "NKJV",
+          title: "New King James Version",
+          language: "en",
+          is_copyrighted: true,
+          is_downloaded: true,
+        },
+        {
+          id: 3,
+          abbreviation: "OYCB",
+          title: "Yorùbá Bible",
+          language: "yo",
+          is_copyrighted: false,
+          is_downloaded: true,
+        },
+      ],
+    })
+    mockInvoke.mockImplementation(
+      (command: unknown, args: { translationId?: number }) => {
+        if (command !== "get_verse") return Promise.resolve(undefined)
+        return Promise.resolve(args.translationId === 2 ? english : yoruba)
+      }
+    )
+
+    await presentVerse(staleVerse)
+
+    expect(useBroadcastStore.getState().liveVerse).toMatchObject({
+      reference: "John 3:16",
+      segments: [{ text: "For God so loved the world" }],
+      translationLines: [
+        "For God so loved the world",
+        "Nitori Ọlọrun fẹ́ràn ayé",
+      ],
+    })
   })
 
   it("refuses to present a verse with empty text (issue #141)", async () => {
@@ -132,7 +191,12 @@ describe("presentVerse", () => {
   })
 
   it("refuses to replace the live verse with an empty one", async () => {
-    const fullVerse: Verse = { ...staleVerse, id: 26137, translation_id: 2, text: "For God so loved the world" }
+    const fullVerse: Verse = {
+      ...staleVerse,
+      id: 26137,
+      translation_id: 2,
+      text: "For God so loved the world",
+    }
     // Route by command — mark() also calls invoke ("ui_mark"), so Once
     // queues would be consumed by instrumentation.
     let lookups = 0
@@ -146,7 +210,7 @@ describe("presentVerse", () => {
     await presentVerse({ ...sampleVerse, text: "" })
 
     expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
-      "John 3:16 (NKJV)",
+      "John 3:16 (NKJV)"
     )
   })
 
@@ -155,7 +219,7 @@ describe("presentVerse", () => {
     let resolveOlder: (v: Verse) => void = () => {}
     mockInvoke
       .mockImplementationOnce(
-        () => new Promise<Verse>((resolve) => (resolveOlder = resolve)),
+        () => new Promise<Verse>((resolve) => (resolveOlder = resolve))
       )
       .mockResolvedValueOnce(sampleVerse)
 
@@ -165,7 +229,26 @@ describe("presentVerse", () => {
     await first
 
     expect(useBroadcastStore.getState().liveVerse?.reference).toBe(
-      "Genesis 1:2 (NKJV)",
+      "Genesis 1:2 (NKJV)"
     )
+  })
+})
+
+describe("toDualVerseRenderData", () => {
+  it("keeps two translations on the same scripture reference", () => {
+    const english = { ...sampleVerse, text: "In the beginning" }
+    const yoruba = { ...sampleVerse, text: "Ni atetekọṣe" }
+
+    const rendered = toDualVerseRenderData([
+      { verse: english, translation: "KJV" },
+      { verse: yoruba, translation: "OYCB" },
+    ])
+
+    expect(rendered.reference).toBe("Genesis 1:2")
+    expect(rendered.segments).toEqual([{ text: "In the beginning" }])
+    expect(rendered.translationLines).toEqual([
+      "In the beginning",
+      "Ni atetekọṣe",
+    ])
   })
 })

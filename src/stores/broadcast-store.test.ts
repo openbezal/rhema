@@ -158,6 +158,20 @@ describe("broadcast store sync", () => {
     )
   })
 
+  it("inherits primary verse styling when a secondary language style is edited", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+    useBroadcastStore.getState().startEditing(theme.id)
+
+    const primary = useBroadcastStore.getState().draftTheme!.verseText
+    useBroadcastStore
+      .getState()
+      .updateDraftNested("secondaryVerseText.color", "#00ff00")
+
+    const secondary = useBroadcastStore.getState().draftTheme!.secondaryVerseText
+    expect(secondary).toEqual({ ...primary, color: "#00ff00" })
+  })
+
   it("saving a customised builtin repoints the outputs that used it", async () => {
     const { useBroadcastStore } = await import("./broadcast-store")
     const builtin = useBroadcastStore.getState().themes[0]

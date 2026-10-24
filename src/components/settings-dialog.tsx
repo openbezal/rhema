@@ -46,7 +46,7 @@ import {
 } from "lucide-react"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { useAudioTest } from "@/hooks/use-audio-test"
-import { useSettingsStore } from "@/stores"
+import { useBibleStore, useSettingsStore } from "@/stores"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
@@ -512,6 +512,7 @@ interface TranslationInfo {
 function BibleSection() {
   const [translations, setTranslations] = useState<TranslationInfo[]>([])
   const [activeId, setActiveId] = useState<number>(1)
+  const secondaryId = useBibleStore((state) => state.secondaryTranslationId)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -547,6 +548,11 @@ function BibleSection() {
 
   const englishTranslations = translations.filter((t) => t.language === "en")
   const otherTranslations = translations.filter((t) => t.language !== "en")
+  const handleSecondaryChange = (value: string) => {
+    useBibleStore
+      .getState()
+      .setSecondaryTranslation(value === "__none__" ? null : parseInt(value))
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -592,6 +598,35 @@ function BibleSection() {
         <p className="text-[0.625rem] text-muted-foreground">
           Detected verses will display in this translation.
           {translations.length > 0 && ` ${translations.length} translations available.`}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Secondary Translation
+        </label>
+        <Select
+          value={secondaryId === null ? "__none__" : String(secondaryId)}
+          onValueChange={handleSecondaryChange}
+          disabled={loading}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={loading ? "Loading..." : "None"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None</SelectItem>
+            {translations
+              .filter((translation) => translation.id !== activeId)
+              .map((translation) => (
+                <SelectItem key={translation.id} value={String(translation.id)}>
+                  {translation.abbreviation} — {translation.title}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[0.625rem] text-muted-foreground">
+          When selected, the live output shows both translations for every
+          detected reference.
         </p>
       </div>
     </div>

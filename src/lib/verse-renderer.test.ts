@@ -5,7 +5,8 @@ import type { BroadcastTheme, VerseRenderData } from "@/types/broadcast"
 // parsed from the item font, lines wrap greedily at maxWidth. Enough for the
 // layout math under test (wrapping monotonicity, rect containment, auto-fit).
 vi.mock("@chenglou/pretext/rich-inline", () => {
-  const parsePx = (font: string) => Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 16)
+  const parsePx = (font: string) =>
+    Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 16)
   const itemWidth = (item: { text: string; font: string }) =>
     item.text.trim().length * parsePx(item.font) * 0.6
 
@@ -57,7 +58,11 @@ vi.mock("@chenglou/pretext/rich-inline", () => {
   }
 })
 
-import { computeVerseLayoutMetrics, renderVerse } from "./verse-renderer"
+import {
+  computeVerseLayoutMetrics,
+  measureVerseHeight,
+  renderVerse,
+} from "./verse-renderer"
 import { BUILTIN_THEMES } from "./builtin-themes"
 
 function stubCtx(): CanvasRenderingContext2D {
@@ -220,10 +225,62 @@ describe("computeVerseLayoutMetrics — stacked mode", () => {
   })
 
   it("returns no element rects without a verse", () => {
-    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[0], null)
+    const metrics = computeVerseLayoutMetrics(
+      stubCtx(),
+      BUILTIN_THEMES[0],
+      null
+    )
     expect(metrics.referenceRect).toBeNull()
     expect(metrics.verseRect).toBeNull()
     expect(metrics.fittedVerseFontSize).toBeUndefined()
+  })
+})
+
+describe("dual translation rendering", () => {
+  it("reserves a blank line between translation texts", () => {
+    const theme = BUILTIN_THEMES[0]
+    const single = measureVerseHeight(
+      stubCtx(),
+      theme,
+      { reference: "John 3:16", segments: [{ text: "For God so loved" }] },
+      1200
+    )
+    const dual = measureVerseHeight(
+      stubCtx(),
+      theme,
+      {
+        reference: "John 3:16",
+        segments: [{ text: "For God so loved" }],
+        translationLines: ["For God so loved", "Nitori Ọlọrun fẹ́ràn ayé"],
+      },
+      1200
+    )
+
+    expect(dual.height).toBe(single.height * 3)
+  })
+
+  it("uses the secondary language style for the second translation line", () => {
+    const theme = BUILTIN_THEMES[0]
+    const dualVerse: VerseRenderData = {
+      reference: "John 3:16",
+      segments: [{ text: "For God so loved" }],
+      translationLines: ["For God so loved", "Nitori Ọlọrun fẹ́ràn ayé"],
+    }
+    const sharedStyleHeight = measureVerseHeight(stubCtx(), theme, dualVerse, 1200).height
+    const styledHeight = measureVerseHeight(
+      stubCtx(),
+      {
+        ...theme,
+        secondaryVerseText: {
+          ...theme.verseText,
+          lineHeight: theme.verseText.lineHeight * 2,
+        },
+      },
+      dualVerse,
+      1200,
+    ).height
+
+    expect(styledHeight).toBeGreaterThan(sharedStyleHeight)
   })
 })
 
@@ -277,20 +334,31 @@ function overlayFreeTheme(): BroadcastTheme {
 }
 
 describe("computeVerseLayoutMetrics — text box backdrop", () => {
-
   it("equals the anchored text area in stacked mode", () => {
-    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[2], VERSE)
+    const metrics = computeVerseLayoutMetrics(
+      stubCtx(),
+      BUILTIN_THEMES[2],
+      VERSE
+    )
     expect(metrics.textBoxRect).toEqual(metrics.textAreaRect)
     expect(metrics.textBoxRect).toEqual(ANCHORED_BAND)
   })
 
   it("stays at the anchored text area in free mode", () => {
-    const metrics = computeVerseLayoutMetrics(stubCtx(), overlayFreeTheme(), VERSE)
+    const metrics = computeVerseLayoutMetrics(
+      stubCtx(),
+      overlayFreeTheme(),
+      VERSE
+    )
     expect(metrics.textBoxRect).toEqual(ANCHORED_BAND)
   })
 
   it("does not move when the free-mode boxes are dragged", () => {
-    const before = computeVerseLayoutMetrics(stubCtx(), overlayFreeTheme(), VERSE)
+    const before = computeVerseLayoutMetrics(
+      stubCtx(),
+      overlayFreeTheme(),
+      VERSE
+    )
     const theme = overlayFreeTheme()
     theme.layout.referenceBox = { x: 30, y: 40, width: 50, height: 10 }
     theme.layout.verseBox = { x: 35, y: 55, width: 60, height: 30 }
@@ -299,7 +367,11 @@ describe("computeVerseLayoutMetrics — text box backdrop", () => {
   })
 
   it("is present without a verse", () => {
-    const metrics = computeVerseLayoutMetrics(stubCtx(), overlayFreeTheme(), null)
+    const metrics = computeVerseLayoutMetrics(
+      stubCtx(),
+      overlayFreeTheme(),
+      null
+    )
     expect(metrics.textBoxRect).toEqual(ANCHORED_BAND)
   })
 
@@ -310,11 +382,10 @@ describe("computeVerseLayoutMetrics — text box backdrop", () => {
     const moveTos = calls.filter((c) => c.method === "moveTo")
     expect(
       moveTos.some(
-        (c) => c.args[0] === ANCHORED_BAND.x + 12 && c.args[1] === ANCHORED_BAND.y
+        (c) =>
+          c.args[0] === ANCHORED_BAND.x + 12 && c.args[1] === ANCHORED_BAND.y
       )
-    ).toBe(
-      true
-    )
+    ).toBe(true)
   })
 })
 
@@ -389,11 +460,10 @@ describe("surface fills", () => {
     const moveTos = calls.filter((c) => c.method === "moveTo")
     expect(
       moveTos.some(
-        (c) => c.args[0] === ANCHORED_BAND.x + 12 && c.args[1] === ANCHORED_BAND.y
+        (c) =>
+          c.args[0] === ANCHORED_BAND.x + 12 && c.args[1] === ANCHORED_BAND.y
       )
-    ).toBe(
-      true
-    )
+    ).toBe(true)
   })
 
   it("insets the text by the container's padding", () => {
@@ -426,7 +496,11 @@ describe("surface fills", () => {
   })
 
   it("leaves per-element surfaces off when the theme does not define them", () => {
-    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[2], VERSE)
+    const metrics = computeVerseLayoutMetrics(
+      stubCtx(),
+      BUILTIN_THEMES[2],
+      VERSE
+    )
     expect(metrics.referenceSurfaceRect).toBeNull()
     expect(metrics.verseSurfaceRect).toBeNull()
   })
@@ -468,14 +542,20 @@ describe("surface fills", () => {
     expect(metrics.scaledTheme.textBox.borderRadius).toBe(
       theme.textBox.borderRadius * 0.5
     )
-    expect(metrics.scaledTheme.textBox.padding).toBe(theme.textBox.padding * 0.5)
+    expect(metrics.scaledTheme.textBox.padding).toBe(
+      theme.textBox.padding * 0.5
+    )
     expect(metrics.scaledTheme.textBox.image!.blur).toBe(4)
   })
 })
 
 describe("computeVerseLayoutMetrics — background region", () => {
   it("covers the full canvas at 100% × 100%", () => {
-    const metrics = computeVerseLayoutMetrics(stubCtx(), BUILTIN_THEMES[0], VERSE)
+    const metrics = computeVerseLayoutMetrics(
+      stubCtx(),
+      BUILTIN_THEMES[0],
+      VERSE
+    )
     expect(metrics.backgroundRect).toEqual({
       x: 0,
       y: 0,
@@ -527,8 +607,8 @@ describe("computeVerseLayoutMetrics — background region", () => {
       method: "fillRect",
       args: [0, 756, 1920, 324],
     })
-    expect(
-      fills.some((c) => c.args[2] === 1920 && c.args[3] === 1080)
-    ).toBe(false)
+    expect(fills.some((c) => c.args[2] === 1920 && c.args[3] === 1080)).toBe(
+      false
+    )
   })
 })

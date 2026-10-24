@@ -4,7 +4,12 @@ import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
-import { presentVerse, toVerseRenderData } from "@/hooks/use-broadcast"
+import {
+  getTranslationLabel,
+  presentVerse,
+  toDualVerseRenderData,
+  toVerseRenderData,
+} from "@/hooks/use-broadcast"
 import { bibleActions } from "@/hooks/use-bible"
 
 export function LiveOutputPanel() {
@@ -14,6 +19,7 @@ export function LiveOutputPanel() {
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
+  const secondaryTranslationId = useBibleStore((s) => s.secondaryTranslationId)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
 
@@ -27,20 +33,56 @@ export function LiveOutputPanel() {
   useEffect(() => {
     const source = useBroadcastStore.getState().liveSourceVerse
     if (!source) return
-    bibleActions
-      .fetchVerse(source.book_number, source.chapter, source.verse)
-      .then((v) => {
-        if (!v) return
-        const bible = useBibleStore.getState()
-        const abbreviation =
-          bible.translations.find((t) => t.id === bible.activeTranslationId)
-            ?.abbreviation ?? "KJV"
+    const ids = [
+      activeTranslationId,
+      ...(secondaryTranslationId !== null &&
+      secondaryTranslationId !== activeTranslationId
+        ? [secondaryTranslationId]
+        : []),
+    ]
+    void Promise.all(
+      ids.map((id) =>
+        bibleActions.fetchVerse(
+          source.book_number,
+          source.chapter,
+          source.verse,
+          id
+        )
+      )
+    )
+      .then((verses) => {
+        const primary = verses[0]
+        if (!primary?.text?.trim()) return
+        const entries = verses
+          .map((verse, index) => {
+            if (!verse?.text?.trim()) return null
+            return {
+              verse,
+              translation: getTranslationLabel(
+                ids[index],
+                index === 0 ? "KJV" : "Translation"
+              ),
+            }
+          })
+          .filter(
+            (
+              entry
+            ): entry is {
+              verse: NonNullable<typeof primary>
+              translation: string
+            } => entry !== null
+          )
         useBroadcastStore
           .getState()
-          .setLiveVerse(toVerseRenderData(v, abbreviation), v)
+          .setLiveVerse(
+            entries.length > 1
+              ? toDualVerseRenderData(entries)
+              : toVerseRenderData(primary, entries[0]?.translation ?? "KJV"),
+            primary
+          )
       })
       .catch(() => {})
-  }, [activeTranslationId])
+  }, [activeTranslationId, secondaryTranslationId])
 
   const handleGoLive = (checked: boolean) => {
     useBroadcastStore.getState().setLive(checked)
@@ -67,7 +109,7 @@ export function LiveOutputPanel() {
         >
           <span
             className={cn(
-              "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
+              "text-[0.625rem] font-medium tracking-wider uppercase transition-colors",
               autoLive ? "text-foreground" : "text-muted-foreground"
             )}
           >
@@ -83,7 +125,7 @@ export function LiveOutputPanel() {
         <label className="ml-2 flex items-center gap-2">
           <span
             className={cn(
-              "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
+              "text-[0.625rem] font-medium tracking-wider uppercase transition-colors",
               isLive ? "text-emerald-400" : "text-muted-foreground"
             )}
           >

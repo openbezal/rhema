@@ -32,7 +32,9 @@ describe("bible store persistence", () => {
 
   describe("hydrateBibleStore", () => {
     it("loads from bible.json and sets stored translation in Zustand", async () => {
-      mockGet.mockResolvedValue(5)
+      mockGet.mockImplementation((key: string) =>
+        Promise.resolve(key === "activeTranslationId" ? 5 : null)
+      )
       const { hydrateBibleStore, useBibleStore } = await import("./bible-store")
 
       await hydrateBibleStore()
@@ -43,6 +45,19 @@ describe("bible store persistence", () => {
       })
       expect(mockGet).toHaveBeenCalledWith("activeTranslationId")
       expect(useBibleStore.getState().activeTranslationId).toBe(5)
+      expect(useBibleStore.getState().secondaryTranslationId).toBeNull()
+    })
+
+    it("restores a distinct secondary translation", async () => {
+      mockGet.mockImplementation((key: string) =>
+        Promise.resolve(key === "activeTranslationId" ? 5 : 8)
+      )
+      const { hydrateBibleStore, useBibleStore } = await import("./bible-store")
+
+      await hydrateBibleStore()
+
+      expect(useBibleStore.getState().activeTranslationId).toBe(5)
+      expect(useBibleStore.getState().secondaryTranslationId).toBe(8)
     })
 
     it("invokes set_active_translation with the hydrated value", async () => {
@@ -97,9 +112,8 @@ describe("bible store persistence", () => {
   describe("initBiblePersistence", () => {
     it("writes to bible.json when activeTranslationId changes", async () => {
       vi.useFakeTimers()
-      const { initBiblePersistence, useBibleStore } = await import(
-        "./bible-store"
-      )
+      const { initBiblePersistence, useBibleStore } =
+        await import("./bible-store")
 
       await initBiblePersistence()
       useBibleStore.getState().setActiveTranslation(3)
@@ -107,15 +121,15 @@ describe("bible store persistence", () => {
       await vi.advanceTimersByTimeAsync(500)
 
       expect(mockSet).toHaveBeenCalledWith("activeTranslationId", 3)
+      expect(mockSet).toHaveBeenCalledWith("secondaryTranslationId", null)
       expect(mockSave).toHaveBeenCalled()
       vi.useRealTimers()
     })
 
     it("debounces rapid changes and only persists the last value", async () => {
       vi.useFakeTimers()
-      const { initBiblePersistence, useBibleStore } = await import(
-        "./bible-store"
-      )
+      const { initBiblePersistence, useBibleStore } =
+        await import("./bible-store")
 
       await initBiblePersistence()
       useBibleStore.getState().setActiveTranslation(2)
@@ -125,8 +139,22 @@ describe("bible store persistence", () => {
       useBibleStore.getState().setActiveTranslation(4)
       await vi.advanceTimersByTimeAsync(500)
 
-      expect(mockSet).toHaveBeenCalledTimes(1)
+      expect(mockSet).toHaveBeenCalledTimes(2)
       expect(mockSet).toHaveBeenCalledWith("activeTranslationId", 4)
+      expect(mockSet).toHaveBeenCalledWith("secondaryTranslationId", null)
+      vi.useRealTimers()
+    })
+
+    it("persists the selected secondary translation", async () => {
+      vi.useFakeTimers()
+      const { initBiblePersistence, useBibleStore } =
+        await import("./bible-store")
+
+      await initBiblePersistence()
+      useBibleStore.getState().setSecondaryTranslation(8)
+      await vi.advanceTimersByTimeAsync(500)
+
+      expect(mockSet).toHaveBeenCalledWith("secondaryTranslationId", 8)
       vi.useRealTimers()
     })
 
