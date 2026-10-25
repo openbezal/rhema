@@ -21,6 +21,21 @@ const mockBooks: Book[] = [
   { id: 46, translation_id: 1, book_number: 46, name: "I Corinthians", abbreviation: "1Cor", testament: "NT" },
 ]
 
+// The Bible database stores these names with Arabic prefixes. Keep this
+// fixture separate from mockBooks, whose older tests use Roman prefixes.
+const arabicNumberedBooks: Book[] = [
+  "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles",
+  "1 Corinthians", "2 Corinthians", "1 Thessalonians", "2 Thessalonians",
+  "1 Timothy", "2 Timothy", "1 Peter", "2 Peter", "1 John", "2 John", "3 John",
+].map((name, index) => ({
+  id: index + 1,
+  translation_id: 1,
+  book_number: index + 1,
+  name,
+  abbreviation: name.replace(/\s/g, ""),
+  testament: index < 6 ? "OT" : "NT",
+}))
+
 describe("numberToRoman", () => {
   it("converts 1 to I", () => {
     expect(numberToRoman(1)).toBe("I")
@@ -62,6 +77,12 @@ describe("normalizeInput", () => {
     expect(normalizeInput("1")).toBe("I")
   })
 
+  it("accepts ordinal prefixes", () => {
+    expect(normalizeInput("1st Samuel")).toBe("I Samuel")
+    expect(normalizeInput("2nd Kings")).toBe("II Kings")
+    expect(normalizeInput("3rd John")).toBe("III John")
+  })
+
   it("trims whitespace", () => {
     expect(normalizeInput("  john  ")).toBe("john")
   })
@@ -96,6 +117,36 @@ describe("findMatchingBook", () => {
   it("handles case insensitive matching", () => {
     const result = findMatchingBook("JOHN", mockBooks)
     expect(result?.name).toBe("John")
+  })
+
+  it("matches Arabic and Roman numbered-book prefixes", () => {
+    expect(findMatchingBook("1 Samuel", arabicNumberedBooks)?.name).toBe("1 Samuel")
+    expect(findMatchingBook("I Samuel", arabicNumberedBooks)?.name).toBe("1 Samuel")
+    expect(findMatchingBook("1st Samuel", arabicNumberedBooks)?.name).toBe("1 Samuel")
+  })
+})
+
+describe("Arabic-numbered database books", () => {
+  it("supports every numbered book in autocomplete and reference parsing", () => {
+    for (const book of arabicNumberedBooks) {
+      const autocomplete = getAutocompleteSuggestion(`${book.name} 1:1`, arabicNumberedBooks)
+      expect(autocomplete.matchedBook?.name, book.name).toBe(book.name)
+
+      const reference = parseTypedReference(`${book.name} 1:1`, arabicNumberedBooks)
+      expect(reference?.book.name, book.name).toBe(book.name)
+    }
+  })
+
+  it("supports ordinal input such as 1st Samuel", () => {
+    const result = getAutocompleteSuggestion("1st Samuel 1:1", arabicNumberedBooks)
+    expect(result.matchedBook?.name).toBe("1 Samuel")
+    expect(parseTypedReference("1st Samuel 1:1", arabicNumberedBooks)?.book.name).toBe("1 Samuel")
+  })
+
+  it("suggests the database name when a numbered prefix is typed alone", () => {
+    const result = getAutocompleteSuggestion("1", arabicNumberedBooks)
+    expect(result.suggestion).toBe("1 Samuel 1:1")
+    expect(result.matchedBook?.name).toBe("1 Samuel")
   })
 })
 
@@ -185,6 +236,12 @@ describe("getAutocompleteSuggestion", () => {
     expect(result.matchedBook?.name).toBe("I John")
     expect(result.chapter).toBe(3)
     expect(result.stage).toBe("chapter")
+  })
+
+  it("advances through an Arabic-numbered database book", () => {
+    const result = getAutocompleteSuggestion("1 sam", arabicNumberedBooks)
+    expect(result.suggestion).toBe("1 Samuel 1:1")
+    expect(getTabNavigationResult("1 sam", result.suggestion)).toBe("1 Samuel ")
   })
 
   // Test 11: Abbreviation "rom" suggests "Romans 1:1"
