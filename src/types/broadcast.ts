@@ -6,6 +6,10 @@ export interface VerseSegment {
 export interface VerseRenderData {
   reference: string
   segments: VerseSegment[]
+  /** When this content was (re)presented. The output re-arms its idle fade
+   * timer only when this changes, so incidental re-emits (theme edits,
+   * output syncs) don't keep a stale verse alive. Absent = always re-arm. */
+  presentedAt?: number
 }
 
 export interface RenderOptions {

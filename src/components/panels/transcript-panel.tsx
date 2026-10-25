@@ -18,6 +18,7 @@ import { bibleActions } from "@/hooks/use-bible"
 import { presentVerse } from "@/hooks/use-broadcast"
 import { mark, observeLongTasks } from "@/lib/latency-marks"
 import { pickAutoPresentTarget } from "@/lib/auto-present-target"
+import { keepLiveVerseAlive } from "@/lib/verse-keepalive"
 import type { DetectionResult, ReadingAdvance } from "@/types"
 
 /**
@@ -88,6 +89,10 @@ export function TranscriptPanel() {
     )
     useDetectionStore.getState().addDetections(detections)
     mark(`addDetections done src=${detections[0]?.source ?? "?"}`)
+
+    // Candidates still related to the on-air verse keep it from
+    // idle-fading; unrelated speech lets the fade clock run out.
+    keepLiveVerseAlive(detections)
 
     // Auto-navigate book search + select verse for preview/live. Picks the
     // most confident direct hit and skips operator-dismissed references —

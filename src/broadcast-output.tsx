@@ -30,7 +30,13 @@ const OUTPUT_ID = new URLSearchParams(window.location.search).get("output") ?? "
 interface BroadcastPayload {
   theme: BroadcastTheme
   verse: VerseRenderData | null
+  idleFadeMs?: number
 }
+
+/** Fallback if a payload arrives without idleFadeMs (older event shape).
+ * Kept in sync with the Idle Fade Timeout default in settings-store.ts. */
+const DEFAULT_IDLE_FADE_MS = 30_000
+const FADE_DURATION_MS = 800
 
 function BroadcastCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -44,6 +50,15 @@ function BroadcastCanvas() {
   const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const lastPushRef = useRef(0)
   const pushingRef = useRef(false)
+  const alphaRef = useRef(1)
+  const targetAlphaRef = useRef(1)
+  const rafRef = useRef<number | null>(null)
+  const lastFrameTimeRef = useRef<number | null>(null)
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // presentedAt of the verse the fade timer was last armed for; undefined =
+  // nothing shown. Only a CHANGED stamp re-arms the timer, so incidental
+  // re-emits (theme edits, output syncs) can't keep a stale verse alive.
+  const lastPresentStampRef = useRef<number | null | undefined>(undefined)
   const pushNdiBurstRef = useRef<(() => void) | null>(null)
 
   const logDebug = useCallback((message: string, meta?: unknown) => {
@@ -64,6 +79,7 @@ function BroadcastCanvas() {
     const data = latestData.current
     if (!data) {
       // Black screen when no data
+      ctx.globalAlpha = 1
       ctx.fillStyle = "#000"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       return
@@ -72,16 +88,83 @@ function BroadcastCanvas() {
     const { theme, verse } = data
     canvas.width = theme.resolution.width
     canvas.height = theme.resolution.height
+
+    // Clear to black at full opacity first, then draw the scene at the
+    // current fade alpha, so fading blends toward black rather than
+    // ghosting over whatever the canvas previously held.
+    ctx.globalAlpha = 1
+    ctx.fillStyle = "#000"
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.globalAlpha = alphaRef.current
+
     const result = renderVerse(ctx, theme, verse, {
       scale: 1,
       imageCache: themeImageCache(),
     })
+    ctx.globalAlpha = 1
     if (!result) {
       ctx.fillStyle = "#000"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       logDebug("renderVerse returned null; drew fallback frame")
     }
   }, [logDebug])
+
+  // Animate alphaRef toward targetAlphaRef, redrawing each frame. Reads
+  // targetAlphaRef live on every tick, so retargeting mid-fade (e.g. a new
+  // verse arrives while fading out) smoothly reverses direction instead of
+  // finishing the stale animation first.
+  const animateFade = useCallback(() => {
+    if (rafRef.current !== null) return // loop already running
+    lastFrameTimeRef.current = null
+
+    const step = (now: number) => {
+      const last = lastFrameTimeRef.current ?? now
+      const dt = now - last
+      lastFrameTimeRef.current = now
+
+      const target = targetAlphaRef.current
+      const diff = target - alphaRef.current
+      if (Math.abs(diff) < 0.01) {
+        alphaRef.current = target
+        draw()
+        rafRef.current = null
+        lastFrameTimeRef.current = null
+        return
+      }
+
+      alphaRef.current += (dt / FADE_DURATION_MS) * diff
+      draw()
+      rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }, [draw])
+
+  const setFadeTarget = useCallback(
+    (target: number) => {
+      targetAlphaRef.current = target
+      animateFade()
+    },
+    [animateFade]
+  )
+
+  const clearIdleTimer = useCallback(() => {
+    if (idleTimerRef.current !== null) {
+      clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
+  }, [])
+
+  const armIdleTimer = useCallback(
+    (idleFadeMs: number) => {
+      clearIdleTimer()
+      idleTimerRef.current = setTimeout(() => {
+        idleTimerRef.current = null
+        logDebug("Idle timeout reached; fading display to black")
+        setFadeTarget(0)
+      }, idleFadeMs)
+    },
+    [clearIdleTimer, logDebug, setFadeTarget]
+  )
 
   // Redraw once a theme's images land. The burst matters: without it NDI
   // receivers keep the flat fallback frame until the 2s keepalive fires.
@@ -182,6 +265,23 @@ function BroadcastCanvas() {
         hasVerse: Boolean(event.payload.verse),
         themeId: event.payload.theme.id,
       })
+      if (event.payload.verse) {
+        // A fresh present (new verse, re-detected same verse, or keepalive)
+        // carries a new presentedAt stamp — only then fade in and re-arm.
+        // An unchanged stamp is an incidental re-emit (theme edit, output
+        // sync): redraw, but leave the fade timer running. A missing stamp
+        // (older payload shape) always re-arms, matching prior behavior.
+        const stamp = event.payload.verse.presentedAt ?? null
+        if (stamp === null || stamp !== lastPresentStampRef.current) {
+          lastPresentStampRef.current = stamp
+          setFadeTarget(1)
+          armIdleTimer(event.payload.idleFadeMs ?? DEFAULT_IDLE_FADE_MS)
+        }
+      } else {
+        lastPresentStampRef.current = undefined
+        clearIdleTimer()
+        setFadeTarget(0)
+      }
       draw()
       pushNdiBurst()
     })
@@ -228,8 +328,19 @@ function BroadcastCanvas() {
       unsubscribeFonts()
       unlisten.then((fn) => fn())
       unlistenNdiConfig.then((fn) => fn())
+      clearIdleTimer()
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
-  }, [draw, logDebug, preloadThemeAssets, pushNdiFrame, pushNdiBurst])
+  }, [
+    draw,
+    logDebug,
+    preloadThemeAssets,
+    pushNdiFrame,
+    pushNdiBurst,
+    setFadeTarget,
+    armIdleTimer,
+    clearIdleTimer,
+  ])
 
   // Slow keepalive: push one frame every 2s if idle (prevents NDI receivers from dropping the source)
   useEffect(() => {

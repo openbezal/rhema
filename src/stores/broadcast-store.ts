@@ -11,6 +11,7 @@ import type {
 import { MAIN_OUTPUT_ID, defaultNdiSettings, outputWindowLabel } from "@/types"
 import { BUILTIN_THEMES, LOWER_THIRDS, CLASSIC_DARK } from "@/lib/builtin-themes"
 import { normalizeTheme } from "@/lib/theme-migrations"
+import { useSettingsStore } from "./settings-store"
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -110,11 +111,13 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
 function emitDraftToBroadcast(state: BroadcastState): void {
   if (!state.draftTheme) return
   const verse = state.isLive ? state.liveVerse : null
+  const idleFadeMs = useSettingsStore.getState().idleFadeMs
   for (const output of state.outputs) {
     if (output.themeId !== state.editingThemeId) continue
     void emitTo(outputWindowLabel(output.id), "broadcast:verse-update", {
       theme: state.draftTheme,
       verse,
+      idleFadeMs,
     }).catch(() => {})
   }
 }
@@ -248,6 +251,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     void emitTo(outputWindowLabel(outputId), "broadcast:verse-update", {
       theme,
       verse: s.isLive ? s.liveVerse : null,
+      idleFadeMs: useSettingsStore.getState().idleFadeMs,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {

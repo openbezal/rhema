@@ -12,6 +12,7 @@ interface SettingsState {
   autoMode: boolean
   confidenceThreshold: number
   cooldownMs: number
+  idleFadeMs: number
   onboardingComplete: boolean
   sttProvider: SttProvider
 
@@ -23,6 +24,7 @@ interface SettingsState {
   setAutoMode: (auto: boolean) => void
   setConfidenceThreshold: (threshold: number) => void
   setCooldownMs: (ms: number) => void
+  setIdleFadeMs: (ms: number) => void
   setOnboardingComplete: (complete: boolean) => void
   setSttProvider: (provider: SttProvider) => void
 }
@@ -36,6 +38,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   autoMode: false,
   confidenceThreshold: 0.8,
   cooldownMs: 2500,
+  idleFadeMs: 30_000,
   onboardingComplete: false,
   sttProvider: "deepgram",
 
@@ -47,6 +50,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setAutoMode: (autoMode) => set({ autoMode }),
   setConfidenceThreshold: (confidenceThreshold) => set({ confidenceThreshold }),
   setCooldownMs: (cooldownMs) => set({ cooldownMs }),
+  setIdleFadeMs: (idleFadeMs) => set({ idleFadeMs }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
   setSttProvider: (sttProvider) => set({ sttProvider }),
 }))
@@ -60,6 +64,7 @@ const PERSISTED_KEYS = [
   "autoMode",
   "confidenceThreshold",
   "cooldownMs",
+  "idleFadeMs",
   "onboardingComplete",
   "sttProvider",
 ] as const satisfies readonly (keyof SettingsState)[]
