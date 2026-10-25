@@ -126,8 +126,22 @@ export function BroadcastOutputsDialog({
     }
   }
 
-  const handleToggle = (output: BroadcastOutput, enabled: boolean) =>
+  const handleToggle = (output: BroadcastOutput, enabled: boolean) => {
+    // Turning off an output while live kills what the congregation sees —
+    // make the operator confirm instead of doing it on one click.
+    if (!enabled && useBroadcastStore.getState().isLive) {
+      toast.warning("This is your live broadcast display", {
+        description:
+          "Closing it will stop what the congregation sees right now.",
+        action: {
+          label: "Close anyway",
+          onClick: () => void withBusy(output.id, () => disableOutput(output)),
+        },
+      })
+      return
+    }
     void withBusy(output.id, () => (enabled ? enableOutput(output) : disableOutput(output)))
+  }
 
   const handleRemove = (output: BroadcastOutput) =>
     void withBusy(output.id, async () => {
